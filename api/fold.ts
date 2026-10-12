@@ -39,10 +39,10 @@
 // refresh can only add or lawfully-remove keys, never blink one. A push-based
 // per-member claim stream is a wire optimization, tracked in IDEAS.
 
-import { isTooLarge, sizeOf } from './methods.ts'
+import { isTooLarge, tooLarge } from './methods.ts'
 import { proxy, snapshot, applyStreamRec, type Fault } from './substrate.ts'
-import { copyOf } from '../kernel/codec.ts'
-import { RESULT } from './data.ts'
+import { copyOf, sizeOf, Unsendable } from '../kernel/codec.ts'
+import { atCap } from './data.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import type { ScopedError } from './types.ts'
 
@@ -163,7 +163,7 @@ export class Gather {
       } satisfies ScopedError
     //! superseded mid-flight by a newer refresh — answer a COPY, never the live union root
     // (M6-review finding 8: the one-shot paths hand this value to user code)
-    if (gen !== this.#gen) return answer(snapshot(this.proxy))
+    if (gen !== this.#gen) return answer(snapshot(this.proxy), node)
     //! per-generation attestations: uuid → the partitions that member attests (null = ALL). Built
     // from the answers of THIS generation only — attestation never survives a refresh (findings 0/28/53)
     const att = new Map<string, Set<string> | null>()
@@ -287,7 +287,7 @@ export class Gather {
     // path copies into frame bytes anyway; local must match (V4-52: the very value a client's read
     // decodes — see answer). (The live SUB path hands out `proxy` itself — a read-only projection by
     // contract — and stays as-is.)
-    return answer(snapshot(this.proxy))
+    return answer(snapshot(this.proxy), this.#rt.node)
   }
 
   //! #unvivify — take back the levels a deleted field cell alone had made up (see the projection above).
@@ -336,8 +336,11 @@ export class Gather {
 //! answer — the gather's one-shot answer as a client's whole read decodes it (V4-52): copyOf with RESULT's limits,
 // a fresh copy like structuredClone was, but the codec's (structuredClone kept a Date a client gets as {}, and threw
 // on a Proxy the wire carries as a plain object), and refused when a reply could not carry it
-const answer = (v: unknown): unknown => {
-  try { return copyOf(v, RESULT) } catch (e) { throw new Error(`the result could not be sent: ${(e as Error).message}`) }
+const answer = (v: unknown, node: Runtime['node']): unknown => {
+  try { return copyOf(v, atCap(node.tune.frame).result) } catch (e) {
+    if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, 'the whole resource')
+    throw new Error(`the result could not be sent: ${(e as Error).message}`)
+  }
 }
 
 //! applyCell — project one folded cell into the result proxy through the ONE substrate seam.

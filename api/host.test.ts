@@ -189,3 +189,44 @@ test('V4-51 — endLive ends every live sub streaming one proxy with a typed rea
     assert.equal(h.host.served, 1, 'the other sub streams on')
   } finally { await h.done() }
 })
+
+//! V4-51 + V4-52, together: a server's own read is what a client's read decodes (V4-52), so it is refused where a client's
+// is (V4-51) — in the same words. A read too big for one frame is the same typed 'too-large'; a result the codec cannot
+// carry is 'the result could not be sent: <why>' on both (the remote reply used to say 'FrameError: unencodable value
+// type: bigint'). And every limit follows the node's frame cap: a write that could not go alone in one frame of it is
+// refused before the stamp, typed, instead of being stamped and then thrown out of the encoder.
+test('V4-51/52 — a server\'s own read too big for one frame is refused as a client\'s is: the same typed too-large; a keyed read still answers', async () => {
+  const h = tooLargeHost({ read })
+  try {
+    await assert.rejects(h.host.invokeLocal('read', undefined), (e: { scoped?: boolean; reason?: string; op?: string; hint?: string }) =>
+      e.scoped === true && e.reason === 'too-large' && e.op === 'read' && /^the answer is bigger than one frame \(8 KiB\)/.test(e.hint ?? ''))
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'read' }) })
+    await h.settle()
+    const [r] = h.results()
+    assert.deepEqual([r.ok, r.v.reason, r.v.op], [0, 'too-large', 'read'], 'the remote read is refused the same way')
+    assert.deepEqual(await h.host.invokeLocal('read', 'r1'), { b: new Uint8Array(1024).fill(1) })
+  } finally { await h.done() }
+})
+
+test('V4-52 — a result fero cannot send is refused in the same words on a server\'s own call and on a client\'s', async () => {
+  const h = tooLargeHost({ odd: () => ({ toys: ['ball', { n: 10n }] }) }, 0)
+  try {
+    await assert.rejects(h.host.invokeLocal('odd', undefined), /^Error: methods\.odd: the result could not be sent: a bigint at toys\[1\]\.n$/)
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'odd' }) })
+    await h.settle()
+    const [r] = h.results()
+    assert.deepEqual([r.ok, r.v], [0, 'the result could not be sent: a bigint at toys[1].n'])
+  } finally { await h.done() }
+})
+
+test('V4-51/52 — at a node\'s frame cap, a write that could not go alone in one frame is refused before the stamp, typed', async () => {
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0, tune: { frame: 4096 } })
+  const bind = new Bind(rt)
+  try {
+    assert.throws(() => { bind.data.big = { b: new Uint8Array(5000) } }, (e: Error) => e instanceof TypeError && e.message.startsWith('fero: ["big"] cannot be sent: bigger than 3.8 KiB'))
+    assert.deepEqual(bind.issue([{ type: 0, key: ['big'], value: new Uint8Array(5000) }]), ['unencodable'])
+    assert.equal(rt.node.seq, 0, 'nothing was stamped')
+    bind.data.small = { b: new Uint8Array(1000) }
+    assert.equal(rt.node.seq, 1, 'a write that fits is taken')
+  } finally { bind.destroy(); await rt.destroy() }
+})
