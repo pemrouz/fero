@@ -1804,7 +1804,10 @@ fixed in the diff: a HELLO that names holds is an announcement). And two build n
    and `genesisProposerDies` forms at 2. Supersession needs a BALLOT, and the fifth review found the
    shape where no membership change opens one — the kept ballot's proposer dead, a member of nobody's
    view — so the lowest live member opens it (the opener, §10.10.4, `keptBallotProposerGone`): the
-   same members at the next epoch, joint, when and only when it can commit. Where a majority of the
+   same members at the next epoch, joint, when and only when it can commit — on a hold a linked
+   member named, or on its OWN (the eighth round, `ownHoldProposerGone`: the lowest live member can be
+   the only held one, on a vote it gave over the old view between its own ballot and its own commit,
+   to a proposer now dead and out of the view). Where a majority of the
    held view is NOT reachable the rule
    freezes, and that is the CP answer in three shapes: the far side of a cut (`evictTwo`), where the
    held view may be live on the other side; the proposer and one granter of a two-evictee ballot
@@ -2178,26 +2181,56 @@ new); `open` and `committed` by bb's `{bb,cc,dd}`@4 — `P(2,3) P(4,3)` — on c
 without the opener the end is `bb@2 r:minority cc@2 r:held dd@2 r:held`, without the ask to the
 proposer `evicted` shows the three held after the asks land and heals by the opener instead. No
 other pin of the harness moved: the opener never fires where a hold's view majority is unreachable,
-where the held member is itself the lowest (its gate is `held`, and its eviction ballot is the joint
-one), or where the hold's proposer is a member (then it is a suspect, and the eviction is the
-ballot; or it is linked to the held member, and the ask reaches it).
-The trigger reads the holds my linked MEMBERS named (`#heldPeers`), never my own, while the ballot it
-opens is joint over both (`#jointViews`) — and my own holds need no trigger (the seventh review,
-2026-10-12). A hold of mine is a vote for ANOTHER proposer's ballot. That proposer is a member of my
-view, and linked: then my ask goes on its link (`#askTargets`) and it answers with a VIEW or a disown
-in one round trip. Or a member of my view, and lost: then it is my suspect in `suspectTicks` ticks and
-its eviction, joint over my holds, is the ballot the opener would have opened — the opener waits for
-it, as above. Or no member of my view: then form (β) (its view at or above mine when I voted) and the
-rule that every proposer is a member of its own view (the lowest live member proposes; a leaver its
-own exit) make its view one ABOVE mine that I never installed, and the chain from my view up to it
-starts with a ballot over my view by one of my own members, who committed and installed it before
-anyone above could propose — linked, it is above me and answers my ask with its VIEW, which I install
-and re-read the hold against; lost, it is a suspect again. At epoch 0 the formation ballot is the joint
-one (`genesisProposerDies`), and the opener never fires there (a member of an empty view is nobody).
-So the shape the trigger would miss — I am the lowest live member, the only one held, every member
-of my view linked and my vote's proposer gone — cannot be built, and folding my own holds into the
-trigger would add a guard no pin can turn red. The asymmetry is kept on purpose: the holds I was told
-of OPEN my ballot, my own holds WIDEN it.
+or where the hold's proposer is a member (then it is a suspect, and the eviction is the ballot; or it
+is linked to the held member, and the ask reaches it). The fifth review's build named a third case
+where it never fires — "where the held member is itself the lowest (its gate is `held`, and its
+eviction ballot is the joint one)" — and that was wrong where there is no eviction, the next
+paragraph.
+**The trigger reads my own holds too** (the eighth round, 2026-10-12). The opener as the fifth review
+built it fired on the holds my linked MEMBERS named (`#heldPeers`) and never on a hold of my own,
+while the ballot it opened was joint over both (`#jointViews`); `tick` reached it only when a member's
+word named a hold. The seventh review asked whether my own holds need a trigger, and the page first
+answered no: a hold of mine is a vote for ANOTHER proposer's ballot, and that proposer is a linked
+member (my ask reaches it), a lost member (its eviction is the ballot), or no member of my view — in
+which case, the argument went, form (β) and the rule that every proposer is a member of its own view
+put its view ABOVE mine, so one of my own members installed it and tells me on my ask. The sixth
+re-check had already BUILT the shape that argument says cannot exist, and the eighth round rebuilt it
+on the tree. The proposer of a view can hold a vote it gave ABOVE that view, over the view BEFORE it,
+between its own PROPOSE and its own commit. At n=5: aa, cut from dd and ee, proposes `{aa,bb,cc}`@2;
+bb, cut from aa, proposes `{bb,cc,dd,ee}`@2 and cc grants (two of five: nothing commits), dd's and
+ee's VOTEs still in flight; aa's ballot at 2 is refused at cc (`ve` 2) and aa escalates to
+`{aa,bb,cc}`@3 over view 1; the aa-bb link heals inside one of bb's heartbeats (aa's ballot holds bb,
+so the returning suspect does not abandon it), and bb — its own ballot at 2 open, its vote at 2 its
+own — GRANTS aa's 3 from view 1: two apart, held, the vote at 2 behind the grant in `prior`; aa dies;
+dd's VOTE lands and bb commits its own `{bb,cc,dd,ee}`@2, prunes its vote at 2 and keeps aa's at 3.
+Now bb is view 2's lowest live member and the only held one (`{aa,bb,cc}` is three apart from view
+2); aa is dead and no member, so nobody's suspect; cc, dd and ee hold nothing, so no ask ever names a
+hold at bb; and the third case's chain is empty — aa's view 3 was never installed by anyone, and
+aa's ballot was over view 1, not over bb's view 2. On the tree before the eighth round:
+`bb@2 r:held cc@2 W dd@2 W ee@2 W` for sixty rounds, bb `P(2,4)` and nothing more, no release row,
+with the held view's majority (bb itself and cc) linked — line 6's liveness claim denied again, and
+this time the base kernel is writable there. The fix is two lines of the same rule. In
+`#openOverHolds` my own holds whose proposer is no member of my view AND unlinked set the trigger
+(every own hold's epoch counts toward the ballot's floor, whoever its proposer is: a ballot at one of
+them would re-spend a vote I gave away there), and `tick` reaches the opener when `held()` as well as
+when a member's word names a hold. A LINKED proposer, member or not, gets no opener: my ask goes on
+its link (`#askTargets`) and its VIEW or disown is the release in one round trip — the opener never
+fires where a word can. `ownHoldProposerGone` pins both: `dead` — after the flood bb `held` and the
+rest writable, then `P(2,4) P(4,4)` joint over `{aa,bb,cc}`, cc, dd and ee consent, everyone writable
+at 4; `linked` — bb ticks held with aa linked and opens nothing (`P(2,4)`; without the narrowing the
+mid reads `P(2,4) P(4,4)`), aa, evicted by the flood with the ballot dropped, disowns on bb's ask
+(cc's VIEW 2 reaches aa before bb's own: `bb>aa` is a long FIFO of refusals, the grant, the ask and
+the VIEW), bb is writable at 2 inside the flood, and the ordinary rejoin brings aa back at 4
+(`P(4,5)`, past the disowned vote at 3). The kernel pin drives bb alone through the three answers: aa
+linked, nothing (the ask reaches it); dd lost, nothing (its eviction is the ballot); aa gone and every
+member linked, `P(4,4)` over view 2 joint over `{aa,bb,cc}`, committed on cc's, dd's and ee's grants,
+the hold gone with the install. Each of the three lines (the trigger, the narrowing, the tick) turns
+exactly these two pins red when removed. Safety is unchanged, as for every opener: it grants nothing
+and counts nothing new. The cost is nothing new either: `held()` is the fast path in the common case,
+and `#ask` has just warmed its memo at the top of `tick`. The asymmetry the seventh review's note
+praised is gone: the holds I was told of and my own both OPEN my ballot and both WIDEN it; what stays
+is that a hold whose proposer can hear my ask — mine on a ballot of my own, or any hold whose
+proposer is linked — opens nothing.
 
 Where supersession cannot fire, it must not, and that has THREE shapes, not one. The far side of a
 cut: `evictTwo`'s n03 (held) opens `{n03,n04,n05}`@3 joint over `{n01,n02,n03}` and needs n01 or n02,
@@ -2695,8 +2728,35 @@ and the 18-clause data contract), the ask to a non-member proposer (`#askTargets
 every member linked), the `holds()` memo, the empty-hold check and the `hm` identity guard. The built note above now
 says its counts are the build's at the time and the tree's are in the review notes; the ledger the integrator gets is
 written from the tree. The nit: the opener's trigger reads only linked members' holds, never the lowest live member's
-own, while its joint set reads both — §10.10.4 now says why that is complete (the proposer of my own hold is a linked
-member, a lost member or a member of a view above mine, and each of those already has its path), and why the fold
-was NOT made: the shape it would catch cannot be built, so the guard would have no pin. No kernel line moved; the
-comment on `#openOverHolds` carries the same three lines. The targeted suites, the four gate-path perf files and one
-full battery were run on the final tree; their numbers are in the lane's report, not here.
+own, while its joint set reads both — the review argued the shape that would miss cannot be built (the proposer of my
+own hold is a linked member, a lost member or a member of a view above mine, each with its own path), and for three
+commits the page said so and kept the fold out as a guard no pin could turn red. That was WRONG. The sixth re-check,
+over the same tree, had built exactly that shape with a probe and called it a major; the eighth round below rebuilt
+the probe on the tree, where it stands, and fixed it. The three-case argument missed the proposer of a view holding a
+vote it gave ABOVE that view, over the view BEFORE it, between its own PROPOSE and its own commit (§10.10.4, "the
+trigger reads my own holds too"). The seventh review moved no kernel line; the eighth moved two. The targeted suites,
+the four gate-path perf files and one full battery were run on the seventh's tree; its numbers are in the lane's
+report, not here.
+
+**2026-10-12, the eighth round (the sixth re-check's major and minor and the seventh review's minor, settled on the
+tree): one major fixed in the kernel with two pins, two older guards re-pinned, the record corrected, the decision
+renumbered V4-55; four commits on top.** The sixth re-check (the skeptic's second pass over ca98049) ended fix-first
+with one major and one minor; the seventh review of the same tree said ship, and its nit dismissed as unconstructible
+the very shape the sixth had built. The probe wins: rebuilt on the tree, step for step as the sixth wrote it, it read
+`bb@2 r:held cc@2 W dd@2 W ee@2 W` after sixty rounds with bb `P(2,4)` alone, no release row, no split. The fix, its
+kernel pin and its harness shape are in §10.10.4 ("the trigger reads my own holds too"; `ownHoldProposerGone`,
+`sim/leave-harness.test.ts` 20 → 21; `kernel/membership.test.ts` 50 → 51); each of the fix's three lines turns exactly
+those two pins red when removed (the trigger: `dead` frozen at `held`; the "unlinked" narrowing: `linked` reads
+`P(2,4) P(4,4)` at the held tick; the `tick` guard: `dead` frozen). The minor: the sixth review's every-member guard
+had masked the pins of two older guards in `#openOverHolds` — the held view's majority linked, and never for a hold
+whose proposer is me — so deleting either left the two suites green (72 of 72, re-run here); each has a negative with
+EVERY member linked now (`kernel/membership.test.ts` 51 → 52): cc's ask naming `{aa,cc,ee}`@3 at view `{bb,cc,dd}`
+with aa and ee unlinked opens nothing over three ticks (the mutant reads `P(4,3)`, a ballot that can never commit,
+re-opened at every age-out), and a hold on my own dropped ballot with all five linked draws one NACK and nothing (the
+mutant reads `P(3,5)` beside the NACK). The seventh review's minor was the record: the ledger text must describe the
+whole tree; it is in the lane's report, written from the tree. The number: V4-51 and V4-52 landed from another session
+while this branch was under review, and V4-53 and V4-54 are this wave's other two lanes, so the release rule is V4-55 —
+renamed here, in the README and in the harness. Counts from `git rev-list`: nine commits for the build, five for the
+fifth review, three for the sixth, three for the seventh, four for the eighth — twenty-four on v4 at 35d7300. The tree
+now: `kernel/membership.test.ts` 38 → 52, `sim/leave-harness.test.ts` 17 → 21, `kernel/door.test.ts` 34 → 35 —
+954 + 19 = 973 tests on the branch's base. The battery and the perf numbers are in the lane's report.
