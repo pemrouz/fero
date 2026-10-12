@@ -66,14 +66,18 @@ const STAGE = 1 << 20
 // wal.log, holding the holder's pid, host, boot id and process start time as JSON, put there in ONE step (written whole
 // to a side file and hard-linked onto the name: link fails EEXIST atomically, so no reader ever meets an empty lock)
 // before the boot record is read and the WAL opens, and removed at destroy() and at process exit.
-// Who holds it, from the record: the same running kernel (the boot id; without one, the host name) with the pid alive
-// and started when the record says — a pid the kernel has since given to another program, a container's pid 1 after a
-// restart, this process's own pid from a life before this one — is a LIVE holder, and the open is refused with a typed
-// error, code 'dir-held', naming the pid and host. A dead pid, a reused one, or a boot id of this host's that is not the
-// running one (the box rebooted) is a stale lock: taken over. Another machine (another boot id under another host name,
-// or another host name where no boot id can be read) cannot be checked and counts as live: the message says to remove
-// the file by hand once that machine is gone (a shared network dir is not the deployment rule). Pids are per namespace,
-// so two containers on one kernel sharing a volume cannot check each other: not a shape the lock protects, as before.
+// Who holds it, from the record: the same running kernel (the boot id; without one, the host name) and the same pid
+// namespace, with the pid alive and started when the record says, is a LIVE holder, and the open is refused with a typed
+// error, code 'dir-held', naming the pid and host. A dead pid, a pid the kernel has since given to another program, this
+// process's own pid from a life before this one, or a boot id of this host's that is not the running one (the box
+// rebooted) is a stale lock: taken over. A holder in ANOTHER pid namespace on this kernel (a container: pid 1 is every
+// container's first process, and a container sees no pid of the host's) cannot be checked by its pid, so it is judged by
+// its LEASE: a holder touches its lock's mtime every TOUCH ms, and a record untouched for LEASE ms is stale. The look
+// waits for the next touch, up to the rest of the lease: a container that restarts on its volume waits at most one lease
+// before it takes its own stale lock over, and two containers started on one volume, or a container and a process on the
+// host, are told apart within one touch. Another machine (another boot id under another host name, or another host name
+// where no boot id can be read) cannot be checked at all and counts as live: the message says to remove the file by hand
+// once that machine is gone (a shared network dir is not the deployment rule).
 // A takeover is serialised through a second file of the same kind, `lock.take`: two heirs starting at once after a
 // crash cannot both remove the stale lock and both hold the dir, and a process that opens the dir fresh while a
 // takeover runs wins or loses by the one atomic link of `lock` itself.
@@ -82,23 +86,29 @@ const HOST = os.hostname()
 const read = (p: string): string | null => { try { return fs.readFileSync(p, 'utf8') } catch { return null } }
 //! BOOT — this kernel's boot id (Linux; null elsewhere). The same id is the same running kernel, so a pid on the record
 // can be checked here; a different id under this host name is a reboot; a different id under another name is another
-// machine. startOf — when a pid started, in clock ticks since boot (/proc/<pid>/stat field 22, counted from the last ')'
-// because the command name may hold spaces and parentheses); null where /proc has no such file.
+// machine. NS — this process's pid namespace (the nsfs inode; null where /proc has none): a pid means the same thing
+// only inside one. startOf — when a pid started, in clock ticks since boot (/proc/<pid>/stat field 22, counted from the
+// last ')' because the command name may hold spaces and parentheses); null where /proc has no such file.
 const BOOT = read('/proc/sys/kernel/random/boot_id')?.trim() || null
+const NS = (() => { try { return fs.readlinkSync('/proc/self/ns/pid') } catch { return null } })()
 const startOf = (pid: number): number | null => {
   const s = read(`/proc/${pid}/stat`)
   if (s === null) return null
   const n = Number(s.slice(s.lastIndexOf(')') + 2).split(' ')[19])
   return Number.isFinite(n) ? n : null
 }
-interface Holder { pid: number; host: string; boot: string | null; start: number | null }
+//! TOUCH / LEASE — the holder touches its lock every TOUCH ms; a holder another namespace cannot check by pid is stale
+// once its lock went LEASE ms untouched (eight touches: a holder stalled that long has missed its cluster's heartbeats
+// too). A disk that keeps whole seconds (drvfs) is inside that slack.
+const TOUCH = 500, LEASE = 4000
+interface Holder { pid: number; host: string; boot: string | null; ns: string | null; start: number | null }
 export interface DirHeld extends Error { code: 'dir-held'; pid: number; host: string }
 const alivePid = (pid: number): boolean => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
 const holderOf = (p: string): Holder | null => {
   try {
-    const v = JSON.parse(fs.readFileSync(p, 'utf8')) as { pid?: unknown; host?: unknown; boot?: unknown; start?: unknown }
+    const v = JSON.parse(fs.readFileSync(p, 'utf8')) as { pid?: unknown; host?: unknown; boot?: unknown; ns?: unknown; start?: unknown }
     return typeof v?.pid === 'number' && typeof v?.host === 'string'
-      ? { pid: v.pid, host: v.host, boot: typeof v.boot === 'string' ? v.boot : null, start: typeof v.start === 'number' ? v.start : null }
+      ? { pid: v.pid, host: v.host, boot: typeof v.boot === 'string' ? v.boot : null, ns: typeof v.ns === 'string' ? v.ns : null, start: typeof v.start === 'number' ? v.start : null }
       : null
   } catch { return null }
 }
@@ -125,17 +135,36 @@ let exitHooked = false
 // dir it was opened under (a symlink, another letter case on a case-blind disk: one process held one dir twice and the
 // second release deleted the lock the first ran on); a life before this one (a container restarts its node as pid 1
 // again, on the same volume) started at another time and is stale. Without a start time (no /proc) the path decides.
-const ME: Holder = { pid: process.pid, host: HOST, boot: BOOT, start: startOf(process.pid) }
+const ME: Holder = { pid: process.pid, host: HOST, boot: BOOT, ns: NS, start: startOf(process.pid) }
 //! liveHolder — may the process the record names still be running? 'mine' = this process holds it; 'alive' = another
-// process on this kernel; 'elsewhere' = another machine (never checked); null = stale.
-const liveHolder = (p: string, h: Holder | null): 'mine' | 'alive' | 'elsewhere' | null => {
+// process in this pid namespace; 'ns' = a process in another pid namespace on this kernel, live by its lease (leaseOf
+// waited for the touch); 'elsewhere' = another machine (never checked); null = stale.
+type Why = 'mine' | 'alive' | 'ns' | 'elsewhere'
+const liveHolder = (p: string, h: Holder | null): Why | null => {
   if (h === null) return null
   const sameKernel = h.boot !== null && BOOT !== null ? h.boot === BOOT : h.host === HOST
   if (!sameKernel) return h.host === HOST ? null : 'elsewhere' // this host rebooted: nothing survives one; another machine
+  if (h.ns !== ME.ns) return leaseOf(p) // another pid namespace (or a record that names none): its pid means nothing here
   if (h.pid === ME.pid) return h.start !== null && ME.start !== null ? (h.start === ME.start ? 'mine' : null) : locks.has(p) ? 'mine' : null
   if (!alivePid(h.pid)) return null
   const s = startOf(h.pid)
   return h.start === null || s === null || s === h.start ? 'alive' : null
+}
+//! leaseOf — a holder whose pid cannot be checked: live while it touches its lock. The look waits for the next touch, up
+// to the rest of the lease (a stale record is known at once; a touched one within TOUCH; a restart in a container waits
+// at most LEASE). One kernel is one clock, and the holder sets the time itself (utimes), so a disk whose own clock is
+// elsewhere (9p) makes no difference. An mtime in the future (the clock stepped back) is bounded to one lease from now.
+const leaseOf = (file: string): 'ns' | null => {
+  let m0: number
+  try { m0 = fs.statSync(file).mtimeMs } catch { return null }
+  const until = Math.min(m0, Date.now()) + LEASE
+  for (;;) {
+    if (Date.now() > until) return null
+    Atomics.wait(napCell, 0, 0, 50)
+    let m: number
+    try { m = fs.statSync(file).mtimeMs } catch { return null }
+    if (m !== m0) return 'ns'
+  }
 }
 //! claim — put my record at `p` in one step: written whole to a side file, then hard-linked onto the name (link fails
 // EEXIST when the name exists, atomically). False when the name exists (held, or stale), anything else throws. A
@@ -154,11 +183,13 @@ const claim = (p: string, mine: string): boolean => {
     return true
   } finally { try { fs.unlinkSync(side) } catch { /* linked, or never made */ } }
 }
-const heldError = (who: string, dir: string, h: Holder, why: 'mine' | 'alive' | 'elsewhere'): DirHeld =>
+const heldError = (who: string, dir: string, h: Holder, why: Why): DirHeld =>
   Object.assign(new Error(why === 'mine'
     ? `${who}: dir ${dir} is held by this process already (pid ${h.pid} on ${h.host}); one dir is one node: stop the fero that holds it first, or give this one a dir of its own`
-    : `${who}: dir ${dir} is held by another process — pid ${h.pid} on ${h.host}; one dir is one node: stop that process first, or give this one a dir of its own${why === 'elsewhere' ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)` : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
-const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, start: null }
+    : `${who}: dir ${dir} is held by another process — pid ${h.pid} on ${h.host}; one dir is one node: stop that process first, or give this one a dir of its own${
+      why === 'elsewhere' ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)`
+      : why === 'ns' ? ' (a container on this kernel: it still touches its lock)' : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
+const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, ns: NS, start: null }
 //! lockDir — take the dir for this process (made if missing); returns the release, which is also run at process exit.
 // `who` prefixes the refusal (the composer's fero('name')).
 export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
@@ -166,9 +197,17 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   const p = path.join(path.resolve(dir), LOCK), take = p + '.take'
   const mine = JSON.stringify(ME) + '\n'
   //! release only what is still mine: a crash and a takeover may have put another holder's record there since
-  const release = () => { locks.delete(p); try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ } }
+  let touching: NodeJS.Timeout | null = null
+  const release = () => {
+    locks.delete(p)
+    if (touching !== null) { clearInterval(touching); touching = null }
+    try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ }
+  }
   const held = () => {
     locks.set(p, release)
+    //! the lease: touch the lock every TOUCH ms for a reader in another pid namespace (it never keeps the process alive)
+    touching = setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* the dir is gone: nothing to hold */ } }, TOUCH)
+    touching.unref()
     if (!exitHooked) { exitHooked = true; process.on('exit', () => { for (const r of [...locks.values()]) r() }) }
     return release
   }

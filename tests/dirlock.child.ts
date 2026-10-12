@@ -5,14 +5,22 @@
 // without any exit hook, so the lock stays as after a kill -9; `take-slow` holds the takeover of a stale lock open for three
 // seconds between the look and the unlink, and prints `taking` as it enters that window (two heirs at once); `nolink`
 // runs on a filesystem without hard links (linkSync refused), and `nolink-slow` on top sits one second between the
-// create of the empty lock and the write of its record (the gap a second opener may meet there). Not a test file (the
-// battery's glob is tests/*.test.ts).
+// create of the empty lock and the write of its record (the gap a second opener may meet there); `touch` opens nothing:
+// it plays a holder in another pid namespace, touching the dir's `lock` every 100 ms until Ctrl-C (the lease). Not a
+// test file (the battery's glob is tests/*.test.ts).
 
 import fs from 'node:fs'
+import path from 'node:path'
 import { fero } from '../api/index.ts'
 
 const [dir, mode] = process.argv.slice(2)
 const nap = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+if (mode === 'touch') {
+  const p = path.join(dir, 'lock')
+  setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* planted later, or gone */ } }, 100)
+  process.on('SIGINT', () => process.exit(0))
+  console.log('touching')
+}
 if (mode === 'take-slow') {
   const unlink = fs.unlinkSync
   fs.unlinkSync = (p) => { if (String(p).endsWith('/lock')) { console.log('taking'); nap(3000) } return unlink(p) }
@@ -24,14 +32,16 @@ if (mode === 'nolink' || mode === 'nolink-slow') {
     fs.openSync = ((p: fs.PathLike, flags?: fs.OpenMode, m?: fs.Mode) => { const fd = open(p, flags, m); if (String(p).endsWith('/lock') && flags === 'wx') { console.log('created-empty'); nap(1000) } return fd }) as typeof fs.openSync
   }
 }
-try {
-  await fero('locked', { dir, listen: false })
-  console.log(`up ${process.pid}`)
-  if (mode === 'exit') process.exit(0)
-  //! a crash leaves the lock: no exit hook runs (pid 1 of a namespace ignores a SIGKILL it sends itself, so not kill -9)
-  if (mode === 'crash') { process.removeAllListeners('exit'); process.exit(0) }
-} catch (e) {
-  const err = e as Error & { code?: string; pid?: number; host?: string }
-  console.log(`refused ${err.code} ${err.pid} ${err.host} ${err.message}`)
-  process.exit(2)
+if (mode !== 'touch') {
+  try {
+    await fero('locked', { dir, listen: false })
+    console.log(`up ${process.pid}`)
+    if (mode === 'exit') process.exit(0)
+    //! a crash leaves the lock: no exit hook runs (pid 1 of a namespace ignores a SIGKILL it sends itself, so not kill -9)
+    if (mode === 'crash') { process.removeAllListeners('exit'); process.exit(0) }
+  } catch (e) {
+    const err = e as Error & { code?: string; pid?: number; host?: string }
+    console.log(`refused ${err.code} ${err.pid} ${err.host} ${err.message}`)
+    process.exit(2)
+  }
 }
