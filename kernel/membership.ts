@@ -355,6 +355,14 @@ export class Membership {
   //! suspicion: consecutive ticks each member has been unreachable
   #suspectTicks = new Map<string, number>()
   #suspects = new Set<string>()
+  //! #gaveUp — the suspects whose redial chain has given up at least once since the suspicion: #leaveView's reading of
+  // dead (the round-4 review of wave 6b, 2026-10-20). Set at the tick that sees a suspect's chain given up — before the
+  // same step's revival (V4-20) re-arms it — and kept while that revived chain dials: a dial in flight to a member whose
+  // chain already gave up once is not a member back. Forgotten exactly as the suspicion is: the link back (the suspicion
+  // loop), or the member out of my view (the install). The eviction keeps its own reading (#dead, this chain gave up):
+  // its hold is the churn guard of V4-39 and its timing is pinned across the sweeps; a leave ballot has a leaver's window
+  // to meet, so it reads the evidence it already has.
+  #gaveUp = new Set<string>()
   //! epoch-staleness gate state
   epochStale = false
   #staleWant = 0
@@ -464,12 +472,13 @@ export class Membership {
     //! suspicion: a committed-view member with no admitted link for suspectTicks (SUSPECT_TICKS) ticks is suspect
     if (!node.client && this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
       const suspectTicks = node.tune.suspectTicks
-      for (const [uuid] of this.view.members) {
+      for (const [uuid, listen] of this.view.members) {
         if (uuid === node.uuid) continue
         const id = node.byUuid.get(uuid)
         const live = id !== undefined && node.links.get(id)?.state === LS.admitted && !node.links.get(id)?.dead
         if (live) {
           this.#suspectTicks.delete(uuid)
+          this.#gaveUp.delete(uuid)
           if (this.#suspects.delete(uuid) && this.#proposal && !this.#proposal.view.members.some((m) => m[0] === uuid) && this.isMember(uuid))
             this.#proposal = null //! the suspect came BACK: abandon the eviction ballot before a post-heal vote commits it against a live member
           continue
@@ -480,6 +489,7 @@ export class Membership {
           this.#suspects.add(uuid)
           j.armed && j.emit(JK.suspect, uuid)
         }
+        if (this.#suspects.has(uuid) && !node.dialing(listen)) this.#gaveUp.add(uuid) // the give-up, remembered before the revival below re-arms the chain
       }
       //! eviction: the lowest-uuid LIVE member proposes the shrunk view. A suspect the proposer is STILL
       // DIALING is held back (node.dialing): an un-exhausted backoff chain — the pending-redial window
@@ -661,15 +671,28 @@ export class Membership {
     this.#propose(node, { epoch: this.#nextEpoch(node), members: this.#leaveView(node, leaver) }, leaver)
   }
 
-  //! #dead — a suspect whose redial chain gave up: evictable (the tick), and a vote that will not come (#leaveView)
+  //! #dead — a suspect whose redial chain gave up: evictable (the tick). #leaveView reads one more thing: a suspect whose
+  // chain gave up once since the suspicion (#gaveUp) is dead to a leave ballot while the revival dials it again
   #dead(node: Node, u: string, listen: string): boolean { return this.#suspects.has(u) && !node.dialing(listen) }
 
   //! #leaveView — THE EVICTION RIDES WITH THE LEAVE (DESIGN-LEAVE §10.7's note of 2026-10-12). A leave ballot is the
-  // view without the leaver; when the members of that view that are not dead (#dead) are no majority of it — on a bare
-  // majority, three members with one crashed and not yet voted out or five with two, its new-set majority would need
-  // the dead member's vote and it can never commit — the ballot leaves out every dead suspect as well, provided the
-  // live members are a majority of the view (the eviction's own guard: with no live majority nothing can commit, and
-  // the ballot is today's). Why: the plain ballot aged out, and the leaver's next knock, landing between ticks,
+  // view without the leaver; the plain ballot stands only while the members of it that are NOT SUSPECTS — the votes
+  // that can come — are a majority of it; otherwise, on a bare majority (three members with one crashed and not yet
+  // voted out, five with two), its new-set majority would need a dead member's vote and it can never commit, so every
+  // dead suspect (#dead) leaves it as well, provided the live members are a majority of the view (the eviction's own
+  // guard: with no live majority nothing can commit, and the ballot is today's). A suspect whose chain is still on its
+  // FIRST try since the suspicion is not dropped — its vote may still come — and not counted either: THE DROP COUNTS
+  // WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20). As first built the plain ballot
+  // stood while the members not DEAD were a majority of it, so with two dead chains it dropped them only when both read
+  // dead at one tick; the heartbeat's revival (node.ts) re-arms a given-up chain in the step that saw it dead, so two
+  // give-ups a heartbeat apart were never both dead at one tick — the ballot stayed plain, needed a dead vote, and the
+  // stop wedged for good (n=5 with two crashed: 7 of 30 seeds with n03 stopping, 8 of 30 with n01, at 16 and 64 ticks
+  // alike). Now each dead member leaves at the tick that first sees its give-up, the sticky re-read keeps it out while
+  // the revival dials, and a give-up once seen is REMEMBERED on the suspect (#gaveUp) so a ballot opened while the revived
+  // chain dials — a knock, or the lowest member's exit, landing then — leaves it out at once instead of waiting a second
+  // chain through (n=5 at a 40 ms pair, n03 stopping and n01 at t0+700: n01's exit took epoch 2 and n03's leave at the
+  // next lowest opened as the plain {n02,n04}@3 over n04's revived chain, 680 ms from its next give-up, past n03's
+  // window). A ballot of one suspect (n=3) reads as before. Why: the plain ballot aged out, and the leaver's next knock, landing between ticks,
   // reopened it before the tick's eviction branch ran, so the dead member was never evicted while the leaver knocked and
   // the leaver went unclean at the window's end. And why ONE ballot rather than the eviction first and the leave after
   // (the first build of this rule): the chain's give-up can land late in the leaver's window — the sweep's family 2,
@@ -691,9 +714,9 @@ export class Membership {
   // next knock opens a fresh one from the view — the eviction's own rule, which the revival never cancels either.
   #leaveView(node: Node, leaver: string, ballot?: [string, string][]): [string, string][] {
     const base = ballot ?? this.view.members.filter(([u]) => u !== leaver)
-    const live = base.filter(([u, l]) => !this.#dead(node, u, l))
-    if (live.length * 2 > base.length) return base
-    return this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 > this.view.members.length ? live : base
+    if (base.filter(([u]) => !this.#suspects.has(u)).length * 2 > base.length) return base // its non-suspects carry it
+    if (this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 <= this.view.members.length) return base // no live majority: nothing can commit
+    return base.filter(([u, l]) => !this.#dead(node, u, l) && !this.#gaveUp.has(u)) // every dead member out — this chain given up, or one before it since the suspicion; a suspect on its first chain stays
   }
 
   onPropose(node: Node, link: Link, v: { e?: unknown; m?: unknown; o?: unknown; j?: unknown }) {
@@ -866,8 +889,8 @@ export class Membership {
     // hold (the suspects are still suspects, a knock is re-sent every tick, a leaver re-knocks — V4-6's rebase was this
     // rule for one case) instead of waiting proposalAge ticks for it to age out.
     this.#proposal = null
-    for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
-    if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
+    for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u); this.#gaveUp.delete(u) }
+    if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear(); this.#gaveUp.clear() } // an evictee's grudges expire with its membership
     for (const u of [...this.#leavers]) if (!this.isMember(u)) this.#leavers.delete(u) // hygiene: a leaver out of the view is no longer "leaving" (§10.7); #answerable checks membership first, so this changes no answer
     //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
     // unless a redial chain is still trying it: that chain owns the target until it ends. A dial over it

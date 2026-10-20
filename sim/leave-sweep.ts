@@ -267,6 +267,41 @@ export const lowestStopsInsideDrop = (lowestAt: number, leaveWindow = 16, pairDe
   return { n03: sim.left.get('n03') ?? null, n01: sim.left.get('n01') ?? null, n03After: after('n03'), n01After: after('n01'), survivor: `n02@${n02.epoch}{${members(n02)}}`, writable: n02.membership.gate(n02).open, ballots: `${shown('n01')} | ${shown('n02')}` }
 }
 
+//! straddle — THE DROP COUNTS WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20). n=5 at
+// heartbeat 50 on plain 3 ms links, seeded; n04 and n05 are cut from everyone at t0 (two crashes, a bare majority left)
+// and ONE member stops at t0 + 200 — `who`, n03 (a knock at n01) or n01 (the lowest: its own exit) — under `leaveWindow`
+// ticks. The two dead chains give up at the proposer about 680 ms after the cut, a few ms apart by the seed's jitter.
+// As first built the leave ballot dropped the dead only when EVERY dead member read dead at one tick: two give-ups that
+// straddle a heartbeat were each revived in the step that saw it dead, so they were never both dead at one tick, the
+// ballot stayed plain, needed a dead vote, and the stop wedged for good at 16 and 64 ticks alike — the survivors
+// read-only at the old view (7 of 30 seeds with n03 stopping, 8 of 30 with n01; the base before the lane wedged 30 of
+// 30). Now the plain ballot stands only while its non-suspects are a majority of it, so the first give-up drops its
+// member alone (`P(2,4) G5 P(2,3) R5 G4`: {n01,n02,n04}@2 commits on n02's and n03's grants, 2 of 3 new and 3 of 5 old)
+// and the other is evicted by the tick's own eviction at its next give-up. Returns the verdict, the ms after the stop,
+// n02's end state and writability, and the ORDER of the give-up / revive / propose rows at the proposer n01 (G4 = n04's
+// chain gave up, R5 = n05's revived, P(e,n) = a ballot of n members at epoch e) — the straddle reads `G R G R`, a drop
+// needs the give-up before the propose.
+export const straddle = (seed: number, who: 'n01' | 'n03', leaveWindow: number): { left: boolean | null; afterStop: number; survivor: string; writable: boolean; order: string; violations: number } => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, fault: { delay: [3, 3] }, tune: { leaveWindow } })
+  sim.run({ until: 1500 })
+  if (!nodes.every((x) => x.epoch === 1)) throw new Error('never formed')
+  const t0 = sim.now
+  const cursor = nodes[0].journal.n // the journal's t is a sequence number: read what n01 wrote from here on
+  for (const dead of ['n04', 'n05']) for (const o of nodes.map((x) => x.uuid)) if (o !== dead) sim.partition(dead, o)
+  sim.post(who, { kind: 'leave' }, 200)
+  const stop = t0 + 200
+  let leftAt = -1
+  for (let t = sim.now; t <= stop + 50 * (leaveWindow + 4); t += 5) {
+    sim.run({ until: t })
+    if (sim.left.has(who)) { leftAt = sim.now; break }
+  }
+  const order = nodes[0].journal.read(cursor).filter((e) => e.kind === JK.giveUp || e.kind === JK.revive || (e.kind === JK.propose && (e.a as number) >= 2))
+    .map((e) => (e.kind === JK.giveUp ? `G${String(e.a).slice(-1)}` : e.kind === JK.revive ? `R${String(e.a).slice(-1)}` : `P(${e.a},${e.b})`)).join(' ')
+  const n02 = nodes[1]
+  return { left: sim.left.get(who) ?? null, afterStop: leftAt < 0 ? -1 : leftAt - stop, survivor: `n02@${n02.epoch}{${members(n02)}}`, writable: n02.membership.gate(n02).open, order, violations: sim.violations.length }
+}
+
 export const shape1 = (s: Schedule) => `${s.seed} n=${s.n} leavers=${s.leavers} stall=${s.stall ? `${s.stall.node}/${s.stall.ms}` : '-'} slow=${s.stalls.map((x) => x.join(':')).join(',')} offsets=${s.offsets} linger=${s.linger}${s.join ? ' join' : ''}`
 export const shape2 = (s: Schedule2) => `${s.seed} n=${s.n} leavers=${s.leavers} cuts=${JSON.stringify(s.cuts)} restart=${s.restart} slow=${s.delay.filter((d) => d[2] > 3).map((d) => d.join(':')).join(',')}`
 
