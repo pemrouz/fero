@@ -158,7 +158,16 @@ test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one sta
 // the whole window: n01 went unclean and n03 sat `minority` for good. Now the ballot is kept while the vote round-trips:
 // n03's grant commits {n03}@2 at n01 at 870, n03 installs it at 930 and ends alone, writable (n01 goes `unechoed` at 950 —
 // the echo would land at 990, past its window: its verdict, not the cluster's liveness). No other seed moved.
-const KNOWN_NOT_LIVE_R = new Set<number>([9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 60, 63, 82, 84, 98])
+// THE DROP COUNTS WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20) took 31 off it, 17 → 16:
+// n=5, the three lowest stop at once (n01, n02, n03), n01 cut from n05 for 1500 ms and from n03 for 600 ms. n01's exit
+// {n02,n03,n04,n05}@2 had n02's and n04's grants and waited on a suspect's vote; n05's chain gave up at 686 and the tick
+// at 700 re-read the exit. Before, three of its four were not dead (n03's chain still dialing), so the plain exit stood:
+// the three windows ended at 850 `unanswered`, every leaver was torn down, and n04 and n05 were left `minority` at view
+// 1 with three dead members for good — the reborn n02r and n03r `joining` for good. Now the exit's non-suspects (n02,
+// n04) are no majority of it, so n05, dead, leaves it: {n02,n03,n04}@2 commits on n02's and n04's grants at 740, n01 is
+// clean at 746, n02's exit {n03,n04}@3 at 762 and n03's {n04}@4 at 812 follow, n05 rejoins at 5 and the reborn pair at
+// 6 and 7: all four in {n02r,n03r,n04,n05}@7, writable. No other seed moved.
+const KNOWN_NOT_LIVE_R = new Set<number>([9, 19, 25, 26, 32, 33, 40, 41, 46, 47, 49, 60, 63, 82, 84, 98])
 
 test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the H9 seeds 306, 744 and 804 heal; the named shapes heal (seed 157 under 10 sim seeds, the n=3 two-stop pair once each)', () => {
   const unsafeOnes: string[] = [], notLive: number[] = [], shapes = new Map<number, string>()

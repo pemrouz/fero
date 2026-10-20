@@ -1562,6 +1562,111 @@ test('the exit may only shrink too: bb knocked, the re-read dropped cc from bb\'
   assert.deepEqual(h.of('left'), [['left', true]], 'clean: bb echoed the view without aa')
 })
 
+//! THE DROP COUNTS WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20): two dead chains whose
+// give-ups STRADDLE a heartbeat. As first built the plain ballot stood while the members not dead were a majority of it,
+// so at n=5 with two crashed members it dropped them only when BOTH read dead at one tick — and the heartbeat's revival
+// re-arms a given-up chain in the step that saw it dead, so two give-ups a heartbeat apart were never both dead at one
+// tick: the ballot stayed plain, needed a dead vote, and the stop wedged for good (the sim: 7 of 30 seeds with n03
+// stopping, 8 of 30 with n01, at 16 and 64 ticks alike). Now the plain ballot stands only while its NON-SUSPECTS are a
+// majority of it; otherwise each dead member leaves at the tick that first sees its give-up, the sticky re-read keeps it
+// out while the revival dials, and the give-up is REMEMBERED on the suspect (#gaveUp) until its link comes back or it
+// leaves the view, so a ballot opened while the revived chain dials — a knock, or the lowest member's exit — leaves it out
+// at once instead of waiting a second chain through. aa at {aa,bb,cc,dd,ee}: dd and ee are cut and become suspects, both
+// chains dialing.
+//! give up ONE chain while the other keeps dialing: every pending redial timer fires (a dial in flight on the other
+// target is not a failure — its chain still owns it, dialing() true), and the failed dial is posted for `u` alone
+const giveUpOne = (h: ReturnType<typeof harness>, u: string, base: number) => {
+  for (let i = 0; i < 11; i++) {
+    for (const t of h.of('timer').filter((x) => x[2] === TAG.redial)) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }) // a fired id is ignored
+    h.node.step({ kind: 'linkDown', link: base + i, reason: 'refused', to: `sim:${u}` })
+  }
+  assert.ok(!h.node.dialing(`sim:${u}`), `${u}'s chain gave up`)
+}
+const twoSuspects = (me = 'aa') => {
+  const h = fiveAt1(me)
+  h.node.step({ kind: 'linkDown', link: h.link.dd, reason: 'cut' })
+  h.node.step({ kind: 'linkDown', link: h.link.ee, reason: 'cut' })
+  for (let i = 0; i < 3; i++) h.tick()
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a).sort(), ['dd', 'ee'])
+  assert.ok(h.node.dialing('sim:dd') && h.node.dialing('sim:ee'), 'both chains still trying')
+  return h
+}
+
+test('the drop counts what can vote: cc knocks at {aa,bb,cc,dd,ee} with dd and ee suspects still dialing — the plain {aa,bb,dd,ee}@2 opens; ee\'s chain gives up and the next tick drops ee ALONE ({aa,bb,dd}@2, dd still dialing; before: kept plain, 3 of 4 not dead) while the same step revives ee; dd\'s chain gives up and the next tick KEEPS {aa,bb,dd} (its non-suspects aa and bb carry it); bb\'s and cc\'s grants commit it — 2 of 3 new, 3 of 5 old. The eviction still waits for dd\'s revived chain; a KNOCK does not: bb\'s leave opens {aa}@3 at once, dd out on the give-up remembered (before: the plain {aa,dd}@3, a second chain to wait through)', () => {
+  const h = twoSuspects()
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(h, h.link.bb, 2), [['aa', 'bb', 'dd', 'ee']], 'the plain leave: nobody is dead yet, and a dialing suspect is not dropped')
+  giveUpOne(h, 'ee', 800)
+  assert.ok(h.node.dialing('sim:dd'), 'dd\'s chain is still dialing')
+  h.tick()
+  assert.deepEqual(proposed(h, h.link.bb, 2), [['aa', 'bb', 'dd', 'ee'], ['aa', 'bb', 'dd']], 'the re-read drops ee at the tick that first sees its give-up — dd, still dialing, stays (before: the plain ballot stood, three of its four not dead)')
+  assert.ok(h.node.dialing('sim:ee'), 'the same step\'s revival re-armed ee\'s chain')
+  assert.deepEqual(h.jk(JK.revive).map((e) => e.a), ['sim:ee'])
+  giveUpOne(h, 'dd', 900)
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4], [2, 3]], 'kept: {aa,bb,dd}\'s non-suspects aa and bb are a majority of it, so dd\'s give-up drops nothing more and no new ballot opens (sticky: ee, dialing again, is not put back)')
+  assert.equal(h.node.membership.votedFor.h, 'aa,bb,dd')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb,dd,ee' }) })
+  assert.equal(h.node.epoch, 1, 'bb\'s grant for the plain ballot counts for nothing')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb,dd' }) })
+  assert.equal(h.node.epoch, 1, 'aa and bb: the new set\'s majority, but two of the old five')
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb,dd' }) })
+  assert.equal(h.node.epoch, 2, 'the leaver\'s grant: three of the old five — committed without a dead vote')
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['aa', 'bb', 'dd'])
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['cc', 'ee'])
+  assert.ok(h.sentOn(h.link.cc, VERB.VIEW).some((f) => (f.value as { e: number }).e === 2), 'the VIEW to cc is its exit proof')
+  //! dd, a suspect of the new view whose revived chain is dialing: the tick's eviction keeps its hold (V4-39's churn guard,
+  // this chain's give-up) — but the give-up dd's first chain had is remembered, so a leave ballot opened now reads dd dead
+  h.tick()
+  assert.ok(h.node.dialing('sim:dd'), 'dd\'s revived chain is dialing')
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4], [2, 3]], 'no eviction while dd\'s chain dials: the eviction\'s own reading is unchanged')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(h, h.link.bb, 3), [['aa']], 'bb\'s knock: dd out at once on the give-up remembered (before: {aa,dd}@3, which needed dd\'s vote until its second chain gave up)')
+  assert.equal(h.node.membership.votedFor.h, 'aa')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.VOTE, { e: 3, g: 1, ce: 2, h: 'aa' }) })
+  assert.equal(h.node.epoch, 3, 'aa + bb: two of the old three; aa alone the new')
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['cc', 'ee', 'bb', 'dd'])
+})
+
+test('the drop counts what can vote, the lowest leaver: aa leaves at {aa,bb,cc,dd,ee} with dd and ee dialing — its exit is the plain {bb,cc,dd,ee}@2; ee\'s give-up re-reads it to {bb,cc,dd}@2 at the next tick (before: kept plain), dd\'s give-up a tick later changes nothing, and bb\'s and cc\'s grants commit it (2 of 3 new, 3 of 5 old); the give-up remembered is forgotten with the link back, or with the member out of the view; one suspect (n=3) reads as before', () => {
+  const h = twoSuspects()
+  h.node.step({ kind: 'leave' })
+  assert.deepEqual(proposed(h, h.link.bb, 2), [['bb', 'cc', 'dd', 'ee']], 'my exit, nobody dead yet')
+  giveUpOne(h, 'ee', 800)
+  h.tick()
+  assert.deepEqual(proposed(h, h.link.bb, 2), [['bb', 'cc', 'dd', 'ee'], ['bb', 'cc', 'dd']], 'ee out at the tick that sees its give-up (before: the plain exit stood)')
+  giveUpOne(h, 'dd', 900)
+  h.tick(); h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4], [2, 3]], 'kept across dd\'s give-up and the revivals: bb and cc carry {bb,cc,dd}')
+  assert.equal(h.node.membership.votedFor.h, 'bb,cc,dd')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb,cc,dd' }) })
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb,cc,dd' }) })
+  assert.equal(h.node.epoch, 2, 'bb and cc: two of the new three, and with me three of the old five')
+  assert.equal(h.of('left').length, 0, 'the echo is awaited')
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['bb', 'cc', 'dd']) }) })
+  assert.deepEqual(h.of('left'), [['left', true]], 'clean: bb echoed the view without aa')
+  //! the memory follows the suspicion: ee gave up once at aa and its revived chain dials; its LINK comes back and the next
+  // tick forgets both — a knock then opens the plain ballot with ee in it. And an install prunes the memory of a member
+  // out of the new view with its suspicion (the suspects set itself): nothing stale is read at the next epoch
+  const m = twoSuspects()
+  giveUpOne(m, 'ee', 800)
+  m.tick()
+  assert.deepEqual(proposed(m, m.link.bb, 2), [['aa', 'bb', 'cc', 'dd']], 'the tick\'s eviction of ee (dd, dialing, is held back as before)')
+  assert.ok(m.node.dialing('sim:ee'), 'ee revived')
+  m.admit(9, 'ee')
+  m.tick()
+  assert.deepEqual(m.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4]], 'ee came BACK by its link: the eviction that left it out is abandoned at this tick')
+  m.node.step({ kind: 'bytesIn', link: m.link.cc, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(m, m.link.bb, 2), [['aa', 'bb', 'cc', 'dd'], ['aa', 'bb', 'dd', 'ee']], 'cc\'s knock: ee is in the ballot — its give-up is forgotten with its suspicion (dd, on its first chain, stays too)')
+  //! n=3, one suspect: the ballot's one non-suspect is no majority of two, so the rule reads the chain exactly as before —
+  // the plain {aa,cc}@2 while cc dials, {aa}@2 once it gave up (the pins above)
+  const k = formedView1()
+  k.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  for (let i = 0; i < 3; i++) k.tick()
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(k, 1, 2), [['aa', 'cc']], 'one suspect, dialing: the plain ballot, as before')
+})
+
 test('a knock from a member my view no longer holds is answered with the VIEW (wave 6b, 2026-10-12): bb left and aa installed {aa,cc}@2, but bb never saw the VIEW and knocks on — aa ships view 2 on bb\'s link and proposes nothing; on bb\'s side the VIEW without it is the exit proof', () => {
   const h = formedView1()
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })

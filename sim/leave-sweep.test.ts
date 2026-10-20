@@ -44,7 +44,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe, starved, lowestStopsInsideDrop } from './leave-sweep.ts'
+import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe, starved, lowestStopsInsideDrop, straddle } from './leave-sweep.ts'
 
 //! sweep — run `count` seeds of a family; the safety problems are asserted empty, the not-live seeds are compared to the
 // pinned set in both directions (a wedge where the kernel used to heal, or a heal where it used to wedge, is a change
@@ -230,4 +230,45 @@ test('the exit may only shrink too: n=5 with two dead, n03 stops on a slow pair 
   assert.deepEqual([before.n03, before.n01, before.survivor, before.ballots], [true, true, 'n02@3{n02}', 'n01: P(1,5) P(2,4) P(2,2) | n02: P(3,1)'], `the stop before the drop: n01's exit replaces the plain ballot and is re-read once — ${JSON.stringify(before)}`)
   const after = lowestStopsInsideDrop(950, 16)
   assert.deepEqual([after.n03, after.n01, after.survivor, after.ballots], [true, true, 'n02@3{n02}', 'n01: P(1,5) P(2,4) P(2,2) P(3,1) | n02: '], `the stop after the commit: n03 is out, n01's exit is the next ballot — ${JSON.stringify(after)}`)
+})
+
+//! THE DROP COUNTS WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20): n=5 with TWO crashed
+// members whose give-ups straddle a heartbeat (`straddle`, seeded). As first built #leaveView dropped the dead only when
+// every dead member read dead at one tick — `live.length * 2 > base.length` kept the plain ballot while the members not
+// DEAD were a majority of it — and two chains a tick apart never were: each was revived in the step that saw it dead
+// (G5 R5 G4 R4 …), so the ballot stayed plain, needed a dead vote, and the stop wedged for good at 16 and 64 ticks alike
+// with the survivors read-only at the old view: n03 stopping, seeds 10, 14, 15, 18, 22, 29, 30 of 1..30 unclean at 16
+// ticks (6 still at 64); n01 the lowest stopping, seeds 1, 11, 12, 14, 18, 22, 25, 29 (7 at 64). The base before the
+// lane wedged 30 of 30. Now the plain ballot stands only while its NON-SUSPECTS are a majority of it: the first give-up
+// drops its member alone — `P(2,4) G5 P(2,3) R5 G4`, {n01,n02,n04}@2 on n02's and n03's grants, clean 509-520 ms after
+// the stop like the non-straddle seeds (`G4 G5 P(2,2)`) — and the other dead member is evicted by the tick's own
+// eviction at its next give-up. And the give-up is REMEMBERED on the suspect while the revival dials it again:
+// `lowestStopsInsideDrop` on a 40 ms pair with n01 stopping at t0 + 700 — n01's exit {n02,n03,n04}@2 takes epoch 2
+// (clean at 90 ms), and n03's leave at the next lowest, n02, lands while n04's revived chain dials; without the memory it
+// opened as the plain {n02,n04}@3, 680 ms from n04's next give-up, past n03's window (n03 unclean at 800, n02 left at
+// {n02,n03,n04}@2 with both others dead, read-only for good); with it, {n02}@3 at once and n03 is clean at 615 ms. The
+// 80 ms pair at t0 + 700 the same (715 / 169 ms). Pinned: the two straddle seeds at 16 and 64 ticks, every seed 1..30
+// for both stoppers at both windows, and the two pairs. The sweep's family lists and `starved` did not move.
+test('the drop counts what can vote: n=5 with two crashed members whose give-ups straddle a heartbeat — seed 10 with n03 stopping, seed 1 with n01 the lowest — the first give-up drops its member alone and the stop is clean about 510 ms after it at 16 and 64 ticks (before: wedged for good at both, the survivors read-only); every seed 1..30 is clean for both stoppers at both windows (before: 7 and 8 of 30 at 16 ticks); and the lowest stopping at t0+700 on a 40 or 80 ms pair inside another leave is clean with the leaver, the give-up remembered while the revival dials (before: the leaver unclean, the survivor read-only for good)', () => {
+  for (const [seed, who] of [[10, 'n03'], [1, 'n01']] as const) {
+    for (const w of [16, 64]) {
+      const r = straddle(seed, who, w)
+      assert.equal(r.left, true, `seed ${seed}, ${who} at ${w} ticks: ${JSON.stringify(r)}`)
+      assert.ok(r.afterStop > 450 && r.afterStop < 600, `seed ${seed}, ${who} at ${w} ticks: clean once the first chain gave up — ${JSON.stringify(r)}`)
+      assert.match(r.order, /^P\(2,4\) G5 P\(2,3\) R5( G4)?$/, `seed ${seed}, ${who} at ${w} ticks: the first give-up drops its member alone, before the other chain gives up (the straddle) — ${JSON.stringify(r)}`)
+      assert.equal(r.violations, 0)
+      assert.equal(r.survivor, who === 'n03' ? 'n02@2{n01,n02,n04}' : 'n02@2{n02,n03,n04}', `seed ${seed}, ${who} at ${w} ticks: n02 in the view without the leaver and n05, n04 still to be evicted — ${r.survivor}`)
+    }
+  }
+  const unclean = { n03: [] as string[], n01: [] as string[] }
+  for (const who of ['n03', 'n01'] as const) for (let seed = 1; seed <= 30; seed++) for (const w of [16, 64]) {
+    const r = straddle(seed, who, w)
+    if (r.left !== true || r.violations) unclean[who].push(`${seed}@${w}: ${JSON.stringify(r)}`)
+  }
+  assert.deepEqual(unclean, { n03: [], n01: [] }, 'every seed clean for both stoppers at both windows (before: n03 10,14,15,18,22,29,30 and n01 1,11,12,14,18,22,25,29 at 16 ticks)')
+  for (const [d, n03After, n01After] of [[40, 615, 90], [80, 715, 169]] as const) {
+    const r = lowestStopsInsideDrop(700, 16, d)
+    assert.deepEqual([r.n03, r.n01, r.survivor, r.writable, r.ballots], [true, true, 'n02@3{n02}', true, 'n01: P(1,5) P(2,4) P(2,3) | n02: P(3,1)'], `the ${d} ms pair, n01 at t0+700: n01's exit {n02,n03,n04}@2, then n02 answers n03's knock with {n02}@3 at once — n04's give-up remembered (before: {n02,n04}@3 over the revived chain, n03 unclean at 800) — ${JSON.stringify(r)}`)
+    assert.deepEqual([r.n03After, r.n01After], [n03After, n01After], `the ${d} ms pair: n01 in one round trip of the pair, n03 inside its window — ${JSON.stringify(r)}`)
+  }
 })
