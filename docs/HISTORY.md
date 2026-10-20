@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 on 2026-10-21 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -779,6 +779,12 @@ working as designed.
   the boot record written at the compacting swap's issue (a window the second review found, closed in
   the kernel). Fable built and reviewed, Opus re-checked three times. 1085/1085 + 18/18, perf 62/62,
   1000/1000 seeds, sim:scale green.
+
+- 2026-10-21 — wave 6b part 3: a client leaves a feeder whose write-gate is shut for a linked server whose
+  gate is open (V4-58); one process at a time holds a durable dir — a lock file with a lease touched
+  from a worker thread (V4-59; four Opus review rounds on the lock: pid reuse in containers, two
+  same-instant starts, a boot that blocks the main thread, the thread's own failures). 1108/1108 + 18/18,
+  perf 62/62, 1000/1000 seeds, sim:scale green.
 
 ## The debug tool
 
