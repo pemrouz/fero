@@ -454,10 +454,12 @@ export class Node {
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
   primary                = null
-  //! feederOpen — the client's copy of its PRIMARY's write-gate, from the `w` its digests carry (I-33):
-  // null while unknown (no feeder, a fresh feeder that has not digested yet, or an older server that
-  // sends no `w`). One heartbeat behind the feeder at worst; the api's `cluster.writable` on a client.
-  feederOpen                 = null
+  //! feederOpen — the client's copy of its PRIMARY's write-gate, from the `w` its digests and PONGs carry (I-33;
+  // wave 6b): null while unknown (no feeder, a feeder that has not said yet, or an older server that sends no `w`).
+  // Read live off the primary link (Link.gateOpen): the client keeps every server's last word, so a feeder elected
+  // at a failover is known at once when it had already said. One heartbeat behind the feeder at worst; the api's
+  // `cluster.writable` on a client.
+  get feederOpen()                 { return this.primary !== null ? (this.links.get(this.primary)?.gateOpen ?? null) : null }
   //! feederMethodsOnly (DESIGN-DOOR §4) — did the PRIMARY's HELLO say methods-only (`m: 1`)? Read LIVE off
   // the primary link, never copied at admit: HELLO is sent once per link, so a copy reset on failover
   // (the feederOpen shape above) could never be refilled. False with no primary, or an old server that
@@ -853,6 +855,9 @@ export class Node {
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
         this.#covered.delete(link)
+        //! a client's link died: what this relay still held for it leaves the queue (wave 6b, write.ts dropVia) — the
+        // client re-sends what it has in flight to its next relay, and a copy kept here would commit a second time
+        if (link.client && link.state === LS.admitted) this.writes.dropVia(link.id)
         //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
         // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
         // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
@@ -873,12 +878,13 @@ export class Node {
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
         if (this.client && this.primary === e.link) {
           this.primary = null
-          this.feederOpen = null
           //! the dead feeder's taps die with it (wave 5e): every attempt its WACK cleared whose record has not
           // landed here is marked; the resync onto the next feeder settles what that feeder's ship does not bring
           this.writes.strand()
-          for (const l of this.links.values())
-            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
+          //! the next feeder (wave 6b): a linked server whose gate is known OPEN before any other — a client that
+          // closed its own feeder for a shut gate (#refeed) lands on the open one it saw, never on a second shut one
+          const next = this.#electFeeder(false)
+          if (next !== undefined) { this.primary = next.id; this.#feederLast = next.contract }
           if (this.primary !== null) {
             //! a SCOPED feeder (feederScoped, DESIGN-SCALE stage 2): the new feeder holds a different subset, and its
             // copy of a lane this spoke learnt from the old one may run BELOW the spoke's tail (another partition's
@@ -1277,6 +1283,50 @@ export class Node {
     this.#inflightParts.clear()
     this.#snapMeta.clear()
     this.bootDirty.clear()
+  }
+
+  //! #gateWord (clients, wave 6b — DECISIONS V4-NN) — a server said its write-gate on this link (`w` on a digest or a
+  // PONG toward a client link; anything else is no word): keep it on the link and apply the move rule.
+  #gateWord(link      , w         ) {
+    if (w !== 1 && w !== 0) return
+    link.gateOpen = w === 1
+    this.#refeed()
+  }
+
+  //! #refeed — the move rule: a client never stays on a feeder whose gate is SHUT while another linked server says its
+  // gate is OPEN. Before this a client moved only when its feeder's link died: fed by a member the others had refused
+  // (the r2 platform spike, 2026-10-11), it timed out 80 of 80 calls over 20 s while two members took writes — the
+  // relay parks a write behind its closed gate, and nothing on the link says "go elsewhere". The move is a CLOSE of the
+  // feeder link, so the failover its linkDown runs is the one path every feeder change takes (the election prefers an
+  // open gate, the in-flight attempts repark onto the new relay, a scoped spoke resyncs, V4-43's receipt rules hold):
+  // the link to the shut feeder is redialed like any lost link and comes back as a non-primary, its gate still heard.
+  // A second feeder cannot be elected UNDER the first (the single-feeder rule: the old one keeps tap-forwarding until
+  // its side of the link is gone — two feeders fork per-origin ordering), which is why the link closes. With no open
+  // server linked the client stays: its writes wait, as they did, and land when the gate opens. What the old feeder
+  // parked for this client leaves its queue at the linkDown the close causes (write.ts dropVia): the client re-sends it
+  // to the next relay, and a copy kept at the old one would commit a second time under its stale view once its gate
+  // reopened. One move per word, and a word comes once per heartbeat per link.
+  #refeed() {
+    if (this.primary === null) return
+    const p = this.links.get(this.primary)
+    if (p === undefined || p.dead || p.gateOpen !== false) return
+    const to = this.#electFeeder(true)
+    if (to === undefined) return
+    this.journal.armed && this.journal.emit(JK.refeed, p.id, to.id)
+    p.dead = true
+    this.env.sink.close(p.id, 'feeder-shut')
+  }
+
+  //! #electFeeder — the client's next feeder: the first admitted server link whose gate is known OPEN, else (unless
+  // openOnly) the first admitted one in link order, as the failover always chose. Undefined when there is none.
+  #electFeeder(openOnly         )                   {
+    let any                  
+    for (const l of this.links.values()) {
+      if (l.state !== LS.admitted || l.dead || l.client) continue
+      if (l.gateOpen === true) return l
+      any ??= l
+    }
+    return openOnly ? undefined : any
   }
 
   //! #resyncBegin (spokes) — take the feeder's truth: remember the cells held, wipe the fold, and ask the
@@ -1872,9 +1922,15 @@ export class Node {
         return this.env.sink.subRecs(v.id, v.recs         ) // deliberately un-journaled: per-delta volume
       }
       case VERB.PING:
-        return link.ship(encodeControl(VERB.PONG), this.env.sink, j)
+        //! a server's PONG toward a CLIENT link carries its write-gate (`w`, wave 6b): on a link where the client's uuid
+        // is the lower one the client PINGs and no digest flows to it (it floors only its primary, and the server
+        // waits for the lower side), so without this word a client could not know the gate of a server it does not
+        // follow. An old client ignores the body (V4-14). Every other PONG is the bare frame it always was.
+        return link.ship(encodeControl(VERB.PONG, link.client && !this.client ? { w: this.membership.gate(this).open ? 1 : 0 } : undefined), this.env.sink, j)
       case VERB.PONG:
-        return // proof of life; liveness accounting lands with M2 membership
+        //! proof of life — and, at a CLIENT, a server's gate word (wave 6b): read it, and move if the rule says so
+        if (this.client && !link.client && link.state === LS.admitted) this.#gateWord(link, (f.value                               )?.w)
+        return
       case VERB.DIGEST: {
         if (link.state !== LS.admitted) {
           j.armed && j.emit(JK.frameDrop, link.id, 'digest before hello')
@@ -1892,6 +1948,8 @@ export class Node {
         // feeder, forking per-origin ordering. The evidence maps are still consumed (confirm is
         // side-effect-free reading); everything active is primary-only.
         if (this.client && link.id !== this.primary) {
+          //! its gate word is kept (wave 6b): a server this client does not follow saying `open` is what a move onto it needs
+          this.#gateWord(link, v.w)
           if (typeof v.p === 'object' && v.p !== null) this.confirm.sawP(link.uuid)
           for (const [origin, tail] of Object.entries(v.d))
             if (typeof tail === 'number') {
@@ -1920,8 +1978,11 @@ export class Node {
         // "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO: at the instant a feeder builds a
         // digest, its tails cover everything it has ever shipped us (live tap-forwards included).
         if (this.client) {
-          //! the feeder's gate rides its digests to us (I-33): read it before anything can return
-          if (v.w === 1 || v.w === 0) this.feederOpen = v.w === 1
+          //! the feeder's gate rides its digests to us (I-33): read it before anything can return. A shut gate with an
+          // open server linked CLOSES this link (wave 6b, #refeed): nothing below is owed to a feeder we are leaving —
+          // the failover its linkDown runs asks the next one for everything this digest would have settled.
+          this.#gateWord(link, v.w)
+          if (link.dead) return
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin]          ) : 0)) return this.#resyncBegin(link)

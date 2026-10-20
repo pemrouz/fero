@@ -108,6 +108,12 @@ export class Link {
   // to learn whether its feeder is scoped — a scoped feeder shows the spoke only the partitions it holds,
   // so an absent row there says nothing about the resource. Undefined from a client, the sim, an old server.
   contract         
+  //! gateOpen (wave 6b, DECISIONS V4-NN): the peer's write-gate as this node LAST HEARD it — a CLIENT keeps one per
+  // server link, from the `w` a server puts on every digest and every PONG toward a client link. null until the first
+  // word (a fresh link; an old server that sends none). node.feederOpen reads the primary's; the move rule
+  // (node.ts #refeed) reads every link's: a client never stays on a feeder whose gate is shut while another linked
+  // server says its gate is open. Never set on a member's links (a member reads no `w`).
+  gateOpen                 = null
   //! the door (DESIGN-DOOR §3, secured nodes only — every field stays at its zero on the open path):
   // nonce = MY `k` for this link, minted by door.nonce() at linkUp and never reused; said = the HELLO I
   // sent, the exact object (my proof signs its keys); hello = the peer's HELLO, stashed while proving
