@@ -1642,7 +1642,9 @@ kernel (`kernel/membership.ts`, `#leaveView`, `#dead`, the tick's re-read of a l
 ballot is the view without the leaver, and when the members of that view that are not dead — a suspect whose redial
 chain gave up — are no majority of it, the ballot leaves out every dead suspect too, provided the live members are a
 majority of the view (the eviction's own guard: with no live majority nothing can commit, and the ballot is the one
-before). The ballot in flight is re-read at every tick: a suspect whose chain gives up after the ballot opened leaves
+before). *(The guard as first built; the note of 2026-10-20 below corrects it: the plain ballot stands only while the
+ballot's NON-SUSPECTS are a majority of it, and a give-up once seen is remembered on the suspect — counting the members
+not dead let two dead chains a heartbeat apart hold the ballot plain for good.)* The ballot in flight is re-read at every tick: a suspect whose chain gives up after the ballot opened leaves
 it too, at the same epoch (my own vote there is mine; the voters re-grant the same proposer; a grant for the dropped
 ballot echoes its identity and counts for nothing). The lowest leaver's own exit reads the same way, and an eviction
 in flight when it begins leaving is replaced by its exit WITH the evictees (leaving outranks, as before; the
@@ -1769,6 +1771,64 @@ clean, and is unchanged.
   the stop at t0 + 700 or earlier, at t0 + 950 or later — was clean before and reads the same now. The kernel pin
   (`kernel/membership.test.ts`): bb's dropped ballot `{aa}@2` in flight, cc's chain revived by the same step, aa
   leaves — its exit is `{bb}@2` at once (before: `{bb,cc}@2`), bb's grant commits it and bb's echo is the exit proof.
+
+**2026-10-20, the drop counts what can vote, not what is dialing (the round-4 review of wave 6b).** The three notes
+above say the drop happens "when the members of that view that are not dead are no majority of it", and the DECISIONS
+draft said the rule covers "three members with one crashed and not yet voted out, five with two". The second half was
+false as built. `#leaveView` kept the plain ballot while the members of it NOT DEAD were a majority of it (`live.length
+* 2 > base.length`), and `#dead` reads one thing: a suspect whose chain is not dialing. So with two dead members the
+ballot dropped them only when BOTH read dead at one tick. They never did when their give-ups straddled a heartbeat: the
+heartbeat step runs `membership.tick` first and the give-up revival (V4-20) right after it, so the tick that saw n05's
+give-up read n04 still dialing (three of the ballot's four not dead: the plain ballot stood) and the same step revived
+n05; n04 gave up before the next tick, which read n05 dialing again and kept the ballot plain while reviving n04 — `G5
+R5 G4 R4 G5 R5 …` for the whole window. The ballot needed a dead vote, the leaver's knock reopened it at every age-out,
+and the stop went unclean at 16 and 64 ticks alike with the survivors read-only at the old view, for good. The review's
+scan (`sim/leave-sweep.ts` `straddle`: n=5 at heartbeat 50 on plain 3 ms links, n04 and n05 cut at t0, one member
+stopping at t0 + 200, seeds 1..30): n03 stopping, 7 of 30 unclean at 16 ticks (seeds 10, 14, 15, 18, 22, 29, 30; 6 at
+64); n01 the lowest stopping, 8 of 30 (1, 11, 12, 14, 18, 22, 25, 29; 7 at 64). The base before the lane wedged 30 of
+30: the lane had fixed about three quarters of the timings, not the rule.
+
+- *The rule, as it must be: the drop counts what can VOTE, not what is dialing.* The plain ballot stands only while the
+  ballot's NON-SUSPECTS are a majority of it — those are the votes that can come. Otherwise every dead member leaves it,
+  each at the tick that first sees its chain give up, and the sticky re-read (the amendment above) keeps it out while
+  the revival dials it again: the drop never needs two give-ups in one heartbeat. A suspect whose first chain since the
+  suspicion is still dialing is neither counted nor dropped — its vote may still come, and the ballot that keeps it is
+  one the non-suspects can carry anyway once the dead are out. And a give-up once seen is REMEMBERED on the suspect
+  (`#gaveUp`, set at the tick that sees it, before the same step's revival re-arms the chain; forgotten exactly as the
+  suspicion is — the link back, or the member out of my view at an install): a ballot opened while the revived chain
+  dials — a knock, or the lowest member's exit, landing then — reads it dead at once instead of waiting a second chain
+  through. A revived chain is a dial in flight to a member whose chain already gave up once; it is not a member back. The
+  eviction keeps its own reading (`#dead`: this chain gave up) and its hold while the chain dials — the churn guard of
+  V4-39, whose timing is pinned across the sweeps; a leave ballot has a leaver's window to meet, and reads the evidence
+  it already has. In the straddle at n=5: the tick that sees n05's give-up drops it alone — `{n01,n02,n04}@2`, which
+  commits on n02's and n03's grants (two of the new three, three of the old five) with n04 still dialing — and n04 is
+  evicted by the tick's own eviction at its next give-up (`P(2,4) G5 P(2,3) R5 G4`).
+- *Why it is safe.* The amendment's argument, unchanged: the ballot only shrinks between re-reads (counting fewer
+  members as able to vote drops more, never puts one back; the memory only widens "dead"); the old-set majority is the
+  view's; a smaller new set needs fewer votes, never a dead one; each re-read is the same proposer at the same epoch (at
+  most one commits); the ballot is two or more apart from the view, so V4-55 holds its granters until the VIEW lands.
+  The view-level guard stays: with no live majority of the view (two dead at three) nothing is dropped and nothing can
+  commit — the crash-at-two class (§7). A dropped member comes back as before, by its link, through a fresh ballot: the
+  suspicion loop forgets the memory with the suspicion and abandons any ballot that leaves the returned member out.
+- *What n=3's shape does.* One suspect: the ballot's one non-suspect is no majority of two, so the dead rule decides —
+  the plain `{aa,cc}@2` while cc's first chain dials, `{aa}@2` once it gave up — exactly as before; `starved` and its
+  slow-link pin did not move, nor did the sweep's family lists or the harness's.
+- *Measured.* The scan reads 0 of 30 unclean for both stoppers at 16 and at 64 ticks (violations 0): the straddle seeds
+  are clean 509-520 ms after the stop, as the seeds whose give-ups shared a tick always were (`G4 G5 P(2,2)`). The
+  memory's own shape, `lowestStopsInsideDrop` on a 40 ms pair with n01 stopping at t0 + 700: n01's exit
+  `{n02,n03,n04}@2` takes epoch 2 (clean at 90 ms) and n03's leave at the next lowest, n02, lands while n04's revived
+  chain dials — with the guard alone n02 opened the plain `{n02,n04}@3`, 680 ms from n04's next give-up, past n03's
+  window: n03 unclean at 800 ms and n02 left at `{n02,n03,n04}@2` with both others dead, read-only for good; with the
+  memory, `{n02}@3` at once and n03 clean at 615 ms, n02 alone at 3, writable. The 80 ms pair at t0 + 700 the same
+  (715 / 169 ms). The 80 and 100 ms pairs at t0 + 800..900 keep the crash-at-two verdict of the note above at 16 ticks
+  and are clean at 64: the window's class, unchanged. The kernel pins (`kernel/membership.test.ts`): cc knocks at
+  `{aa,bb,cc,dd,ee}` with dd and ee dialing; ee's give-up drops ee alone at the next tick (red before: the plain ballot
+  stood, three of four not dead), dd's give-up a tick later keeps `{aa,bb,dd}`, bb's and cc's grants commit it; then
+  bb's knock over dd's revived chain opens `{aa}@3` at once (red without the memory: `{aa,dd}@3`); the lowest leaver's
+  exit the same way; the memory forgotten with the link back and pruned at the install; n=3 as before.
+- *What remains.* A leaver's window still ends before the FIRST chain gives up when it is shorter than the chain, as a
+  bound must. With two dead the second dead member is voted out by the eviction's second ballot, one chain later, not
+  with the leaver — one more epoch, nobody waiting on it. The eviction's hold on a revived chain is the hold it had.
 
 **2026-10-12, the scoped leaver whose vote never came back (wave 6b).** STATUS carried: "still in its own view
 when its bound ends, it goes like a crash: nothing froze, so there is no orphan to drain and `undrained` reads 0
