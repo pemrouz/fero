@@ -231,10 +231,13 @@ for (const p of PLANTS)
 // ── part 2: the scoped sweep's families, mutated and not ──────────────────────────────────────────
 
 //! the pinned mutation catches of sim/scoped-sweep.test.ts, a clean run of each, and A2 seed 9 (a real attempt-exactly-once
-// violation of today's kernel)
+// violation of today's kernel). A6 seed 3 and A7 seed 4 (drop-one) were here until 2026-10-21, no longer pins since
+// stage 3: A7 seed 4 carried no violation since then, and A6 seed 3's only one was the mutation runner's own drop of a
+// swept field's parent row (M2 "still the WINNER"), which the runner no longer makes. A4 seed 6 (drop-one) and A7
+// seed 16 (release-all), today's pins, replace them.
 const FAMILY_RUNS: [string, number, Mutation][] = [
-  ['A6-flip-mid-latch', 3, 'drop-one'],
-  ['A7-down-to-one', 4, 'drop-one'],
+  ['A4-restarts', 6, 'drop-one'],
+  ['A7-down-to-one', 16, 'release-all'],
   ['A1-zombie', 8, 'drop-one'],
   ['A11-spoke', 7, 'version-only'],
   ['A2-slow-owner-join', 9, 'none'],
