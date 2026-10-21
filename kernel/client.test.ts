@@ -1769,15 +1769,18 @@ test('a clear on a link that was never synced leaves no cover: the drain digest 
 // the ceiling is belt and braces now; it stays as V4-49 recorded it.
 const PX = (k: string, v: number): Rec => ({ type: REC.update, key: ['px', k], value: v })
 test('a clear\'s cover is a ceiling, never a claim: a latch-folded record (tapped onto the paused link since wave 6a), a clear that takes its frame and lowers the ceiling to just under it, and a later record on its lane before the drain — the ceiling is not resumed, the spoke\'s reply uses it up, the latch row arrives', () => {
-  const { F, S, p, link, rows } = steady(2)
+  //! a queue of four (two until wave 6c): the fold's forward is a GROUP now — FEED {b}, the tap frame, FEED {e} — three
+  // frames, which overflowed a queue of two at the fold itself (a clear there heals the same way; the shape this test
+  // pins is the clear that takes the latch row later, with the replies)
+  const { F, S, p, link, rows } = steady(4)
   F.node.writes.ring.place('px', 'bb', 'aa')
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 23 } } }) })
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: PX('a', 23), origin: 'bb', seq: 23, epoch: 1, pp: 0 }], VERB.ACQ, true)[0] })
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 23 }, n: 1 }) })
   assert.equal(F.node.scope!.held('px'), true, 'the latch folded px')
-  assert.equal(link.queued.length, 1, 'the latch fold tapped the row onto the paused link (wave 6a; it tapped nothing before)')
+  assert.equal(link.queued.length, 3, 'the latch fold tapped the row onto the paused link, inside its group (wave 6a; it tapped nothing before)')
   for (let i = 0; i < 3; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i })
-  assert.equal(F.jk(JK.dropOldest).length, 1, 'one clear: it took the tap frame and two replies')
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'one clear: it took the group (the tap frame and its two markers) and two replies')
   assert.deepEqual(link.torn, { d: { bb: 22 }, r: undefined, q: undefined, c: true }, 'the cover: the feeder\'s tails lowered to just under the latch row the clear took, a ceiling')
   F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 20) }) // folds; not tapped (unsynced); above the ceiling
   F.node.step({ kind: 'drain', link: 7 })
@@ -2453,4 +2456,72 @@ test('wave 6c — the same clear with no failover: the spoke\'s capped r=1 reach
   S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 6 }, r: 1, w: 1 }) })
   assert.deepEqual(digests(S, 2).at(-1), { d: { bb: 6 }, r: 0 }, 'the reply dropped the ceiling: the real tails again')
   assert.equal(digests(S, 2).filter((d) => d.r === 1).length, 2, 'two asks in all: the connect and the drain exchange')
+})
+
+//! the fold group (STATUS "a spoke can show a removed row for a few events when its feeder acquires that partition"):
+// the forward of a latch fold ships a partition's history in lane order, one frame per contiguous run, so an older
+// value of a row and its later remove on one lane arrived in separate events — the spoke showed the row between them
+// (A12 seed 4: p27 at two older stamps in two events). Now the feeder brackets the fold's forward with FEED {b: p} and
+// FEED {e: p} on every synced client link, and the spoke buffers the RECORDS frames between them (a copy of each) and
+// lands them as ONE apply at the end: no event shows the removed row. A lost end is closed by the next frame that
+// proves the feeder's step ended (its digest, a PING or PONG); a failover drops the buffer (the resync covers it). Red
+// on the tree before at "px.c never shows between the fold's frames": it showed after the first frame.
+//! oneByOne — feed B every frame A sent on `al` since `from`, one step each, running `check` after each step
+const oneByOne = (A: H, al: number, B: H, bl: number, from: number, check: (i: number) => void) => {
+  const s = A.of('send').filter((e) => e[1] === al).slice(from).map((e) => e[2] as Uint8Array)
+  s.forEach((b, i) => { B.node.step({ kind: 'bytesIn', link: bl, bytes: b }); check(i) })
+  return s.length
+}
+test('wave 6c — the fold group: a write and its later remove forwarded in separate frames land as ONE apply at the spoke — the removed row never shows; the frames are bracketed by FEED {b} and FEED {e}; a lost end is closed by the feeder\'s next digest; a failover drops an open group', () => {
+  const { F, S, p, link, connect, cells, laneAt, teach } = latching()
+  //! px held at aa with bb#3 (px.a = 1); qx on the same lane at bb#8, tapped live: the spoke's bb fence sits at 8
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  connect()
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  p.settle()
+  assert.deepEqual(laneAt(S, 'bb'), [3, 8])
+  //! cc announces px with bb at 9: aa re-latches px; the teacher ships bb#7 (px.c = 3) and bb#9 (REMOVE px.c) — a gap at 8
+  // (qx's record, not px's), so the forward leaves in two frames
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  teach(2, [{ seq: 7, rec: PX('c', 3), pp: 3 }, { seq: 9, rec: { type: REC.remove, key: ['px', 'c'] }, pp: 7 }], 9)
+  assert.equal(F.node.scope!.held('px'), true)
+  const pxc = JSON.stringify(['px', 'c'])
+  const n = oneByOne(F, 7, S, 2, m, (i) => {
+    assert.equal(S.node.state.has(pxc), false, `px.c never shows between the fold's frames (after frame ${i})`)
+    if (i < 3) assert.notEqual(S.node.group, null, `the group is open (after frame ${i})`)
+  })
+  assert.equal(n, 4)
+  assert.deepEqual(wireOf(F, 7, m), ['verb28', '7', '9', 'verb28'], 'FEED {b}, the two frames of the forward, FEED {e}')
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ b: 'px' }, { e: 'px' }])
+  assert.equal(S.node.group, null, 'the end landed the group')
+  assert.deepEqual(laneAt(S, 'bb'), [3, 7, 8, 9], 'both records are in the spoke\'s lane')
+  assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder')
+  assert.deepEqual(S.of('apply').filter((e) => JSON.stringify((e[1] as Rec).key) === pxc).map((e) => (e[1] as Rec).type), [REC.update, REC.remove], 'the write and the remove reached the screen in one step, in order')
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0]], 'the journal: two frames landed as one for px, nothing kept back')
+  //! a lost end: the feeder's next frame that proves its step ended (a heartbeat digest) lands the group
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 11 } } }) })
+  const m2 = F.of('send').filter((e) => e[1] === 7).length
+  teach(2, [{ seq: 11, rec: PX('d', 4), pp: 9 }], 11)
+  const sent = F.of('send').filter((e) => e[1] === 7).slice(m2).map((e) => e[2] as Uint8Array)
+  assert.equal(sent.length, 3)
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: sent[0] }) // {b}
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: sent[1] }) // bb#11, buffered
+  assert.notEqual(S.node.group, null)
+  assert.equal(S.node.state.has(JSON.stringify(['px', 'd'])), false, 'buffered: the end has not come')
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 11 }, r: 1, w: 1 }) }) // the end was lost; the heartbeat digest follows
+  assert.equal(S.node.group, null, 'the digest closed the group')
+  assert.equal(S.node.state.get(JSON.stringify(['px', 'd'])), 4, 'and its frame landed')
+  //! a failover drops an open group: the resync onto the next feeder covers it
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 13 } } }) })
+  const m3 = F.of('send').filter((e) => e[1] === 7).length
+  teach(2, [{ seq: 13, rec: PX('e', 5), pp: 11 }], 13)
+  const sent3 = F.of('send').filter((e) => e[1] === 7).slice(m3).map((e) => e[2] as Uint8Array)
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: sent3[0] })
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: sent3[1] })
+  assert.notEqual(S.node.group, null)
+  S.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(S.node.group, null, 'the failover dropped the open group')
+  assert.equal(S.node.state.has(JSON.stringify(['px', 'e'])), false, 'its frame never landed here: the resync onto the next feeder brings px whole')
+  assert.equal(link.dead, false)
 })

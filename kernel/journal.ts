@@ -123,6 +123,7 @@ export const JK = {
   refeed: 81,        // a=link (the feeder's), b=link (the open server's) — a CLIENT closed its feeder link on purpose: the feeder said its write-gate is shut (`w: 0`) while another linked server said its is open; the linkDown that follows elects that server, and the shut feeder is redialed as a non-primary
   //! ── the spoke edge cases (2026-10-21, wave 6c, DECISIONS V4-NN) ──
   unfed: 82,         // a=partition, b=laneEntriesDropped — a CLIENT's feeder said the partition LEFT it (FEED {x}: its copy froze into an orphan at an install and was shed once every holder attested it): the spoke dropped the partition's cells, lane entries and screen rows with it (they stayed on the screen, frozen, until a failover's resync before)
+  fed: 83,           // a=partition, b=framesLanded, c=ghostsJudged — a CLIENT's feeder ended a fold group for the partition (FEED {e}: its latch fold's forward, bracketed by FEED {b}): the b frames the spoke buffered landed as one apply; c is 0 until the resync end keeps cells back for the fold (the next change)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

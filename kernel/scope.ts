@@ -791,6 +791,15 @@ export class Scope {
     // owner-to-holder frame repaired through the latch; an acquire in a hand-off).
     const taps = node.clientLinks.size !== 0
     const reentry = e.preState === SCOPE.orphan
+    //! THE FOLD GROUP (wave 6c, 2026-10-21): the forward below leaves in lane order, one frame per contiguous run, and
+    // before this each frame landed at the spoke in its own event — an older value of a row and its later remove on
+    // one lane in separate events, the row showing between them (STATUS; A12 seed 4). Now FEED {b: p} goes before the
+    // forward and FEED {e: p} after it on every synced client link (the forward's links), and the spoke buffers the
+    // frames between them until the end: a partition's history lands as ONE apply (node.ts `group`). The flush before
+    // {b} ships whatever an earlier handler of this step left in the outbox, so the group holds the fold's frames alone.
+    if (taps)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && cl.synced && !cl.dead) { cl.flush(node.env.sink, j); cl.ship(encodeControl(VERB.FEED, { b: p }), node.env.sink, j) }
     //! THE LANE RULE (wave 6b, 2026-10-12): a lane holds each (origin, seq) ONCE, so the scalar fence (streams.applied)
     // never sits below the lane's tail. The fast path appends at the tail on `seq > applied` alone (write.ts inbound), and
     // the teacher ships every entry of p it holds with its OWN floor as the cut — an entry above its floor (a gapped
@@ -870,7 +879,11 @@ export class Scope {
     //! one flush per fold on each client link, as the RECORDS handler flushes once per frame: the forwarded teacher
     // records and the replayed live span (inbound added them to the same outbox; before wave 6a nothing flushed them
     // here, so they left with the feeder's next frame or commit) leave in this step
-    if (taps) for (const cl of node.clientLinks) cl.flush(node.env.sink, j)
+    if (taps)
+      for (const cl of node.clientLinks) {
+        cl.flush(node.env.sink, j)
+        if (cl.state === LS.admitted && cl.synced && !cl.dead) cl.ship(encodeControl(VERB.FEED, { e: p }), node.env.sink, j) // the group's end (a clear in the flush unsynced the link: no end, the drain digest closes the group)
+      }
     //! durable: the base entered memory only — arm the snapshot swap so it reaches disk atomically
     // (never persistRun: interior rows condemn the chain), and dirty until the echo
     if (node.durable) node.spliced(p)

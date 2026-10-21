@@ -534,6 +534,15 @@ export class Node {
   // at or above the first capped ask's q drops it (any later ask to any feeder carried the cap, so that answer fills the
   // hole wherever it comes from). A resync drops it: the ask is d = {} there. Null when none is held.
   #ceiling: { d: Record<string, number>; q?: number } | null = null
+  //! group (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the fold group open on the primary link — the feeder said
+  // FEED {b: p} (kernel/scope.ts onAcqDone: a latch fold's forward begins) and its FEED {e: p} has not come. The RECORDS
+  // frames between them wait here, each its own copy of the bytes (a frame is a view on the receive chunk), and land
+  // as ONE apply at the end (#groupLand). Before this the forward landed frame by frame — a partition's history in lane
+  // order, one frame per contiguous run — so an older value of a row and its later remove on one lane arrived in
+  // separate events and the spoke showed the row between them (STATUS; A12 seed 4 showed p27 at two older stamps in
+  // two events). Bounded by the fold's size, which the spoke is about to hold in its lanes anyway. Public for the sim's
+  // monitors (a spoke with a group open covers nothing yet). Null when no group is open.
+  group: { p: string; frames: Uint8Array[] } | null = null
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
   // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
@@ -907,6 +916,7 @@ export class Node {
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
         if (this.client && this.primary === e.link) {
           this.primary = null
+          this.group = null // a fold group the dead feeder left open is dropped, not landed: the resync onto the next feeder brings the partition whole (wave 6c)
           //! the dead feeder's taps die with it (wave 5e): every attempt its WACK cleared whose record has not
           // landed here is marked; the resync onto the next feeder settles what that feeder's ship does not bring
           this.writes.strand()
@@ -1467,6 +1477,55 @@ export class Node {
     this.journal.armed && this.journal.emit(JK.unfed, p, dropped)
   }
 
+  //! #ingest — one RECORDS frame into the fold (the RECORDS handler's body; a fold group's buffered frames take the same
+  // road when the group lands, #groupLand): the staleness contract, every record through write.ts inbound, the WAL row
+  // for a fresh append, the spoke feed's flush.
+  #ingest(link: Link, f: Frame, prov: NonNullable<ReturnType<Frame['prov']>>) {
+    const j = this.journal
+    //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
+    // evidence of a view I missed — close the gate NOW and pull the view on this same link
+    if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
+    let fresh = 0
+    let maxSeq = 0
+    //! armed: reset the per-frame partition scratch — fast-path APPENDS record their per-partition
+    // maxes into it for the batch's durable-floor cover; SPLICES (flavor 2) deliberately don't
+    // (no-interior-rows: they reach disk via snapshot, and node.spliced() already armed it)
+    if (this.armed) { if (this.writes.rxParts) this.writes.rxParts.clear(); else this.writes.rxParts = new Map() }
+    for (const rv of f.records()) {
+      const flavor = this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
+      if (flavor === 1) { fresh++; maxSeq = rv.seq }
+      else if (flavor === 2) fresh++
+    }
+    //! WAL the frame when it carried a fresh APPEND (durable mode) — the received bytes ARE the row
+    // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
+    // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent. A
+    // splice-only frame persists NOTHING here (maxSeq would walk the chain backwards) — its bytes
+    // reach disk inside the armed snapshot swap.
+    if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
+    if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
+    //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
+    // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too (a run past
+    // this node's frame cap leaves in cuts, V4-51)
+    if (fresh && this.clientLinks.size)
+      for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
+  }
+
+  //! #groupLand (clients, wave 6c) — the fold group's end: every frame it held goes through #ingest in order, in this one
+  // step. Called by FEED {e}, by FEED {b} when a group is still open (a lost end), by the primary's next digest, PING or
+  // PONG (frames of a later step at the feeder: the end was lost with a clear), and dropped — not landed — at a primary
+  // failover (the resync onto the next feeder brings the partition whole). Returns the frames landed.
+  #groupLand(link: Link): number {
+    const g = this.group
+    if (g === null) return 0
+    this.group = null
+    for (const b of g.frames) {
+      const f = new Frame(b)
+      const prov = f.prov()
+      if (prov !== null) this.#ingest(link, f, prov)
+    }
+    return g.frames.length
+  }
+
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
   // lease — see LAMPORT_LEASE), the incarnation, and the SPENT ballot identity (a vote must be durable
   // before the VOTE frame leaves — membership calls this before shipping; the env's boot() contract is
@@ -1921,32 +1980,10 @@ export class Node {
           j.armed && j.emit(JK.frameDrop, link.id, 'records without prov')
           return
         }
-        //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
-        // evidence of a view I missed — close the gate NOW and pull the view on this same link
-        if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
-        let fresh = 0
-        let maxSeq = 0
-        //! armed: reset the per-frame partition scratch — fast-path APPENDS record their per-partition
-        // maxes into it for the batch's durable-floor cover; SPLICES (flavor 2) deliberately don't
-        // (no-interior-rows: they reach disk via snapshot, and node.spliced() already armed it)
-        if (this.armed) { if (this.writes.rxParts) this.writes.rxParts.clear(); else this.writes.rxParts = new Map() }
-        for (const rv of f.records()) {
-          const flavor = this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
-          if (flavor === 1) { fresh++; maxSeq = rv.seq }
-          else if (flavor === 2) fresh++
-        }
-        //! WAL the frame when it carried a fresh APPEND (durable mode) — the received bytes ARE the row
-        // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
-        // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent. A
-        // splice-only frame persists NOTHING here (maxSeq would walk the chain backwards) — its bytes
-        // reach disk inside the armed snapshot swap.
-        if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
-        if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
-        //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
-        // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too (a run past
-        // this node's frame cap leaves in cuts, V4-51)
-        if (fresh && this.clientLinks.size)
-          for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
+        //! a fold group is open on this link (FEED {b}, wave 6c): the frame waits, as its own copy of the bytes, for the
+        // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes
+        if (this.group !== null && link.id === this.primary) { this.group.frames.push(f.buf.slice()); return }
+        this.#ingest(link, f, prov)
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -2032,12 +2069,15 @@ export class Node {
         return this.env.sink.subRecs(v.id, v.recs as Rec[]) // deliberately un-journaled: per-delta volume
       }
       case VERB.PING:
+        //! a heartbeat frame from the primary is a later step's: a fold group still open at this client lost its end (wave 6c)
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link)
         //! a server's PONG toward a CLIENT link carries its write-gate (`w`, wave 6b): on a link where the client's uuid
         // is the lower one the client PINGs and no digest flows to it (it floors only its primary, and the server
         // waits for the lower side), so without this word a client could not know the gate of a server it does not
         // follow. An old client ignores the body (V4-14). Every other PONG is the bare frame it always was.
         return link.ship(encodeControl(VERB.PONG, link.client && !this.client ? { w: this.membership.gate(this).open ? 1 : 0 } : undefined), this.env.sink, j)
       case VERB.PONG:
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link) // as at PING (wave 6c)
         //! proof of life — and, at a CLIENT, a server's gate word (wave 6b): read it, and move if the rule says so
         if (this.client && !link.client && link.state === LS.admitted) this.#gateWord(link, (f.value as { w?: unknown } | undefined)?.w)
         return
@@ -2093,6 +2133,8 @@ export class Node {
           // the failover its linkDown runs asks the next one for everything this digest would have settled.
           this.#gateWord(link, v.w)
           if (link.dead) return
+          //! a digest is a frame of a later step at the feeder: a fold group still open here lost its end (wave 6c)
+          if (this.group !== null) this.#groupLand(link)
           //! a ceiling on the feeder's drain digest (`c`, wave 6c): keep it, and ask every feeder with it until a reply
           // at or above the first capped ask lands (#ceiling). In resync the ask is d = {} already: nothing to keep.
           if (v.r === 1 && v.h === 1 && typeof v.c === 'object' && v.c !== null) {
@@ -2221,8 +2263,15 @@ export class Node {
         }
         if (!this.client) { j.armed && j.emit(JK.frameDrop, link.id, 'feed at a server'); return }
         if (link.id !== this.primary) { j.armed && j.emit(JK.frameDrop, link.id, 'feed from a spare'); return }
-        const v = f.value as { x?: unknown } | undefined
+        const v = f.value as { x?: unknown; b?: unknown; e?: unknown } | undefined
         if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
+        //! {b: p}: a fold group begins — an open one lost its end (the next frames are a later step's): land it first
+        if (typeof v?.b === 'string') { this.#groupLand(link); this.group = { p: v.b, frames: [] } }
+        //! {e: p}: the group lands as one apply
+        if (typeof v?.e === 'string') {
+          const n = this.#groupLand(link)
+          j.armed && j.emit(JK.fed, v.e, n, 0)
+        }
         return
       }
       //! M7 DIAG plane (cold cases, after every hot verb): per-frame auth is the LATCH state check
