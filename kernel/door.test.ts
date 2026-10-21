@@ -217,7 +217,7 @@ test('a WRITE whose issuer is over ISSUER_MAX (uuid + \'~\' + 16 digits = 81 byt
   assert.equal(ISSUER_MAX, UUID_MAX + 17)
   const write = (issuer: string, cid: number, key: string) =>
     encodeRuns([{ rec: { type: REC.update, key: [key], value: 1 }, origin: issuer, seq: cid, epoch: 0 }], VERB.WRITE)[0]
-  for (const [r, issuer] of [[1, 'X'.repeat(1000) + '~1'], [1, 'c'.repeat(65) + '~' + '9'.repeat(16)], [1, 'é'.repeat(41)], [undefined, 'X'.repeat(1000) + '~1']] as const) {
+  for (const [r, issuer] of [[1, 'X'.repeat(1000) + '~1'], [1, 'c'.repeat(65) + '~' + '9'.repeat(16)], [1, 'é'.repeat(41)], [1, '€'.repeat(28)], [undefined, 'X'.repeat(1000) + '~1']] as const) {
     const { node, closes, rows, up } = harness('aa', { tune: { frame: 1024 } })
     up(1)
     helloWith(1, node, { u: 'cl', l: r === 1 ? '' : 'sim:cl', ...(r !== undefined ? { r } : {}) })
@@ -229,7 +229,9 @@ test('a WRITE whose issuer is over ISSUER_MAX (uuid + \'~\' + 16 digits = 81 byt
     assert.equal(rows(JK.writeRelay).length, 0, 'refused before the relay')
   }
   //! the bound itself: an issuer of exactly 81 bytes (the longest an honest node can be) and a short one commit
-  for (const issuer of ['c'.repeat(64) + '~' + '9'.repeat(16), 'cl~1', 'é'.repeat(40) + '~']) {
+  // '€' is 3 bytes in 1 UTF-16 unit, the most bytes a unit can take: 27 of them (81 bytes) commit and 28 (84 bytes,
+  // above) are refused, which holds the fast path's `length * 3` factor
+  for (const issuer of ['c'.repeat(64) + '~' + '9'.repeat(16), 'cl~1', 'é'.repeat(40) + '~', '€'.repeat(27)]) {
     const { node, closes, up } = harness('aa', { tune: { frame: 1024 } })
     up(1)
     helloWith(1, node, { u: 'cl', l: '', r: 1 })
