@@ -576,8 +576,9 @@ export class Node {
   // ran while the link was NOT synced (no {b}, no forward and no {e} go out on an unsynced link; the answer that syncs it
   // ships the fold, scope.ts onAcqDone → owe). The words are said again right after the next answer that syncs the link,
   // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
-  // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is still
-  // held (a new latch for p says its own end; a shed says {x}); an owed {x} always; a word a clear takes again is owed
+  // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is HELD
+  // (a latch open for p again says its own end; an orphan's or a gone partition's exit is a shed's or an abort's {x});
+  // an owed {x} always; a word a clear takes again is owed
   // again; the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
   // partition on the spoke for good and PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
   #owed = new Map<Link, { e: Set<string>; x: Set<string> }>()
@@ -2646,7 +2647,7 @@ export class Node {
     const es = [...o.e], xs = [...o.x]
     for (let i = 0; i < es.length; i++) {
       const p = es[i]
-      if (this.scope === null || !this.scope.held(p)) continue
+      if (this.scope === null || !this.scope.held(p)) continue // held strictly (never feeds): acquiring again, that fold says its own end; an orphan or gone, a shed's or an abort's {x} is the exit
       if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) {
         for (const q of es.slice(i + 1)) this.owe(link, 'e', q)
         for (const q of xs) this.owe(link, 'x', q)
