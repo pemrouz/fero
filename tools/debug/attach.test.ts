@@ -63,6 +63,17 @@ test('parity: a slice pulled over the DIAG wire deepEquals the in-process captur
   } finally { c.close(); await stop() }
 })
 
+test('an IPv6 target in brackets attaches: a node listening on [::1] is pulled at the listen it prints', async () => {
+  const port = await ports.free()
+  const rt = new Runtime({ uuid: 'v6', name: 'r', listen: `[::1]:${port}`, hosts: [], redialMs: 100, heartbeatMs: 500, journalCap: 1 << 14, diag: { allow: { ops: TOKEN } } })
+  await rt.start()
+  const c = new DiagClient(`[::1]:${port}`, TOKEN)
+  try {
+    const answer = await pullNode(c)
+    assert.equal(answer.node.uuid, 'v6')
+  } finally { c.close(); await rt.destroy() }
+})
+
 test('the pool: answering nodes render, every failure is a typed absent row, nothing is invented', async () => {
   const { rts, addrs, stop } = await spin(2)
   const dead = `127.0.0.1:${await ports.free()}` // nothing listens there

@@ -58,8 +58,11 @@ export class DiagClient {
     if (this.denied) return Promise.reject(new Error('unauthorized'))
     if (this.#ready) return this.#ready
     this.#ready = new Promise<void>((resolve, reject) => {
+      //! 'host:port', split at the last colon; an IPv6 host comes in brackets ('[::1]:4000', as a node prints its
+      // listen) and net wants it bare, so the brackets come off as a pair (shell/runtime.ts split does the same)
       const at = this.target.lastIndexOf(':')
-      const sock = net.connect(Number(this.target.slice(at + 1)), this.target.slice(0, at))
+      const host = this.target.slice(0, at)
+      const sock = net.connect(Number(this.target.slice(at + 1)), host.length > 2 && host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host)
       this.#sock = sock
       this.#accept = { resolve, reject }
       this.#refused = false
