@@ -646,9 +646,11 @@ export class Runtime {
           //! port 0 (V4-3): the OS chose — publish the real address to the kernel NOW, inside the listen
           // callback: before the start stimulus dials anyone and before any accepted socket can HELLO
           // (accept fires only after listen), so the gossiped listen is never ':0'.
+          // The host prints as it was written, so an IPv6 listen keeps its brackets ('[::1]:0' → '[::1]:40123').
           if (port === 0) {
             const a = server.address() as net.AddressInfo
-            this.node.listen = `${host}:${a.port}`
+            const l = this.#opts.listen!
+            this.node.listen = `${l.slice(0, l.lastIndexOf(':'))}:${a.port}`
           }
           resolve()
         })
@@ -789,7 +791,10 @@ const MAX_TIMER_MS = 2_147_483_647
 //! the typed reject start() settles with when the runtime stopped before it listened
 const stoppedError = () => Object.assign(new Error('runtime stopped before it listened'), { code: 'stopped' })
 
+//! split — 'host:port' as the net module takes it. An IPv6 host is written in brackets ('[::1]:4000', the
+// one spelling fero reads and prints, api/directory.ts isAddr); net wants it without them.
 const split = (addr: string): [string, number] => {
   const i = addr.lastIndexOf(':')
-  return [addr.slice(0, i), Number(addr.slice(i + 1))]
+  const h = addr.slice(0, i)
+  return [h.length > 2 && h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h, Number(addr.slice(i + 1))]
 }
