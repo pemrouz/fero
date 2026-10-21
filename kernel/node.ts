@@ -567,6 +567,17 @@ export class Node {
   //! #askF (servers) — the client links whose latest ask said `f: 1`: their reply carries the in-flight list; kept across a
   // torn or queued answer so the resumed reply carries it too
   #askF = new Set<Link>()
+  //! #owed (servers, wave 6c 2026-10-21, the rule's clause 3 — DESIGN-SCALE's wave-6c note): the FEED words this feeder
+  // owes each client link. A word is one frame on a client link, and a clear takes the whole queue — so a FEED {e} or
+  // {x} a clear took (#clearCover reads every dropped frame's verb) is remembered here, and so is the end of a fold that
+  // ran while the link was NOT synced (no {b}, no forward and no {e} go out on an unsynced link; the answer that syncs it
+  // ships the fold, scope.ts onAcqDone → owe). The words are said again right after the next answer that syncs the link,
+  // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
+  // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is still
+  // held (a new latch for p says its own end; a shed says {x}); an owed {x} always; a word a clear takes again is owed
+  // again; the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
+  // partition on the spoke for good and PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
+  #owed = new Map<Link, { e: Set<string>; x: Set<string> }>()
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
   // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
@@ -918,6 +929,7 @@ export class Node {
         this.clientLinks.delete(link)
         this.#covered.delete(link)
         this.#askF.delete(link)
+        this.#owed.delete(link)
         //! a client's link died: what this relay still held for it leaves the queue (wave 6b, write.ts dropVia) — the
         // client re-sends what it has in flight to its next relay, and a copy kept here would commit a second time
         if (link.client && link.state === LS.admitted) this.writes.dropVia(link.id)
@@ -2549,6 +2561,7 @@ export class Node {
         }
         this.#sendDigest(link, 0, q, undefined, this.#askF.delete(link))
       }
+      if (link.client && this.#owed.size) this.#payOwed(link) // the owed FEED words, after the whole ship and the reply (wave 6c)
       return
     }
     link.synced = false
@@ -2585,20 +2598,53 @@ export class Node {
   // meanwhile is lowered into the ceiling by indexInsert (the link joins #covered here); a second clear lowers the same
   // ceiling again, never raises it. The cost: one header read per frame the clear took (the clear is cold), and the
   // answer re-sends a lowered lane's suffix above the lowest lost record.
+  //! THE OWED WORDS (wave 6c, clause 3; see #owed): a FEED frame the clear took is owed — read before the cover's early
+  // return below, since a word on an unsynced link with no cover is lost all the same. {b} owes nothing: its end does.
   #clearCover = (link: Link, dropped: Uint8Array[], wasSynced: boolean): void => {
     let t = link.torn
-    if (t === null) {
-      if (!wasSynced) return
-      t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined, c: true }
-    }
+    if (t === null && wasSynced) t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined, c: true }
     for (const b of dropped) {
       const f = new Frame(b)
-      if (f.verb !== VERB.RECORDS) continue
+      if (f.verb === VERB.FEED) {
+        const v = f.value as { e?: unknown; x?: unknown } | undefined
+        if (typeof v?.e === 'string') this.owe(link, 'e', v.e)
+        if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.owe(link, 'x', p)
+        continue
+      }
+      if (t === null || f.verb !== VERB.RECORDS) continue
       const p = f.prov()
       if (p === null) continue
       if ((t.d[p.origin] ?? 0) >= p.baseSeq) t.d[p.origin] = p.baseSeq - 1
     }
-    this.#covered.add(link)
+    if (t !== null) this.#covered.add(link)
+  }
+
+  //! owe — remember a FEED word for a client link (#owed): `e` the end of a fold for p, `x` p left this feeder.
+  owe(link: Link, kind: 'e' | 'x', p: string) {
+    let o = this.#owed.get(link)
+    if (o === undefined) this.#owed.set(link, o = { e: new Set(), x: new Set() })
+    o[kind].add(p)
+  }
+  //! #payOwed — the answer that syncs the link has shipped whole and replied: say the owed words, {e} per partition
+  // still held, then one {x}. Never into a full paused queue (the reply before it was placed never to overflow one;
+  // the spoke's next heartbeat answer is an untorn answer too, and pays within a tick). A word a clear takes on its way
+  // out is owed again by #clearCover; the ones not yet shipped behind it are owed again here.
+  #payOwed(link: Link) {
+    const o = this.#owed.get(link)
+    if (o === undefined) return
+    if (link.paused && link.queued.length >= link.maxQueued) return
+    this.#owed.delete(link)
+    const es = [...o.e], xs = [...o.x]
+    for (let i = 0; i < es.length; i++) {
+      const p = es[i]
+      if (this.scope === null || !this.scope.held(p)) continue
+      if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) {
+        for (const q of es.slice(i + 1)) this.owe(link, 'e', q)
+        for (const q of xs) this.owe(link, 'x', q)
+        return
+      }
+    }
+    if (xs.length) link.ship(encodeControl(VERB.FEED, { x: xs }), this.env.sink, this.journal)
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
