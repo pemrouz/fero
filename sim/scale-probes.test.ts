@@ -781,7 +781,8 @@ const sighting3 = (seed: number, off: number) => {
   assert.ok(count(Pn, JK.acquire) >= 5, `seed ${seed}: P repaired every partition through the latch (${count(Pn, JK.acquire)} acquires)`)
   //! the ghost sweep's count at each resync end (JK.resynced a), summed: the rows the spoke had and the answer did not bring
   // and the end REMOVED; `kept` (JK.resynced c, wave 6c): the rows it kept on the screen for a partition the reply named in
-  // flight; `judged` (JK.fed c): kept rows a fold's end, or the lane moving past them, found gone
+  // flight; `judged` (JK.fed c): kept rows a fold's end found gone (the fold did not bring them; the rework judges every kept
+// row at the end, nothing waits on a lane)
   const rows = s1.journal.read()
   const swept = rows.filter((e) => e.kind === JK.resynced).reduce((a, e) => a + (e.a as number), 0)
   const kept = rows.filter((e) => e.kind === JK.resynced).reduce((a, e) => a + ((e.c as number | undefined) ?? 0), 0)
