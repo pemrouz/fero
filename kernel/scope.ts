@@ -159,6 +159,24 @@ export class Scope {
     return e !== undefined && (e.state === SCOPE.held || (e.state === SCOPE.acquiring && e.preState !== SCOPE.orphan))
   }
 
+  //! inFlight — THE PARTITIONS A SPOKE'S RESYNC WAITS FOR (wave 6c, 2026-10-21): every open latch (a repair of a held
+  // base, a re-entry from an orphan, a from-zero acquire) and every orphan the ring still assigns here (a re-entry in
+  // waiting: the next handshake round latches it, finding 26). The answer to a resync's ask carries what this node holds
+  // of each FED partition at that moment (node.ts #answer, `feeds`); what it is about to fold — a latch's staged
+  // records, an orphan's delta, a from-zero partition whole — is not in it, so a spoke that had those rows from its
+  // first feeder would lose them at the resync's end and see them return at the fold (the vanish-and-return, STATUS).
+  // The reply names these partitions (`f`) and the spoke keeps their cells on its screen until the fold's end judges
+  // them (node.ts #resyncEnd, FEED {e}). An orphan the ring does not assign is on its way to a shed: not in flight.
+  // Computed only for a reply the spoke asked for (`f: 1` on a resync's ask): O(entries), once per resync.
+  inFlight(node: Node): string[] {
+    const out: string[] = []
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    for (const [p, e] of this.entries)
+      if (e.state === SCOPE.acquiring || (e.state === SCOPE.orphan && ring.holdsAny(node.uuid, p, node.replicas))) out.push(p)
+    return out
+  }
+
   //! verdict — THE INBOUND-GATE decision (write.ts ingest, armed only), the §0 law's first rows:
   // 1 = fold (held; a first-ever record to its lawful holder mints held), 2 = stage (an open latch
   // buffers live records for p), 0 = gate-drop (orphan freeze / not assigned / epoch skew).

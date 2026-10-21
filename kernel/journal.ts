@@ -106,7 +106,7 @@ export const JK = {
   nameReject: 71,    // a=link, b=theirName — the HELLO declared a DIFFERENT resource name: refused (dead + noRedial), never admitted (admitting would silently cross-replicate two resources' logs)
   //! ── spokes are views (2026-09-06, DECISIONS V4-5) ──
   resync: 72,        // a=cells — a SPOKE found itself AHEAD of its feeder (the cluster's truth moved under it): fold reset, empty r=1 digest out, re-download begins
-  resynced: 73,      // a=ghosts — the re-download completed (the feeder's r=0 reply, FIFO after its suffix): cells held before that did not come back were removed downstream
+  resynced: 73,      // a=ghosts, c=kept (wave 6c) — the re-download completed (the feeder's r=0 reply, FIFO after its suffix): cells held before that did not come back were removed downstream (a), except the c cells of partitions the reply named in flight at the feeder (`f`: an open latch, a re-entry in waiting), which stay on the screen until the fold's end judges them (FEED {e}, the `fed` row)
   //! ── the graceful leave (2026-09-07, DECISIONS V4-6) ──
   leave: 74,         // a=uuid — a LEAVE sent (a=self: this node is stopping on purpose) or received (a=the leaver): "propose the view without me"
   left: 75,          // a=epoch, b=clean(0|1), c=why — the leaver's exit: 1 = the view without it committed and a survivor echoed it (and, scoped, every partition it held was proved held elsewhere); 0 = the bound (LEAVE_TICKS, or the knock window LEAVE_WINDOW with a member linked) ran out: c='unanswered' (the vote never came back; it is still in its own view, or holds no view yet at epoch 0, and goes like a crash — suspicion + eviction follow — after counting what goes with it, `undrained`) or c='unechoed' (it committed the view without itself and no survivor echoed it) — or, with no c, after an `undrained` row: the view change committed and echoed but some of its partitions went with it
@@ -123,7 +123,7 @@ export const JK = {
   refeed: 81,        // a=link (the feeder's), b=link (the open server's) — a CLIENT closed its feeder link on purpose: the feeder said its write-gate is shut (`w: 0`) while another linked server said its is open; the linkDown that follows elects that server, and the shut feeder is redialed as a non-primary
   //! ── the spoke edge cases (2026-10-21, wave 6c, DECISIONS V4-NN) ──
   unfed: 82,         // a=partition, b=laneEntriesDropped — a CLIENT's feeder said the partition LEFT it (FEED {x}: its copy froze into an orphan at an install and was shed once every holder attested it): the spoke dropped the partition's cells, lane entries and screen rows with it (they stayed on the screen, frozen, until a failover's resync before)
-  fed: 83,           // a=partition, b=framesLanded, c=ghostsJudged — a CLIENT's feeder ended a fold group for the partition (FEED {e}: its latch fold's forward, bracketed by FEED {b}): the b frames the spoke buffered landed as one apply; c is 0 until the resync end keeps cells back for the fold (the next change)
+  fed: 83,           // a=partition, b=framesLanded, c=ghostsJudged — a CLIENT's feeder ended a fold group for the partition (FEED {e}: its latch fold's forward, bracketed by FEED {b}): the b frames the spoke buffered landed as one apply; c cells a resync end kept back for this partition (the reply's `f`) were judged ghosts now and left the screen. b=0 with c>0: a kept cell judged later, when the feeder's lane moved past its stamp
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

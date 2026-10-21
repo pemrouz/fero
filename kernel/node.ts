@@ -543,6 +543,26 @@ export class Node {
   // two events). Bounded by the fold's size, which the spoke is about to hold in its lanes anyway. Public for the sim's
   // monitors (a spoke with a group open covers nothing yet). Null when no group is open.
   group: { p: string; frames: Uint8Array[] } | null = null
+  //! THE KEPT CELLS (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the vanish-and-return at a resync ending across a
+  // fold. A failover's resync answer carries what the new feeder holds of each FED partition when it builds it; the rows
+  // it is about to fold (a repair latch's staged delta, a re-entry's whole partition, a from-zero acquire) are not in
+  // it, and the spoke had them from its first feeder, so the ghost sweep at the end took them from the screen and the
+  // fold's forward brought them back (STATUS; sighting 3: 7 to 20 of forty cells on 22 of 56 runs, M11 on two). Now a
+  // resync's ask says `f: 1`, the reply names the partitions in flight at the feeder (`f`: Scope.inFlight — every open
+  // latch and every orphan the ring still assigns there), and the sweep KEEPS a ghost cell of such a partition on the
+  // screen (#deferred, with the stamp it held at the reset: #oldStamps) instead of removing it. The fold's end for that
+  // partition (FEED {e}, #groupLand) judges them: a kept cell the group brought is back in the kernel and done; one it
+  // did not bring is a ghost once the feeder has shown this spoke its lane past the cell's stamp (the spoke's applied for
+  // that lane: the feeder's lane moved on and the fold did not carry it), else it waits for the lane (a record in flight
+  // to the feeder at the fold, tapped right after; judged again after each frame while kept cells remain). A shed of the
+  // partition drops its kept cells with the rest (#unfeed); a failover folds them into the next resync's sweep set; a
+  // kept cell is screen-only — the kernel lacks it — so M12's screen check names one that never gets judged.
+  #deferred = new Map<string, { ended: boolean; cells: Map<string, { seq: number; origin: string }> }>()
+  //! the stamps the cells of `resync.old` had at the reset (the fold is wiped there): what a kept cell is judged by
+  #oldStamps = new Map<string, { seq: number; origin: string }>()
+  //! #askF (servers) — the client links whose latest ask said `f: 1`: their reply carries the in-flight list; kept across a
+  // torn or queued answer so the resumed reply carries it too
+  #askF = new Set<Link>()
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
   // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
@@ -893,6 +913,7 @@ export class Node {
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
         this.#covered.delete(link)
+        this.#askF.delete(link)
         //! a client's link died: what this relay still held for it leaves the queue (wave 6b, write.ts dropVia) — the
         // client re-sends what it has in flight to its next relay, and a copy kept here would commit a second time
         if (link.client && link.state === LS.admitted) this.writes.dropVia(link.id)
@@ -1378,7 +1399,13 @@ export class Node {
   // the partial re-download's cells join it; the fold is wiped again (the new feeder's held subset is the truth).
   #resyncBegin(link: Link) {
     const old = this.resync !== null ? this.resync.old : new Set<string>()
-    for (const k of this.state.keys()) old.add(k)
+    for (const k of this.state.keys()) { old.add(k); const v = this.versions.get(k); if (v !== undefined) this.#oldStamps.set(k, v) }
+    //! the cells kept back by an earlier end (#deferred, wave 6c) are on the screen too: they join the sweep set with the
+    // stamps they were kept under, and the next feeder's reply says which to keep again
+    if (this.#deferred.size) {
+      for (const g of this.#deferred.values()) for (const [k, st] of g.cells) { old.add(k); this.#oldStamps.set(k, st) }
+      this.#deferred.clear()
+    }
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
     this.#ceiling = null // the ask below is d = {}: everything is re-asked, a ceiling has nothing left to cap
@@ -1395,10 +1422,12 @@ export class Node {
   // re-download applied the whole row, which is the truth, and a remove here would tear a field out of
   // it — or was held at the reset and is a ghost itself: its remove takes the field with it. A ghost
   // ROW whose newer fields came back has erased them downstream: they go back on top, as after a sweep.
-  #resyncEnd() {
+  //! `f` (wave 6c): the partitions the reply named in flight at the feeder — a ghost cell of one of them is KEPT on the
+  // screen (#deferred), not removed: the fold about to land there carries its rows, and its end judges what it did not.
+  #resyncEnd(f: Set<string> | null) {
     const { old } = this.resync!
     this.resync = null
-    let ghosts = 0
+    let ghosts = 0, kept = 0
     for (const cell of old) {
       if (this.state.has(cell)) continue
       const path = JSON.parse(cell) as string[]
@@ -1410,13 +1439,56 @@ export class Node {
         }
         if (covered) continue
       }
+      if (f !== null && f.has(path[0])) {
+        let g = this.#deferred.get(path[0])
+        if (g === undefined) this.#deferred.set(path[0], g = { ended: false, cells: new Map() })
+        g.cells.set(cell, this.#oldStamps.get(cell) ?? { seq: 0, origin: '' })
+        kept++
+        continue
+      }
       ghosts++
       this.#ghost(cell, path)
     }
-    this.journal.armed && this.journal.emit(JK.resynced, ghosts)
+    this.#oldStamps.clear()
+    this.journal.armed && this.journal.emit(JK.resynced, ghosts, undefined, kept || undefined)
     //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
     // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
     this.writes.settleStranded(this)
+  }
+
+  //! #judge (clients, wave 6c) — the kept cells of partition p (#deferred), once the fold's end for p has come (`ended`):
+  // a cell back in the kernel is done; one the feeder's lane has moved past (the spoke's applied for the cell's lane is
+  // at or above its stamp: the fold that just landed is the feeder's whole p, and it did not carry the cell) is a ghost
+  // and leaves the screen through #ghost — unless an ancestor is live now (the row came back whole: covered); one above
+  // the lane waits (a record in flight to the feeder at the fold, tapped right behind the group) and is judged again
+  // after each frame that lands here (#judgeEnded). Returns the ghosts removed.
+  #judge(p: string, ended: boolean): number {
+    const g = this.#deferred.get(p)
+    if (g === undefined) return 0
+    if (ended) g.ended = true
+    if (!g.ended) return 0
+    let ghosts = 0
+    for (const [cell, st] of g.cells) {
+      if (this.state.has(cell)) { g.cells.delete(cell); continue }
+      if (st.seq > (this.streams.get(st.origin)?.applied ?? 0)) continue
+      g.cells.delete(cell)
+      const path = JSON.parse(cell) as string[]
+      let covered = false
+      for (let d = 1; d < path.length && !covered; d++) covered = this.state.has(JSON.stringify(path.slice(0, d)))
+      if (covered) continue
+      ghosts++
+      this.#ghost(cell, path)
+    }
+    if (g.cells.size === 0) this.#deferred.delete(p)
+    return ghosts
+  }
+  //! #judgeEnded — after a frame landed: every ended partition's waiting cells are judged again (cold: only while kept cells remain)
+  #judgeEnded() {
+    for (const [p, g] of this.#deferred) {
+      if (!g.ended) continue
+      const ghosts = this.#judge(p, false)
+      if (ghosts) this.journal.armed && this.journal.emit(JK.fed, p, 0, ghosts)
+    }
   }
 
   //! #ghost — one cell leaves the SCREEN without a remove record existing anywhere (the ghost sweep's removal, shared
@@ -1449,7 +1521,10 @@ export class Node {
     if (this.state.has(row)) shown.add(row)
     for (const k of fields) if (this.state.has(k)) shown.add(k)
     //! a resync in flight: the cells of p it remembered from the reset are on the screen too, and leave the sweep set
-    if (this.resync !== null) for (const k of this.resync.old) if (partitionOf({ type: REC.update, key: JSON.parse(k) as string[] }) === p) { this.resync.old.delete(k); shown.add(k) }
+    if (this.resync !== null) for (const k of this.resync.old) if (((JSON.parse(k) as string[])[0] ?? '') === p) { this.resync.old.delete(k); shown.add(k) }
+    //! the cells a resync end kept back for p (#deferred) are on the screen too: they go with the partition
+    const kept = this.#deferred.get(p)
+    if (kept !== undefined) { for (const k of kept.cells.keys()) shown.add(k); this.#deferred.delete(p) }
     this.dropCell(row); this.versions.delete(row)
     for (const k of fields) { this.dropCell(k); this.versions.delete(k) }
     let dropped = 0
@@ -1523,6 +1598,8 @@ export class Node {
       const prov = f.prov()
       if (prov !== null) this.#ingest(link, f, prov)
     }
+    //! the fold's end for p: the cells a resync end kept back for p are judged now (wave 6c)
+    this.journal.armed && this.journal.emit(JK.fed, g.p, g.frames.length, this.#judge(g.p, true))
     return g.frames.length
   }
 
@@ -1984,6 +2061,7 @@ export class Node {
         // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes
         if (this.group !== null && link.id === this.primary) { this.group.frames.push(f.buf.slice()); return }
         this.#ingest(link, f, prov)
+        if (this.#deferred.size && link.id === this.primary) this.#judgeEnded() // kept cells waiting for the lane (wave 6c)
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -2087,7 +2165,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number; q?: number; h?: number; c?: Record<string, unknown> }
+        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number; q?: number; h?: number; c?: Record<string, unknown>; f?: unknown }
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -2151,7 +2229,7 @@ export class Node {
           //! the end is the reply to a digest sent AFTER the resync began (q ≥ the resync's own; the failover's fresh
           // r=1 counts); a reply to an older digest is NOT the end — the re-download is still on its way behind it,
           // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
-          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
+          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd(Array.isArray(v.f) ? new Set(v.f.filter((p): p is string => typeof p === 'string')) : null)
           link.synced = true
           //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. In resync the ask is out on THIS
           // link (the single-feeder rule above: only the primary reaches here, and every ask goes to the primary) and
@@ -2184,6 +2262,9 @@ export class Node {
         }
         //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
         // its ship stops at a full queue or a clear takes it). A client's r=1 carries `q`; the reply echoes it (only clients send one).
+        //! a client's ask that says `f: 1` (a scoped spoke's resync, wave 6c) gets the in-flight list on its reply (#sendDigest);
+        // remembered on the link, so a torn or queued answer's resumed reply carries it too
+        if (link.client) { if (v.f === 1) this.#askF.add(link); else this.#askF.delete(link) }
         //! a clear's ceiling (`c`, #clearCover, wave 5f) caps this digest's tails lane by lane, and this answer uses it up:
         // a lane the clear took a record from is answered from just under it, every other lane from the spoke's own tail
         const t = link.torn
@@ -2267,10 +2348,11 @@ export class Node {
         if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
         //! {b: p}: a fold group begins — an open one lost its end (the next frames are a later step's): land it first
         if (typeof v?.b === 'string') { this.#groupLand(link); this.group = { p: v.b, frames: [] } }
-        //! {e: p}: the group lands as one apply
+        //! {e: p}: the group lands as one apply (and judges the kept cells of its partition); with no group open — its
+        // {b} was lost, or the fold forwarded nothing — the kept cells of p are judged all the same
         if (typeof v?.e === 'string') {
-          const n = this.#groupLand(link)
-          j.armed && j.emit(JK.fed, v.e, n, 0)
+          if (this.group !== null) this.#groupLand(link)
+          else j.armed && j.emit(JK.fed, v.e, 0, this.#judge(v.e, true))
         }
         return
       }
@@ -2472,7 +2554,7 @@ export class Node {
           link.inQueue = { d: this.#cover(d, null, 0), r, q }
           if (link.client) this.#covered.add(link)
         }
-        this.#sendDigest(link, 0, q)
+        this.#sendDigest(link, 0, q, undefined, this.#askF.delete(link))
       }
       return
     }
@@ -2550,13 +2632,13 @@ export class Node {
   // the lane drops what it already has (write.ts #splice, dupDrop).
   //! `h` (the drain digest, see `resync`): toward a CLIENT, `h: 1` says this link dropped frames while paused — the one
   // event after which an ask of the spoke's may have no reply coming. Member digests never carry it: bytes unchanged.
-  #sendDigest(link: Link, r: 0 | 1, q?: number, h?: boolean) {
+  #sendDigest(link: Link, r: 0 | 1, q?: number, h?: boolean, f?: boolean) {
     const d: Record<string, number> = {}
     if (!(this.client && this.resync !== null))
       for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
     //! a held ceiling caps every lane (wave 6c): the lower of this spoke's tail and what the clear's cover said
     if (this.#ceiling !== null) for (const o in d) { const c = this.#ceiling.d[o]; if (c !== undefined && c < d[o]) d[o] = c }
-    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number; h?: number; c?: Record<string, number> }
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number; h?: number; c?: Record<string, number>; f?: number | string[] }
     if (this.durable) {
       const p: Record<string, number> = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -2568,8 +2650,14 @@ export class Node {
     if (this.client && r === 1) {
       body.q = q ?? ++this.#dq
       if (this.#ceiling !== null && this.#ceiling.q === undefined) this.#ceiling.q = body.q // the first capped ask: its reply drops the ceiling
+      //! a scoped spoke's resync ask asks which partitions are in flight at the feeder (`f: 1`, wave 6c): the reply's `f`
+      // tells the end which cells to keep (#deferred). An unscoped feeder folds nothing: its asks are the frames they were.
+      if (this.resync !== null && this.feederScoped) body.f = 1
     }
     else if (q !== undefined) body.q = q
+    //! the in-flight list (wave 6c): a reply to an ask that said `f: 1`, from an armed feeder — only then, so the walk of
+    // the scope entries costs one resync, never a heartbeat; omitted when nothing is in flight (the frame it was)
+    if (f === true && link.client && this.armed) { const fl = this.scope!.inFlight(this); if (fl.length) body.f = fl }
     if (h === true && link.client) {
       body.h = 1
       //! the ceiling rides the drain digest (wave 6c): a clear on this synced client link left a cover at my tails,

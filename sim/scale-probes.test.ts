@@ -780,44 +780,54 @@ const sighting3 = (seed: number, off: number) => {
   assert.equal(s1.resync, null, `seed ${seed}: the resync ended`)
   assert.ok(count(Pn, JK.acquire) >= 5, `seed ${seed}: P repaired every partition through the latch (${count(Pn, JK.acquire)} acquires)`)
   //! the ghost sweep's count at each resync end (JK.resynced a), summed: the rows the spoke had and the answer did not bring
-  const swept = s1.journal.read().filter((e) => e.kind === JK.resynced).reduce((a, e) => a + (e.a as number), 0)
-  return { sim, s1, swept }
+  // and the end REMOVED; `kept` (JK.resynced c, wave 6c): the rows it kept on the screen for a partition the reply named in
+  // flight; `judged` (JK.fed c): kept rows a fold's end, or the lane moving past them, found gone
+  const rows = s1.journal.read()
+  const swept = rows.filter((e) => e.kind === JK.resynced).reduce((a, e) => a + (e.a as number), 0)
+  const kept = rows.filter((e) => e.kind === JK.resynced).reduce((a, e) => a + ((e.c as number | undefined) ?? 0), 0)
+  const judged = rows.filter((e) => e.kind === JK.fed).reduce((a, e) => a + ((e.c as number | undefined) ?? 0), 0)
+  return { sim, s1, swept, kept, judged }
 }
-test('the latch tap, sighting 3 (the review\'s shape): a spoke fails over onto a feeder that is re-latching a partition it held — the resync\'s answer brings the base, the fold the delta, the spoke mirrors its feeder at the horizon, M11 and M12 green (the sweep still removed 9, 10, 7 and 8 of forty cells at the end, and the fold brought them back), on four seeds', () => {
-  for (const [seed, swept] of [[2, 9], [4, 10], [5, 7], [6, 8]] as const) {
-    const { sim, s1, swept: got } = sighting3(seed, 0)
+test('the latch tap, sighting 3 (the review\'s shape): a spoke fails over onto a feeder that is re-latching a partition it held — the resync\'s answer brings the base, the fold the delta, the spoke mirrors its feeder at the horizon, M11 and M12 green; since wave 6c the end keeps the partition\'s 9, 10, 7 and 8 cells on the screen (it swept them and the fold brought them back) and the fold\'s end confirms every one, on four seeds', () => {
+  for (const [seed, kept] of [[2, 9], [4, 10], [5, 7], [6, 8]] as const) {
+    const { sim, s1, swept, kept: got, judged } = sighting3(seed, 0)
     const c = { parts: 0, cells: 0 }
     assert.equal(spokeMirror(sim, 's1', c), null, `seed ${seed}: the spoke mirrors P's held subset (it lacked r0 and r1 of every partition before)`)
     assert.equal(c.cells, 40, `seed ${seed}: M12 compared all forty cells`)
     assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired (M11 fired at the resync's end on seed 4 before)`)
     assert.equal(screenMatches(sim, 's1'), null, `seed ${seed}: screen = kernel`)
-    assert.equal(got, swept, `seed ${seed}: the ghost sweep removed ${swept} of forty cells at the resync's end (the vanish-and-return: the fold brought them back)`)
+    assert.equal(swept, 0, `seed ${seed}: the end removed nothing from the screen (it swept ${kept} of forty cells before wave 6c, and the fold brought them back)`)
+    assert.equal(got, kept, `seed ${seed}: the end kept ${kept} cells of the partition under repair on the screen (the reply named it in flight)`)
+    assert.equal(judged, 0, `seed ${seed}: the fold's end found every kept cell back in the kernel — none was a ghost`)
     void s1
   }
 })
 
-//! KNOWN (STATUS; the review of wave 6a's review, 2026-10-12): the vanish-and-return at a resync ending ACROSS the fold.
-// Sighting 3's schedule with the spoke's cut from Q delayed 1 ms (seed 2) and 10 ms (seed 6) after P first re-latches.
-// P builds the failover's resync answer while it is repairing: the rows it LACKS then (the lost frame's delta) are not in
-// it; on seed 6 the repair latches had aborted into orphans on a link loss and were re-entering when the answer was built,
-// so it withheld their base too (an orphan is no spoke feed, and a re-entry is not fed until its fold). The spoke had all
-// those rows from Q, so the ghost sweep at the resync's end removes them — 7 of forty cells on seed 2, 20 on seed 6 — and
-// the fold's forward brings them back. M11 fires at the end: its excuse assumes a record at or below the reply's tail was
-// shipped before the reply, and a latch fold between the build and the end puts such a record into P's lane unshipped
-// (seed 2: a delta row, n01#12; seed 6: a base row, n01#1, withheld as a re-entry). At the horizon the spoke mirrors P
-// (M12 green, screen = kernel). Over seeds 2, 4, 5, 6 × fourteen offsets 0-30 ms (56 runs): rows swept and returned on
-// 22 (7 to 20 of forty), M11 on these two alone, M12 green on all; the base tree on the same 56: M11 on 8, and on 23 the
-// rows never came back (M12 red). Pinned as it is: a schedule that stops firing M11, or stops sweeping, is a change to
-// read (the fix that closes it must put the rows a feeder is folding into the answer, or keep the spoke's rows across
-// the end until the fold lands).
-test('KNOWN (STATUS): the vanish-and-return at a resync ending across the fold — sighting 3 with the cut 1 ms (seed 2) and 10 ms (seed 6) later: the ghost sweep removes 7 and 20 of forty cells the spoke had from its first feeder, M11 fires at the end, the fold brings them back, M12 green and screen = kernel at the horizon', () => {
-  for (const [seed, off, swept, row] of [[2, 1, 7, 'a delta row the lost frame carried'], [6, 10, 20, 'a base row the answer withheld as a re-entry from an orphan']] as const) {
-    const { sim, s1, swept: got } = sighting3(seed, off)
-    assert.equal(got, swept, `seed ${seed} off ${off}: the ghost sweep removed ${swept} of forty cells at the resync's end`)
-    assert.deepEqual(sim.violations.map((x) => x.monitor), ['resync-behind'], `seed ${seed} off ${off}: M11 fired at the end, and nothing else did`)
-    assert.match(String(sim.violations[0].detail), /^s1's resync ended with its fold behind its feeder n02: it held \["p\d+","r\d"\] at the reset, n02 holds it @1\/\d+\/n01 \(at or below the reply's tail \d+ for lane n01\), and s1 no longer has it \(a ghost that is live at the feeder\)/, `seed ${seed} off ${off}: M11 names ${row}`)
+//! CLOSED (wave 6c, 2026-10-21; KNOWN on STATUS from the review of wave 6a's review, 2026-10-12): the vanish-and-return at a
+// resync ending ACROSS the fold. Sighting 3's schedule with the spoke's cut from Q delayed 1 ms (seed 2) and 10 ms (seed 6)
+// after P first re-latches. P builds the failover's resync answer while it is repairing: the rows it LACKS then (the lost
+// frame's delta) are not in it; on seed 6 the repair latches had aborted into orphans on a link loss and were re-entering
+// when the answer was built, so it withheld their base too. The spoke had all those rows from Q. Before: the ghost sweep at
+// the end removed them (7 of forty cells on seed 2, 20 on seed 6), M11 fired (a latch fold between the reply's build and
+// the end put a record at or below the reply's tail into P's lane unshipped: seed 2 a delta row, seed 6 a base row
+// withheld as a re-entry), and the fold's forward brought them back. Now the resync's ask says `f: 1`, P's reply names the
+// partitions in flight (an open latch, an orphan the ring still assigns), the end KEEPS their cells on the screen (7 and
+// 20), the fold's end (FEED {e}) finds every one back in the kernel (0 ghosts judged), and M11 skips the named partitions
+// (counted: resyncKept). Over seeds 2, 4, 5, 6 × fourteen offsets 0-30 ms (56 runs): swept 0 on 56, kept on 12 (7 to 20 of
+// forty; the base tree today sweeps exactly those on the same 12), judged ghosts 0, M11 0, M12 green and screen = kernel on
+// all 56. Pinned as it is: a sweep, a judged ghost or an M11 here is a change to read.
+test('CLOSED (wave 6c): the vanish-and-return at a resync ending across the fold — sighting 3 with the cut 1 ms (seed 2) and 10 ms (seed 6) later: the end keeps the 7 and 20 cells of forty the spoke had from its first feeder (the reply named the partitions in flight), the fold\'s end confirms every one, M11 counts them and stays silent, M12 green and screen = kernel at the horizon', () => {
+  for (const [seed, off, kept] of [[2, 1, 7], [6, 10, 20]] as const) {
+    const { sim, s1, swept, kept: got, judged } = sighting3(seed, off)
+    assert.equal(swept, 0, `seed ${seed} off ${off}: the end removed nothing from the screen (${kept} of forty before)`)
+    assert.equal(got, kept, `seed ${seed} off ${off}: the end kept ${kept} cells on the screen for the partitions the reply named in flight`)
+    assert.equal(judged, 0, `seed ${seed} off ${off}: the fold's end found every kept cell back in the kernel`)
+    assert.deepEqual(sim.violations, [], `seed ${seed} off ${off}: no monitor fired (M11 did, at the end, before)`)
+    //! M11 counts the kept rows it would otherwise have judged (7 on seed 2; 10 of the 20 on seed 6 — the other ten are
+    // rows of re-entries from orphans, which M11 never judges: `feeds` is false there)
+    assert.ok(ledgerOf(sim).counts.resyncKept > 0, `seed ${seed} off ${off}: M11 counted the rows it skipped as kept (${ledgerOf(sim).counts.resyncKept})`)
     const c = { parts: 0, cells: 0 }
-    assert.equal(spokeMirror(sim, 's1', c), null, `seed ${seed} off ${off}: the rows came back with the fold — the spoke mirrors P at the horizon`)
+    assert.equal(spokeMirror(sim, 's1', c), null, `seed ${seed} off ${off}: the spoke mirrors P at the horizon`)
     assert.equal(c.cells, 40, `seed ${seed} off ${off}: M12 compared all forty cells`)
     assert.equal(screenMatches(sim, 's1'), null, `seed ${seed} off ${off}: screen = kernel`)
     void s1

@@ -562,7 +562,7 @@ test('a client of a SCOPED feeder resyncs at every failover: the new feeder\'s r
   h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   assert.equal(h.node.primary, 2)
   assert.notEqual(h.node.resync, null, 'a scoped failover begins a resync')
-  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2 }], 'the failover digest asks for EVERYTHING, not for what is above tail 6')
+  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2, f: 1 }], 'the failover digest asks for EVERYTHING, not for what is above tail 6; `f: 1` asks which partitions are in flight (wave 6c)')
   assert.deepEqual(h.jk(JK.resync).map((e) => e.a), [2], 'two cells held at the reset')
   //! O holds lane T's LOW rows (partition B at seqs 1-3) and nothing of A: they come back, A is swept
   serve(h, 2, { tt: ['b1', 'b2', 'b3'] })
@@ -598,10 +598,10 @@ test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets 
   h.node.step({ kind: 'bytesIn', link: 1, bytes: lane('tt', 5, ['a1', 'a2']) })
   h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   assert.equal(h.node.primary, 2)
-  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2 }], 'the ask, at the failover')
+  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2, f: 1 }], 'the ask, at the failover')
   //! oo's heartbeat r=1 crosses it (ticks 0): read for its gate, answered with nothing
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { tt: 3 }, r: 1, w: 1 }) })
-  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2 }], 'the crossing r=1 got no answer: the ask is on its way and its reply is the end (an r=0 with d = {} would re-ship everything)')
+  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2, f: 1 }], 'the crossing r=1 got no answer: the ask is on its way and its reply is the end (an r=0 with d = {} would re-ship everything)')
   assert.notEqual(h.node.resync, null, 'still in resync')
   assert.equal(h.node.feederOpen, true, 'the crossing digest was still read: the gate rides it')
   //! oo serves the ask: the end, after exactly one ship
@@ -620,7 +620,7 @@ test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets 
   admitScoped(h, 3, 'oo')
   assert.equal(h.node.primary, 3)
   assert.notEqual(h.node.resync, null, 'a scoped feeder elected at the admit: the spoke resyncs onto it (it held three rows from the last one)')
-  assert.deepEqual(digests(h, 3), [{ d: {}, r: 1, q: 3 }], 'the ask asks for everything, not for what is above tail 3')
+  assert.deepEqual(digests(h, 3), [{ d: {}, r: 1, q: 3, f: 1 }], 'the ask asks for everything, not for what is above tail 3')
   assert.deepEqual(h.jk(JK.resync).map((e) => e.a), [2, 3], 'the two resets remembered their cells (a1-a2, then b1-b3)')
   //! a tick passes: in resync the spoke sends NO heartbeat floor (cl sorts below oo; out of resync it floors oo), and oo's
   // heartbeat r=1 gets no answer whatever the ask's age. oo's DRAIN digest (h: 1) is what re-asks: q=4 (kernel probe B)
@@ -630,7 +630,7 @@ test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets 
   h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { tt: 1 }, r: 1, w: 1 }) })
   assert.equal(digests(h, 3).length, sent, 'a tick old or not, a heartbeat r=1 in resync gets no answer')
   h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { tt: 1 }, r: 1, w: 1, h: 1 }) })
-  assert.deepEqual(digests(h, 3).slice(sent), [{ d: {}, r: 1, q: 4 }], 'the drain digest: answered with a request of the spoke\'s own')
+  assert.deepEqual(digests(h, 3).slice(sent), [{ d: {}, r: 1, q: 4, f: 1 }], 'the drain digest: answered with a request of the spoke\'s own')
   serve(h, 3, { tt: ['c1'] })
   assert.equal(h.node.resync, null)
   assert.deepEqual(cells(h), ['c1'], 'the new feeder\'s subset; b1-b3 swept')
@@ -984,7 +984,7 @@ test('a torn answer (the third re-check): the feeder\'s queue fills partway thro
   const s0 = digests(S, 2).length
   S.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   assert.notEqual(S.node.resync, null, 'a scoped failover is a resync')
-  assert.deepEqual(digests(S, 2).slice(s0), [{ d: {}, r: 1, q: 2 }], 'the ask')
+  assert.deepEqual(digests(S, 2).slice(s0), [{ d: {}, r: 1, q: 2, f: 1 }], 'the ask')
   //! the ask lands: ff ships, pauses inside its 2nd frame, queues the next four, and stops before the 7th — the tear
   F.arm(2)
   const m0 = p.mark()
@@ -1010,7 +1010,7 @@ test('a torn answer (the third re-check): the feeder\'s queue fills partway thro
   assert.deepEqual(S.jk(JK.resynced).map((e) => e.a), [0], 'nothing swept: every row came back')
   assert.deepEqual(cells(S), ROWS, 'the kernel holds all ten')
   assert.deepEqual(screenOf(S), ROWS, 'the screen shows all ten')
-  assert.deepEqual(digests(S, 2).slice(s0), [{ d: {}, r: 1, q: 2 }], 'one ask, one ship: no drain digest, so nothing more is asked')
+  assert.deepEqual(digests(S, 2).slice(s0), [{ d: {}, r: 1, q: 2, f: 1 }], 'one ask, one ship: no drain digest, so nothing more is asked')
   assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [6, 4], 'ten records shipped once')
 })
 
@@ -2524,4 +2524,65 @@ test('wave 6c — the fold group: a write and its later remove forwarded in sepa
   assert.equal(S.node.group, null, 'the failover dropped the open group')
   assert.equal(S.node.state.has(JSON.stringify(['px', 'e'])), false, 'its frame never landed here: the resync onto the next feeder brings px whole')
   assert.equal(link.dead, false)
+})
+
+//! the vanish-and-return (STATUS "a spoke that fails over onto a feeder that is repairing a partition ... loses that
+// partition's rows from its screen at the resync's end, until the fold forwards them back"): a spoke first fed by qq holds
+// px whole (bb#3, 5, 7, 9, 11) and qx; qq dies while aa, its next feeder, is RE-LATCHING px (its base bb#3, bb#5 in the
+// lane; the teacher's delta still to come). The resync's answer ships what aa holds of px; the end used to sweep px.c,
+// px.d and px.z from the screen, and the fold's forward brought px.c and px.d back. Now the ask says `f: 1`, aa's reply
+// names px in flight, the end KEEPS the three cells on the screen (JK.resynced c=3), the fold's group lands px.c and
+// px.d (back in the kernel, done) and judges px.z: its stamp bb#11 is above the spoke's lane (9) — a record aa may still
+// get — so it waits; the next frame on lane bb (qx at 13) moves the lane past it and it leaves the screen, a ghost: qq had
+// a record aa never gets. Red on the tree before at "no cell left the screen at the resync's end": three removes.
+test('wave 6c — the vanish-and-return: a spoke failing over onto a feeder mid-repair keeps the partition\'s cells on its screen across the resync end (the reply names the partition in flight), the fold\'s end confirms what it brought, and a cell the feeder never gets leaves once the lane moves past it', () => {
+  const { F, S, p, connect, cells, laneAt, teach } = latching()
+  //! the first feeder qq, hand-driven on link 3: admitted first, so it is the primary; it serves px whole and qx
+  S.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:qq' })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'qq', i: 1, l: 'sim:qq', c: SCOPED }) })
+  assert.equal(S.node.primary, 3)
+  assert.deepEqual(digests(S, 3), [{ d: {}, r: 1, q: 1 }], 'a first ask: not a resync, no f')
+  for (const [k, v, seq, pp] of [['a', 1, 3, 0], ['b', 2, 5, 3], ['c', 3, 7, 5], ['d', 4, 9, 7], ['z', 5, 11, 9]] as const) S.node.step({ kind: 'bytesIn', link: 3, bytes: one('bb', PX(k, v), seq, pp, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { bb: 11 }, r: 0, q: 1, w: 1 }) })
+  assert.equal(S.node.state.size, 6)
+  //! aa admitted as the spare (no digest: the single-feeder rule); at aa px is held with bb#3, bb#5, qx with bb#8, and cc's
+  // announcement (bb at 9) opens the repair latch for px
+  connect()
+  assert.equal(S.node.primary, 3, 'still fed by qq')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'aa is repairing px')
+  assert.deepEqual(F.node.scope!.inFlight(F.node), ['px'])
+  //! qq dies: the failover onto aa is a resync — the ask asks for the in-flight list
+  const a0 = S.of('apply').length
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  assert.equal(S.node.primary, 2)
+  const ask = digests(S, 2).at(-1)
+  p.settle()
+  assert.equal(S.node.resync, null, 'the resync ended')
+  const removes = () => S.of('apply').slice(a0).map((e) => e[1] as Rec).filter((r) => r.type === REC.remove).map((r) => JSON.stringify(r.key))
+  assert.deepEqual(removes(), [], 'no cell left the screen at the resync\'s end (px.c, px.d and px.z were swept before, and two came back at the fold)')
+  assert.deepEqual(ask, { d: {}, r: 1, q: 2, f: 1 }, 'the resync\'s ask asked which partitions are in flight')
+  const reply = F.sentOn(7, VERB.DIGEST).at(-1)!.value as { r: number; f?: string[] }
+  assert.deepEqual([reply.r, reply.f], [0, ['px']], 'the reply named px in flight')
+  assert.deepEqual(cells(S), ['["px","a"]=1', '["px","b"]=2', '["qx","z"]=9'], 'the kernel holds what the answer brought')
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, 3]], 'the journal: no ghost, three cells kept back')
+  //! the teacher's delta: bb#7 and bb#9 (a gap at 8: two frames) — the fold's group lands them and judges the kept cells
+  teach(2, [{ seq: 7, rec: PX('c', 3), pp: 5 }, { seq: 9, rec: PX('d', 4), pp: 7 }], 9)
+  assert.equal(F.node.scope!.held('px'), true)
+  p.settle()
+  assert.deepEqual(laneAt(S, 'bb'), [3, 5, 7, 8, 9])
+  assert.deepEqual(cells(S), cells(F), 'px.c and px.d are back in the kernel: the group brought them')
+  assert.deepEqual(removes(), [], 'still nothing left the screen: px.z waits — bb#11 is above the lane the feeder has shown (9)')
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0]], 'the fold\'s end: two frames, no ghost yet')
+  //! the lane moves on at aa (qx at bb#13, tapped): px.z is below it now and aa never got it — a ghost, off the screen
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('w', 7), 13, 8, VERB.RECORDS) })
+  p.settle()
+  assert.deepEqual(removes(), [JSON.stringify(['px', 'z'])], 'px.z left the screen once the lane passed its stamp')
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0], ['px', 0, 1]], 'judged later: no frame, one ghost')
+  assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder')
+  assert.deepEqual(screenRows(S), ['px', 'qx'])
 })
