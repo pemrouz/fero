@@ -560,7 +560,8 @@ export class Node {
   // flight TO the feeder at that moment, is one bounded vanish-and-return and never more than the base swept. (2) Every
   // way out of in flight sends a word: a fold (FEED {e}); a clean latch abort (FEED {x: [p]}, scope.ts #abort); an
   // abort to an orphan (still in flight while assigned, else the shed's FEED {x}); a failover folds the kept cells into
-  // the next resync's sweep set (#resyncBegin). (3) Nothing a clear can take is the only exit: the feeder owes the words
+  // the next resync's sweep set (#resyncBegin), and so does the re-admit after a link blip onto the same feeder (the
+  // admit arm resyncs on kept cells too: the word went to the dead link). (3) Nothing a clear can take is the only exit: the feeder owes the words
   // a clear took and the end of a fold on an unsynced link, and says them after the answer that syncs the link again
   // (#owed, #payOwed); a group whose end was lost lands and judges nothing. Keyed by partition: the cells kept.
   #deferred = new Map<string, Set<string>>()
@@ -1811,8 +1812,11 @@ export class Node {
         // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
         // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
         // A spoke with stranded writes (wave 5e: WACKed by the dead feeder, never tapped) resyncs too, even with an
-        // empty fold: the resync's end is where they settle.
-        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded)) this.#resyncBegin(link)
+        // empty fold: the resync's end is where they settle. And a spoke with KEPT CELLS (#deferred, wave 6c): its link
+        // to the feeder blipped and the fold's end or the abort's word went to the dead link or to none, so the cells
+        // join the resync's sweep set and the reply says which to keep again (the rule's link-loss exit, clause 2; a
+        // spoke whose only fed rows were in flight has an empty kernel and asked plainly before: the ghosts stayed).
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded || this.#deferred.size > 0)) this.#resyncBegin(link)
         else this.#sendDigest(link, 1)
       }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)

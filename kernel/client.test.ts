@@ -2786,6 +2786,54 @@ for (const foldedBeforeHeal of [true, false])
     assert.deepEqual(screenCells(S), kernelCells(F))
   })
 
+//! the spoke's link to aa blips: both ends see the close, the spoke re-dials aa (its only host) on link 4, aa admits it on
+// link 8; the pump is re-made on the new pair
+const reAdmit = (L: ReturnType<typeof latching>) => {
+  const { F, S } = L
+  S.node.step({ kind: 'linkUp', link: 4, dialed: true, to: 'sim:aa' })
+  F.node.step({ kind: 'linkUp', link: 8, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 8, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const p2 = pump(F, 8, S, 4)
+  S.node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) })
+  p2.settle()
+  const beat2 = (n: number) => { for (let i = 0; i < n; i++) { F.tick(); p2.settle(); S.tick(); p2.settle() } }
+  return { p2, beat2 }
+}
+//! the second review's SK2 and SK3, the rule's link-loss exit (clause 2): the spoke's link to its feeder blips and it
+// re-dials the SAME feeder. The admit arm resynced only on a non-empty kernel (or stranded writes, or a resync open),
+// and a spoke whose only fed rows were in flight has an EMPTY kernel: it asked plainly, no sweep ran, and the fold's end
+// (or the clean abort's word) said during the blip had gone to the dead link — the kept ghosts stayed for good. Now a
+// spoke with kept cells resyncs at the admit arm too: the cells join the sweep set and the reply says which to keep.
+// Red on the rework at "the screen mirrors the feeder": [px.a, px.b] against [px.a] (and against []); JK.resync 1.
+for (const during of ['the fold completes', 'the latch aborts clean'])
+  test(`wave 6c — a link blip onto the same feeder with an empty spoke kernel: ${during} while the link is down, and the re-admit resyncs because kept cells exist — the sweep judges them against the next reply`, () => {
+    const L = latching()
+    const { F, S, p, teach } = L
+    onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3]])
+    //! aa holds nothing; px is assigned to it and cc's announcement (px to bb#3: px.b died with bb and qq) opens the from-zero latch
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 3 } } }) })
+    assert.equal(F.node.scope!.entries.get('px')?.state, SCOPE.acquiring, 'the from-zero latch')
+    S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+    p.settle()
+    assert.equal(S.node.resync, null, 'the failover\'s resync ended')
+    assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[1, 2]], 'qx.z swept; px.a and px.b kept (px in flight)')
+    assert.deepEqual(kernelCells(S), [], 'the kernel is empty: every fed row is in flight')
+    assert.equal(S.node.logs.size, 0)
+    //! the link blips; while it is down px leaves the in-flight set and the word goes to no admitted link
+    S.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+    F.node.step({ kind: 'linkDown', link: 7, reason: 'close' })
+    if (during === 'the fold completes') { teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }], 3); assert.equal(F.node.scope!.held('px'), true) }
+    else { F.node.writes.ring.place('px', 'bb', 'cc'); F.node.scope!.rescope(F.node); assert.equal(F.node.scope!.entries.has('px'), false, 'the clean abort') }
+    assert.equal(F.node.clientLinks.size, 0, 'nobody heard the word')
+    const { beat2 } = reAdmit(L)
+    beat2(10)
+    assert.equal(S.jk(JK.resync).length, 2, 'the re-admit resynced (the kept cells joined the sweep set)')
+    assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[1, 2], [during === 'the fold completes' ? 1 : 2, undefined]], 'the second end swept the ghosts and kept nothing')
+    assert.deepEqual(kernelCells(F), during === 'the fold completes' ? ['px.a'] : [])
+    assert.deepEqual(screenCells(S), kernelCells(F), 'the screen mirrors the feeder')
+    assert.deepEqual(kernelCells(S), kernelCells(F))
+  })
+
 //! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
 // flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
 // paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
