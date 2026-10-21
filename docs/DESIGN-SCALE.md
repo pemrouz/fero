@@ -1939,25 +1939,53 @@ feeder has sent since. A word said there is true when said: p LEFT the
 feeder when the word was queued (a shed filters p's rows out of every
 lane, scope.ts `#shed`; a clean abort held none), so what the spoke
 holds of p is from before the word. And the answer that follows
-re-sends whatever of p the feeder feeds NOW. Every record of p at the
-feeder at the heal arrived after the word was queued, and each sits
-above the lower of the spoke's tail and the cover on its lane, which is
-where the answer walks from: a record tapped onto the link behind the
-word was taken by the same clear (a paused queue lets nothing out, and
-a clear takes the whole queue), and `#clearCover` lowered the cover
-under it; a record appended after the clear sits above the spoke's
-tail (a spoke's lanes are its feeder's fed subset, so its tail on a
-lane never passes the feeder's); a record spliced or folded after the
-clear lowered the cover under itself (`indexInsert` on a covered link);
-a re-entry's whole partition lowered it under every entry of p
-(`#forwardWhole`). So at the end of the heal exchange the spoke holds
-exactly what its feeder feeds, kernel and screen, in every state p can
-be in: no entry; a latch from zero, with or without the owner's own
-mid-latch commits; held again, by a fold or by one minted first record;
-a repair latch open on a held base; an orphan, assigned or not; and a
-fold that carries no remove of a row the spoke once held, because the
-holders released the partition's tombstones while it was off this
-feeder (stage 4's `gcRow`). The word is one frame straight to the
+re-sends the named partitions WHOLE: `#payOwed` says the word and, in
+the same breath, lowers the answer's start on every lane to just under
+its lowest entry of a named partition (read off the per-partition
+index, as `#forwardWhole` lowers a cover for a re-entry), and the ship
+walks each lane from there to its end, so every entry of p the feeder
+feeds leaves behind the word. The rule is one place, checked at the
+word: whatever of p the feeder holds when the word is said, on
+whichever lane, by whichever path it came (tapped behind the word,
+appended since the clear, spliced by a fold, re-entered whole), sits
+above the start. Neither the cover nor the spoke's tails can stand in
+for it, and the fifth review (R5-1, R5-2) showed why. The fourth round
+argued that a record of p tapped behind the word was taken by the same
+clear, "since a paused queue lets nothing out and a clear takes the
+whole queue"; false on a client link, where a flush goes on shipping
+after a clear (kernel/link.ts `flush`: the clear's cover lowers the
+lanes it took, so a survivor of ANOTHER lane leapfrogging the hole was
+safe before this rule). A frame of p queued behind the word in the same
+flush that cleared the queue survives, reaches the spoke at the drain,
+BEFORE the word is said again, and the re-said word drops it; the clear
+took nothing from its lane, so the cover sits at that lane's tail, the
+spoke's reply (sent before the word, from the lane that still held the
+frame) carries a tail at or above it, and an answer from the lower of
+the two never re-sends it: px.c lost for good when a later row of
+another partition held the spoke's tail on that lane (R5-2), back one
+heartbeat late when the unfeed emptied the lane and the next digest
+asked from zero (R5-1). Reachable when one partition is shed and comes
+back inside one pause of a synced client link, with the clear landing
+inside a fold's forward that spans two or more lanes. So at the end of
+the heal exchange, at the reply, the spoke holds exactly what its
+feeder feeds, kernel and screen, in every state p can be in: no entry;
+a latch from zero, with or without the owner's own mid-latch commits;
+held again, by a fold or by one minted first record; a repair latch
+open on a held base; an orphan, assigned or not; a fold that carries no
+remove of a row the spoke once held, because the holders released the
+partition's tombstones while it was off this feeder (stage 4's
+`gcRow`); and a fold forwarded across two or more lanes whose frames
+leapfrogged the clear. Weighed and not taken: lowering the COVER
+instead, at the clear, when `#clearCover` reads a dropped {x} (under
+every entry of p then, as `#forwardWhole` does for a re-entry). It
+closes the two shapes and leaves `#answer`'s head alone, but it puts the
+rule in four places: what p held at the clear is under the lowered
+cover, and everything of p that reaches the feeder between the clear
+and the heal rests on `indexInsert` for a splice, `#forwardWhole` for a
+re-entry and the append argument for the rest, the chain of claims that
+broke once already; and a reader of `#clearCover` cannot see the word
+being said. The start lowered where the word is said is one line under
+the word, true at the word. The word is one frame straight to the
 socket: `#answer` runs on a flowing link only (the DIGEST handler marks
 a paused link's debt instead of answering, and the drain resumes a torn
 answer only once its flush left the link flowing), so the {x} half
@@ -1969,7 +1997,17 @@ vanish-and-return INSIDE the heal exchange. One flicker, on a cold path
 (a paused client link whose queue a clear emptied), bounded to one
 exchange, visible (M12 reads it), and never a ghost; and the kept cells
 of a partition in flight leave with the word and come back with the
-fold, as before. Why the two kinds sit at different places: an {x} said
+fold, as before. And the lowered start re-sends, on each lane of p, the
+lane's whole suffix above p's lowest entry: rows of other partitions
+the spoke already holds among them, each dropped at the spoke by the
+dual fence (write.ts `#splice`, the client leg: present, dropped;
+absent, spliced at its seq, which is how p's own rows come back below
+the spoke's tail), one frame per run, a cold path. An orphan's frozen
+rows lower the start too, for a ship that filters them out (`feeds`):
+a lane suffix re-sent for nothing, dropped at the spoke, at the heal of
+a cleared link while a partition sits frozen; a `feeds` test on the
+lowering would save it and add a second predicate to the one line, so
+it is not there. Why the two kinds sit at different places: an {x} said
 AFTER the answer drops what the answer just re-sent, and nothing brings
 it back — the spoke's tails equal the feeder's, so no later exchange
 re-sends p (the second review's SK1: the shed's {x} cleared, p placed
@@ -2002,7 +2040,8 @@ on the spoke for good, past every exchange, until a resync (the fourth
 review's R4-4: the held shape, the teacher's fold shipping px.a alone
 with no trace of px.b's remove; the release census sees holders, never
 spokes). The order rule carries no such state: the word says what was
-true at its place, and the answer says the rest. A word may be said
+true at its place, and the answer re-sends the named partitions whole.
+A word may be said
 twice: a shed inside one pause whose first {x} a clear took and whose
 second went out direct reaches the spoke as the direct word at the
 drain, then the owed one before the heal answer's ship; the second
@@ -2137,7 +2176,8 @@ forces a clear). The repeated word is named above.
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
 words at an answer that heals a client link (one {x} before its ship
-for the partitions a cleared word named, one {e} after its reply per
+for the partitions a cleared word named, that answer's start lowered
+under their entries, one {e} after its reply per
 partition whose end a clear took or whose fold ran while the link was
 unsynced and that is still held), `f: 1` on a scoped spoke's resync ask and the list on its
 reply, `c` on a drain digest
