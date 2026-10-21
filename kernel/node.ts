@@ -578,17 +578,26 @@ export class Node {
   // ships the fold, scope.ts onAcqDone → owe). Only a link the spoke has been ANSWERED on owes (a cover or a torn
   // answer, Link.torn): a link never answered since admit carries nothing of this feeder, so there is nothing at the
   // spoke to drop or judge, and its first answer is a resync's, whose end judges by the reply (the second review's SK9:
-  // a spare link owed one end per fold, said as a burst after a later failover). The words are said again right after the next answer that syncs the link,
-  // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
-  // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is HELD
-  // (a latch open for p again says its own end; an orphan's or a gone partition's exit is a shed's or an abort's {x});
-  // an owed {x} while the answer SHIPPED NOTHING of p: the feeder does not feed p or holds no row of it (the second
-  // review's SK1: the words leave AFTER the heal's answer, out of their original order, and a shed's {x} said after p
-  // had come back and the answer had re-sent its rows dropped a partition the feeder holds, for good; the third
-  // review's R3-2 and R3-6: 'no entry' as the test held the word back for a latch from zero and an orphan, and the
-  // spoke kept a row the cluster had removed until the fold or the shed); a word a clear takes again is owed again;
-  // the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
-  // partition on the spoke for good and PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
+  // a spare link owed one end per fold, said as a burst after a later failover). The words are said again at the next
+  // answer that syncs the link, EACH AT ITS OWN PLACE IN THE ORDER (#answer → #payOwed, twice). An owed {x} leaves
+  // BEFORE the answer's ship, unfiltered: where it stood when the clear took it, in front of everything of p the feeder
+  // has sent since. It is true when said (p LEFT the feeder when the word was queued, so what the spoke holds of p is
+  // from before), and the ship that follows re-sends whatever of p the feeder feeds now: every record of p here
+  // arrived after the word and sits above the lower of the spoke's tail and the cover (tapped behind the word and taken
+  // by the same clear: the cover lowered under it; appended since: above the spoke's tail; spliced, folded or
+  // re-entered since: indexInsert or #forwardWhole lowered the cover). So the spoke equals its feeder's fed subset at
+  // the exchange's end in every state p can be in, and the one cost is a vanish-and-return INSIDE the exchange when p
+  // is held again (its rows leave with the word and come back with the same answer). An owed {e} leaves AFTER the
+  // whole ship and the reply, and only while p is HELD (a latch open for p again says its own end; an orphan's or a
+  // gone partition's exit is a shed's or an abort's {x}): the first moment the spoke holds the fed subset above the
+  // cover again, so the end judges against a complete kernel. Why not one place for both: an {x} said AFTER the
+  // answer dropped what the answer had just re-sent, for good (the second review's SK1), and the three filters that
+  // tried to hold it back where it looked stale were each wrong somewhere ('no entry': the third review's R3-2 and
+  // R3-6; 'feeds and byPart': the fourth review's R4-1 and R4-2, entries with no base; '!held': R4-3, a repair's
+  // base lost), while any held-back word leaves a removed row on the spoke for good once a fold carries no remove
+  // (R4-4, stage 4's tombstone release). A word a clear takes again is owed again; the link's death drops the debt.
+  // Without the debt, the review's PROBE3 (a shed's {x} cleared) kept a shed partition on the spoke for good and
+  // PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
   #owed = new Map<Link, { e: Set<string>; x: Set<string> }>()
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
@@ -2530,6 +2539,11 @@ export class Node {
     let shipped = 0
     let tear: string | null = null // the origin the ship stopped in ('' = the lanes are done, only the reply waits)
     let tearSeq = 0 // and the first seq it did not ship
+    //! the owed shed words first (wave 6c, clause 3; #owed): FEED {x} at its own place in the order, BEFORE the ship
+    // that re-sends whatever of those partitions this feeder feeds now. Every answer starts on a flowing link (the
+    // DIGEST handler marks a paused link's debt instead; the drain resumes a torn answer only once its flush left the
+    // link flowing), so the word goes straight to the socket, ahead of the first record.
+    if (link.client && this.#owed.size) this.#payOwed(link, 'x')
     if (!this.armed || link.client) {
       const scopedTo = this.armed ? (p: string) => this.scope!.feeds(p) : null
       const run: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[] = []
@@ -2582,7 +2596,7 @@ export class Node {
         }
         this.#sendDigest(link, 0, q, undefined, this.#askF.has(link))
       }
-      if (link.client && this.#owed.size) this.#payOwed(link) // the owed FEED words, after the whole ship and the reply (wave 6c)
+      if (link.client && this.#owed.size) this.#payOwed(link, 'e') // the owed ends, after the whole ship and the reply (wave 6c)
       return
     }
     link.synced = false
@@ -2620,7 +2634,8 @@ export class Node {
   // ceiling again, never raises it. The cost: one header read per frame the clear took (the clear is cold), and the
   // answer re-sends a lowered lane's suffix above the lowest lost record.
   //! THE OWED WORDS (wave 6c, clause 3; see #owed): a FEED frame the clear took is owed — on a link that leaves here
-  // with a cover, which is every link the spoke has been answered on. A link never answered since admit (not synced, no
+  // with a cover, which is every link the spoke has been answered on — and said at the next answer that syncs the
+  // link, the {x} before its ship and the {e} after its reply (#answer → #payOwed). A link never answered since admit (not synced, no
   // torn answer) leaves without one and owes nothing: the spoke holds nothing of this feeder on it, a spare's word is
   // dropped there, and its first answer is a resync's or a fresh spoke's. {b} owes nothing: its end does.
   #clearCover = (link: Link, dropped: Uint8Array[], wasSynced: boolean): void => {
@@ -2651,34 +2666,30 @@ export class Node {
     if (o === undefined) this.#owed.set(link, o = { e: new Set(), x: new Set() })
     o[kind].add(p)
   }
-  //! #payOwed — the answer that syncs the link has shipped whole and replied: say the owed words, {e} per partition
-  // still held, then one {x} for the partitions still gone. The debt is CONSUMED WORD BY WORD as each one ships: a word
-  // the clear takes on its way out is owed again by #clearCover's read of the dropped frames, and the words behind it
-  // were never taken out of the debt (the rework took the whole debt out first and put the rest back after a failed
-  // ship: one more branch than the rule needs). Never into a full paused queue: the reply before it was placed never
-  // to overflow one, and a word pushed there would clear that very reply; the next untorn answer — the drain's, or a
-  // heartbeat's — pays within a tick.
-  #payOwed(link: Link) {
+  //! #payOwed — say the owed words of one kind at their place in the order (#answer): 'x' BEFORE the answer's ship,
+  // one frame naming every partition whose shed word a clear took (the spoke drops them; the ship that follows
+  // re-sends whatever of them this feeder feeds); 'e' AFTER the whole ship and the reply, one frame per partition
+  // still held strictly (acquiring again, that fold says its own end; an orphan or gone, a shed's or an abort's {x} is
+  // the exit). The debt is CONSUMED WORD BY WORD as each one ships: a word the clear takes on its way out is owed again
+  // by #clearCover's read of the dropped frames, and the words behind it were never taken out (the rework took the
+  // whole debt out first and put the rest back after a failed ship: one more branch than the rule needs). Never into
+  // a full paused queue, one guard for both kinds: a word pushed there would clear whatever waits, the reply it
+  // follows included; the next untorn answer — the drain's, or a heartbeat's — pays within a tick (the {x} half never
+  // meets the guard: every answer starts on a flowing link).
+  #payOwed(link: Link, kind: 'e' | 'x') {
     const o = this.#owed.get(link)
-    if (o === undefined) return
+    if (o === undefined || !o[kind].size) return
     if (link.paused && link.queued.length >= link.maxQueued) return
-    for (const p of [...o.e]) {
-      o.e.delete(p)
-      if (this.scope === null || !this.scope.held(p)) continue // held strictly (never feeds): acquiring again, that fold says its own end; an orphan or gone, a shed's or an abort's {x} is the exit
-      if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) return
-    }
-    if (o.x.size) {
-      //! an {x} only while this answer shipped NOTHING of p (clause 3: a word only while it is still true): the feeder
-      // does not feed p (no entry; an orphan, assigned or not; a re-entry latch from one) or holds no row of it (a latch
-      // from zero; byPart drops an emptied partition). What the spoke holds of p is then from before the word was
-      // queued, and what follows brings p whole (the fold's group, a re-entry's whole forward) or says this word again
-      // (the shed). Back held, or acquiring on a held base, the word is stale: this answer shipped p's rows (the second
-      // review's SK1). 'No entry' alone held it back for a latch from zero and for an orphan, and the spoke kept a row
-      // the cluster had removed until the fold or the shed (the third review's R3-6, R3-2).
-      const gone = [...o.x].filter((p) => this.scope === null || !this.scope.feeds(p) || !this.byPart!.has(p))
+    if (kind === 'x') {
+      const gone = [...o.x]
       o.x.clear()
-      if (gone.length) link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
-    }
+      link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
+    } else
+      for (const p of [...o.e]) {
+        o.e.delete(p)
+        if (this.scope === null || !this.scope.held(p)) continue
+        if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) break
+      }
     if (!o.e.size && !o.x.size) this.#owed.delete(link)
   }
 
