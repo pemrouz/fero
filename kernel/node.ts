@@ -523,6 +523,17 @@ export class Node {
   // review measured 5 and 9 at 200 ms each way with a 50 ms heartbeat, one ordering each); now one on any link.
   resync: { old: Set<string>; q: number } | null = null
   #dq = 0
+  //! #ceiling (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the ceiling a feeder's drain digest carried (`c`, see
+  // #sendDigest and #clearCover). V4-49 left a clear's ceiling on the FEEDER's link and used it up at the spoke's reply
+  // to the drain digest; if the spoke failed over after that digest and before the capped answer, the ceiling died
+  // with the link and the next feeder answered the spoke's own tails, which sit above the hole (the last review of
+  // V4-49; on an unscoped feeder, where a failover asks with tails — a scoped failover resyncs and asks for
+  // everything). So the spoke keeps it: every digest it sends while it holds one carries the LOWER of its tails and
+  // the ceiling, lane by lane — the drain exchange's answer, a heartbeat's answer, and the failover's ask to the next
+  // feeder — and it answers the carrying drain digest with an r=1 of its own (`q`), so a reply comes; the first reply
+  // at or above the first capped ask's q drops it (any later ask to any feeder carried the cap, so that answer fills the
+  // hole wherever it comes from). A resync drops it: the ask is d = {} there. Null when none is held.
+  #ceiling: { d: Record<string, number>; q?: number } | null = null
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
   // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
@@ -1360,6 +1371,7 @@ export class Node {
     for (const k of this.state.keys()) old.add(k)
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
+    this.#ceiling = null // the ask below is d = {}: everything is re-asked, a ceiling has nothing left to cap
     const q = ++this.#dq
     this.resync = { old, q }
     this.#sendDigest(link, 1, q)
@@ -2035,7 +2047,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number; q?: number; h?: number }
+        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number; q?: number; h?: number; c?: Record<string, unknown> }
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -2081,6 +2093,15 @@ export class Node {
           // the failover its linkDown runs asks the next one for everything this digest would have settled.
           this.#gateWord(link, v.w)
           if (link.dead) return
+          //! a ceiling on the feeder's drain digest (`c`, wave 6c): keep it, and ask every feeder with it until a reply
+          // at or above the first capped ask lands (#ceiling). In resync the ask is d = {} already: nothing to keep.
+          if (v.r === 1 && v.h === 1 && typeof v.c === 'object' && v.c !== null) {
+            if (this.resync === null) {
+              const c: Record<string, number> = {}
+              for (const o in v.c) if (typeof v.c[o] === 'number') c[o] = v.c[o] as number
+              this.#ceiling = { d: c }
+            }
+          } else if (this.#ceiling !== null && v.r === 0 && typeof v.q === 'number' && this.#ceiling.q !== undefined && v.q >= this.#ceiling.q) this.#ceiling = null
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0)) return this.#resyncBegin(link)
@@ -2102,8 +2123,10 @@ export class Node {
           // lands BEFORE this digest): that one is answered
           // with an r=1 of our own, so the exchange ships everything and its reply ends the resync, one exchange
           // after the drain (see `resync`).
+          //! Out of resync a drain digest that carried a ceiling is answered with an r=1 of our own (wave 6c): its
+          // reply is what lets the ceiling go; an r=0 would buy the capped re-send and no word that it landed.
           if (v.r === 1) {
-            if (this.resync === null) this.#sendDigest(link, 0)
+            if (this.resync === null) this.#sendDigest(link, v.h === 1 && this.#ceiling !== null ? 1 : 0)
             else if (v.h === 1) this.#sendDigest(link, 1)
           }
           return
@@ -2482,7 +2505,9 @@ export class Node {
     const d: Record<string, number> = {}
     if (!(this.client && this.resync !== null))
       for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number; h?: number }
+    //! a held ceiling caps every lane (wave 6c): the lower of this spoke's tail and what the clear's cover said
+    if (this.#ceiling !== null) for (const o in d) { const c = this.#ceiling.d[o]; if (c !== undefined && c < d[o]) d[o] = c }
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number; h?: number; c?: Record<string, number> }
     if (this.durable) {
       const p: Record<string, number> = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -2491,9 +2516,20 @@ export class Node {
     //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
     // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
     if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
-    if (this.client && r === 1) body.q = q ?? ++this.#dq
+    if (this.client && r === 1) {
+      body.q = q ?? ++this.#dq
+      if (this.#ceiling !== null && this.#ceiling.q === undefined) this.#ceiling.q = body.q // the first capped ask: its reply drops the ceiling
+    }
     else if (q !== undefined) body.q = q
-    if (h === true && link.client) body.h = 1
+    if (h === true && link.client) {
+      body.h = 1
+      //! the ceiling rides the drain digest (wave 6c): a clear on this synced client link left a cover at my tails,
+      // lowered on every lane the clear took a record from (#clearCover, V4-49). It used to live on this link alone,
+      // used up by the spoke's reply; a spoke that failed over before that reply lost the hole for good. Now the spoke
+      // holds it too and asks every feeder with it (#ceiling). The feeder's own cap stays (an older spoke sends its
+      // real tails). Only a drain digest after a clear carries it: every other digest is the frame it always was.
+      if (link.torn !== null && link.torn.c === true) body.c = link.torn.d
+    }
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }

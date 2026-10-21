@@ -2372,3 +2372,85 @@ test('wave 6c — a shed tells the spokes: a partition that moved off the feeder
   assert.deepEqual(screenRows(S), ['px', 'qx'])
   assert.equal(link.synced, true)
 })
+
+//! the ceiling across a failover (STATUS "on an unscoped feeder, a row can still be lost when a spoke fails over between
+// the drain and the capped answer"; the last review of V4-49). An UNSCOPED feeder aa, a spoke synced in steady state,
+// the socket says full; six wide rows from bb arrive in one inbound frame and the tap cuts them at aa's frame cap
+// (V4-51) into three frames of two, in ONE flush: 1+2 waits in the queue of one, 3+4 overflows it (the clear takes
+// both), 5+6 survives — delivered at the drain, it raises the spoke's bb tail to 6 above the hole 1-4. V4-49's ceiling
+// (aa's tails lowered to just under 1) capped the spoke's reply to the drain digest, so aa re-sent 1-4 — unless the spoke
+// failed over after the drain digest and before that answer: the ceiling stayed on the dead link, the next feeder
+// answered the spoke's own tail (6), and 1-4 were lost for good. Now the drain digest CARRIES the ceiling (`c`), the
+// spoke keeps it, asks every feeder with the lower of its tails and the ceiling until a reply at or above its first
+// capped ask lands (so it answers the drain digest with an r=1 of its own, which buys that reply), and the failover's
+// digest to oo says bb: 0. Red on the tree before at "the hole is filled by the next feeder": the spoke held w5, w6.
+const wide = (origin: string, from: number, keys: string[]) =>
+  encodeRuns(keys.map((k, i) => ({ rec: { type: REC.update, key: [k], value: 'x'.repeat(1500) + k } as Rec, origin, seq: from + i, epoch: 1 })))[0]
+const seqsOf = (b: Uint8Array) => new Framer().push(b.slice())[0].records().map((rv) => rv.seq).join('+')
+const ceilingShape = () => {
+  const F = harness('aa', { tune: { frame: 4096, queued: 1 } })
+  F.admit(1, 'bb'); F.digestFrom(1)
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:aa', 'sim:oo'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+  const p = pump(F, 7, S, 2)
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa' }) }) // no contract: unscoped
+  p.settle()
+  const link = F.node.links.get(7)!
+  assert.equal(link.synced, true, 'steady state')
+  assert.equal(S.node.feederScoped, false)
+  //! the spare oo, admitted but never digested (the single-feeder rule)
+  S.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:oo' })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'oo', i: 1, l: 'sim:oo' }) })
+  assert.equal(S.node.primary, 2)
+  F.node.step({ kind: 'pause', link: 7 })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: wide('bb', 1, ['w1', 'w2', 'w3', 'w4', 'w5', 'w6']) })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'one clear, in the middle of one flush')
+  assert.deepEqual(link.queued.map(seqsOf), ['5+6'], 'the last cut survived it')
+  assert.deepEqual(link.torn, { d: { bb: 0 }, r: undefined, q: undefined, c: true }, 'the ceiling: bb lowered to just under 1, the lowest record the clear took')
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(wireOf(F, 7, m), ['5+6', 'DIGEST'], 'the drain: the surviving cut, then the drain digest (a ceiling is never resumed)')
+  const drainDigest = F.sentOn(7, VERB.DIGEST).at(-1)!.value as { h?: number; c?: Record<string, number> }
+  assert.equal(drainDigest.h, 1)
+  p.toB()
+  assert.deepEqual(cells(S).sort(), ['w5', 'w6'], 'the surviving cut raised the spoke\'s tail above the hole')
+  assert.equal(S.node.streams.get('bb')!.applied, 6)
+  const answer = digests(S, 2).at(-1)
+  return { F, S, p, link, drainDigest, answer }
+}
+test('wave 6c — the ceiling crosses a failover: a clear mid-flush on an UNSCOPED feeder, the spoke fails over after the drain digest and before the capped answer — its ask to the next feeder is the lower of its tails and the ceiling the drain digest carried, and the hole is filled (lost for good before)', () => {
+  const { S, drainDigest, answer } = ceilingShape()
+  //! aa dies before the spoke's answer reaches it: the failover onto oo
+  S.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(S.node.primary, 3, 'fed by oo')
+  assert.equal(S.node.resync, null, 'unscoped: no resync, a digest with tails')
+  const ask = digests(S, 3).at(-1)
+  serve(S, 3, { bb: ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] })
+  assert.deepEqual(cells(S).sort(), ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'], 'the hole is filled by the next feeder (w1-w4 were lost for good before)')
+  assert.deepEqual(ask, { d: { bb: 0 }, r: 1, q: 3 }, 'the failover digest asked with the ceiling (bb: 0), not the tail of 6')
+  assert.deepEqual(drainDigest.c, { bb: 0 }, 'the drain digest carried the ceiling')
+  assert.deepEqual(answer, { d: { bb: 0 }, r: 1, q: 2 }, 'the spoke answered the ceiling-carrying drain digest with an r=1 of its own, capped (an r=0 at the real tails before)')
+  assert.equal(S.node.resync, null)
+  //! oo's reply (q=3 ≥ the first capped ask's q=2) used the ceiling up: a heartbeat r=1 is answered with the real tails
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { bb: 6 }, r: 1, w: 1 }) })
+  assert.deepEqual(digests(S, 3).at(-1), { d: { bb: 6 }, r: 0 }, 'the ceiling is gone: the real tails again')
+  assert.deepEqual(S.jk(JK.resync), [], 'never a resync')
+})
+test('wave 6c — the same clear with no failover: the spoke\'s capped r=1 reaches the feeder, which re-sends the hole and replies; the reply drops the ceiling, every row once at the spoke, one exchange', () => {
+  const { F, S, p, link, answer } = ceilingShape()
+  assert.deepEqual(answer, { d: { bb: 0 }, r: 1, q: 2 })
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  p.toA()
+  assert.deepEqual(wireOf(F, 7, m), ['1+2', '3+4', '5+6', 'DIGEST'], 'the capped answer: the hole, the cut the spoke holds (its lane drops it), the reply')
+  assert.equal(link.torn, null, 'the feeder\'s ceiling is used up')
+  assert.equal(link.synced, true)
+  p.settle()
+  assert.deepEqual(cells(S).sort(), ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'])
+  assert.deepEqual(S.jk(JK.dupDrop).map((e) => e.b), [5, 6], 'the surviving cut came twice; the lane dropped the copy')
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 6 }, r: 1, w: 1 }) })
+  assert.deepEqual(digests(S, 2).at(-1), { d: { bb: 6 }, r: 0 }, 'the reply dropped the ceiling: the real tails again')
+  assert.equal(digests(S, 2).filter((d) => d.r === 1).length, 2, 'two asks in all: the connect and the drain exchange')
+})
