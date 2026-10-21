@@ -561,6 +561,23 @@ export class Node {
     return !!b && !b.gaveUp && !b.parked
   }
 
+  //! #refused — the DIALED targets that answered this node's HELLO for ANOTHER RESOURCE NAME (DESIGN-DIRECTORY §13,
+  // 2026-10-12, narrowed after its first review): another resource is another resource for that process's life, and
+  // it refuses every member of mine the same way (the name rides HELLO both ways), so genesis (kernel/membership.ts)
+  // stops counting it toward `links >= hosts`, where before a squatter the directory handed out held the first view
+  // for good. NOTHING ELSE leaves the count. A contract or door refusal (another `replicas`, a secret where I have
+  // none, no secret where I have one, a proof refused) is the same process with a config that can be FIXED: counting it
+  // out let each consistent half of one host list form its own view at epoch 1, and once the config was fixed the two
+  // halves linked and never merged (equal epochs, one view per epoch) — two clusters under one name for good, where
+  // the base waited and then formed one view (the review's probe). So those wait, and the composer says so (the
+  // refusal line's "the first view waits on it"). Only MY dial's outcome at the address I dialed counts — never a claim
+  // on an accepted link (a stranger that can connect could otherwise name a real member's listen and shrink the
+  // count), and never a target that merely never answers (a closed port, a cut: dead and cut look the same from here).
+  // An entry leaves when the target admits (#admit: the right resource moved onto that port) or the directory forgets
+  // it (discover).
+  #refused = new Set        ()
+  refused(to        )          { return this.#refused.has(to) }
+
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
   // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
   // The value says whether the target is a committed member's listen: a revived MEMBER keeps the
@@ -630,6 +647,7 @@ export class Node {
           for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
           if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true, parked: true })
           else this.#backoff.delete(to)
+          this.#refused.delete(to) // the directory forgot it: a refusal remembered for nothing the node dials
         }
         for (const to of next) {
           if (prev.has(to) || statics.has(to)) continue
@@ -1554,8 +1572,8 @@ export class Node {
     // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
     // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
     // reporting dialing() forever and permanently holding eviction (review finding)
-    if (link.to) this.#backoff.delete(link.to)
-    if (v.l) this.#backoff.delete(v.l)
+    if (link.to) { this.#backoff.delete(link.to); this.#refused.delete(link.to) }
+    if (v.l) { this.#backoff.delete(v.l); this.#refused.delete(v.l) }
     j.armed && j.emit(JK.identified, link.id, v.u, v.i)
     //! digest-on-admit, ONE opener: the LOWER uuid sends the r=1 digest, the higher answers r=0
     // (2026-10-06). The rule is direction-independent — it asks who sorts lowest, never who dialed
@@ -1624,9 +1642,16 @@ export class Node {
   // GIVEN-UP — never a redial chain (that would hammer a misconfigured or hostile port) — so the heartbeat's
   // give-up revival re-dials it once per heartbeat while it stays in hosts ∪ view: a fixed secret, a fixed
   // config or a resource that moves onto the right port heals at heartbeat cadence. The caller journals.
-  #refuse(link      , reason        ) {
+  //! `otherName`: the target answered for ANOTHER RESOURCE NAME — the one refusal that is permanent and symmetric
+  // (#refused): a DIALED target is then remembered there, so genesis stops waiting for it. Every other refusal (the
+  // contract, the door's five answers) leaves the count alone: the same process with its config fixed is one of us,
+  // and counting it out split one host list into two clusters (DESIGN-DIRECTORY §13).
+  #refuse(link      , reason        , otherName = false) {
     link.dead = link.noRedial = true
-    if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+    if (link.dialed && link.to) {
+      this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+      if (otherName) this.#refused.add(link.to)
+    }
     this.env.sink.close(link.id, reason)
   }
 
@@ -1692,7 +1717,7 @@ export class Node {
           // resource that moves onto the right port later, heals at heartbeat cadence instead of
           // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
           // revival — which keys on gaveUp — could never reach the target). #refuse is that idiom.
-          return this.#refuse(link, 'name-mismatch')
+          return this.#refuse(link, 'name-mismatch', true)
         }
         //! the cluster contract (DESIGN-DOOR §4): when BOTH ends carry `c` and the link is not a client
         // link and the strings differ, the two servers run different cluster config (heartbeat.ms,
