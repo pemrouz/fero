@@ -958,3 +958,62 @@ test('seed probe (DESIGN-SCALE §2, A4): a holder whose boot record was written 
   assert.equal(scopedConverged(sim), null, 'the holder heals the lost rows')
   assert.equal(reborn.logs.get('n01')?.length, 5)
 })
+
+// ── M1 reads a scoped spoke against its feeder's floor (wave 6c, 2026-10-21) ─────────────────────────────────────
+//! From wave 6a to wave 6c a spoke of a SCOPED feeder covered nothing per event (sim/monitors.ts `covers`): its applied
+// watermark is a dedup fence, not a claim (the latch's forward lands interior records; a lost owner-to-holder frame
+// leaves the feeder lawfully showing a row whose remove the spoke's fence already sits above). Now it covers (lane,
+// partition) as far as its FEEDER does once everything the feeder sent has landed (the link synced and flowing, nothing
+// queued or in flight, no fold group open), and a cell that changed while the wire was busy is judged at the first quiet
+// pass after. The plant: a cell the cluster removed is put back into the spoke's kernel at the write's older stamp. While
+// the feeder's link to the spoke is paused the spoke claims nothing (silent); at the drain, M1 names it against the
+// feeder's floor. A lawful run with the spoke is green and counted.
+test('M1 on a scoped spoke (wave 6c): a removed cell planted back at the spoke at its older stamp is silent while the feeder\'s link is paused and named at the first quiet pass after the drain, against the feeder\'s floor; the lawful run is green and counted', () => {
+  const ids = ['n01', 'n02', 'n03']
+  const sim = new Sim(5)
+  const nodes = mesh(sim, 3, { hb: 50, replicas: 2, fault: { delay: [1, 5] } })
+  sim.run({ until: 1500 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed))
+  const s1 = sim.add({ uuid: 's1', listen: 'sim:s1', hosts: ids.map((x) => 'sim:' + x), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('s1', { kind: 'start' }, 0)
+  sim.run({ until: sim.now + 300 })
+  const F = sim.nodes.get(s1.links.get(s1.primary!)!.uuid)!
+  assert.equal(s1.feederScoped, true)
+  //! a row owned by T and held by F, written and then removed; a second row written after, so the lane moves on
+  let k = ''
+  for (let i = 0; i < 100_000 && !k; i++) { const h = holdersAt(ids, 'm' + i, 2); if (h[0] !== F.uuid && h.includes(F.uuid)) k = 'm' + i }
+  const T = holdersAt(ids, k, 2)[0], Tn = sim.nodes.get(T)!
+  sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k], value: 1 }] }, 0)
+  sim.run({ until: sim.now + 100 })
+  sim.post(T, { kind: 'write', recs: [{ type: REC.remove, key: [k] }] }, 0)
+  sim.run({ until: sim.now + 100 })
+  sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k + 'b'], value: 2 }] }, 0)
+  sim.run({ until: sim.now + 400 })
+  const cell = JSON.stringify([k])
+  assert.equal(F.state.has(cell), false, 'removed at the feeder')
+  assert.equal(s1.state.has(cell), false, 'and at the spoke')
+  assert.deepEqual(sim.violations, [], 'the lawful run is green')
+  assert.ok(ledgerOf(sim).counts.cells > 0, 'and counted')
+  const w = Tn.logs.get(Tn.origin)!.find((e) => e.rec.type === REC.update && JSON.stringify(e.rec.key) === cell)!
+  const rv = F.versions.get(cell)!
+  assert.ok(w.seq < rv.seq && F.streams.get(Tn.origin)!.parts!.get(k)!.s >= rv.seq, 'the feeder\'s floor for the partition covers the remove')
+  const plant = () => { s1.state.set(cell, 1); s1.versions.set(cell, { epoch: w.epoch, seq: w.seq, origin: Tn.origin }) }
+  //! the feeder's link to the spoke pauses: the spoke claims nothing while the wire is not quiet, so the plant waits
+  const fl = [...F.links.values()].find((l) => l.uuid === 's1')!
+  sim.post(F.uuid, { kind: 'pause', link: fl.id }, 0)
+  sim.run({ until: sim.now + 5 })
+  assert.equal(fl.paused, true)
+  plant()
+  sim.run({ until: sim.now + 150 })
+  assert.deepEqual(sim.violations, [], 'silent while the feeder\'s link is paused: nothing is claimed of a spoke whose feeder may still owe it frames')
+  sim.post(F.uuid, { kind: 'drain', link: fl.id }, 0)
+  for (let t = sim.now + 1, end = sim.now + 400; t <= end && !sim.violations.length; t++) sim.run({ until: t })
+  assert.equal(sim.violations.length, 1, 'at the first quiet pass after the drain, M1 judged the planted cell')
+  assert.equal(sim.violations[0].monitor, 'stamp-oracle')
+  assert.match(String(sim.violations[0].detail), new RegExp(`^s1 shows ${cell.replace(/[[\]"]/g, '\\$&')} @1/${w.seq}/${Tn.origin} while the remove @1/${rv.seq}/${Tn.origin} is at or below its feeder's floor for lane ${Tn.origin} — resurrected$`), 'named against the feeder\'s floor')
+  //! the spoke back to the truth: quiet again
+  s1.state.delete(cell); s1.versions.set(cell, rv)
+  const n0 = sim.violations.length
+  sim.run({ until: sim.now + 200 })
+  assert.equal(sim.violations.length, n0, 'nothing more')
+})
