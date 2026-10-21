@@ -29,7 +29,7 @@
 import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW, DRAIN_TICKS } from './membership.js'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.js'
 import { MAX_PROBES } from './confirm.js'
-import { MAX_QUEUED } from './link.js'
+import { MAX_QUEUED, MAX_QUEUED_BYTES } from './link.js'
 import { COMPACT_AT } from './log.js'
 import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.js'
 import { MAX_FRAME } from './codec.js'
@@ -98,6 +98,9 @@ export const FRAME_MIN = 1024
                 
                                                                          
                 
+                                                                                                                      
+                                                                         
+                     
                                                                    
                    
                                                                              
@@ -139,6 +142,7 @@ export const TUNE                 = Object.freeze({
   issuers: MAX_ISSUERS,
   probes: MAX_PROBES,
   queued: MAX_QUEUED,
+  queuedBytes: MAX_QUEUED_BYTES,
   compactAt: COMPACT_AT,
   snapshotAt: SNAPSHOT_AT,
   lamportLease: LAMPORT_LEASE,
