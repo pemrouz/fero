@@ -2834,6 +2834,40 @@ for (const during of ['the fold completes', 'the latch aborts clean'])
     assert.deepEqual(kernelCells(S), kernelCells(F))
   })
 
+//! clause 2's failover exit, pinned (the second review's SK8): the kept cells join the next resync's sweep set. aa dies
+// with the fold still to come, a spare rr is elected, and rr's answer has px.a, px.b and qx.z (px.c and px.d died with
+// bb, qq and aa): the second end sweeps the two kept cells. Without the fold into the sweep set (#resyncBegin) every
+// test was green and the screen read [px.a, px.b, px.c, px.d, qx.z] for good.
+test('wave 6c — clause 2\'s failover exit: kept cells, then the feeder dies with a spare linked — the next resync sweeps them when its feeder holds them not and folds nothing', () => {
+  const L = latching()
+  const { F, S, p } = L
+  onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3], ['c', 3, 7, 5], ['d', 4, 9, 7]])
+  //! a third server rr, hand-driven on link 5, linked as a spare
+  S.node.step({ kind: 'linkUp', link: 5, dialed: true, to: 'sim:rr' })
+  S.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HELLO, { u: 'rr', i: 1, l: 'sim:rr', c: SCOPED }) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  p.settle()
+  assert.equal(S.node.primary, 2)
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, 2]], 'px.c and px.d kept: px is in flight at aa')
+  //! aa dies before its fold; rr is elected and holds px.a, px.b and qx.z
+  S.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(S.node.primary, 5)
+  const ask = S.sentOn(5, VERB.DIGEST).pop()!.value as { d: Record<string, number>; q: number; f?: number }
+  assert.deepEqual([ask.d, ask.f], [{}, 1], 'the failover\'s resync ask')
+  S.node.step({ kind: 'bytesIn', link: 5, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 5, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 5, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.DIGEST, { d: { bb: 8 }, r: 0, q: ask.q, w: 1 }) })
+  assert.equal(S.node.resync, null)
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, 2], [2, undefined]], 'the second end swept the two kept cells and kept nothing')
+  assert.deepEqual(screenCells(S), ['px.a', 'px.b', 'qx.z'], 'the kept cells joined the sweep and left')
+  assert.deepEqual(kernelCells(S), screenCells(S))
+})
+
 //! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
 // flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
 // paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
