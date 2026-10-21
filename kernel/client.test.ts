@@ -2711,6 +2711,52 @@ test('wave 6c — the in-flight list survives a cleared reply: the feeder pauses
   assert.deepEqual(screenCells(S), kernelCells(F))
 })
 
+//! a shed word racing an open fold group (the review's PROBE6): the socket fills inside the fold's forward, so the
+// clear takes bb#9 and the end, and the spoke's group for px stays open with bb#7 in it; then px moves off aa and is
+// shed, and FEED {x} waits in the queue. At the drain the {x} landed at the spoke while the group was open: on the
+// first build #unfeed dropped px, then the next digest closed the group and put px.c back, for good. Now a FEED {x}
+// closes an open group first (a frame of a later step, as a digest is) and the unfeed runs on the landed kernel in the
+// same step. Red on the first build at "the spoke holds what its feeder holds": actual [px.c, qx.z], expected [qx.z].
+test('wave 6c — a shed word closes an open fold group first: the fold\'s end cleared, the partition shed and FEED {x} delivered while the group is open — the group lands, then the partition leaves, in one step; nothing of it comes back', () => {
+  let armAt = 0, count = 0
+  let Fh: H | null = null
+  const L = latching({ tune: { queued: 1 } }, (link) => { if (link === 7 && armAt && ++count === armAt && Fh) { armAt = 0; Fh.node.step({ kind: 'pause', link: 7 }) } })
+  const { F, S, p, link, connect, cells, beat, teach } = L
+  Fh = F
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  connect()
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  p.settle()
+  assert.equal(link.synced, true)
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  //! the socket fills inside the 2nd send of the fold's forward (bb#7): bb#9 and the end overflow the queue of one
+  armAt = 2; count = 0
+  teach(2, [{ seq: 7, rec: PX('c', 3), pp: 3 }, { seq: 9, rec: PX('d', 4), pp: 7 }], 9)
+  assert.equal(F.node.scope!.held('px'), true)
+  assert.deepEqual(wireOf(F, 7, m), ['verb28', '7'], 'the {b} and bb#7 reached the socket; the clear took bb#9 and the end')
+  assert.equal(F.jk(JK.dropOldest).length, 1)
+  p.toB()
+  assert.notEqual(S.node.group, null, 'the group is open at the spoke, bb#7 in it, its end lost')
+  //! a join moves px off aa; both holders attest it; aa sheds px, and FEED {x} waits in the paused queue
+  F.node.writes.ring.place('px', 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px'])
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(wireOf(F, 7, m), ['verb28', '7', 'verb28', 'DIGEST'], 'the drain: the shed\'s word, then the drain digest')
+  p.settle()
+  beat(5)
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 1, undefined]], 'the word closed the group: one frame landed, nothing judged')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]], 'then px left: bb#3 and the landed bb#7')
+  assert.deepEqual(cells(S), cells(F), 'the spoke holds what its feeder holds')
+  assert.deepEqual(kernelCells(S), ['qx.z'])
+  assert.deepEqual(screenCells(S), kernelCells(F))
+  assert.equal(S.node.group, null)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ b: 'px' }, { x: ['px'] }], 'no owed end was said: px is not held here any more (the shed\'s word is its exit)')
+})
+
 //! the vanish-and-return (STATUS "a spoke that fails over onto a feeder that is repairing a partition ... loses that
 // partition's rows from its screen at the resync's end, until the fold forwards them back"): a spoke first fed by qq holds
 // px whole (bb#3, 5, 7, 9, 11) and qx; qq dies while aa, its next feeder, is RE-LATCHING px (its base bb#3, bb#5 in the
