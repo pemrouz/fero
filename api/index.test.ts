@@ -1192,6 +1192,16 @@ test('v4.1 identity hardening: legacy dirs, incomplete dirs, invalid and cross-r
     //! an invalid uuid planted in boot.json refuses with the same rule as config
     fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'x~2', epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
     await assert.rejects(fero('r', { dir, listen: false }), /invalid uuid/)
+    //! …and the same size bound as config (UUID_MAX, 64 UTF-8 bytes): a longer restored uuid would boot, and then every
+    // peer would drop its HELLO as malformed, with no message on either side (the 2026-10-21 review's probe)
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'y'.repeat(70), name: 'r', epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+    await assert.rejects(fero('r', { dir, listen: false }), /^Error: fero\('r'\): this dir's boot record carries a uuid over 64 bytes \(UTF-8; got 70\) — every peer would refuse it; repair boot\.json$/)
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'é'.repeat(33), name: 'r', epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+    await assert.rejects(fero('r', { dir, listen: false }), /uuid over 64 bytes \(UTF-8; got 66\)/, 'bytes, not characters')
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'y'.repeat(64), name: 'r', epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+    const at64 = await fero('r', { dir, listen: false }) // 64 bytes is the bound itself: it boots
+    assert.equal((snapshot(at64.cluster) as { me: { uuid: string } }).me.uuid, 'y'.repeat(64))
+    await at64.destroy()
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   //! a NON-EMPTY wal.log with no boot.json is an incomplete dir (partial copy) — never adopted
   const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-idh2-'))

@@ -562,6 +562,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // is the public gate; the kernel trusts NodeOpts by design)
   if (restored.uuid !== undefined && badUuid(restored.uuid))
     refuse(`fero('${name}'): this dir's boot record carries an invalid uuid (${JSON.stringify(restored.uuid)}) — repair boot.json`)
+  //! …its size too: a dir from an older build or a hand edit may hold a uuid over UUID_MAX, and every peer would drop
+  // that node's HELLO as malformed — a node cut off with no message. Refused here instead, loudly.
+  if (restored.uuid !== undefined && utf8Len(restored.uuid) > UUID_MAX)
+    refuse(`fero('${name}'): this dir's boot record carries a uuid over ${UUID_MAX} bytes (UTF-8; got ${utf8Len(restored.uuid)}) — every peer would refuse it; repair boot.json`)
   if (config.uuid !== undefined && restored.uuid !== undefined && config.uuid !== restored.uuid)
     refuse(`fero('${name}'): uuid '${config.uuid as string}'${at('uuid')} does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
   //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
