@@ -973,6 +973,16 @@ export class Scope {
       node.journal.armed && node.journal.emit(JK.orphaned, p, node.epoch)
     } else {
       this.entries.delete(p)
+      //! THE CLEAN ABORT'S WORD (wave 6c, 2026-10-21, the rule's clause 2 — DESIGN-SCALE's wave-6c note): nothing of p
+      // is here now, and the latch a spoke's resync reply named IN FLIGHT is gone with no fold, no orphan and no shed
+      // to follow — the review's PROBE1 (an install moved p off this node mid-acquire) left the spoke's kept cells of p
+      // on its screen for good. So the drop says what the shed says: FEED {x: [p]}, p LEFT this feeder, to every
+      // client link (the spoke drops p with its kept cells, node.ts #unfeed; a word a clear takes is owed and said
+      // again, node.ts #clearCover). If the ring still assigns p, the next round's latch re-feeds it whole through the
+      // fold's forward: a vanish-and-return in that rare case, and an honest one — this node held nothing of p between.
+      if (node.clientLinks.size)
+        for (const cl of node.clientLinks)
+          if (cl.state === LS.admitted && !cl.dead) cl.ship(encodeControl(VERB.FEED, { x: [p] }), node.env.sink, node.journal)
     }
     //! either leg changes the boot record's lists (an abort-to-orphan joins orphanParts; a clean
     // drop leaves both) — persist so a crash in the window classifies correctly (finding 31's class)

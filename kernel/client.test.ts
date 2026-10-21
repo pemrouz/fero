@@ -2344,6 +2344,18 @@ const screenCells = (h: H): string[] => {
 }
 //! kernelCells — the kernel's cells as 'row.field', for a screen comparison
 const kernelCells = (h: H): string[] => [...h.node.state.keys()].map((k) => (JSON.parse(k) as string[]).join('.')).sort()
+//! onQQ — a spoke first fed by qq (hand-driven on link 3, admitted first so it is the primary) holding the given px cells
+// ([field, value, seq, pp] on lane bb) and qx.z at bb#qxSeq, its first download ended; aa admitted as the spare
+const onQQ = (L: ReturnType<typeof latching>, px: [string, number, number, number][], qxSeq = 8) => {
+  const { S } = L
+  S.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:qq' })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'qq', i: 1, l: 'sim:qq', c: SCOPED }) })
+  for (const [k, v, seq, pp] of px) S.node.step({ kind: 'bytesIn', link: 3, bytes: one('bb', PX(k, v), seq, pp, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: one('bb', QX('z', 9), qxSeq, 0, VERB.RECORDS) })
+  S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { bb: Math.max(qxSeq, ...px.map((x) => x[2])) }, r: 0, q: 1, w: 1 }) })
+  L.connect()
+  assert.equal(S.node.primary, 3, 'still fed by qq')
+}
 test('wave 6c — a shed tells the spokes: a partition that moved off the feeder (an orphan at the install, shed once every holder attested it) leaves the spoke with it — its cells, lane entries and screen rows go; a FEED from a spare link is dropped; a later re-acquire brings the partition back whole', () => {
   const { F, S, p, link, connect, cells, laneAt, teach } = latching()
   F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
@@ -2541,6 +2553,40 @@ test('wave 6c — the fold group: a write and its later remove forwarded in sepa
   assert.equal(S.node.group, null, 'the failover dropped the open group')
   assert.equal(S.node.state.has(JSON.stringify(['px', 'e'])), false, 'its frame never landed here: the resync onto the next feeder brings px whole')
   assert.equal(link.dead, false)
+})
+
+//! the rule's clause 2 (the review's PROBE1): every way out of in flight sends a word. A from-zero latch the resync reply
+// named in flight is aborted CLEAN by an install that moves px off aa — nothing of px in any lane, so the entry goes:
+// no orphan, no shed, no fold, and on the first build no word either, so the two kept cells stayed on the spoke's
+// screen for good (the base swept them at the resync end). Now the drop leg of scope.ts #abort says FEED {x: [px]}:
+// px LEFT this feeder, and the spoke drops it, kept cells included. Red on the first build at "the spoke screen shows
+// what its feeder holds": actual [px.a, px.b, qx.z], expected [qx.z].
+test('wave 6c — a clean latch abort says FEED {x}: a from-zero latch the reply named in flight, aborted by an install that moves the partition off the feeder (no residue, so no orphan, shed or fold follows) — the feeder says the partition left, and its kept cells leave the spoke\'s screen', () => {
+  const L = latching()
+  const { F, S, p, beat } = L
+  onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3]])
+  //! aa holds qx alone; px is assigned to it, and cc's announcement opens the from-zero latch
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')?.state, SCOPE.acquiring, 'the from-zero latch')
+  assert.deepEqual(F.node.scope!.inFlight(F.node), ['px'])
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  p.settle()
+  assert.equal(S.node.resync, null, 'the resync ended')
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, 2]], 'the end kept px.a and px.b: the reply named px in flight')
+  assert.deepEqual(screenCells(S), ['px.a', 'px.b', 'qx.z'], 'kept on the screen; the kernel holds qx.z alone')
+  assert.deepEqual(kernelCells(S), ['qx.z'])
+  //! a join moves px off aa: the install's rescope aborts the latch clean — no entry of px in any lane, the entry goes
+  F.node.writes.ring.place('px', 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  assert.equal(F.node.scope!.entries.has('px'), false, 'aa has nothing of px: no orphan, no shed and no fold will come')
+  assert.deepEqual(F.jk(JK.acquireAbort).map((e) => [e.a, e.b]), [['px', 'epoch']])
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the abort said px left (the shed\'s word)')
+  p.settle()
+  beat(10)
+  assert.deepEqual(screenCells(S), kernelCells(F), 'the spoke screen shows what its feeder holds')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 0]], 'the word dropped the two kept cells; the kernel had no lane entry of px to drop')
+  assert.deepEqual(cells(S), cells(F))
 })
 
 //! the vanish-and-return (STATUS "a spoke that fails over onto a feeder that is repairing a partition ... loses that
