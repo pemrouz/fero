@@ -2748,43 +2748,158 @@ test('wave 6c — the shed\'s word is owed when a clear takes it: FEED {x} queue
 //! the second review's SK1 (a regression of the rework): the owed words leave AFTER the heal's answer, out of their
 // original order. A shed's {x} the clear took was said after px had come BACK to aa (placed back, latched from zero and
 // folded on the unsynced link) and after the answer had re-sent px's rows: the spoke dropped a partition its feeder
-// holds, and its tails equalled the feeder's, so no exchange ever re-sent them. Now an owed {x} is said only while px
-// has no entry at the feeder (clause 3: a word only while it is still true); the owed end is said (px is held) and
-// judges nothing. With the latch still open at the heal (acquiring from zero) the word is stale too: the fold brings px
-// whole. Red on the rework at the FEED line: [{e: px}, {x: [px]}] / [{x: [px]}, {b: px}, {e: px}], JK.unfed [[px, 2]].
-for (const foldedBeforeHeal of [true, false])
-  test(`wave 6c — an owed shed word is not said once the partition is back at the feeder (${foldedBeforeHeal ? 'folded on the unsynced link before the heal' : 'still acquiring from zero at the heal'}): the heal re-sends or the fold brings its rows, and no stale {x} drops them`, () => {
-    const L = latching({ tune: { queued: 2 } })
-    const { F, S, p, connect, beat, teach } = L
-    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
-    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
-    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
-    connect()
-    assert.deepEqual(kernelCells(S), kernelCells(F))
-    F.node.step({ kind: 'pause', link: 7 })
-    F.node.writes.ring.place('px', 'bb', 'cc')
-    F.node.scope!.rescope(F.node)
-    F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
-    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
-    assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px'], 'aa shed px')
-    for (let s = 7; s < 12 && F.jk(JK.dropOldest).length === 0; s++) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y' + s, s), s, s - 1, VERB.RECORDS) })
-    assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear took the word: it is owed')
-    //! px comes back to aa before the link heals: cc's announcement opens a from-zero latch
-    F.node.writes.ring.place('px', 'bb', 'aa')
-    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
-    assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'the from-zero latch')
-    const fold = () => teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }], 5)
-    if (foldedBeforeHeal) { fold(); assert.equal(F.node.scope!.held('px'), true, 'aa holds px again; its end is owed too (the link is unsynced)') }
-    F.node.step({ kind: 'drain', link: 7 })
-    p.settle()
-    if (!foldedBeforeHeal) { fold(); p.settle() }
-    beat(10)
-    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), foldedBeforeHeal ? [{ e: 'px' }] : [{ b: 'px' }, { e: 'px' }], foldedBeforeHeal ? 'the owed end alone (px is held): the stale {x} is not said' : 'the fold\'s own markers alone: no stale {x} before them')
-    assert.deepEqual(S.jk(JK.unfed), [], 'nothing was unfed')
-    assert.deepEqual(kernelCells(F), ['px.a', 'px.b', 'qx.y7', 'qx.y8', 'qx.z'])
-    assert.deepEqual(kernelCells(S), kernelCells(F), 'the spoke holds what its feeder holds')
-    assert.deepEqual(screenCells(S), kernelCells(F))
-  })
+// holds, and its tails equalled the feeder's, so no exchange ever re-sent them. Now an owed {x} is said only while the
+// answer that healed the link shipped nothing of px (clause 3: a word only while it is still true); here px is held
+// again and the answer shipped its rows, so the word is stale; the owed end is said (px is held) and judges nothing.
+// Red on the rework at the FEED line: [{e: px}, {x: [px]}], JK.unfed [[px, 2]].
+//! shedPx — px moves off aa (a join placed it on bb and cc) and both holders attest it to bb#t: aa sheds it, FEED {x}
+const shedPx = (F: H, t: number) => {
+  F.node.writes.ring.place('px', 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: t } } }) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: t } } }) })
+}
+//! owedShed — the shape the four tests below share: aa feeds px (bb#3, bb#5) and qx (bb#6) to a synced spoke; the link
+// pauses, px is shed (its {x} queued), and live taps of qx overflow the queue of two: the clear takes the word, it is
+// owed. `from` is the first qx seq after the shed (the lane leaves room at bb#7 for px.b's remove when the test wants it)
+const owedShed = (from: number) => {
+  const L = latching({ tune: { queued: 2 } })
+  const { F, S, connect } = L
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+  connect()
+  assert.deepEqual(kernelCells(S), kernelCells(F))
+  F.node.step({ kind: 'pause', link: 7 })
+  shedPx(F, 5)
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px'], 'aa shed px')
+  for (let s = from; s < from + 5 && F.jk(JK.dropOldest).length === 0; s++) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y' + s, s), s, s === from ? 6 : s - 1, VERB.RECORDS) })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear took the word: it is owed')
+  return L
+}
+const RMX = (k: string): Rec => ({ type: REC.remove, key: ['px', k] } as Rec)
+test('wave 6c — an owed shed word is not said once the partition is back and HELD at the feeder (folded on the unsynced link before the heal): the heal re-sends its rows, and no stale {x} drops them', () => {
+  const L = owedShed(7)
+  const { F, S, p, beat, teach } = L
+  //! px comes back to aa before the link heals: cc's announcement opens a from-zero latch, and the fold runs on the
+  // unsynced link (the cover is lowered under px's rows; the end is owed)
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'the from-zero latch')
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }], 5)
+  assert.equal(F.node.scope!.held('px'), true, 'aa holds px again; its end is owed too (the link is unsynced)')
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  beat(10)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ e: 'px' }], 'the owed end alone (px is held): the stale {x} is not said')
+  assert.deepEqual(S.jk(JK.unfed), [], 'nothing was unfed')
+  assert.deepEqual(kernelCells(F), ['px.a', 'px.b', 'qx.y7', 'qx.y8', 'qx.z'])
+  assert.deepEqual(kernelCells(S), kernelCells(F), 'the spoke holds what its feeder holds')
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
+
+//! the third review's R3-6 and R3-2: the second fix round said the owed {x} only while px had NO ENTRY at aa, and held
+// it back while px was a latch from zero or an orphan. In both the heal's answer ships nothing of px (`feeds` walks the
+// answer; a from-zero latch holds no row yet), so the spoke kept its rows from before the shed — px.b among them, which
+// the cluster removed while px lived on bb and cc — until the fold landed or the orphan shed. Now the word is said
+// whenever the answer shipped nothing of px: the spoke drops px at the heal, and what follows brings it whole (the
+// fold's group, a re-entry's whole forward) or says the word again (the shed, a no-op). Red on the second round at
+// "mid-latch the spoke shows nothing of px" (it showed px.a and px.b) and at "between the heal and the shed".
+test('wave 6c — an owed shed word IS said while the partition is a latch from zero at the heal: the answer shipped nothing of it, the spoke drops its rows from before the shed (a removed one among them), and the fold brings it whole', () => {
+  const L = owedShed(8)
+  const { F, S, p, beat, teach } = L
+  //! px comes back to aa before the heal: the from-zero latch opens on cc's announcement (bb#7: px.b's remove, made while
+  // px lived elsewhere), and the teacher has not shipped yet
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'the from-zero latch')
+  assert.equal(F.node.scope!.feeds('px'), true, 'fed: a latch from nothing')
+  assert.equal(F.node.byPart!.has('px'), false, 'but no row of px here yet')
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  beat(3)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word, said after the heal: the answer shipped nothing of px')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]], 'the spoke dropped its two rows of px from before the shed')
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'mid-latch the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
+  assert.deepEqual(kernelCells(S), kernelCells(F))
+  //! the fold: the group brings px whole — px.a, and px.b with its remove in one apply
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }, { seq: 7, rec: RMX('b'), pp: 5 }], 7)
+  assert.equal(F.node.scope!.held('px'), true)
+  p.settle()
+  beat(5)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }, { b: 'px' }, { e: 'px' }], 'then the fold\'s own group')
+  assert.deepEqual(kernelCells(F), ['px.a', 'qx.y8', 'qx.y9', 'qx.z'])
+  assert.deepEqual(kernelCells(S), kernelCells(F), 'the spoke holds what its feeder holds')
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
+
+test('wave 6c — an owed shed word IS said while the partition is an orphan the ring no longer assigns at the heal: a frozen copy is no spoke\'s, the spoke drops its rows from before the shed, and the orphan\'s own shed says the word again to no effect', () => {
+  const L = owedShed(8)
+  const { F, S, p, beat, teach } = L
+  //! px comes back from zero and folds on the unsynced link (bb#7 is px.b's remove), then moves off aa again: an orphan
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }, { seq: 7, rec: RMX('b'), pp: 5 }], 7)
+  assert.equal(F.node.scope!.held('px'), true)
+  assert.deepEqual(kernelCells(F), ['px.a', 'qx.y8', 'qx.y9', 'qx.z'], 'the feeder: px.b is removed')
+  F.node.writes.ring.place('px', 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.orphan, 'frozen, not assigned')
+  assert.equal(F.node.scope!.feeds('px'), false)
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  beat(3)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word alone: the owed end is not said (px is not held), the {x} is (the answer shipped nothing of a frozen copy)')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'between the heal and the shed the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
+  assert.deepEqual(kernelCells(S), ['qx.y8', 'qx.y9', 'qx.z'])
+  //! the orphan sheds (both holders attest bb#7): its own word, the second time, drops nothing
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px', 'px'], 'shed twice')
+  p.settle()
+  beat(3)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }, { x: ['px'] }], 'the shed says the word again')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2], ['px', 0]], 'the second word drops nothing')
+  assert.deepEqual(kernelCells(F), ['qx.y8', 'qx.y9', 'qx.z'])
+  assert.deepEqual(kernelCells(S), kernelCells(F))
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
+
+test('wave 6c — an owed shed word IS said while the partition is an orphan the ring still assigns at the heal (a repair whose teacher died): the spoke drops its rows from before the shed, and the re-entry fold forwards the partition whole', () => {
+  const L = owedShed(8)
+  const { F, S, p, beat, teach } = L
+  //! px comes back from zero and folds on the unsynced link; then a repair (cc announces bb#11) whose teacher dies: the
+  // latch aborts with residue, px is an orphan the ring still assigns to aa — in flight (a re-entry in waiting)
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }], 5)
+  assert.equal(F.node.scope!.held('px'), true)
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 11 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.preState, SCOPE.held, 'a repair of the held base')
+  F.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.orphan, 'the teacher died: an orphan with residue')
+  assert.deepEqual(F.node.scope!.inFlight(F.node), ['px'], 'still assigned: in flight')
+  assert.equal(F.node.scope!.feeds('px'), false)
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  beat(3)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word: the answer shipped nothing of px')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'nothing of px at the spoke while aa holds it frozen')
+  //! cc comes back and announces px: the re-entry latch (preState orphan), and its fold forwards px WHOLE in a group
+  F.admit(5, 'cc'); F.digestFrom(5)
+  F.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 11 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.preState, SCOPE.orphan, 'the re-entry latch')
+  teach(5, [{ seq: 11, rec: PX('c', 3), pp: 5 }], 11)
+  assert.equal(F.node.scope!.held('px'), true)
+  p.settle()
+  beat(3)
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }, { b: 'px' }, { e: 'px' }], 'the re-entry\'s group')
+  assert.deepEqual(kernelCells(F), ['px.a', 'px.b', 'px.c', 'qx.y8', 'qx.y9', 'qx.z'])
+  assert.deepEqual(kernelCells(S), kernelCells(F), 'px whole at the spoke: the base the answer withheld and the delta')
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
 
 //! the spoke's link to aa blips: both ends see the close, the spoke re-dials aa (its only host) on link 4, aa admits it on
 // link 8; the pump is re-made on the new pair

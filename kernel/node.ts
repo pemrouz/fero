@@ -582,10 +582,12 @@ export class Node {
   // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
   // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is HELD
   // (a latch open for p again says its own end; an orphan's or a gone partition's exit is a shed's or an abort's {x});
-  // an owed {x} while p has NO entry here (the second review's SK1: the words leave AFTER the heal's answer, out of their
-  // original order, and a shed's {x} said after p had come back and the answer had re-sent its rows dropped a partition
-  // the feeder holds, for good — held or acquiring, the answer or the fold brings p; an orphan's own exit says its own
-  // word); a word a clear takes again is owed again; the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
+  // an owed {x} while the answer SHIPPED NOTHING of p: the feeder does not feed p or holds no row of it (the second
+  // review's SK1: the words leave AFTER the heal's answer, out of their original order, and a shed's {x} said after p
+  // had come back and the answer had re-sent its rows dropped a partition the feeder holds, for good; the third
+  // review's R3-2 and R3-6: 'no entry' as the test held the word back for a latch from zero and an orphan, and the
+  // spoke kept a row the cluster had removed until the fold or the shed); a word a clear takes again is owed again;
+  // the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
   // partition on the spoke for good and PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
   #owed = new Map<Link, { e: Set<string>; x: Set<string> }>()
 
@@ -2666,11 +2668,14 @@ export class Node {
       if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) return
     }
     if (o.x.size) {
-      //! an {x} only while p has NO entry here (clause 3: a word only while it is still true) — p back in any state makes
-      // the word stale: held or acquiring on a base, this answer shipped p's rows; from zero, the fold brings p whole; an
-      // orphan, its own exit says its own word (the shed's {x} or a re-entry's whole forward), and an assigned one is in
-      // flight, whose kept cells wait for that fold's end (clause 2)
-      const gone = [...o.x].filter((p) => this.scope === null || !this.scope.entries.has(p))
+      //! an {x} only while this answer shipped NOTHING of p (clause 3: a word only while it is still true): the feeder
+      // does not feed p (no entry; an orphan, assigned or not; a re-entry latch from one) or holds no row of it (a latch
+      // from zero; byPart drops an emptied partition). What the spoke holds of p is then from before the word was
+      // queued, and what follows brings p whole (the fold's group, a re-entry's whole forward) or says this word again
+      // (the shed). Back held, or acquiring on a held base, the word is stale: this answer shipped p's rows (the second
+      // review's SK1). 'No entry' alone held it back for a latch from zero and for an orphan, and the spoke kept a row
+      // the cluster had removed until the fold or the shed (the third review's R3-6, R3-2).
+      const gone = [...o.x].filter((p) => this.scope === null || !this.scope.feeds(p) || !this.byPart!.has(p))
       o.x.clear()
       if (gone.length) link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
     }
