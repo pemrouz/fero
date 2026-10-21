@@ -2818,9 +2818,9 @@ test('wave 6c — an owed shed word IS said while the partition is a latch from 
   F.node.step({ kind: 'drain', link: 7 })
   p.settle()
   beat(3)
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'mid-latch the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
   assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word, said after the heal: the answer shipped nothing of px')
   assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]], 'the spoke dropped its two rows of px from before the shed')
-  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'mid-latch the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
   assert.deepEqual(kernelCells(S), kernelCells(F))
   //! the fold: the group brings px whole — px.a, and px.b with its remove in one apply
   teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }, { seq: 7, rec: RMX('b'), pp: 5 }], 7)
@@ -2849,9 +2849,9 @@ test('wave 6c — an owed shed word IS said while the partition is an orphan the
   F.node.step({ kind: 'drain', link: 7 })
   p.settle()
   beat(3)
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'between the heal and the shed the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
   assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word alone: the owed end is not said (px is not held), the {x} is (the answer shipped nothing of a frozen copy)')
   assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
-  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'between the heal and the shed the spoke shows nothing of px (it showed px.a and px.b, px.b removed at the cluster, on the second round)')
   assert.deepEqual(kernelCells(S), ['qx.y8', 'qx.y9', 'qx.z'])
   //! the orphan sheds (both holders attest bb#7): its own word, the second time, drops nothing
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
@@ -2884,9 +2884,9 @@ test('wave 6c — an owed shed word IS said while the partition is an orphan the
   F.node.step({ kind: 'drain', link: 7 })
   p.settle()
   beat(3)
+  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'nothing of px at the spoke while aa holds it frozen (px.a and px.b from before the shed on the second round)')
   assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the owed word: the answer shipped nothing of px')
   assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
-  assert.deepEqual(screenCells(S), ['qx.y8', 'qx.y9', 'qx.z'], 'nothing of px at the spoke while aa holds it frozen')
   //! cc comes back and announces px: the re-entry latch (preState orphan), and its fold forwards px WHOLE in a group
   F.admit(5, 'cc'); F.digestFrom(5)
   F.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 11 } } }) })
