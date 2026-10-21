@@ -582,12 +582,14 @@ export class Node {
   // answer that syncs the link, EACH AT ITS OWN PLACE IN THE ORDER (#answer → #payOwed, twice). An owed {x} leaves
   // BEFORE the answer's ship, unfiltered: where it stood when the clear took it, in front of everything of p the feeder
   // has sent since. It is true when said (p LEFT the feeder when the word was queued, so what the spoke holds of p is
-  // from before), and the ship that follows re-sends whatever of p the feeder feeds now: every record of p here
-  // arrived after the word and sits above the lower of the spoke's tail and the cover (tapped behind the word and taken
-  // by the same clear: the cover lowered under it; appended since: above the spoke's tail; spliced, folded or
-  // re-entered since: indexInsert or #forwardWhole lowered the cover). So the spoke equals its feeder's fed subset at
-  // the exchange's end in every state p can be in, and the one cost is a vanish-and-return INSIDE the exchange when p
-  // is held again (its rows leave with the word and come back with the same answer). An owed {e} leaves AFTER the
+  // from before), and the ship that follows re-sends the named partitions WHOLE: #payOwed lowers the answer's start on
+  // every lane under its lowest entry of a named partition, so every entry of p the feeder feeds is above the start
+  // (neither the cover nor the spoke's tails can stand in for that: a frame of p queued behind the word survives the
+  // clear on a client link, Link.flush, and reaches the spoke before the re-said word drops it; the fifth review's
+  // R5-1 and R5-2). So the spoke equals its feeder's fed subset at the exchange's end, at the reply, in every state p
+  // can be in, and the one cost is a vanish-and-return INSIDE the exchange when p is held again (its rows leave with
+  // the word and come back with the same answer), plus the lane suffix above p's lowest entry re-sent (rows the spoke
+  // holds dropped by its dual fence). An owed {e} leaves AFTER the
   // whole ship and the reply, and only while p is HELD (a latch open for p again says its own end; an orphan's or a
   // gone partition's exit is a shed's or an abort's {x}): the first moment the spoke holds the fed subset above the
   // cover again, so the end judges against a complete kernel. Why not one place for both: an {x} said AFTER the
@@ -2539,11 +2541,15 @@ export class Node {
     let shipped = 0
     let tear: string | null = null // the origin the ship stopped in ('' = the lanes are done, only the reply waits)
     let tearSeq = 0 // and the first seq it did not ship
-    //! the owed shed words first (wave 6c, clause 3; #owed): FEED {x} at its own place in the order, BEFORE the ship
-    // that re-sends whatever of those partitions this feeder feeds now. Every answer starts on a flowing link (the
-    // DIGEST handler marks a paused link's debt instead; the drain resumes a torn answer only once its flush left the
-    // link flowing), so the word goes straight to the socket, ahead of the first record.
-    if (link.client && this.#owed.size) this.#payOwed(link, 'x')
+    //! the owed shed words first (wave 6c, clause 3; #owed): FEED {x} at its own place in the order, BEFORE the ship,
+    // and the ship re-sends the named partitions WHOLE: #payOwed lowers this answer's start on every lane to just under
+    // its lowest entry of a named partition. Neither the cover nor the spoke's tails can stand in for that (the fifth
+    // review): a frame of the partition queued BEHIND the word in the flush that cleared the queue survives the clear
+    // (Link.flush ships on after a clear on a client link), reaches the spoke at the drain, and the re-said word drops
+    // it; on a lane the clear took nothing from, the cover and the spoke's reply both sit at or above it. Every answer
+    // starts on a flowing link (the DIGEST handler marks a paused link's debt instead; the drain resumes a torn answer
+    // only once its flush left the link flowing), so the word goes straight to the socket, ahead of the first record.
+    if (link.client && this.#owed.size) d = this.#payOwed(link, 'x', d)
     if (!this.armed || link.client) {
       const scopedTo = this.armed ? (p: string) => this.scope!.feeds(p) : null
       const run: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[] = []
@@ -2667,23 +2673,47 @@ export class Node {
     o[kind].add(p)
   }
   //! #payOwed — say the owed words of one kind at their place in the order (#answer): 'x' BEFORE the answer's ship,
-  // one frame naming every partition whose shed word a clear took (the spoke drops them; the ship that follows
-  // re-sends whatever of them this feeder feeds); 'e' AFTER the whole ship and the reply, one frame per partition
-  // still held strictly (acquiring again, that fold says its own end; an orphan or gone, a shed's or an abort's {x} is
-  // the exit). The debt is CONSUMED WORD BY WORD as each one ships: a word the clear takes on its way out is owed again
-  // by #clearCover's read of the dropped frames, and the words behind it were never taken out (the rework took the
-  // whole debt out first and put the rest back after a failed ship: one more branch than the rule needs). Never into
-  // a full paused queue, one guard for both kinds: a word pushed there would clear whatever waits, the reply it
-  // follows included; the next untorn answer — the drain's, or a heartbeat's — pays within a tick (the {x} half never
-  // meets the guard: every answer starts on a flowing link).
-  #payOwed(link: Link, kind: 'e' | 'x') {
+  // one frame naming every partition whose shed word a clear took (the spoke drops them), AND THE SHIP RE-SENDS THEM
+  // WHOLE: the answer's start `d` (the peer's tails, capped by the cover) comes back lowered on every lane to just
+  // under its lowest entry of a named partition (the per-partition index, as #forwardWhole lowers a cover for a
+  // re-entry), so the walk from there ships every entry of those partitions this feeder feeds. Whatever of p the
+  // feeder holds at the word, on whichever lane, by whichever path it came, is above the start: the rule is this one
+  // line under the word, with no claim about what happened between the clear and the heal (the fifth review's
+  // leapfrog, R5-1 and R5-2: a frame of p queued behind the word survived the clear, reached the spoke first, and the
+  // word dropped it from a lane the cover and the spoke's reply both sat at the tail of). The cost: the lane suffix
+  // above p's lowest entry, rows the spoke holds among them (its dual fence drops them); an orphan's frozen rows lower
+  // the start too, for a ship that filters them out (a `feeds` test here would be a second predicate on the line).
+  // 'e' AFTER the whole ship and the reply, one frame per partition still held strictly (acquiring again, that fold
+  // says its own end; an orphan or gone, a shed's or an abort's {x} is the exit). The debt is CONSUMED WORD BY WORD
+  // as each one ships: a word the clear takes on its way out is owed again by #clearCover's read of the dropped
+  // frames, and the words behind it were never taken out (the rework took the whole debt out first and put the rest
+  // back after a failed ship: one more branch than the rule needs). Never into a full paused queue, one guard for
+  // both kinds: a word pushed there would clear whatever waits, the reply it follows included; the next untorn
+  // answer — the drain's, or a heartbeat's — pays within a tick (the {x} half never meets the guard: every answer
+  // starts on a flowing link).
+  #payOwed(link: Link, kind: 'x', d: Record<string, unknown>): Record<string, unknown>
+  #payOwed(link: Link, kind: 'e'): void
+  #payOwed(link: Link, kind: 'e' | 'x', d?: Record<string, unknown>): Record<string, unknown> | void {
     const o = this.#owed.get(link)
-    if (o === undefined || !o[kind].size) return
-    if (link.paused && link.queued.length >= link.maxQueued) return
+    if (o === undefined || !o[kind].size) return d
+    if (link.paused && link.queued.length >= link.maxQueued) return d
     if (kind === 'x') {
       const gone = [...o.x]
       o.x.clear()
       link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
+      //! the start under every entry of the named partitions (a copy: `d` may be the decoded frame's map)
+      let start = d!
+      if (this.byPart !== null)
+        for (const p of gone) {
+          const per = this.byPart.get(p)
+          if (per === undefined) continue
+          for (const [origin, arr] of per) {
+            if (!arr.length) continue
+            const under = arr[0].seq - 1
+            if ((typeof start[origin] === 'number' ? (start[origin] as number) : 0) > under) { if (start === d) start = { ...d }; start[origin] = under }
+          }
+        }
+      d = start
     } else
       for (const p of [...o.e]) {
         o.e.delete(p)
@@ -2691,6 +2721,7 @@ export class Node {
         if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) break
       }
     if (!o.e.size && !o.x.size) this.#owed.delete(link)
+    return d
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
