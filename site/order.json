@@ -1,4 +1,26 @@
 {
-  "order": ["lede", "cluster", "argument", "break", "start", "inside", "contract", "wire", "data"],
-  "nav": [["cluster", "demo"], ["break", "break it"], ["start", "start"], ["contract", "contract"]]
+  "order": [
+    "hero",
+    "demo",
+    "write",
+    "break",
+    "start",
+    "trust",
+    "views"
+  ],
+  "nav": [
+    [
+      "demo-story",
+      "try it",
+      "demo"
+    ],
+    [
+      "break",
+      "break it"
+    ],
+    [
+      "start",
+      "start"
+    ]
+  ]
 }

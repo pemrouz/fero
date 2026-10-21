@@ -1,0 +1,166 @@
+/* sections/write.css — 01 How a write travels: A's four step cards, lit in order by the real writes (write.js).
+   Builds on calm.css (.step-no, .badge, details.more, the tokens). Only the six type steps, never an em size between
+   them. Colour means state: violet = the write and luna's owner (★); green = every copy agrees (✓); amber = waiting;
+   red = down (the ✕ badge) or cut off (a dashed red box); a server that left is a dashed grey box. */
+
+/* "How a write / travels", never "How a / write travels" (balance splits it badly on a phone) */
+#write .sec-head h2 { text-wrap: pretty; }
+#write p.sub { margin: 0; text-wrap: pretty; }
+/* code inside a sentence is the sentence's own size (calm.css's 0.92em would be a size off the steps) */
+#write p.sub code, #write p.wr-cap code { font-size: 1em; }
+
+/* ---------- four cards in a row, an arrow between each two ---------- */
+#write .wr-steps { display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr) 30px minmax(0, 1fr) 30px minmax(0, 1fr); }
+#write .wr-step { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 344px; padding: 1.15rem 1.1rem 1.25rem;
+  background: var(--bg-2); border: 1px solid var(--rule); border-radius: 14px;
+  transition: border-color 0.4s, background-color 0.4s, box-shadow 0.4s; }
+/* as tall as a two-line title, so a one-line title's picture starts level with the others even without subgrid */
+#write .wr-top { display: flex; align-items: center; gap: 0.75rem; min-height: calc(var(--t-body) * 1.3 * 2); }
+#write .wr-step .step-no { transition: background-color 0.2s, color 0.2s, box-shadow 0.4s; }
+#write h3.wr-title { margin: 0; font: 600 var(--t-body)/1.3 var(--sans); color: var(--ink); letter-spacing: 0; text-wrap: balance; }
+#write .wr-vis { flex: 1; display: grid; place-items: center; padding: 1.1rem 0 1.05rem; min-width: 0; }
+#write p.wr-cap { margin: 0; max-width: none; padding-top: 1rem; border-top: 1px solid var(--rule); font: var(--t-small)/1.5 var(--sans);
+  color: var(--dim); text-wrap: pretty; }
+#write p.wr-cap b { color: var(--ink); font-weight: 600; }
+
+/* where subgrid works, the four cards share their rows: titles, pictures and captions line up across the row */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 1120px) {
+    #write .wr-steps { grid-template-rows: auto 1fr auto; }
+    #write .wr-step { display: grid; grid-row: 1 / span 3; grid-template-rows: subgrid; row-gap: 0; min-height: 0; }
+    #write .wr-arrow { grid-row: 2; }
+  }
+}
+
+/* lit: the card the write has reached now; the ones it passed keep a filled number */
+#write .wr-step.on { border-color: var(--accent-line);
+  background: linear-gradient(180deg, rgba(157, 123, 255, 0.13), rgba(157, 123, 255, 0.03) 62%), var(--bg-3);
+  box-shadow: 0 12px 44px -20px rgba(157, 123, 255, 0.6); }
+#write .wr-step.on .step-no, #write .wr-step.done .step-no { background: var(--accent); color: var(--accent-ink); }
+#write .wr-step.on .step-no { box-shadow: 0 0 0 4px rgba(157, 123, 255, 0.18); }
+#write .wr-step.wait { border-color: rgba(245, 211, 107, 0.5); background: var(--bg-2); box-shadow: none; }
+
+/* the arrows: faint at rest; bright once the write has passed, with a dot running along */
+#write .wr-arrow { display: grid; place-items: center; }
+#write .wr-arrow svg { width: 26px; height: 14px; overflow: visible; opacity: 0.42; transition: opacity 0.4s; }
+#write .wr-arrow .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+#write .wr-arrow .hd { fill: var(--accent); }
+#write .wr-arrow .dot { fill: #d4c6ff; opacity: 0; }
+#write .wr-arrow.on svg { opacity: 1; }
+#write .wr-arrow.go .dot { animation: wr-run 0.55s ease-out; }
+@keyframes wr-run { 0% { opacity: 0; transform: translateX(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateX(19px); } }
+
+/* ---------- 1 · you assign: the line of code, in the writer ---------- */
+#write .wr-assign { display: grid; justify-items: center; gap: 0.6rem; min-width: 0; max-width: 100%; }
+#write pre.wr-code { margin: 0; max-width: 100%; overflow-x: auto; padding: 0.75rem; background: var(--bg); border: 1px solid var(--rule-2);
+  border-radius: 10px; font: var(--t-small)/1.7 var(--mono); color: var(--ink); white-space: pre; tab-size: 4;
+  /* as wide as the longest mood makes it (19 characters), so a new mood never re-centres the block; it fits the
+     narrowest card four across (1120 px) */
+  min-width: calc(19ch + 1.5rem + 2px); }
+#write .wr-code .c { color: var(--faint); }
+#write .wr-code .w { color: var(--accent); }
+#write .wr-step.on .wr-code { border-color: rgba(157, 123, 255, 0.45); }
+
+/* ---------- 2 · the owner takes it ---------- */
+#write .wr-own { display: grid; justify-items: center; gap: 0.5rem; text-align: center; }
+#write .wr-via { font: var(--t-small)/1.4 var(--sans); color: var(--dim); }
+/* the line into the owner always keeps its place, so the card never grows while you read */
+#write .wr-via.off, #write svg.wr-down.off { visibility: hidden; }
+#write .wr-via .nm { font-family: var(--mono); color: var(--ink); }
+#write svg.wr-down { width: 14px; height: 22px; margin: -0.1rem 0 0.05rem; opacity: 0.6; transition: opacity 0.4s; }
+#write .wr-down .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+#write .wr-down .hd { fill: var(--accent); }
+#write .wr-step.on svg.wr-down { opacity: 1; }
+#write .wr-own-k { font: var(--t-label)/1.3 var(--mono); color: var(--accent); letter-spacing: 0.02em; margin-top: 0.15rem; }
+#write .wr-own-k.wait { color: var(--wait); }
+/* why a write waits, under "◌ waiting". Four across, it fits the height card 1 already gives the row */
+#write .wr-why { max-width: 24ch; margin-top: -0.25rem; font: var(--t-label)/1.35 var(--sans); color: var(--dim); text-wrap: balance; }
+#write .wr-why.off { display: none; }
+#write .wr-why .nm { font-family: var(--mono); color: var(--ink); }
+
+/* a server or a client, small: one shape everywhere (the demo's .node, in miniature) */
+#write .wr-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; height: 34px; padding: 0 0.7rem;
+  border-radius: 10px; border: 1px solid var(--rule-2); background: var(--bg-3); font: 500 var(--t-small)/1 var(--mono); color: var(--ink);
+  white-space: nowrap; transition: border-color 0.35s, background-color 0.35s, box-shadow 0.35s, color 0.35s; }
+#write .wr-chip .r { font: 500 var(--t-label)/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); margin-left: 0.2rem; }
+#write .wr-chip.lg { height: 46px; padding: 0 1.15rem; font-size: var(--t-body); }
+/* down: calm.css's 22 px ✕ badge, inside the chip after its name, with as much room to its right as above and below */
+#write .wr-chip .badge { position: static; flex: none; margin: 0 -0.3rem 0 0.1rem; }
+#write .wr-chip.lg .badge { margin-right: -0.4rem; }
+#write .wr-chip .owner-star { color: var(--accent); margin-left: 0.05rem; }
+#write .wr-chip.owner { border-color: var(--accent-line);
+  background: linear-gradient(180deg, rgba(157, 123, 255, 0.14), rgba(157, 123, 255, 0.04) 60%), var(--bg-3); }
+#write .wr-step.on .wr-chip.owner:not(.down):not(.gone) { box-shadow: 0 8px 30px -12px rgba(157, 123, 255, 0.7); }
+#write .wr-chip.got { border-color: var(--accent-line); background: rgba(157, 123, 255, 0.16); box-shadow: 0 6px 22px -12px rgba(157, 123, 255, 0.8); }
+/* down (✕) or left (a dashed box, like one that is no longer there), as the demo draws them: the name keeps full ink,
+   so it stays readable; only an owner's ★ dims */
+#write .wr-chip.down { background: transparent; border-color: var(--rule); box-shadow: none; }
+#write .wr-chip.gone { background: transparent; border: 1px dashed var(--rule-2); box-shadow: none; }
+#write .wr-chip.down .owner-star, #write .wr-chip.gone .owner-star { opacity: 0.6; }
+#write .wr-chip.cut { border: 1px dashed var(--neg); }
+
+/* ---------- 3 · it goes to every copy: a fan from the owner to each other copy ---------- */
+#write .wr-fan { display: grid; grid-template-columns: 44px auto; align-items: center; }
+#write svg.wr-fan-lines { display: block; width: 44px; height: 34px; overflow: visible; }
+#write .wr-fan-lines path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+#write .wr-fan-lines .hd { fill: var(--accent); stroke: none; }
+#write .wr-fan-lines .br { opacity: 0.42; transition: opacity 0.35s; }
+#write .wr-fan-lines .br.on { opacity: 1; }
+#write .wr-fan-lines .br.off { opacity: 0.12; }
+#write .wr-fan-lines .root { fill: var(--accent); }
+/* room for the café's three other copies before the first paint (34 px chips, 10 px apart), so nothing grows later */
+#write .wr-to { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; justify-items: start; align-content: center; min-height: 122px; }
+
+/* ---------- 4 · it shows everywhere: how many copies say the new mood ---------- */
+#write .wr-result { display: grid; justify-items: center; text-align: center; transition: opacity 0.35s; }
+/* the count is always live; until the lit story reaches card 4 (or while the write waits for its owner) it is
+   dimmed, and the ✓ only shows when every live copy says the mood */
+#write .wr-result.pre { opacity: 0.4; }
+#write .wr-cat { display: block; width: 40px; height: 34px; margin-bottom: 0.7rem; color: var(--faint); transition: color 0.4s; }
+#write .wr-cat svg { display: block; width: 100%; height: 100%; overflow: visible; }
+#write .wr-cat path, #write .wr-cat circle, #write .wr-cat ellipse { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#write .wr-cat .fill { fill: currentColor; stroke: none; }
+#write .wr-step.on .wr-cat { color: var(--accent); }
+#write .wr-cat.hop { animation: wr-hop 0.5s ease-out; }
+@keyframes wr-hop { 0% { transform: translateY(0); } 35% { transform: translateY(-6px) rotate(-5deg); } 70% { transform: translateY(0) rotate(2deg); } 100% { transform: none; } }
+#write .wr-big { font: 500 var(--t-big)/1 var(--mono); color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  white-space: nowrap; transition: color 0.35s; }
+#write .wr-big.ok { color: var(--pos); }
+#write .wr-say { margin-top: 0.75rem; font: var(--t-small)/1.4 var(--sans); color: var(--dim); }
+#write .wr-say .wr-ok { color: var(--pos); margin-right: 0.15rem; transition: opacity 0.25s; }
+#write .wr-result:not(.ok) .wr-ok { opacity: 0; transition: none; }
+#write .wr-mood { font-family: var(--mono); color: var(--ink); }
+/* room for a seven-letter mood, so the line does not re-centre when the mood changes */
+#write .wr-say .wr-mood { display: inline-block; min-width: 7ch; text-align: left; }
+#write .wr-note { min-height: 1.4em; margin-top: 0.3rem; font: var(--t-label)/1.4 var(--mono); color: var(--dim); }
+#write .wr-note .neg { color: var(--neg); }
+#write .wr-note .wait { color: var(--wait); }
+#write .wr-note .dim { color: var(--dim); }
+
+/* ---------- the one door: how the owner orders writes, and luna's latest stamp (calm.css draws the door) ---------- */
+#write .wr-door-body p { margin: 0 0 0.6rem; font-size: var(--t-small); line-height: 1.6; color: var(--dim); }
+#write .wr-door-body p:last-child { margin-bottom: 0; }
+#write .wr-st { font-family: var(--mono); color: var(--ink); white-space: nowrap; }
+
+/* ---------- narrower: the cards stack, each a row (words left, picture right), the arrows point down ---------- */
+@media (max-width: 1119px) {
+  #write .wr-steps { grid-template-columns: minmax(0, 1fr); }
+  #write .wr-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "top vis" "cap vis";
+    grid-template-rows: auto 1fr; column-gap: 2rem; min-height: 0; padding: 1.25rem 1.4rem 1.3rem; }
+  #write .wr-top { grid-area: top; min-height: 0; }
+  #write .wr-vis { grid-area: vis; padding: 0.4rem 0; }
+  #write p.wr-cap { grid-area: cap; align-self: start; border-top: 0; padding-top: 0.75rem; max-width: 36ch; }
+  /* stacked, card 2 has no height to spare: the reason keeps its one line even at rest, so the card never grows */
+  #write .wr-why { max-width: none; min-height: 1.35em; }
+  #write .wr-why.off { display: block; visibility: hidden; }
+  #write .wr-arrow { height: 38px; }
+  #write .wr-arrow svg { transform: rotate(90deg); }
+}
+@media (max-width: 640px) {
+  #write .wr-steps { margin-top: 2rem; }
+  #write .wr-step { display: flex; flex-direction: column; padding: 1.1rem 1.1rem 1.2rem; }
+  #write .wr-vis { padding: 1.3rem 0 1.15rem; }
+  #write p.wr-cap { align-self: stretch; border-top: 1px solid var(--rule); padding-top: 0.95rem; max-width: none; }
+  #write .wr-arrow { height: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { #write .wr-arrow.go .dot, #write .wr-cat.hop { animation: none; } }

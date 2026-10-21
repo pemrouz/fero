@@ -1,0 +1,28 @@
+<section class="sec" id="views" aria-labelledby="views-h">
+  <div class="sec-head"><span class="sec-no">05</span><h2 id="views-h">Live views</h2></div>
+  <!-- "up to date" never breaks inside (on a phone it read "up to / date") -->
+  <p class="point">A filter stays up&nbsp;to&nbsp;date as writes land.</p>
+  <!-- the page shows cafe.data as an object of rows (hero, 03), so say once that it has list methods; and name the
+       library "the data library" (a bare "data" reads like a typo) -->
+  <p class="vw-sub"><code>cafe.data</code> also has list methods from the <b>data</b> library: <code>filter</code> keeps the rows that pass, and stays live. Sums and sorted lists stay live too. <a class="vw-data" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener">data's site <span aria-hidden="true">→</span></a></p>
+
+  <!-- one figure: the live two-liner, run by the data library (npm, data@4.0.0 via jsDelivr) on the copy the café's
+       client holds (sections/views.js). The answer shows once: the first comment is what the filter holds right now.
+       The second line shows only when there is a real write to show (c1's latest), and says what it did. Until then
+       the card keeps that line's room, empty, so it does not grow when the first write lands. -->
+  <figure class="figure vw-fig" data-state="idle">
+    <pre class="code vw-code" data-keep="1" style="--vw-keep: 1"><span class="c">// who wants dinner?</span>
+<span class="k">const</span> hungry = cafe.data.filter((cat) =&gt; cat.mood === <span class="s">'hungry'</span>)    <span class="c">// …</span></pre>
+  </figure>
+  <p class="caption vw-cap"><code>hungry</code> is live: when a cat gets hungry, she joins by herself. <span class="vw-status">The data library loads from npm as you scroll here.</span></p>
+  <p class="sr-only vw-said" aria-live="polite"></p>
+
+  <details class="more vw-door">
+    <summary>How this runs in your tab</summary>
+    <div class="vw-door-body">
+      <p class="vw-load">This page loads the <b>data</b> library from npm when you scroll here.</p>
+      <p>fero's kernel runs here too, on a simulated network. The page cannot run <code>fero()</code> itself (that needs Node's sockets), so client <span class="vw-c1" data-literal>c1</span> posts the record each assignment becomes. The library starts from that client's copy, then takes every change that reaches it through <code>lane()</code>, the same call fero makes when a change reaches a copy.</p>
+      <p class="vw-checks">After every change, the page also checks each cat in that copy by hand, in plain JavaScript, and compares the rows with the filter's.</p>
+    </div>
+  </details>
+</section>

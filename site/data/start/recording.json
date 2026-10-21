@@ -1,0 +1,81 @@
+{
+ "recordedAt": "2026-10-20T23:28:51.398Z",
+ "node": "v26.1.0",
+ "fero": {
+  "version": "4.0.0",
+  "head": "a28ede5"
+ },
+ "commands": {
+  "cafe": "FERO_RENDEZVOUS=127.0.0.1:43907 FERO_CONFIG=off nice -n 15 node cafe.ts",
+  "visitor": "FERO_RENDEZVOUS=127.0.0.1:43907 FERO_CONFIG=off nice -n 15 node visitor.ts"
+ },
+ "shown": {
+  "cafe": "node cafe.ts",
+  "visitor": "node visitor.ts"
+ },
+ "how": "the café first; the visitor once the café had printed; when both screens showed the write and 1500 ms more had passed, Ctrl-C (SIGINT) to the visitor, then to the café. stdout only (stderr was empty); a private directory port (FERO_RENDEZVOUS) so the run met nothing else on the box, and no config files (FERO_CONFIG=off).",
+ "exit": {
+  "cafe": 0,
+  "visitor": 0
+ },
+ "files": {
+  "cafe.ts": "2b2a10fd8551f4de78a659b07537f054f769f3e8164d664cd4e361cd6cd9eb7f",
+  "visitor.ts": "8c3f24b7bf26f01e1018de176187e364d0f635d2cce1e4405888bfbe14fedcce"
+ },
+ "cafe": [
+  "{",
+  "  luna: { mood: 'sleepy' },",
+  "  mochi: { mood: 'playful' },",
+  "  biscuit: { mood: 'hungry' }",
+  "}",
+  "{",
+  "  luna: { mood: 'sleepy' },",
+  "  mochi: { mood: 'playful' },",
+  "  biscuit: { mood: 'purring' }",
+  "}"
+ ],
+ "visitor": [
+  "{}",
+  "{ luna: { mood: 'sleepy' } }",
+  "{ luna: { mood: 'sleepy' }, mochi: { mood: 'playful' } }",
+  "{",
+  "  luna: { mood: 'sleepy' },",
+  "  mochi: { mood: 'playful' },",
+  "  biscuit: { mood: 'hungry' }",
+  "}",
+  "{",
+  "  luna: { mood: 'sleepy' },",
+  "  mochi: { mood: 'playful' },",
+  "  biscuit: { mood: 'purring' }",
+  "}"
+ ],
+ "at": {
+  "cafe": [
+   1260,
+   1260,
+   1260,
+   1260,
+   1260,
+   2676,
+   2676,
+   2676,
+   2676,
+   2676
+  ],
+  "visitor": [
+   2638,
+   2676,
+   2677,
+   2678,
+   2678,
+   2678,
+   2678,
+   2678,
+   2720,
+   2721,
+   2721,
+   2721,
+   2721
+  ]
+ }
+}

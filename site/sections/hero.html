@@ -1,0 +1,48 @@
+<section class="hero" id="hero" aria-labelledby="hero-h">
+  <p class="kicker">Shared live objects for Node</p>
+  <h1 class="headline" id="hero-h">Plain assignment <em>replicates</em>.</h1>
+
+  <div class="hero-grid">
+    <div class="hero-text">
+      <p class="lead"><code>await fero(name)</code> gives you a <b>live object</b>. Read it like a plain object. Change it by plain assignment. Every process that opens the same name sees <b>the same object</b>, on one box or across a cluster.</p>
+      <p class="hero-uses">Its examples build a chat room, a kanban board and a ledger. This page runs a tiny cat café.</p>
+
+      <!-- real fero code, release state (FACTS override 1): a bare fero('cafe') is a client; the assignment is a write -->
+      <pre class="code hero-code"><span class="l">import { <span class="f">fero</span> } from <span class="s">'fero'</span>
+</span><span class="l gap">
+</span><span class="l">const cafe = await <span class="f">fero</span>(<span class="s">'cafe'</span>)
+</span><span class="l c">// every copy hears luna purr
+</span><span class="l">cafe.data.luna = <span class="w">{ mood: 'purring' }</span>
+</span></pre>
+
+      <div class="hero-cta">
+        <span class="install"><span><span class="pr">$</span> npm i fero</span><button type="button" data-copy="npm i fero" aria-label="copy npm i fero">copy</button></span>
+        <a class="btn hero-go" href="#start">Start in two files <span aria-hidden="true">↓</span></a>
+        <a class="hero-gh icon-link" href="https://github.com/pemrouz/fero/tree/main" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+      </div>
+    </div>
+
+    <!-- the live object: c1's copy of cafe.data, read from the kernel running in this tab (sections/hero.js) -->
+    <div class="hero-side">
+      <figure class="hero-obj" aria-labelledby="hero-obj-name">
+        <div class="ho-head">
+          <span class="ho-name" id="hero-obj-name">cafe.data</span>
+          <span class="ho-live label" data-state="starting"><span class="ho-dot" aria-hidden="true"></span><span class="ho-live-t">starting</span></span>
+        </div>
+        <div class="ho-cols label" aria-hidden="true"><span class="ho-colk">row</span><span>value</span></div>
+        <div class="ho-rows" role="list" aria-label="The rows of cafe.data in one client's copy">
+          <p class="ho-empty" role="listitem">Starting fero's kernel…</p>
+        </div>
+        <div class="ho-foot" aria-live="polite"><span class="ho-fill">The copies are filling in…</span></div>
+      </figure>
+      <p class="ho-cap">One client's copy, from fero's real kernel in your tab. <span class="ho-cap-t">This client sets luna's mood every few seconds.</span></p>
+    </div>
+  </div>
+
+  <p class="trust hero-trust pending">
+    <span class="t-tests"><b data-ht="tests">—</b> tests</span>
+    <span class="t-runs"><a href="#trust"><b class="ok" data-ht="runs">—</b> simulated runs green</a></span>
+    <span class="t-node">Node <span data-ht="node">—</span>+</span>
+    <span class="t-lic" data-ht="license">—</span>
+  </p>
+</section>

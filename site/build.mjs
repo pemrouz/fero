@@ -17,7 +17,8 @@ for (const name of ORDER) {
   if (existsSync(join(here, 'sections', `${name}.css`))) styles += `  <link rel="stylesheet" href="./sections/${name}.css">\n`
   if (existsSync(join(here, 'sections', `${name}.js`))) scripts += `<script type="module" src="./sections/${name}.js"></script>\n`
 }
-const nav = NAV.filter(([id]) => present.includes(id)).map(([id, text]) => `      <a href="#${id}">${text}</a>`).join('\n')
+// a nav entry is [anchor, text] or [anchor, text, section]: the link shows when its section is present
+const nav = NAV.filter(([id, , sec]) => present.includes(sec ?? id)).map(([id, text]) => `      <a href="#${id}">${text}</a>`).join('\n')
 // section numerals are literal typography, not figures: exempt them from the audit
 const literalNos = sections.replace(/<span class="sec-no">/g, '<span class="sec-no" data-literal>')
 const out = page.replace('<!-- @sections -->', literalNos).replace('<!-- @styles -->\n', styles).replace('<!-- @scripts -->\n', scripts).replace('<!-- @nav -->', nav)
