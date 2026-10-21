@@ -1724,7 +1724,9 @@ stayed on the screen, frozen (the orphan gate-dropped every new record),
 until a failover's resync wiped them. `spokeStale` counted 6, 5, 1, 2
 and 1 such rows on A12 seeds 3, 5, 6, 8 and 11. Now `evaluateSheds`
 ships one FEED {x: [p…]} per admitted client link naming what it shed,
-synced or not (a spoke whose answer is still torn held the rows too),
+synced or not (a spoke whose answer is still torn held the rows too;
+a word a clear takes is owed and said again after the answer that heals
+the link: the vanish-and-return below, clause 3),
 and the spoke drops each partition with its feeder (node.ts `#unfeed`):
 its cells, versions and deep-index entries, its lane entries (a kept
 entry would make the dual fence drop a later re-feed of the same record
@@ -1776,7 +1778,9 @@ the fold's frames alone) and FEED {e: p} after it; the spoke (node.ts
 `group`) keeps the RECORDS frames between them, each its own copy of the
 bytes, and lands them as ONE apply at the end (`#groupLand`, through the
 RECORDS handler's body, now `#ingest`). A lost end is closed by the next
-frame that proves the feeder's step ended (its digest, a PING or PONG);
+frame that proves the feeder's step ended (its digest, a PING or PONG, a
+FEED {x}): the frames land and nothing is judged, the end is owed and
+said again after the heal (the vanish-and-return below, clause 3);
 a {b} while a group is open lands the open one first; a failover drops
 an open group (the resync onto the next feeder brings the partition
 whole). Bounded by the fold's size, which the spoke is about to hold in
@@ -1824,8 +1828,9 @@ whole partition, a from-zero acquire — are not in it, and the spoke had
 them from its first feeder, so the ghost sweep at the end took them from
 the screen and the fold's forward brought them back. Today's base, on
 sighting 3's schedule over seeds 2, 4, 5, 6 × fourteen offsets (56
-runs): the end swept 7 to 20 of forty cells on 12 runs, M11 on the two
-pinned offsets. The two shapes the plan named: (a) the answer carries an
+runs): the end swept 7 to 20 of forty cells on 12 runs and M11 fired on
+none of them; the two offsets where M11 fires (seed 2 at 1 ms, seed 6 at
+10 ms) are the pins' own, not on the grid. The two shapes the plan named: (a) the answer carries an
 open latch's staged records as a provisional tail the fold confirms or
 withdraws; (b) the spoke keeps its rows across the end until the fold
 lands, under a mark the end sweep respects. (a) was not taken: it cannot
@@ -1842,26 +1847,111 @@ the ring still assigns it — a re-entry in waiting, which the next round
 latches; an orphan the ring does not assign is on its way to a shed and
 not in flight), and the end KEEPS a ghost cell of a named partition on
 the screen (`#deferred`, under the stamp it held at the reset) instead
-of removing it. The fold's end for that partition (FEED {e}) judges
-them: a kept cell the group brought is back in the kernel and done; one
-the group did not bring is a ghost once the feeder has shown the spoke
-its lane past the cell's stamp (the spoke's applied for that lane: the
-fold that just landed is the feeder's whole partition and did not carry
-it), else it waits — a record in flight to the feeder at the fold is
-tapped right behind the group — and is judged again after each frame
-while kept cells remain. A shed drops a partition's kept cells with the
-rest; a failover folds them into the next resync's sweep set with their
-stamps. A kept cell is screen-only (the kernel lacks it), so the sweep's
-screen check names one that never gets judged — a liveness finding, not
-a silent gap. The in-flight walk runs once per resync (only for a reply
-to an ask that said `f: 1`), never per heartbeat. M11 skips the rows of
-the named partitions (the spoke keeps them by design; the rows M11 is
-for, swept while the feeder holds them, are not swept) and counts them
-(`resyncKept`). What stays open in the rule: a record lost TWICE (its
-frame to the feeder lost, the spoke's first feeder had it, the repair of
-that loss not yet folded when the feeder's lane moves past it) is judged
-a ghost and comes back at the repair's fold — a double fault, named
-here, not pinned.
+of removing it. A kept cell is screen-only (the kernel lacks it), so the
+rule must give it a BOUNDED life, and the first build did not: the
+skeptic's review of 2026-10-21 showed three ways a kept cell stayed for
+good, each a deterministic probe green on the base and red on the build
+(a from-zero latch aborted cleanly at an install and no word came; a
+kept cell above a lane that never moved again waited for ever; a clear
+took the fold's markers and nothing judged). The rule, said as what a
+kept cell waits for: ITS PARTITION STOPS BEING IN FLIGHT, AND THE SPOKE
+HOLDS THE FEEDER'S WHOLE PARTITION AFTER THAT. Three clauses make it
+bounded.
+
+(1) THE END JUDGES EVERY KEPT CELL. The fold's end for p (FEED {e})
+judges every kept cell of p at once: one the group brought is back in
+the kernel and done; every other one leaves the screen, a ghost. No
+waiting for the lane. At the end the feeder holds p whole as the teacher
+attested it, plus what it staged, and the spoke holds the base (the
+answer) plus the group: a kept cell not in the kernel now is one the
+feeder does not hold. The cost: a record in flight TO the feeder at that
+moment (the owner's frame to it still on a paused link after the
+failover, the ask, the answer and the fold; or a frame lost on the way
+and repaired by a later latch, the double fault) leaves the screen at
+the end and returns when it lands: one bounded vanish-and-return, which
+M12 reads, and never more than the base, which swept every ghost at the
+resync end. The first build waited instead, until the feeder's lane had
+moved past the cell's stamp, and that wait had no bound: a record that
+died with its owner and the spoke's first feeder sits above a lane that
+never moves again, and the spoke showed it for good (the review's
+PROBE5). Weighed and not taken: FEED {e} carrying the feeder's lane
+tails. It sorts the kept cells into "surely gone" (at or under the tail)
+and "maybe in flight" (above it), and the second kind still needs a
+bound, so it needs this clause anyway, and then it buys nothing.
+
+(2) EVERY WAY OUT OF IN FLIGHT SENDS A WORD. In flight is an open latch
+or an orphan the ring still assigns. The exits, each with its word: a
+latch FOLDS, FEED {b}..{e} (clause 1). A latch ABORTS CLEAN, no residue
+(a torn teach, the teacher's death, a stage overflow, an install's
+rescope): the feeder holds nothing of p now, and says FEED {x: [p]} to
+every client link at the abort (scope.ts `#abort`, the drop leg); the
+spoke drops p, its kept cells with it (its kernel has nothing of p from
+this feeder), and if the ring still assigns p the next round's latch
+re-feeds it whole through the fold's forward, a vanish-and-return in
+that rare case and an honest one (the feeder held nothing of p in
+between; PROBE1 was the install with p moved off). A latch ABORTS TO AN
+ORPHAN (residue: an acquiring owner's own commits): assigned, it is
+still in flight (a re-entry in waiting; the next round latches it and
+the fold's end judges); not assigned, it is on its way to a shed, and
+the shed's FEED {x} is the word. An ASSIGNED ORPHAN loses its assignment
+at an install: the shed's word (an orphan the ring assigns is never
+shed, "never shed our own duty"). The FEEDER DIES, or the spoke moves:
+the failover's resync folds the kept cells into its sweep set with their
+stamps, and the next reply says which to keep again. Nothing else leaves
+the in-flight set.
+
+(3) NOTHING A CLEAR CAN TAKE IS THE ONLY THING THAT ENDS A KEPT CELL. A
+FEED word is one frame on a client link, and a clear takes the whole
+queue (PROBE4: {b}, the frames and {e} gone, the kept cells never
+judged; PROBE3: the shed's {x} gone, the partition kept for good). So
+the feeder REMEMBERS the words it owes each client link (node.ts
+`#owed`: the partitions whose {e} or {x} a clear took, read in
+`#clearCover`'s walk of the dropped frames, which reads every frame's
+verb already; and the partitions whose fold ended while the link was not
+synced, where no {b}, no forward and no {e} go out at all) and says them
+again right after the next answer that syncs the link: after its whole
+ship and its reply (`#answer`, the untorn path). That is the first
+moment the spoke holds the feeder's fed subset above the cover again:
+the clear's cover was lowered under every record the clear took (V4-49),
+and a fold on an unsynced link lowers it under the fold's rows (V4-53),
+so an {e} said there judges against a complete kernel. An owed {e} is
+said only while p is still held (a new latch for p says its own end; a
+shed says {x}); an owed {x} always; a word a clear takes again is owed
+again; the link's death drops the debt. A group whose end was lost is
+closed at the spoke by the feeder's next frame of a later step (a
+digest, a PING, a PONG, a FEED {x}): its frames land and it judges
+NOTHING, the end is owed and comes after the heal. Weighed and not
+taken: tying "ended" to the drain exchange's reply alone. A clear cannot
+take that reply, but it says nothing about WHICH partitions ended: a
+partition whose latch is still open must not be judged there, so it
+would need the in-flight list on every drain digest (a walk per drain),
+and it still misses the fold on a link whose answer is torn, where no
+clear happened at all. The owed word is per partition and only where a
+word was lost or withheld: cold and exact.
+
+Two more holes the review found on the same page, closed with the rule.
+The in-flight list rode a link flag the first reply used up (`#askF`,
+deleted at the reply), so a reply a clear took from the paused queue
+resumed without `f` and the end swept the partition under repair
+(PROBE2): the flag now lives until the spoke's next digest on that link,
+so a torn or cleared reply's resume carries the list. And a FEED {x}
+that arrived while a fold group of the same partition was open (its end
+lost) dropped the partition, and then the group landed and put a row
+back (PROBE6): a FEED {x} is a frame of a later step at the feeder, so
+it closes an open group first, as a digest does, and the unfeed runs on
+the landed kernel, in one step.
+
+The in-flight walk runs once per resync (only for a reply to an ask that
+said `f: 1`), never per heartbeat. M11 skips the rows of the named
+partitions (the spoke keeps them by design; the rows M11 is for, swept
+while the feeder holds them, are not swept) and counts them
+(`resyncKept`). What stays open in the rule is clause 1's cost: a record
+in flight to the feeder at the fold's end (a paused owner-to-feeder link
+spanning the failover, the ask, the answer and the fold; or a record
+lost twice, its frame to the feeder lost, the spoke's first feeder had
+it, the repair not yet folded at the end) is judged gone at the end and
+comes back when it lands or when the repair folds. Bounded and visible
+(M12 reads it); reached by no seeded schedule; named here, not pinned.
 
 *Measured.* The 56-run probe on this tree: swept 0 on 56, kept on the
 same 12 runs the base sweeps on (7 to 20 of forty; 9, 10, 7, 8 at the
@@ -1872,8 +1962,9 @@ pins now: swept 0, judged 0, no monitor, M11 counting 7 and 10 of the
 kept rows (the other ten on seed 6 are re-entries from orphans, which
 M11 never judges). The kernel test (kernel/client.test.ts): a spoke
 first fed by qq fails over onto aa mid-repair; the end keeps three cells
-(JK.resynced c=3), the fold's end confirms two, and the third — a record
-aa never gets — leaves once the lane moves past it (JK.fed, b=0 c=1).
+(JK.resynced c=3), the fold's end confirms two and judges the third, a
+record aa never gets, gone at once (JK.fed, b=2 c=1); the lane moving on
+later adds nothing.
 Red on the tree before at "no cell left the screen at the resync's end"
 (three removes). Seven pinned scoped resync asks re-recorded with
 `f: 1`; the unscoped pins did not move.
