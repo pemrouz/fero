@@ -1202,6 +1202,18 @@ test('v4.1 identity hardening: legacy dirs, incomplete dirs, invalid and cross-r
     const at64 = await fero('r', { dir, listen: false }) // 64 bytes is the bound itself: it boots
     assert.equal((snapshot(at64.cluster) as { me: { uuid: string } }).me.uuid, 'y'.repeat(64))
     await at64.destroy()
+    //! …and the life count: ISSUER_MAX gives the incarnation 16 digits (a safe integer). A hand-edited 1e17 on a 64-byte
+    // uuid made an 83-byte origin, and every WRITE that node forwarded was refused as malformed at its owner, with no
+    // message (the 2026-10-21 re-check's probe); a string count would concatenate at the bump; a count below 1 would
+    // reuse the first life's lane. Each is refused at compose with "repair boot.json"; a whole number boots and bumps.
+    for (const bad of [1e17, '5', 1.5, 0, -1]) {
+      fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'y'.repeat(64), name: 'r', epoch: 0, members: [], lamport: 0, incarnation: bad, votedFor: { e: 0, p: '', h: '' } }))
+      await assert.rejects(fero('r', { dir, listen: false }), /invalid incarnation .* repair boot\.json$/, `incarnation ${JSON.stringify(bad)}`)
+    }
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'y'.repeat(64), name: 'r', epoch: 0, members: [], lamport: 0, incarnation: 7, votedFor: { e: 0, p: '', h: '' } }))
+    const life8 = await fero('r', { dir, listen: false })
+    assert.equal((snapshot(life8.cluster) as { me: { incarnation: number } }).me.incarnation, 8, 'a whole number boots as the next life')
+    await life8.destroy()
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   //! a NON-EMPTY wal.log with no boot.json is an incomplete dir (partial copy) — never adopted
   const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-idh2-'))
