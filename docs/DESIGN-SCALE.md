@@ -2150,8 +2150,9 @@ fourth review (2026-10-21, R4-1 to R4-4) found that filter wrong too
 (R4-1, R4-2: entries with no base; R4-4: a ghost for good once a fold
 carries no remove) and the rule became the ORDER rule above: the {x}
 before the answer's ship, unfiltered. Its tests in kernel/client.test.ts
-(the owed shed word, eight shapes, each asserting the spoke equal to its
-feeder on kernel and screen at the exchange's end and at the end): back
+(the owed shed word, eight shapes, each asserting the spoke equal to
+what its feeder FEEDS, on kernel and screen, at the exchange's end,
+right after the heal's settle and before any beat, and at the end): back
 and HELD (the cost pinned: JK.unfed [px, 2] at the word, the rows back
 with the answer, FEED [{x}, {e}]); a latch from zero; an orphan the
 ring no longer assigns (R3-2's shape, px.b removed at the cluster); an
@@ -2171,7 +2172,39 @@ rows for good, the wire line moves); the {x} half off (nine); each
 filter put back on the {x} half ('no entry': eight; `feeds && byPart`:
 five, the held test and R4-1 to R4-4; `!held`: three, the held test,
 R4-2 and R4-4); the full-queue guard off (the queue-of-one pin: a word
-forces a clear). The repeated word is named above.
+forces a clear). The repeated word is named above. The fifth review
+(2026-10-21, R5-1 to R5-5) found the order rule's soundness step false,
+the leapfrog above, and the ship after the word now re-sends the named
+partitions whole. R5-1 and R5-2 are tests: the leapfrog at queues of
+two and three, with and without a later row of another partition on
+the surviving lane, each asserting the spoke equal to its feeder on
+screen and kernel at the exchange's end (right after the heal's settle,
+before any beat) and after twenty beats, plus the wire (the drained
+survivors bb#5 and cc#2, the drain digest, the word, cc#2 re-sent
+under the spoke's tail, the reply, the owed end); on the fourth round's
+kernel (0a6572e) the four are red at "the exchange's end: the spoke
+shows what its feeder holds" ([px.a, px.b, qx.z] against [px.a, px.b,
+px.c, qx.z]; with qx.w the same, and still after twenty beats). The
+eight owed-shed-word shapes assert the spoke equal to what its feeder
+feeds at the exchange's end, before any beat, so a row that comes back
+a heartbeat late fails there (the held and stage-4 shapes asserted
+after ten beats, R4-1 to R4-3 after three; green on the old kernel in
+those shapes, as the review said). Thirty-five one-line mutants each
+turn tests red (kernel/client.test.ts, 95 tests): the lowering's own
+(the start not lowered; lowered on one lane only; on the wrong lane;
+by one entry too few: the four leapfrog tests each; the word said after
+the ship with the start still lowered: ten), the order rule's (the {x}
+after the reply, after the end, after the ship: ten each; the {x} half
+off: thirteen; the five filters put back: nine, twelve, seven, ten and
+eleven; the guard off and the debt taken out up front: the two
+paused-queue pins; the {x} never consumed: thirteen; the {e} half off:
+ten; a non-held end kept owed: three) and the earlier rounds' sixteen
+on their current shapes. R5-3 (the word before an answer that tears
+after send one to four), R5-4 and R5-4b (an owed {e} and an owed {x}
+for one partition in one debt) and R5-5 (kept cells under an owed {x})
+are green on the tree; the 56-run probe reads line for line as before
+(swept 0, judged 0, kept on 12, M11 0, bad 0); the scoped sweep stands
+at 16/16 with A11 to A13 engaged.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
