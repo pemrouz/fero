@@ -121,8 +121,10 @@ test('host table: refusals are typed — bad name / uuid / listen, no caller ide
 test('address helpers: isAddr (digits, 1–65535, port 0 only for listen), sameSocket (wildcard/localhost/loopback spellings land on one socket), the env default', () => {
   for (const ok of ['127.0.0.1:1', 'localhost:65535', '[::1]:3376', '[fdaa::3]:4000', '[::ffff:127.0.0.1]:5']) assert.ok(isAddr(ok), ok)
   for (const bad of ['nope', ':5', '127.0.0.1:', '127.0.0.1:0', '127.0.0.1:65536', '127.0.0.1:1e3', 7, '']) assert.equal(isAddr(bad), false, String(bad))
-  //! an IPv6 host goes in brackets: without them the last colon is ambiguous ('fdaa::3' = host 'fdaa:', port 3)
-  for (const bad of ['::1:4000', 'fdaa::3', '[::1:4000', '::1]:4000', '[]:4000', '[nothost]:4000', '[127.0.0.1]:4000']) assert.equal(isAddr(bad), false, bad)
+  //! an IPv6 host: in brackets, or bare when what is left of the last colon is a whole IPv6 literal; a host with
+  // a colon that is neither is refused ('fdaa::3' would read as host 'fdaa:', port 3), and brackets hold IPv6 only
+  for (const ok of ['::1:4000', '::ffff:127.0.0.1:5', 'fdaa::3:4000']) assert.ok(isAddr(ok), ok)
+  for (const bad of ['fdaa::3', '1::2::3:4000', '[::1:4000', '::1]:4000', '[]:4000', '[nothost]:4000', '[127.0.0.1]:4000']) assert.equal(isAddr(bad), false, bad)
   assert.ok(isAddr('127.0.0.1:0', true), 'port 0 is a legal LISTEN (the free-port default)')
   for (const squat of ['0.0.0.0:3376', 'localhost:3376', '[::]:3376', '[::1]:3376', '127.0.0.2:3376', '127.0.0.1:3376'])
     assert.ok(sameSocket(squat, '127.0.0.1:3376'), `${squat} takes the directory's socket`)

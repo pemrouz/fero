@@ -54,10 +54,11 @@ export const rendezvousDefault = (): string | false => {
 }
 
 //! isAddr — 'host:port' with a non-empty host and an all-digit port 1–65535; `zero` admits port 0
-// (the free-port LISTEN default — never a dialable rendezvous). An IPv6 host goes in BRACKETS, the one
-// spelling fero reads and prints ('[::1]:4000', the URL form; the shell takes them off for `net`, and a
-// port-0 listen prints back with them). A host with a colon and no brackets is refused: '::1:4000' could
-// be the address ::1:4000 with no port, and a bare 'fdaa::3' would read as host 'fdaa:', port 3.
+// (the free-port LISTEN default — never a dialable rendezvous). An IPv6 host is written in BRACKETS
+// ('[::1]:4000', the URL form): the shell takes them off for `net`, and a port-0 listen prints back as it
+// was written, brackets and all. The bare form ('::1:4000', V4-45's '::ffff:127.0.0.1:0') still reads,
+// by the last colon, when what is left is a whole IPv6 literal. A host with a colon that is not one is
+// refused: a bare 'fdaa::3' would read as host 'fdaa:', port 3. Brackets hold an IPv6 literal only.
 export const isAddr = (a: unknown, zero = false): a is string => {
   if (typeof a !== 'string') return false
   const i = a.lastIndexOf(':')
@@ -67,9 +68,10 @@ export const isAddr = (a: unknown, zero = false): a is string => {
   const p = Number(port)
   if (!((p >= 1 || (zero && p === 0)) && p <= 65535)) return false
   const host = a.slice(0, i)
-  return !(host.includes(':') || host.startsWith('[')) || (host.length > 2 && host.endsWith(']') && net.isIP(host.slice(1, -1)) === 6)
+  if (host.startsWith('[') || host.endsWith(']')) return host.length > 2 && host.startsWith('[') && host.endsWith(']') && net.isIP(host.slice(1, -1)) === 6
+  return !host.includes(':') || net.isIP(host) === 6
 }
-//! v6Hint — the words a refusal adds when the bad address looks like an IPv6 literal without its brackets
+//! v6Hint — the words a refusal adds when the bad address looks like an IPv6 literal (two colons or more, no brackets)
 export const v6Hint = (a: unknown): string => {
   if (typeof a !== 'string' || a.startsWith('[') || a.split(':').length < 3) return ''
   return ` (an IPv6 address goes in brackets: '[::1]:4000', or '[fdaa::3]' for a bare host)`
