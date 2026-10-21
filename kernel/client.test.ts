@@ -2300,3 +2300,75 @@ test('wave 6b — a relay forgets what it held for a client whose link died: a w
   h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   assert.equal(h.node.writes.pending.size, 1, "the member's linkDown left the client's attempt in place")
 })
+
+//! ── wave 6c: the spoke edge cases the M12 oracle found (DECISIONS V4-NN) ──
+
+//! the shed's word (STATUS "a spoke keeps showing the rows of a partition that moved off its feeder"): a join moved px
+// off aa — the install's rescope froze aa's copy into an orphan, and once every current holder attested its frozen
+// tails the data left aa (scope.ts #shed). Nothing told the spoke: it kept px.a and px.b on its screen, frozen, until
+// a failover's resync wiped them (spokeStale counted them in the scoped sweep). Now the shed ships FEED {x: [px]} to
+// every client link, and the spoke drops px with its feeder — its cells, its lane entries and its screen cells. The
+// lane entries matter: a kept one makes the spoke's dual fence drop a later re-feed of the same record as present, so
+// when aa re-acquires px (the from-zero latch; the fold forwards it whole) the rows must come back. Red on the tree
+// before at "the spoke dropped px with its feeder": the spoke still showed px.a and px.b.
+//! screenRows — the downstream object's top-level keys (every apply effect folded in order), for a spoke harness
+const screenRows = (h: H): string[] => {
+  const root: Record<string, unknown> = {}
+  for (const e of h.of('apply')) {
+    const r = e[1] as Rec
+    const k = r.key.length ? r.key : [r.at ?? '']
+    if (k.length === 1) { if (r.type === REC.remove) delete root[k[0]]; else root[k[0]] = r.value; continue }
+    if (r.type === REC.remove) { const o = root[k[0]]; if (typeof o === 'object' && o !== null) delete (o as Record<string, unknown>)[k[1]]; continue }
+    if (typeof root[k[0]] !== 'object' || root[k[0]] === null) root[k[0]] = {}
+    ;(root[k[0]] as Record<string, unknown>)[k[1]] = r.value
+  }
+  return Object.keys(root).filter((k) => typeof root[k] !== 'object' || Object.keys(root[k] as object).length > 0).sort()
+}
+test('wave 6c — a shed tells the spokes: a partition that moved off the feeder (an orphan at the install, shed once every holder attested it) leaves the spoke with it — its cells, lane entries and screen rows go; a FEED from a spare link is dropped; a later re-acquire brings the partition back whole', () => {
+  const { F, S, p, link, connect, cells, laneAt, teach } = latching()
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+  connect()
+  assert.deepEqual(cells(S), cells(F), 'the spoke holds px and qx')
+  assert.deepEqual(screenRows(S), ['px', 'qx'])
+  //! a join took px: the ring places it on bb and cc, and the install's rescope freezes aa's copy into an orphan
+  F.node.writes.ring.place('px', 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.orphan, 'px is an orphan at aa')
+  p.settle()
+  assert.deepEqual(cells(S), cells(F), 'frozen, not gone: the feeder still holds the frozen copy, and so does the spoke')
+  //! both current holders attest px up to bb#5 (the shed poll's answers): the bar is met, the data leaves aa
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px'], 'aa shed px')
+  assert.equal(F.node.scope!.entries.has('px'), false)
+  p.settle()
+  assert.deepEqual(cells(S), cells(F), 'the spoke dropped px with its feeder (it kept px.a and px.b for good before)')
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the shed told the spoke in one FEED frame')
+  assert.deepEqual(laneAt(S, 'bb'), [6], 'the lane entries of px left the spoke; qx\'s stays')
+  assert.deepEqual(screenRows(S), ['qx'], 'and the screen shows qx alone')
+  assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]], 'the journal says what left: two lane entries of px')
+  assert.equal(S.node.versions.has(JSON.stringify(['px', 'a'])), false, 'the versions of px\'s cells left too (a kept stamp would refuse the same record as not newer)')
+  //! a FEED on a link that is not the primary (a spare feeder shedding a partition the real feeder holds) is dropped
+  S.node.step({ kind: 'linkUp', link: 9, dialed: true, to: 'sim:zz' })
+  S.node.step({ kind: 'bytesIn', link: 9, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', c: SCOPED }) })
+  S.node.step({ kind: 'bytesIn', link: 9, bytes: encodeControl(VERB.FEED, { x: ['qx'] }) })
+  assert.deepEqual(cells(S), cells(F), 'a spare\'s shed says nothing about what the feeder holds: qx stays')
+  assert.ok(S.jk(JK.frameDrop).some((e) => e.a === 9 && e.b === 'feed from a spare'), 'dropped, journaled')
+  //! a server drops a FEED: a spoke is never a feeder
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.FEED, { x: ['qx'] }) })
+  assert.ok(F.jk(JK.frameDrop).some((e) => e.a === 7 && e.b === 'feed at a server'))
+  assert.equal(F.node.scope!.held('qx'), true)
+  //! px comes back to aa (the ring places it here again): the from-zero latch, and the fold forwards it whole
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'absent and assigned: the from-zero latch')
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }], 5)
+  assert.equal(F.node.scope!.held('px'), true)
+  p.settle()
+  assert.deepEqual(cells(S), cells(F), 'px is back at the spoke (a kept lane entry would have made the dual fence drop the re-feed as present)')
+  assert.deepEqual(laneAt(S, 'bb'), [3, 5, 6])
+  assert.deepEqual(screenRows(S), ['px', 'qx'])
+  assert.equal(link.synced, true)
+})

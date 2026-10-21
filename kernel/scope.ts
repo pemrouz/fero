@@ -965,6 +965,7 @@ export class Scope {
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     let released: Map<Link, string[]> | null = null
+    let gone: string[] | null = null // the partitions shed in this evaluation: the spokes' word (FEED {x}), one frame per client link
     for (const [p, e] of this.entries) {
       if (e.state !== SCOPE.orphan) continue
       const tails = e.tails ??= this.#tailsOf(node, p) // captured at the freeze; rebuilt here only for legacy entries
@@ -988,6 +989,7 @@ export class Scope {
         if (!xs) released.set(link, xs = [])
         xs.push(p)
       }
+      (gone ??= []).push(p)
       this.#shed(node, p, e)
     }
     if (released !== null)
@@ -995,6 +997,15 @@ export class Scope {
         link.ship(encodeControl(VERB.HAVEQ, { e: node.epoch, q: {}, x }), node.env.sink, node.journal)
         link.flush(node.env.sink, node.journal)
       }
+    //! THE SHED'S WORD TO THE SPOKES (wave 6c, 2026-10-21): a spoke is a view of its feeder's held subset, and until now
+    // nothing told it that a partition LEFT — its rows of p stayed on the screen, frozen (the orphan gate-dropped every
+    // new record of p, so none reached the spoke), until a failover's resync wiped them (STATUS; M12's other direction,
+    // spokeStale, counted 6, 5, 1, 2 and 1 such rows on A12 seeds 3, 5, 6, 8 and 11). One FEED {x} per client link
+    // names every partition this evaluation shed; the spoke drops each with its feeder (node.ts #unfeed). Every
+    // admitted client link gets it, synced or not: a spoke whose answer is still torn held p's rows from before.
+    if (gone !== null && node.clientLinks.size)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && !cl.dead) cl.ship(encodeControl(VERB.FEED, { x: gone }), node.env.sink, node.journal)
     //! a DRAINING leaver (membership.ts, DESIGN-SCALE stage 1 (b)) re-reads its bar the instant marks moved or a
     // shed landed — one field read on every other armed node
     if (node.membership.leaving?.drain !== undefined) node.membership.drain(node)
