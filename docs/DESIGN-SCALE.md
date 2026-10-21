@@ -1984,15 +1984,19 @@ off; the held filter off; a lost end judging) each turn their test red.
 Seven pinned scoped resync asks carry `f: 1`; the unscoped pins did not
 move.
 
-*What moves.* Scoped trajectories with a spoke: a FEED {x} per shed, two
-FEED frames per fold forwarded, `f: 1` on a scoped spoke's resync ask
-and the list on its reply, `c` on a drain digest after a clear and the
-r=1 it buys. The scoped sweep's counts stand (16/16 green: spokeStale
-reads 0 where it read 6; sighting 3's swept counts are kept counts now;
-the mutation pins did not move). Unscoped: byte-identical where no clear
-ever happened on a client link (FEED and `f` are armed-only; `c` rides
-only a drain digest after a clear, which the golden, the 300-seed sweep,
-59,500 and 104,050 never see).
+*What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
+per clean latch abort, two FEED frames per fold forwarded, the owed
+words after an answer that heals a client link (one {e} per partition
+whose end a clear took or whose fold ran while the link was unsynced,
+one {x} for the partitions a clear's word named), `f: 1` on a scoped
+spoke's resync ask and the list on its reply, `c` on a drain digest
+after a clear and the r=1 it buys. The scoped sweep's counts stand
+(16/16 green before and after the rework: spokeStale reads 0 where it
+read 6; sighting 3's swept counts are kept counts now; the mutation pins
+did not move). Unscoped: byte-identical where no clear ever happened on
+a client link (FEED and `f` are armed-only; `c` rides only a drain
+digest after a clear, which the golden, the 300-seed sweep, 59,500 and
+104,050 never see).
 
 *Left for its own change.* The api line (a spoke's write can settle
 before its value shows when its feeder dies between the WACK and the tap
