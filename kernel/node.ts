@@ -578,8 +578,10 @@ export class Node {
   // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
   // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is HELD
   // (a latch open for p again says its own end; an orphan's or a gone partition's exit is a shed's or an abort's {x});
-  // an owed {x} always; a word a clear takes again is owed
-  // again; the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
+  // an owed {x} while p has NO entry here (the second review's SK1: the words leave AFTER the heal's answer, out of their
+  // original order, and a shed's {x} said after p had come back and the answer had re-sent its rows dropped a partition
+  // the feeder holds, for good — held or acquiring, the answer or the fold brings p; an orphan's own exit says its own
+  // word); a word a clear takes again is owed again; the link's death drops the debt. Without this, the review's PROBE3 (a shed's {x} cleared) kept a shed
   // partition on the spoke for good and PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
   #owed = new Map<Link, { e: Set<string>; x: Set<string> }>()
 
@@ -2654,7 +2656,12 @@ export class Node {
         return
       }
     }
-    if (xs.length) link.ship(encodeControl(VERB.FEED, { x: xs }), this.env.sink, this.journal)
+    //! an {x} only while p has NO entry here (clause 3: a word only while it is still true) — p back in any state makes
+    // the word stale: held or acquiring on a base, this answer shipped p's rows; from zero, the fold brings p whole; an
+    // orphan, its own exit says its own word (the shed's {x} or a re-entry's whole forward), and an assigned one is in
+    // flight, whose kept cells wait for that fold's end (clause 2)
+    const gone = this.scope === null ? xs : xs.filter((p) => !this.scope!.entries.has(p))
+    if (gone.length) link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
