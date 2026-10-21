@@ -705,8 +705,10 @@ export const drained = (sim: Sim): string | null => {
 //                      lane — the reply's `d` map is the feeder's tails when it built the reply) is
 //                      contained-or-covered at the spoke: in its log, or a version at the cell or an
 //                      ancestor at or above the feeder's. A record above that tail was applied after the
-//                      reply and is on the wire behind it: excused. A stale end fails this at once: the
-//                      ghost sweep removed rows the feeder holds, and the rows the re-download then
+//                      reply and is on the wire behind it: excused. So is a row of a partition the reply
+//                      named IN FLIGHT at the feeder (`f`, wave 6c): the spoke keeps it on the screen and
+//                      the fold's end judges it (counted, resyncKept). A stale end fails this at once:
+//                      the ghost sweep removed rows the feeder holds, and the rows the re-download then
 //                      re-applies land at older stamps first. It sees nothing between the reset and the
 //                      end, and nothing the screen shows that the kernel does not: that is the horizon's
 //                      screen check (`screenMatches`, run per spoke by the scoped sweep).
@@ -799,7 +801,7 @@ export class Ledger {
   //! released — cell → the newest tombstone stamp any node ever released for it (M3's memory, M6's trigger)
   released = new Map<string, Stamp>()
   pending: { node: Node; id: string; cell: string; p: string; t: Stamp }[] = []
-  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0, resyncRows: 0 }
+  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0, resyncRows: 0, resyncKept: 0 }
   #cursors = new Map<string, { node: Node; arr: unknown; len: number }>()
   #snap = new Map<Node, Map<string, Stamp>>()
   #floors = new Map<Node, Map<string, number>>()
@@ -1205,8 +1207,9 @@ class SpokeWire {
   // r=0 answers (the feeder replies inside the step that handled it, so its digestIn count names it), -1 for r=1
   answers = new Map<number, number[]>()
   //! spoke-side link id → per DIGEST the feeder sent on it, in order: its `d` map (the feeder's lane tails when it
-  // built the frame) for an r=0, null for an r=1 — M11 reads the ending reply's tails
-  ds = new Map<number, (Record<string, number> | null)[]>()
+  // built the frame) and its `f` list (the partitions in flight at the feeder, wave 6c) for an r=0, null for an r=1 —
+  // M11 reads the ending reply's tails, and skips the partitions it named
+  ds = new Map<number, ({ d: Record<string, number>; f: string[] } | null)[]>()
   //! spoke → the resync it is in (the kernel's object) and, per link, the index of the first r=1 sent since it began
   began = new Map<Node, { obj: object; first: Map<number, number> }>()
   last = new Map<Node, Resync | null>()
@@ -1245,8 +1248,11 @@ class SpokeWire {
 type Resync = NonNullable<Node['resync']>
 const wires = new WeakMap<Sim, SpokeWire>()
 const wireOf = (sim: Sim): SpokeWire => { let w = wires.get(sim); if (!w) { w = new SpokeWire(); wires.set(sim, w) } return w }
-const digestValue = (b: Uint8Array): { r: number; d: Record<string, number> } => {
-  try { const v = new Frame(b).value as { r?: number; d?: Record<string, number> }; return { r: v.r ?? 0, d: v.d ?? {} } } catch { return { r: -1, d: {} } }
+const digestValue = (b: Uint8Array): { r: number; d: Record<string, number>; f: string[] } => {
+  try {
+    const v = new Frame(b).value as { r?: number; d?: Record<string, number>; f?: unknown }
+    return { r: v.r ?? 0, d: v.d ?? {}, f: Array.isArray(v.f) ? v.f.filter((p): p is string => typeof p === 'string') : [] }
+  } catch { return { r: -1, d: {}, f: [] } }
 }
 const digestR = (b: Uint8Array): number => digestValue(b).r
 
@@ -1264,9 +1270,9 @@ const spokeTap = (sim: Sim, w: SpokeWire) => (from: string, to: string, link: nu
       if (!st.first.has(link)) st.first.set(link, w.sent.get(link)!.length - 1)
     }
   } else if (tn.client) {
-    const { r, d } = digestValue(b)
+    const { r, d, f } = digestValue(b)
     w.push(w.answers, peerLink, r === 0 ? w.digestIns(fn, link) - 1 : -1)
-    w.push(w.ds, peerLink, r === 0 ? d : null)
+    w.push(w.ds, peerLink, r === 0 ? { d, f } : null)
   }
 }
 
@@ -1320,8 +1326,14 @@ const resyncBehind = {
       const fu = n.links.get(link)?.uuid
       const F = fu !== undefined ? sim.nodes.get(fu) : undefined
       if (!F) continue
-      const D = w.ds.get(link)?.[w.digestIns(n, link) - 1]
-      if (!D) continue // the ending reply was not seen by the tap: nothing to judge against
+      const DF = w.ds.get(link)?.[w.digestIns(n, link) - 1]
+      if (!DF) continue // the ending reply was not seen by the tap: nothing to judge against
+      const D = DF.d
+      //! the partitions the reply named IN FLIGHT at the feeder (`f`, wave 6c: an open latch, a re-entry in waiting): the
+      // spoke KEEPS their cells on its screen across the end and the fold's end judges them (node.ts #resyncEnd, FEED
+      // {e}), so the kernel lawfully lags there and M11 does not judge them — the rows M11 is for (swept while the feeder
+      // holds them) are not swept. Counted (resyncKept); M12 judges the spoke at the horizon.
+      const inFlight = DF.f.length ? new Set(DF.f) : null
       const L = ledgerOf(sim)
       L.scan(sim)
       for (const cell of was.old) {
@@ -1329,6 +1341,7 @@ const resyncBehind = {
         if (vF === undefined || !F.state.has(cell) || vF.seq > (D[vF.origin] ?? 0) || !inLane(F, vF.origin, vF.seq)) continue
         const path = JSON.parse(cell) as string[]
         if (F.armed && !F.scope!.feeds(path[0])) continue
+        if (inFlight !== null && inFlight.has(path[0])) { L.counts.resyncKept++; continue }
         L.counts.resyncRows++
         const e = L.recs.get(vF.origin + '|' + vF.seq)
         if (e === undefined || containsOrCovers(L, n, e)) continue
