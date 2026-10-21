@@ -1686,3 +1686,29 @@ test('a knock from a member my view no longer holds is answered with the VIEW (w
   k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa']] }) })
   assert.deepEqual(k.of('left'), [['left', true]])
 })
+
+//! the give-up memory is forgotten with the suspicion (the sixth review's one minor, 2026-10-21): ee's chain gave up
+// once (the memory set), then ee's LINK came back; later two OTHER members crash and bb knocks — the drop branch is
+// reached, and a stale memory would drop ee, a live linked member, from the leave ballot. The link back forgets the
+// memory with the suspicion; the reviewer's mutant that keeps it survived every other pin, because the plain-ballot
+// guard answers first in every shape that checks the forgetting — this one reaches the branch that reads the memory.
+test('a give-up memory is forgotten with the link back: ee gave up once and came back, then cc and dd crash and bb knocks — ee, live and linked, stays in the ballot', () => {
+  const h = fiveAt1('aa')
+  h.node.step({ kind: 'linkDown', link: h.link.ee, reason: 'cut' })
+  for (let i = 0; i < 3; i++) h.tick()
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a), ['ee'])
+  giveUpOne(h, 'ee', 800)
+  h.tick() // the give-up seen: the memory set; the eviction {aa,bb,cc,dd}@2 proposed and ee's chain revived
+  assert.deepEqual(proposed(h, h.link.bb, 2), [['aa', 'bb', 'cc', 'dd']])
+  h.admit(9, 'ee') // ee's link comes BACK
+  h.tick() // the suspicion forgotten, the eviction abandoned
+  for (let i = 0; i < 12; i++) h.tick() // the abandoned ballot ages fully out
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a), ['ee'], 'no new suspicion of ee')
+  //! now cc and dd crash: suspects whose chains are dialing, so the eviction is held and the plain ballot cannot carry
+  h.node.step({ kind: 'linkDown', link: h.link.cc, reason: 'cut' })
+  h.node.step({ kind: 'linkDown', link: h.link.dd, reason: 'cut' })
+  for (let i = 0; i < 3; i++) h.tick()
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.LEAVE, {}) })
+  const ballot = proposed(h, 9, 2).pop()
+  assert.ok(ballot?.includes('ee'), `ee, live and linked, must be in the ballot — got ${JSON.stringify(ballot)}`)
+})
