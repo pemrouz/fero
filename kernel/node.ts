@@ -2687,8 +2687,8 @@ export class Node {
   // says its own end; an orphan or gone, a shed's or an abort's {x} is the exit). The debt is CONSUMED WORD BY WORD
   // as each one ships: a word the clear takes on its way out is owed again by #clearCover's read of the dropped
   // frames, and the words behind it were never taken out (the rework took the whole debt out first and put the rest
-  // back after a failed ship: one more branch than the rule needs). Never into a full paused queue, one guard for
-  // both kinds: a word pushed there would clear whatever waits, the reply it follows included; the next untorn
+  // back after a failed ship: one more branch than the rule needs). Never into a full paused queue (Link.full: its frames
+  // or its bytes, V4-61), one guard for both kinds: a word pushed there would clear whatever waits, the reply it follows included; the next untorn
   // answer — the drain's, or a heartbeat's — pays within a tick (the {x} half never meets the guard: every answer
   // starts on a flowing link).
   #payOwed(link: Link, kind: 'x', d: Record<string, unknown>): Record<string, unknown>
@@ -2696,7 +2696,7 @@ export class Node {
   #payOwed(link: Link, kind: 'e' | 'x', d?: Record<string, unknown>): Record<string, unknown> | void {
     const o = this.#owed.get(link)
     if (o === undefined || !o[kind].size) return d
-    if (link.paused && link.queued.length >= link.maxQueued) return d
+    if (link.paused && link.full()) return d
     if (kind === 'x') {
       const gone = [...o.x]
       o.x.clear()

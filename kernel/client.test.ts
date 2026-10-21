@@ -3485,11 +3485,16 @@ test('wave 6c — a shed\'s word cleared from a never-answered client link is no
 // the debt: the drain resumes the torn answer and its reply pays all three. Red with the whole debt taken out before the
 // first word ships (the rework's shape, queue of two): rx's end is never said; red without the full-queue guard (queue of
 // one): a second clear, forced by the word.
-for (const queued of [1, 2])
-  test(`wave 6c — three owed ends paid into a paused queue of ${queued}: ${queued === 1 ? 'the reply fills it, no word forces a clear, the next heartbeat answer pays' : 'the second word overflows and the clear takes it with the reply, the third stays owed, the resumed answer pays all three'}`, () => {
+// The third shape is the queue of one at the BYTE bound (tune row queuedBytes 1, the count bound far off; V4-61): the
+// reply alone holds the queue's bytes, so the queue is full and no word is pushed in. Red with the guard counting
+// frames only, as the lane wrote it before the merge with V4-61: the first word is pushed into the byte-full queue and
+// clears the reply it follows (a second clear).
+for (const shape of [1, 2, 'bytes'] as const)
+  test(`wave 6c — three owed ends paid into a paused queue of ${shape === 'bytes' ? 'one, full by BYTES' : shape}: ${shape !== 2 ? 'the reply fills it, no word forces a clear, the next heartbeat answer pays' : 'the second word overflows and the clear takes it with the reply, the third stays owed, the resumed answer pays all three'}`, () => {
+    const queued = shape === 2 ? 2 : 1
     let armed = false
     let Fh: H | null = null
-    const L = latching({ tune: { queued } }, (l) => { if (l === 7 && armed && Fh) { armed = false; Fh.node.step({ kind: 'pause', link: 7 }) } })
+    const L = latching({ tune: shape === 'bytes' ? { queuedBytes: 1 } : { queued: shape } }, (l) => { if (l === 7 && armed && Fh) { armed = false; Fh.node.step({ kind: 'pause', link: 7 }) } })
     const { F, S, p, link, connect, beat } = L
     Fh = F
     F.node.writes.ring.place('rx', 'bb', 'aa')
