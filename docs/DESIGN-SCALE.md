@@ -1953,21 +1953,36 @@ it, the repair not yet folded at the end) is judged gone at the end and
 comes back when it lands or when the repair folds. Bounded and visible
 (M12 reads it); reached by no seeded schedule; named here, not pinned.
 
-*Measured.* The 56-run probe on this tree: swept 0 on 56, kept on the
-same 12 runs the base sweeps on (7 to 20 of forty; 9, 10, 7, 8 at the
-cut 0 on the four pinned seeds, where the base swept 9, 10, 7, 8), ghosts
-judged 0, M11 0, M12 green and screen = kernel on all 56. The two KNOWN
-offsets (seed 2 at 1 ms: kept 7; seed 6 at 10 ms: kept 20) are CLOSED
-pins now: swept 0, judged 0, no monitor, M11 counting 7 and 10 of the
-kept rows (the other ten on seed 6 are re-entries from orphans, which
-M11 never judges). The kernel test (kernel/client.test.ts): a spoke
-first fed by qq fails over onto aa mid-repair; the end keeps three cells
-(JK.resynced c=3), the fold's end confirms two and judges the third, a
-record aa never gets, gone at once (JK.fed, b=2 c=1); the lane moving on
-later adds nothing.
-Red on the tree before at "no cell left the screen at the resync's end"
-(three removes). Seven pinned scoped resync asks re-recorded with
-`f: 1`; the unscoped pins did not move.
+*Measured.* The 56-run probe on this tree, before and after the rework:
+swept 0 on 56, kept on the same 12 runs the base sweeps on (7 to 20 of
+forty; 9, 10, 7, 8 at the cut 0 on the four pinned seeds, where the base
+swept 9, 10, 7, 8), ghosts judged 0 (every kept cell came back in the
+fold; nothing in these schedules is in flight to the feeder at the end,
+so clause 1 judges nothing gone), M11 0, M12 green and screen = kernel
+on all 56. The two KNOWN offsets (seed 2 at 1 ms: kept 7; seed 6 at 10
+ms: kept 20) are CLOSED pins now: swept 0, judged 0, no monitor, M11
+counting 7 and 10 of the kept rows (the other ten on seed 6 are
+re-entries from orphans, which M11 never judges). The kernel tests
+(kernel/client.test.ts, seven wave-6c shapes for this rule): the
+vanish-and-return (a spoke first fed by qq fails over onto aa
+mid-repair; the end keeps three cells, JK.resynced c=3; the fold's end
+confirms two and judges the third, a record aa never gets, gone at once,
+JK.fed b=2 c=1; then lane bb's owner dies and nothing is left waiting);
+the clean abort's word (a from-zero latch aborted by an install that
+moves the partition off: FEED {x}, the kept cells leave); the owed end
+on an unsynced link (a queue of one, the clear takes {b} and the first
+frame, the exchange re-ships it, the end is said after the reply: two
+back, the third gone); the owed end a later tap cleared from the queue
+(a queue of four); the owed shed word (FEED {x} cleared by live taps,
+said again after the exchange); the in-flight list surviving a cleared
+reply (the feeder pauses inside the answer); a shed word closing an open
+group first. Each is red on the first build (115a0e5) at the line that
+names its bug, and nine one-line mutants of the new guards (the end
+never judging; the abort's word off; the owe at the fold off; the owe in
+#clearCover off; #payOwed off; the ask flag used up; the {x} landing
+off; the held filter off; a lost end judging) each turn their test red.
+Seven pinned scoped resync asks carry `f: 1`; the unscoped pins did not
+move.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed, two
 FEED frames per fold forwarded, `f: 1` on a scoped spoke's resync ask
