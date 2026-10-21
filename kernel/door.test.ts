@@ -17,7 +17,7 @@ import { Node, type NodeOpts } from './node.ts'
 import { VERB, Framer, encodeControl, encodeFrame } from './codec.ts'
 import { JK } from './journal.ts'
 import { LS } from './link.ts'
-import { PROOF_LEN, proofMsg } from './door.ts'
+import { PROOF_LEN, UUID_MAX, proofMsg, utf8Len } from './door.ts'
 import { TAG, type EffectSink, type Env } from './env.ts'
 import { toyDoor, toyClientDoor, toyClientKey } from '../sim/door.ts'
 import { mulberry32 } from '../sim/exec.ts'
@@ -187,6 +187,27 @@ test('malformed c or m is a malformed HELLO: frameDrop + close, never admitted',
     assert.deepEqual(closes(), [])
     assert.deepEqual(node.admitted(), ['bb'])
   }
+})
+
+test('a HELLO whose uuid is over UUID_MAX (64 UTF-8 bytes) is malformed: frameDrop names the bound, the link closes malformed-hello, never admitted; 64 bytes are admitted', () => {
+  assert.equal(UUID_MAX, 64)
+  for (const u of ['b'.repeat(65), 'é'.repeat(33), '€'.repeat(22)]) {
+    const { node, closes, rows, up } = harness('aa')
+    up(1)
+    helloWith(1, node, { u })
+    assert.deepEqual(closes(), [[1, 'malformed-hello']], `${u.length} characters`)
+    assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: uuid over 64 bytes', null]])
+    assert.deepEqual(node.admitted(), [])
+  }
+  for (const u of ['b'.repeat(64), 'é'.repeat(32), '😀'.repeat(16)]) {
+    const { node, closes, up } = harness('aa')
+    up(1)
+    helloWith(1, node, { u })
+    assert.deepEqual(closes(), [], `${u.length} characters, ${utf8Len(u)} bytes`)
+    assert.deepEqual(node.admitted(), [u])
+  }
+  //! utf8Len is TextEncoder's count, a lone surrogate included
+  for (const t of ['', 'abc', 'é', '€', '😀', '\ud800', '\udc00x', 'a😀é€']) assert.equal(utf8Len(t), new TextEncoder().encode(t).length, JSON.stringify(t))
 })
 
 test('contract mismatch: both carry c and differ → contractReject names the first key that differs and THEIR value; the link closes contract-mismatch; a dialed target is parked and revived at heartbeat cadence', () => {

@@ -100,7 +100,7 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
-| `uuid` | the dir's saved identity, else 8 random hex chars | instance | call, flag, env. Never a file: one shared file would give every process the same identity | Names this node. It rides HELLO and stamps every write this node makes. Must be unique per member. On a durable `dir` it must match the saved identity, or `fero()` throws. A value that is all digits is refused from a flag or a variable. |
+| `uuid` | the dir's saved identity, else 8 random hex chars | instance | call, flag, env. Never a file: one shared file would give every process the same identity | Names this node. It rides HELLO and stamps every write this node makes. Must be unique per member, without `~`, and at most 64 bytes of UTF-8 (it names the node's lane in every record frame it sends): a longer one is refused at `fero()`, and a peer drops a HELLO carrying one as malformed. On a durable `dir` it must match the saved identity, or `fero()` throws. A value that is all digits is refused from a flag or a variable. |
 | `server` | unset: a bare `fero(name)` is a client | instance | call, flag, env, file | `true` pins the server role with no other marker (a free loopback port, registered with the directory). `false` pins the client role: then `listen`, `dir`, `replicas`, `data` or `methods` from any layer throws naming both sources. Any of those five markers also makes a server on its own. |
 | `data` | unset | instance | call, file | Initial rows, applied only when the local fold is empty at boot. A restore or replayed state never re-seeds. Implies the server role. |
 

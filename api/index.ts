@@ -27,7 +27,7 @@ import { proxy, contract, commit, errText, snapshot as snapshotOf, unfoldable, S
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, v6Hint } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
-import type { Door } from '../kernel/door.ts'
+import { UUID_MAX, utf8Len, type Door } from '../kernel/door.ts'
 import type { JEvent } from '../kernel/journal.ts'
 import type { Node } from '../kernel/node.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
@@ -538,6 +538,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const badUuid = (u: unknown) => typeof u !== 'string' || u === '' || u.includes('~')
   if (config.uuid !== undefined && badUuid(config.uuid))
     throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)${at('uuid')}`)
+  //! its size (kernel/door.ts UUID_MAX): the uuid rides every record frame as the origin and every committed attempt
+  // as the issuer, and a peer refuses a HELLO with a longer one as malformed — refused here, before anything dials
+  if (config.uuid !== undefined && utf8Len(config.uuid as string) > UUID_MAX)
+    throw new Error(`fero('${name}'): uuid must be at most ${UUID_MAX} bytes (UTF-8), got ${utf8Len(config.uuid as string)} — it names this node's lane in every record frame it sends${at('uuid')}`)
   //! the dir is taken BEFORE its boot record is read (wave 6b, the dir lock): one process at a time holds a dir, and the
   // record this life restores is then the last one the previous life wrote — never one a holder still alive overwrote
   // a moment after we looked. The Runtime adopts the lock (rtOpts.lock); a refusal below gives it back first.

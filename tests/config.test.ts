@@ -137,6 +137,9 @@ test('refusals name their source: the legacy FERO_RENDEZVOUS text, a non-number,
   assert.match((await run('shop', { env: { FERO_HEARTBEATMS: '5' }, call: { server: true } })).err ?? '', /'heartbeatms' is spelled heartbeat: \{ ms \} since V4-10/)
   assert.match((await run('shop', { argv: ['--fero.replica', '2'], call: { server: true } })).err ?? '', /unknown option 'replica' from --fero\.replica — did you mean --fero\.replicas/)
   assert.match((await run('shop', { argv: ['--fero.listen', ':5'], call: { server: true } })).err ?? '', /listen must be a 'host:port' string .* \(from --fero\.listen\)/)
+  //! an IPv6 listen without brackets names the bracket form; a uuid over the bound names the bound, its size and the variable
+  assert.match((await run('shop', { argv: ['--fero.listen', '::1:0'], call: { server: true } })).err ?? '', /listen must be a 'host:port' string .* \(an IPv6 address goes in brackets: '\[::1\]:4000', or '\[fdaa::3\]' for a bare host\) \(from --fero\.listen\)/)
+  assert.match((await run('shop', { env: { FERO_UUID: 'u'.repeat(65) }, call: { server: true } })).err ?? '', /uuid must be at most 64 bytes \(UTF-8\), got 65 — it names this node's lane in every record frame it sends \(from FERO_UUID\)/)
 })
 
 test('server: false pins the client role: a server marker or server: true from a flag is refused naming both sources', async () => {
