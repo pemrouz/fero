@@ -36,7 +36,9 @@
 // 5, 7 (scanned seeds 1-8 of every family). The same pass takes `drop-one`'s bite away on most seeds: the older
 // write under the dropped remove is already compacted at that holder when the mutation fires, so its later teach
 // has nothing to resurrect; it is caught where an older record survives outside the frontier — the zombie's
-// stranded lane (A1 seed 8), and A2 seed 14 (scanned A1/A6/A7 seeds 1-8 and A2/A6/A7/A10 seeds 9-16).
+// stranded lane (A1 seed 8), and A4 seed 6. The runner drops a remove's OWN entry (its stamp and its cell): until
+// 2026-10-21 it matched by stamp alone and, for a field a row write swept, dropped the parent row's winning entry,
+// which is what A7 seed 5 and A2 seed 14 caught (the pins below say how they moved).
 // Cost: about 50 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five
 // pinned mutation schedules, each run clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
 // 70 s on 2026-10-09, before the pinned seeds were added). The known-unsafe seeds below run in every battery on top
@@ -242,13 +244,15 @@ test('runFamily names a screen-only row on a spoke as UNSAFE ("screen: s1: …")
 const CAUGHT: [string, number, Mutation, string[]][] = [
   ['A1-zombie', 1, 'release-all', ['stamp-oracle', 'release-safety', 'census-truth']], // M6 at the release: the zombie still holds an older record
   ['A1-zombie', 1, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // G1: the zombie's write lands above the fence after the heal
-  //! moved from A7 seed 2 to seed 5 with stage 3 (2026-10-12): on seed 2 (n=2 R=2) every lane passed compactAt before
-  // the mutation fired and the superseded writes were gone, so the release left nothing older on a lane for a teach to
-  // ship below the released stamp (release-safety's shape); stamp-oracle alone named it at the horizon (a joiner lacking
-  // the row — the mutation runner's own lane filter dropped the row's winning entry: a swept field's tombstone carries
-  // its parent's stamp, V4-18, so `inject` drops the parent's record; M2 names that drop too, as it always did, but M2
-  // is not a CATCHER). Seed 5 (n=3 R=2) keeps an older field write on a short lane: both catch (scanned A7 seeds 1-8).
-  ['A7-down-to-one', 5, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
+  //! moved from A7 seed 2 to seed 5 with stage 3 (2026-10-12), and from seed 5 to seed 16 when the runner's lane filter
+  // was fixed (2026-10-21). Both earlier catches were the RUNNER's bug, not the release's: `inject` matched the remove's
+  // lane entry by the tombstone's stamp alone, and a field a row write swept carries the row's stamp (V4-18), so the
+  // runner dropped the parent row's WINNING entry (M2 named it "still the WINNER" in every such run; M2 is not a
+  // CATCHER). With the filter matching the remove's own entry (its stamp AND its cell), seeds 2 and 5 catch nothing:
+  // every lane passed compactAt before the mutation fired, so the release leaves nothing older on a lane for a teach to
+  // ship. Seed 16 (n=3 R=1) keeps an older write on a lane past the release: both catch (scanned A7 seeds 1-16; 16 is
+  // the one that catches).
+  ['A7-down-to-one', 16, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
   //! `drop-one` needs the dropping holder to TEACH the partition later WITH an older record still in its lane, so its
   // catch follows the trajectory. Stage 2 (2026-10-10) moved it twice (A6 seed 3 and A1 seed 4 traded places with the
   // targeted rounds and the member digest's retirement). Stage 3 (2026-10-12) took its bite away on most seeds: with
@@ -256,9 +260,12 @@ const CAUGHT: [string, number, Mutation, string[]][] = [
   // (mutateAt 300), so a later teach ships the live state without the remove but also without anything to resurrect
   // — A6 seed 3 and A7 seed 4 catch nothing now (scanned A1/A6/A7 seeds 1-8 and A2/A6/A7/A10 seeds 9-16: two seeds
   // catch). It is caught where an older record survives OUTSIDE the frontier: the healed zombie's stranded lane (A1
-  // seed 8), and A2 seed 14 (n=3 R=1).
+  // seed 8), and A4 seed 6 (n=3 R=3 durable, the restarts family). A2 seed 14 WAS the second pin: its
+  // catch was the runner's own lane filter dropping a swept field's parent row (the A7 note above), and with the filter
+  // fixed (2026-10-21) it catches nothing. Rescanned drop-one on seeds 1-16 of A1/A2/A6/A7/A10 and 1-8 of A3-A5, A8,
+  // A9, A11-A13: A1 seed 8, A4 seed 6, A9 seed 8 and A12 seeds 1, 5, 7 catch.
   ['A1-zombie', 8, 'drop-one', ['stamp-oracle', 'release-safety', 'census-truth']], // the healed zombie is re-taught the partition without the remove
-  ['A2-slow-owner-join', 14, 'drop-one', ['stamp-oracle']], // the demoted owner's lane keeps the older record past the frontier
+  ['A4-restarts', 6, 'drop-one', ['stamp-oracle', 'release-safety']], // the restarts family: an older record outlives the dropped remove
   //! moved from A11 seed 3 to seed 7 with stage 2 (the members' handshake timing changed the spoke's trajectory;
   // scanned over A11 seeds 1-12: 7 is the clean seed that catches it)
   ['A11-spoke', 7, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
@@ -278,5 +285,9 @@ test('mutation runner: today\'s injected-drop class — each pinned schedule is 
     assert.equal(o.eng.mutated, 1, `${o.shape}: the mutation found a tombstone to release`)
     const caught = [...o.red].filter((m) => CATCHERS.has(m)).sort()
     assert.deepEqual(caught, [...by].sort(), `${o.shape}: caught by ${caught.join('+') || 'nothing'}`)
+    //! the runner weakens a RELEASE, never anything else: it drops a remove's own entry, never a live cell's winner
+    // (a swept field's tombstone carries its parent row's stamp, V4-18; matching by stamp alone dropped the parent)
+    const winner = o.unsafe.filter((u) => /still the WINNER/.test(u))
+    assert.deepEqual(winner, [], `${o.shape}: the mutation runner dropped a winning entry`)
   }
 })

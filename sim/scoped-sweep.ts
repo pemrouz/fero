@@ -26,7 +26,7 @@ import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
-import type { Node, NodeOpts } from '../kernel/node.ts'
+import type { Node, NodeOpts, LogEntry } from '../kernel/node.ts'
 import type { Tune } from '../kernel/tune.ts'
 
 const mul = (seed: number) => { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -149,6 +149,8 @@ export const CATCHERS = new Set(['stamp-oracle', 'release-safety', 'census-truth
 // (the seed did not engage). `drop-one` picks (seeded) one removed cell of a partition a live armed node holds and
 // drops it at that node; the other two act like a broken release rule would: on EVERY tombstone of every held
 // partition, at every armed node holding it.
+//! cellOf — a record's cell key, the way Node.apply derives it (a new top-level row's key is [] and its row is `at`)
+const cellOf = (rec: Rec) => JSON.stringify(rec.key.length ? rec.key : [rec.at ?? ''])
 export const inject = (sim: Sim, r: () => number, m: Mutation): string | null => {
   if (m === 'none') return null
   const cands: { n: Node; k: string }[] = []
@@ -163,12 +165,18 @@ export const inject = (sim: Sim, r: () => number, m: Mutation): string | null =>
     n.versions.delete(k)
     n.unlink(k)
     n.tombDrop(k) // a broken RELEASE rule, not a broken index: the indexes follow the drop (M4 stays green here)
+    //! the remove's OWN entry: its stamp AND its cell. A field that a row write swept carries the ROW's stamp as its
+    // tombstone (V4-18), so a match by stamp alone found the parent row's winning entry and dropped it — a broken
+    // release of a field never drops its parent's record. A swept cell has no entry of its own: its stamp goes alone.
     if (m !== 'version-only') {
       const lane = n.logs.get(t.origin)
       if (lane) {
-        const gone = lane.filter((e) => e.seq === t.seq && e.epoch === t.epoch)
-        n.logs.set(t.origin, lane.filter((e) => !(e.seq === t.seq && e.epoch === t.epoch)))
-        n.indexDrop(t.origin, gone)
+        const own = (e: LogEntry) => e.seq === t.seq && e.epoch === t.epoch && cellOf(e.rec) === k
+        const gone = lane.filter(own)
+        if (gone.length) {
+          n.logs.set(t.origin, lane.filter((e) => !own(e)))
+          n.indexDrop(t.origin, gone)
+        }
       }
     }
     sim.stepped.add(n.uuid) // the walk diffs only stepped nodes: this step happened outside a node event
