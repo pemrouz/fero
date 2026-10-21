@@ -121,6 +121,8 @@ export const JK = {
   release: 80,       // a=epoch, b=proposer — the vote's proposer disowned the ballot this node held a vote for (a NACK to its ask): the vote stays spent, it warns no more, and the gate re-reads (`held` ends when it was the last hold)
   //! ── a client moves off a shut feeder (2026-10-12, wave 6b) ──
   refeed: 81,        // a=link (the feeder's), b=link (the open server's) — a CLIENT closed its feeder link on purpose: the feeder said its write-gate is shut (`w: 0`) while another linked server said its is open; the linkDown that follows elects that server, and the shut feeder is redialed as a non-primary
+  //! ── the spoke edge cases (2026-10-21, wave 6c, DECISIONS V4-NN) ──
+  unfed: 82,         // a=partition, b=laneEntriesDropped — a CLIENT's feeder said the partition LEFT it (FEED {x}: its copy froze into an orphan at an install and was shed once every holder attested it): the spoke dropped the partition's cells, lane entries and screen rows with it (they stayed on the screen, frozen, until a failover's resync before)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

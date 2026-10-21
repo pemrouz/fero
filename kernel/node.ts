@@ -1389,15 +1389,70 @@ export class Node {
         if (covered) continue
       }
       ghosts++
-      this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
-      const back = this.#under(cell)
-      if (back.length) this.#reapply(back)
-      if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
+      this.#ghost(cell, path)
     }
     this.journal.armed && this.journal.emit(JK.resynced, ghosts)
     //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
     // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
     this.writes.settleStranded(this)
+  }
+
+  //! #ghost — one cell leaves the SCREEN without a remove record existing anywhere (the ghost sweep's removal, shared
+  // with #unfeed): a synthesized remove under this node's own name, seq 0 — never logged, never on the wire; the live
+  // fields under it go back on top (a ghost row erased them downstream), and a field's made-up levels are cleaned.
+  #ghost(cell: string, path: string[]) {
+    this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
+    const back = this.#under(cell)
+    if (back.length) this.#reapply(back)
+    if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
+  }
+
+  //! #unfeed (clients, wave 6c 2026-10-21 — DECISIONS V4-NN) — the feeder said partition p LEFT it (FEED {x}, kernel/
+  // scope.ts evaluateSheds: its copy froze into an orphan at an install, and once every current holder attested the
+  // frozen tails the data left that node). A spoke is a view of its feeder's held subset, and nothing told it: its
+  // rows of p stayed on the screen, frozen (the orphan gate-dropped every new record of p, so none reached the spoke),
+  // until a failover's resync wiped them (STATUS; the scoped sweep's spokeStale count). Now p leaves the spoke with its
+  // feeder: its cells (state, versions, the deep index), its lane entries (a kept entry would make the dual fence drop
+  // a later re-feed of the same record as present, and the row would never come back when the feeder re-acquires p),
+  // its place in an open resync's sweep set, and its screen rows through the ghost sweep's own removal (#ghost): the
+  // row's remove takes its fields with it downstream; a field-only row goes field by field, shallowest first. The
+  // versions of p's UNINDEXED tombstones stay: a tombstone is sound LWW memory (a re-fed older write loses to it, as
+  // it should), and finding them would cost a walk of every version. A client has no byPart, so the lanes are
+  // scanned: a cold path, once per shed partition. Read from the PRIMARY only (a spare's shed says nothing about what
+  // the feeder holds); a server never reads it.
+  #unfeed(p: string) {
+    const row = JSON.stringify([p])
+    const fields = this.fields(p)
+    const shown = new Set<string>()
+    if (this.state.has(row)) shown.add(row)
+    for (const k of fields) if (this.state.has(k)) shown.add(k)
+    //! a resync in flight: the cells of p it remembered from the reset are on the screen too, and leave the sweep set
+    if (this.resync !== null) for (const k of this.resync.old) if (partitionOf({ type: REC.update, key: JSON.parse(k) as string[] }) === p) { this.resync.old.delete(k); shown.add(k) }
+    this.dropCell(row); this.versions.delete(row)
+    for (const k of fields) { this.dropCell(k); this.versions.delete(k) }
+    let dropped = 0
+    for (const [origin, entries] of this.logs) {
+      const gone: LogEntry[] = []
+      for (const e of entries) if (partitionOf(e.rec) === p) gone.push(e)
+      if (!gone.length) continue
+      dropped += gone.length
+      this.logs.set(origin, gone.length === entries.length ? [] : entries.filter((e) => partitionOf(e.rec) !== p))
+      this.indexDrop(origin, gone)
+    }
+    if (shown.has(row)) this.#ghost(row, [p])
+    else {
+      const cells = [...shown].sort((a, b) => a.length - b.length)
+      const gone = new Set<string>()
+      for (const k of cells) {
+        const path = JSON.parse(k) as string[]
+        let under = false
+        for (let d = 1; d < path.length && !under; d++) under = gone.has(JSON.stringify(path.slice(0, d)))
+        if (under) continue
+        gone.add(k)
+        this.#ghost(k, path)
+      }
+    }
+    this.journal.armed && this.journal.emit(JK.unfed, p, dropped)
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
@@ -2129,6 +2184,22 @@ export class Node {
         else if (f.verb === VERB.NACK) this.membership.onNack(this, link, v)
         else this.membership.onLeave(this, link)
         this.membership.settle(this)
+        return
+      }
+      //! FEED — a feeder's word to its spokes (wave 6c, 2026-10-21; DECISIONS V4-NN): read by a CLIENT from its PRIMARY
+      // link only. {x: [p…]}: these partitions left the feeder (a shed) — the spoke drops them (#unfeed). A FEED on a
+      // spare link is dropped (that server's shed says nothing about what the feeder holds), and a server drops every
+      // FEED (a spoke never feeds). Frame dropped, link kept, either way.
+      case VERB.FEED: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'feed before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'feed-before-hello')
+        }
+        if (!this.client) { j.armed && j.emit(JK.frameDrop, link.id, 'feed at a server'); return }
+        if (link.id !== this.primary) { j.armed && j.emit(JK.frameDrop, link.id, 'feed from a spare'); return }
+        const v = f.value as { x?: unknown } | undefined
+        if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
         return
       }
       //! M7 DIAG plane (cold cases, after every hot verb): per-frame auth is the LATCH state check
