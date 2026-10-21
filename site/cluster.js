@@ -22,7 +22,8 @@ export function put(el, s) { if (el && el.textContent !== s) el.textContent = s 
 const NF = new Map()
 export const fmt = (v, d = 0) => {
   if (typeof v !== 'number' || !Number.isFinite(v)) return String(v)
-  const max = Number.isInteger(v) ? Math.max(d, 0) : Math.max(d, 2), k = d + ':' + max
+  // fmt(v): an integer as is, a fraction to two places; fmt(v, d): exactly d places
+  const max = d > 0 ? d : (Number.isInteger(v) ? 0 : 2), k = d + ':' + max
   let f = NF.get(k); if (!f) NF.set(k, f = new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: max }))
   return f.format(v)
 }
@@ -40,7 +41,7 @@ function loop(now) {
 requestAnimationFrame(loop)
 LiveCluster.ticker = onFrame
 
-// THE house cluster (core.js HOUSE: `shop`, n01 n02 n03 + c1, seed 7 — `?seed=N` overrides it)
+// THE house cluster (core.js HOUSE: `cafe`, n01 n02 n03 + c1, seed 7 — `?seed=N` overrides it)
 const q = new URL(location.href).searchParams.get('seed')
 export const page = new LiveCluster({ seed: q !== null && /^\d{1,9}$/.test(q) ? +q : HOUSE.seed })
 window.__fero = page

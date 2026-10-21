@@ -1,0 +1,112 @@
+/* sections/trust.css — 04 Why trust it: A's band of three numbers, and under it the first runs of the same sweep,
+   run again in this tab, one square per run. Builds on calm.css (.band, .stat, .btn, details.more); only the six
+   type steps. Colour means state: green = a run passed every check, red = a run failed. A cut run also carries a
+   shape (a crack through its square), and every result is also said in words. */
+
+#trust p.tr-sub { text-wrap: pretty; margin-bottom: 0; }
+
+/* the band: A's look. "of" sits lower and quieter between the two numbers */
+#trust .tr-band .v { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 0.45em; }
+#trust .tr-of { font: 400 var(--t-lead)/1 var(--sans); color: var(--dim); }
+#trust .tr-band .stat .k { max-width: 30ch; text-wrap: balance; }
+
+/* the run. Phones: one column in reading order (the line, the button, the grid, its key, the result). From 721 px the
+   grid takes the band's first column, and the words line up with the band's second column: the line, the button, the
+   result, and at the foot the key, level with the grid's last row (so the key costs no height of its own). The result
+   is there at rest too (the runs as they ran when this page was made), with the same three rows a press fills, so at
+   1440 the words' column is as tall as the grid at rest and after a run, and a press never moves anything. */
+#trust .tr-run { display: grid; grid-template-columns: minmax(0, 1fr); padding-top: 2rem;
+  grid-template-areas: "what" "go" "grid" "key" "out" "fails"; }
+#trust .tr-what { grid-area: what; }
+#trust .tr-go { grid-area: go; justify-self: start; }
+#trust .tr-grid { grid-area: grid; }
+#trust .tr-key { grid-area: key; }
+#trust .tr-out { grid-area: out; }
+#trust .tr-fails { grid-area: fails; }
+@media (min-width: 721px) {
+  #trust .tr-run { grid-template-columns: minmax(0, 1.6fr) minmax(0, 2fr); grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas: "grid what" "grid go" "grid out" "grid fails" "grid ." "grid key"; padding-top: 2.4rem; }
+  /* the words start where the band's second number starts (calm.css .band .stat + .stat: 2rem in from the rule) */
+  section.sec#trust .tr-run > :is(.tr-what, .tr-go, .tr-out, .tr-fails, .tr-key) { margin-left: 2rem; }
+}
+
+/* the line takes the words' column (two lines at 1440) */
+section.sec#trust p.tr-what { margin: -0.3rem 0 1.2rem; max-width: 36rem; text-wrap: pretty; }
+#trust .tr-go { min-width: 17rem; }
+#trust .tr-go.again { background: transparent; color: var(--ink); border-color: var(--rule-2); }
+#trust .tr-go.again:hover:not(:disabled) { background: transparent; color: var(--accent); border-color: var(--accent); }
+
+/* one square per run. At rest the runs as they ran when this page was made fill it (green: every check passed). A press
+   clears it, and each square fills again as its run ends in this tab. A run whose network was cut has a crack. */
+#trust .tr-grid { --sq: 22px; --gap: 6px; display: grid; grid-template-columns: repeat(10, var(--sq)); grid-auto-rows: var(--sq); gap: var(--gap);
+  width: max-content; align-self: start; align-content: start; }
+#trust .tr-sq { display: block; width: var(--sq, 22px); height: var(--sq, 22px); border-radius: 5px; border: 1px solid var(--rule-2);
+  background: transparent; position: relative; }
+#trust .tr-sq.next { border-color: var(--faint); }
+#trust .tr-sq.ok { border-color: var(--pos); background: var(--pos); }
+#trust .tr-sq.cut { background: linear-gradient(135deg, var(--pos) 0 46%, rgba(12, 12, 13, 0.62) 46% 54%, var(--pos) 54% 100%); }
+#trust .tr-sq.bad { border-color: var(--neg); background: var(--neg); }
+#trust .tr-sq.bad::after { content: '✕'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--bg);
+  font: 600 var(--t-label)/1 var(--sans); }
+#trust .tr-grid .tr-sq.pop { animation: tr-pop 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+@keyframes tr-pop { from { transform: scale(0.45); opacity: 0.3; } to { transform: none; opacity: 1; } }
+
+/* the key: what the two kinds of square mean. It shows only once a square on the grid has a crack to explain (the
+   manifest's rows say which runs were cut, or a run in this tab cut one); an all-green grid needs no key. Phones:
+   under the grid. From 721 px: at the foot of the words' column, level with the grid's last row. */
+section.sec#trust p.tr-key { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.6rem; margin: 1.1rem 0 0; max-width: none;
+  font: var(--t-label)/1.4 var(--sans); color: var(--faint); }
+#trust .tr-key-i { display: inline-flex; align-items: center; gap: 0.6rem; }
+#trust .tr-key .tr-sq { --sq: 14px; border-radius: 4px; display: inline-block; }
+@media (min-width: 721px) {
+  /* the words and the result end just above the grid's last row, so the key sinks to it, at rest and after a run */
+  section.sec#trust p.tr-key { align-self: end; }
+}
+
+/* the result: three rows in every state. 1 · N of M runs green, the numbers big, the words quiet on their baseline
+   (as the band's "of"). 2 · the events, and after a press the time on this machine. 3 · where the numbers come from
+   ("as they ran when this page was made"), or how a press compares. An empty row keeps its line, so the rows never
+   move the key, at rest, while a run counts, or after it. */
+#trust .tr-out { margin-top: 1.2rem; }
+section.sec#trust .tr-out p { margin: 0; max-width: none; }
+section.sec#trust p.tr-big { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 0.45em; font: 500 var(--t-big)/1.05 var(--mono);
+  color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+#trust .tr-big .tr-k { font: 400 var(--t-lead)/1 var(--sans); color: var(--dim); letter-spacing: 0; }
+section.sec#trust .tr-out.ok p.tr-big { color: var(--pos); }
+section.sec#trust .tr-out.bad p.tr-big { color: var(--neg); }
+section.sec#trust p.tr-line { font: var(--t-small)/1.5 var(--mono); color: var(--dim); margin-top: 0.5rem; min-height: 1.5em; font-variant-numeric: tabular-nums; }
+section.sec#trust p.tr-same { font: var(--t-small)/1.5 var(--sans); color: var(--pos); margin-top: 0.4rem; min-height: 1.5em; text-wrap: balance; }
+section.sec#trust p.tr-same:is(.made, .hint) { color: var(--dim); }
+section.sec#trust p.tr-same.diff { color: var(--neg); }
+@media (max-width: 960px) {
+  /* narrower words: the comparison after a run takes two lines ("✓ Every run took the same events as when this page
+     was made."), so its row keeps two lines at rest too, and a press still moves nothing */
+  section.sec#trust p.tr-same { min-height: 3em; }
+}
+
+/* a failed run prints its seed: the number that replays it */
+#trust .tr-fails { list-style: none; margin-top: 1rem; margin-bottom: 0; padding: 0; display: grid; gap: 0.6rem; max-width: 46ch; }
+#trust .tr-fails li { font: var(--t-small)/1.5 var(--mono); color: var(--neg); overflow-wrap: anywhere; }
+#trust .tr-fails .tr-again { display: block; color: var(--dim); margin-top: 0.15rem; }
+#trust .tr-fails code { color: var(--ink); font-size: 1em; }
+
+/* the door: the ten rules, one plain line each. calm.css draws the door itself (summary, body rule, spacing). */
+#trust .tr-rules { margin: 0; padding: 0; list-style: none; counter-reset: rule; columns: 2 22rem; column-gap: 2.6rem; }
+#trust .tr-rules li { counter-increment: rule; break-inside: avoid; display: grid; grid-template-columns: 2.1rem minmax(0, 1fr);
+  padding: 0.35rem 0; font: var(--t-small)/1.5 var(--sans); color: var(--dim); }
+#trust .tr-rules li::before { content: counter(rule); font: 500 var(--t-label)/1.75 var(--mono); color: var(--faint); }
+section.sec#trust p.tr-end { margin: 0.9rem 0 0.4rem; font: var(--t-small)/1.5 var(--sans); color: var(--ink); max-width: none; }
+
+@media (max-width: 720px) {
+  /* phones: the first number across the top, the other two side by side under it */
+  #trust .tr-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #trust .tr-band .stat:first-child { grid-column: 1 / -1; }
+  #trust .tr-band .stat:nth-child(2) { padding-right: 1rem; }
+  #trust .tr-band .stat + .stat + .stat { padding-left: 1.2rem; border-left: 1px solid var(--rule); }
+  #trust .tr-go { min-width: 0; }
+  #trust .tr-grid { margin-top: 1.6rem; }
+}
+@media (max-width: 400px) {
+  /* phones: 25 px squares fill a 390 column; on a narrower phone they shrink so the grid keeps the 1rem gutter */
+  #trust .tr-grid { --sq: min(25px, calc((100vw - 2rem - 54px) / 10)); --gap: 6px; }
+}

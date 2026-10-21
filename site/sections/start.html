@@ -1,82 +1,53 @@
-<section class="fsec" id="start">
-  <div class="opt" data-section="start">
+<section class="sec" id="start">
+  <div class="sec-head"><span class="sec-no">03</span><h2>Start</h2></div>
+  <p class="point">Two files: a café and a visitor.</p>
+  <p class="sub">Starting data (a seed) makes fero a server. A bare <code>fero('cafe')</code> is a client: it finds the server by name, keeps its own copy, and sends its writes up.</p>
 
-    <!-- ── a · example 02: the two files, a live margin, a real run, the series ─────────────────── -->
-    <div data-variant="a" data-label="the two files" id="start-a">
-      <div class="sec-head">
-        <span class="sec-no">03</span><h2>From zero</h2>
-        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
-      </div>
-
-      <div class="st-top">
-        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
-        <p class="st-intro">The two files below are in <code class="st-dirname" data-b="exdir"></code> at <span data-b="head"></span>. Each <span class="st-arrow">// →</span> note is read live from the cluster above. The files write on timers; here, <b>run this line ▸</b> posts the record its line becomes, and the note follows it.</p>
-      </div>
-
-      <div class="st-files" data-files></div>
-      <div class="st-rec st-rec-tl" data-rec></div>
-
-      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
-           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
-      <div class="st-head st-head-opts">
-        <span class="race-title">three more options</span>
-        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
-      </div>
-      <dl class="st-opts">
-        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
-        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
-        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
-      </dl>
-
-      <div class="st-head st-head-series">
-        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
-        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
-      </div>
-      <div class="st-rungs" data-rungs aria-label="the example series"></div>
-      <p class="st-rungs-foot" data-rungs-foot></p>
-      <p class="st-rungs-foot">All <span data-b="rungs"></span> rungs are one table, each with its lesson and the terminals to open: <a data-repo href="https://github.com/pemrouz/fero/blob/main/examples/README.md" target="_blank" rel="noopener"><code>examples/README.md</code> ↗</a></p>
-    </div>
-
-    <!-- ── b · the README's shape block, with the same live margin ──────────────────────────────── -->
-    <div data-variant="b" data-label="the README shape" id="start-b">
-      <div class="sec-head">
-        <span class="sec-no">03</span><h2>From zero</h2>
-        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
-      </div>
-
-      <div class="st-top">
-        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
-        <p class="st-intro">Below is the shape block from fero's README at <span data-b="head"></span>, its checkout comment kept. A <span class="st-arrow">// →</span> note under a line is read live from the cluster above; <b>run this line ▸</b> posts the record the line becomes, and the note follows it.</p>
-      </div>
-
-      <div class="st-files st-files-one" data-files></div>
-
-      <div class="st-head st-head-rec">
-        <span class="race-title">recorded from a real run</span>
-        <span class="st-path"><span data-b="recorded"></span> · example <span data-b="exno"></span> runs the same two roles as two processes on one box</span>
-      </div>
-      <div class="st-rec" data-rec></div>
-
-      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
-           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
-      <div class="st-head st-head-opts">
-        <span class="race-title">three more options</span>
-        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
-      </div>
-      <dl class="st-opts">
-        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
-        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
-        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
-      </dl>
-
-      <div class="st-head st-head-series">
-        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
-        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
-      </div>
-      <div class="st-rungs" data-rungs aria-label="the example series"></div>
-      <p class="st-rungs-foot" data-rungs-foot></p>
-      <p class="st-rungs-foot">All <span data-b="rungs"></span> rungs are one table, each with its lesson and the terminals to open: <a data-repo href="https://github.com/pemrouz/fero/blob/main/examples/README.md" target="_blank" rel="noopener"><code>examples/README.md</code> ↗</a></p>
-    </div>
-
+  <div class="st-install">
+    <span class="install"><span><span class="pr">$</span> <span class="cmd">npm i fero</span></span><button type="button" data-copy="npm i fero" aria-label="copy npm i fero">copy</button></span>
+    <p class="st-node">Node <span data-st="node">—</span> or later runs the <code>.ts</code> files as they are.</p>
   </div>
+
+  <!-- the two files, each over the screen it printed in a real run (data/start/recording.json, data/start/record.mjs).
+       sections/start.js fills the code from examples/*.ts byte for byte and the screens from the recording.
+       A file's copy button sits on the bar, away from its code: data-copy-from names the code (what to select when the
+       browser refuses the clipboard) and data-copy-name what to say aloud (not the whole file). chrome.js does not
+       read them yet: a shared change, asked for in sections/start.md. -->
+  <div class="figure st-pairs">
+    <figure class="st-pair" data-role="cafe">
+      <figcaption class="label st-k">Terminal <span data-literal>1</span> · the server</figcaption>
+      <div class="st-win">
+        <div class="st-bar"><span class="st-fname">cafe.ts</span><button type="button" class="st-copy" data-copy="" data-copy-from="st-code-cafe" data-copy-name="cafe.ts" aria-label="copy cafe.ts" disabled>copy</button></div>
+        <pre class="code" id="st-code-cafe" data-file="cafe.ts"></pre>
+      </div>
+      <div class="term">
+        <div class="term-bar"><span class="dot" aria-hidden="true"></span><span class="st-cmd">$ node cafe.ts</span></div>
+        <div class="term-body" data-screen="cafe"></div>
+      </div>
+    </figure>
+    <figure class="st-pair" data-role="visitor">
+      <figcaption class="label st-k">Terminal <span data-literal>2</span> · the client</figcaption>
+      <div class="st-win">
+        <div class="st-bar"><span class="st-fname">visitor.ts</span><button type="button" class="st-copy" data-copy="" data-copy-from="st-code-visitor" data-copy-name="visitor.ts" aria-label="copy visitor.ts" disabled>copy</button></div>
+        <pre class="code" id="st-code-visitor" data-file="visitor.ts"></pre>
+      </div>
+      <div class="term">
+        <div class="term-bar"><span class="dot" aria-hidden="true"></span><span class="st-cmd">$ node visitor.ts</span></div>
+        <div class="term-body" data-screen="visitor"></div>
+      </div>
+    </figure>
+  </div>
+
+  <p class="caption st-after">The visitor's copy starts empty and fills in one cat at a time. Then biscuit's new mood shows on both screens, in violet. The visitor's own screen shows it only after the café has it.</p>
+
+  <details class="more st-door">
+    <summary>How these screens were made</summary>
+    <div class="st-door-body">
+      <p>A real run: <span data-st="when">—</span>, Node <span data-st="nodeRun">—</span>, fero <span data-st="fero">—</span>. The café started first, then the visitor, each running its file exactly as shown above:</p>
+      <p class="st-cmds"><span><span class="pr" aria-hidden="true">$ </span><code data-st="cmd-cafe">—</code></span><span><span class="pr" aria-hidden="true">$ </span><code data-st="cmd-visitor">—</code></span></p>
+      <p>The two settings keep the run to itself: a private port for the name directory (where a client looks the café up), and no config files. <code>nice</code> only lowers the run's priority. Ctrl-C stopped both, and both exited cleanly.</p>
+    </div>
+  </details>
+
+  <p class="st-next"><a href="https://github.com/pemrouz/fero/tree/main/examples" target="_blank" rel="noopener">The <span data-st="examples">—</span> examples on GitHub <span aria-hidden="true">→</span></a> <span>They go from two servers to a chat room, a kanban board and a ledger.</span></p>
 </section>

@@ -7,7 +7,7 @@
 //
 // What a page CANNOT run is the public fero() call (it needs node:net/fs/crypto). A page writes by posting the
 // record the api's lens builds from an assignment, and must say so:
-//     shop.data.gadgets = { stock: 4 }   →   { type: 0 /* update */, key: ['gadgets'], value: { stock: 4 } }
+//     cafe.data.luna = { mood: 'purring' }   →   { type: 0 /* update */, key: ['luna'], value: { mood: 'purring' } }
 //
 // DETERMINISM. Everything automatic happens INSIDE the simulation (sim.at): the seed at boot, the scripted
 // writer, finishing a clean leave. Visitor actions are logged with their virtual time and event index
@@ -38,12 +38,29 @@ export const VERB_KIND = {
   HAVEQ: 'scope', HAVEA: 'scope', ACQ: 'scope', ACQDONE: 'scope', DIAGQ: 'diag', DIAGA: 'diag',
 }
 for (const name of Object.keys(VERB)) VERB_KIND[name] ??= 'vote'
+// one plain line per kernel rule (sim/monitors.ts perEvent(), by monitor name): what each one CHECKS, never a promise
+// (FACTS: no 'exactly-once' promise; the demo can break that rule in a few clicks and the line must stay true).
+// The demo's broken-rule note and 04's door print these same words.
+export const RULE_LINES = {
+  'queued-implies-paused': 'It checks that a message waits in line only while its connection is full.',
+  'one-view-per-epoch': 'It checks that no two servers ever hold different member lists under the same vote number.',
+  'epoch-monotone': 'It checks that a server’s member-list number never goes down.',
+  'log-monotone': 'It checks that the writes a server keeps from each writer stay in rising order.',
+  'lane-unique': 'It checks that a server never keeps the same write from a writer twice.',
+  'single-writer': 'It checks that, once the first vote is in, only a row’s one owner puts that row’s writes in order.',
+  'attempt-exactly-once': 'It checks that a write sent more than once is put in order only once, even when its row changes owner.',
+  'watermark-monotone': 'It checks that a server’s “taken in up to here” mark for each writer never goes back.',
+  'watermark-ordering': 'It checks that a server’s three marks for each writer never cross: taken in ≥ kept to pass on ≥ safe on disk.',
+  'scoped-lawful-holding': 'It checks that, with replicas (each row on only some servers), a server holds only the rows given to it.',
+  'orphan-frozen': 'It checks that, with replicas, a row a server must give up stays untouched until it can be dropped safely.',
+}
+export const PLAIN_RULES = RULE_LINES
 export const role = (id) => (id.startsWith('c') ? 'client' : 'server')
 export const label = (id) => `${role(id)} ${id}`
 
 // ── cells and objects (kernel/node.ts apply(): the internal cell key is JSON.stringify(path)) ──────────
 export const keyOf = (path) => JSON.stringify(path)
-// toObject — a node's cells as the plain object `shop.snapshot` would show. NEVER writes into a stored value:
+// toObject — a node's cells as the plain object `cafe.snapshot` would show. NEVER writes into a stored value:
 // a value in node.state is also the record held in that node's per-writer log, so descending into it to merge a
 // field cell would corrupt the kernel (a row changing under an unchanged stamp). Copy on every descent.
 export function toObject(state) {
@@ -84,7 +101,7 @@ export function ownerOnRing(points, row) {
   const ms = [['n01', 'sim:n01'], ['n02', 'sim:n02'], ['n03', 'sim:n03']]
   const r = new Ring(); r.build(1, ms)
   const pts = ringPoints(ms.map((m) => m[0]))
-  for (const row of ['widgets', 'gadgets', 'gizmos', 'sprockets', 'a', 'b', 'c', 'row42'])
+  for (const row of ['luna', 'mochi', 'biscuit', 'widgets', 'gadgets', 'a', 'b', 'row42'])
     if (ownerOnRing(pts, row) !== r.ownerOf(row)) throw new Error(`core.js: ring mismatch on ${row}`)
 }
 
@@ -104,12 +121,16 @@ export function decode(bytes) {
 const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`)
 export { pair }
 
-// the house config (CONCEPT.md §0): the resource `shop`, three durable servers + one client, heartbeat 100 ms on
+// the house config: the resource `cafe` (a tiny cat café; each cat is a row, its mood the value), three durable
+// servers + one client, heartbeat 100 ms on
 // all four, the harness's redial 20 ms, links 30–90 ms simulated, seed 7, whole rows only
 export const HOUSE = {
-  name: 'shop', seed: 7, servers: 3, clients: 1, heartbeatMs: 100, durable: true, delay: [30, 90],
-  data: { widgets: { stock: 10 }, gadgets: { stock: 3 }, gizmos: { stock: 7 } }, seedFrom: 'n01',
-  writer: { on: true, id: 'c1', row: 'gadgets', every: 2500, cycle: [4, 6, 3, 1, 5, 2, 0, 8] },
+  name: 'cafe', seed: 7, servers: 3, clients: 1, heartbeatMs: 100, durable: true, delay: [30, 90],
+  // the ring at three servers: luna → n01, mochi → n02, biscuit → n03 (without n01, luna → n02); at seed 7 c1 follows n02
+  data: { luna: { mood: 'sleepy' }, mochi: { mood: 'playful' }, biscuit: { mood: 'hungry' } }, seedFrom: 'n01',
+  // the scripted visitor: c1 sets luna's mood 1.5 s after the seed lands, then every 5 s of simulated time (calm: the
+  // page rests between writes); it never writes the mood c1's copy already holds
+  writer: { on: true, id: 'c1', row: 'luna', field: 'mood', first: 1500, every: 5000, cycle: ['purring', 'playful', 'hungry', 'zoomies', 'sleepy', 'grumpy'] },
 }
 
 // ── LiveCluster ──────────────────────────────────────────────────────────────────────────────────────
@@ -179,16 +200,16 @@ export class LiveCluster {
     const reported = new Set()
     for (const m of this.sim.monitors) {
       const check = m.check
-      m.check = (sim) => { const bad = check(sim); if (!bad) return bad; const k = m.name + '\u0000' + String(bad); if (reported.has(k)) return null; reported.add(k); return bad }
+      m.check = (sim) => { const bad = check(sim); if (!bad) return bad; const k = m.name + '\u0000' + String(bad).replace(/ \(seen at [^)]*\)$/, ''); if (reported.has(k)) return null; reported.add(k); return bad }
     }
     this.note('boot', `${words(o.servers)} servers and ${words(o.clients)} client start; the servers dial each other`, this.ids())
     if (o.data) {
-      // the seed, as a real `fero('shop', { data })` applies it: at boot, on an empty node, before any view —
+      // the seed, as a real `fero('cafe', { data })` applies it: at boot, on an empty node, before any view —
       // one whole-row update per row (README: "Initial rows, applied only when the local fold is empty at boot")
       this.sim.post(o.seedFrom, { kind: 'write', recs: Object.entries(o.data).map(([k, v]) => ({ type: REC.update, key: [k], value: v })) }, 0)
       this.note('seed', `${o.seedFrom} applies the seed rows at boot, before any view: ${Object.keys(o.data).join(', ')}`, [o.seedFrom])
     } else { this.isReady = true; this.#onReady() }
-    if (this.writer.every) this.sim.at(this.writer.every, () => this.#writerTick())
+    if (this.writer.every) this.sim.at(this.writer.first ?? this.writer.every, () => this.#writerTick())
   }
   reset(seed = this.seed) {
     this.#boot(seed)
@@ -315,14 +336,17 @@ export class LiveCluster {
     const w = this.writer
     if (!this.#writerReady && this.#seedLanded()) this.#writerReady = true
     if (w.on && this.alive(w.id) && this.#writerReady && this.node(w.id).writes.pending.size === 0 && !this.writes.some((x) => x.node === w.id && x.state === 'pending')) {
-      this.#write(w.id, [w.row], { stock: w.cycle[w.i++ % w.cycle.length] }, 'writer')
+      const field = w.field ?? 'stock', now = this.object(w.id)[w.row]?.[field]
+      let next = w.cycle[w.i++ % w.cycle.length]
+      for (let k = 1; k < w.cycle.length && next === now; k++) next = w.cycle[w.i++ % w.cycle.length]
+      this.#write(w.id, [w.row], { [field]: next }, 'writer')
     }
-    this.sim.at(w.every, () => this.#writerTick())
+    this.sim.at(this.#writerReady ? w.every : Math.min(250, w.every), () => this.#writerTick())
   }
 
   // ── actions (each visitor action is logged for replay; `by` says who issued a write) ──
   #act(op, args) { this.actions.push({ at: this.sim.now, ev: this.sim.events, op, args }) }
-  // write(id, row, value): what `shop.data[row] = value` issues on node `id` — ONE WHOLE ROW. The page writes
+  // write(id, row, value): what `cafe.data[row] = value` issues on node `id` — ONE WHOLE ROW. The page writes
   // whole rows only: a field write on a row seeded whole is the open two-cells bug (STATUS.md).
   write(id, row, value) {
     const path = Array.isArray(row) ? row : [row]
@@ -335,7 +359,7 @@ export class LiveCluster {
     const w = { id: ++this.#wid, node: id, path, key: keyOf(path), value, by, issuedAt: this.sim.now, state: 'pending' }
     this.writes.push(w); if (this.writes.length > 300) this.writes.splice(0, 150)
     this.sim.post(id, { kind: 'write', recs: [{ type: REC.update, key: path, value }] })
-    this.note('write', `${id} assigns shop.data.${path[0]} = ${short(value)}`, [id])
+    this.note('write', `${id} assigns ${this.opts.name}.data.${path[0]} = ${short(value)}`, [id])
     this.#emit('write', w)
     return w
   }
@@ -345,7 +369,7 @@ export class LiveCluster {
     const w = { id: ++this.#wid, node: id, path: [row], key: keyOf([row]), remove: true, by: 'page', issuedAt: this.sim.now, state: 'pending' }
     this.writes.push(w)
     this.sim.post(id, { kind: 'write', recs: [{ type: REC.remove, key: [row] }] })
-    this.note('write', `${id} deletes shop.data.${row}`, [id])
+    this.note('write', `${id} deletes ${this.opts.name}.data.${row}`, [id])
     this.#emit('write', w)
     return w
   }
@@ -361,15 +385,17 @@ export class LiveCluster {
     this.#emit('kill', id)
   }
   // restart(id): the same node's next life — boot record, WAL replayed before any link, then it dials (sim.restart).
+  // After a crash it is still a member and is voted back in; after a clean leave it is not, and asks to JOIN.
   // Servers only: a client has no disk, and the harness would bring back the same uuid at view 0 (a real client
   // process would start fresh), which trips epoch-monotone. A crashed client stays down until reset().
   restart(id) {
-    if (!this.down.has(id) || this.clientIds.includes(id)) return
+    if ((!this.down.has(id) && !this.left.has(id)) || this.clientIds.includes(id)) return
     this.#act('restart', [id])
-    for (const o of this.#killCuts.get(id) ?? []) if (!this.cuts.has(pair(id, o)) && !this.down.has(o)) this.sim.heal(id, o)
+    for (const o of this.#killCuts.get(id) ?? []) if (!this.cuts.has(pair(id, o)) && !this.down.has(o) && !this.left.has(o)) this.sim.heal(id, o)
+    const wasLeft = this.left.delete(id)
     this.#killCuts.delete(id); this.down.delete(id)
     const n = this.sim.restart(id); this.#tap(n)
-    this.note('restart', `${id} restarts from its disk as life ${n.incarnation}: its rows come back before any link`, [id])
+    this.note('restart', wasLeft ? `${id} starts again from its disk as life ${n.incarnation} and asks to join` : `${id} restarts from its disk as life ${n.incarnation}: its rows come back before any link`, [id])
     this.#emit('restart', id)
     return n
   }
@@ -383,8 +409,13 @@ export class LiveCluster {
   }
   #finishLeave(id, clean) {
     const n = this.sim.nodes.get(id); if (!n || n.destroyed) return
-    for (const o of this.sim.nodes.keys()) if (o !== id) this.sim.partition(id, o)
-    n.destroy(); this.left.add(id)
+    // its links drop as the process exits; restart() heals them like a crash's
+    const cut = []
+    for (const o of this.sim.nodes.keys()) if (o !== id) { this.sim.partition(id, o); cut.push(o) }
+    this.#killCuts.set(id, cut)
+    n.destroy()
+    // a clean leave was voted out; a timed-out one never was: it is still a member, so it is down, like a crash
+    if (clean) this.left.add(id); else this.down.add(id)
     this.note('left', clean ? `${id} left: the others voted it out on its own request` : `${id} left without its vote (timed out): it went like a crash`, [id])
     this.#emit('left', id)
   }
@@ -437,7 +468,13 @@ export class LiveCluster {
     return best ? { epoch: best.epoch, members: best.members.map((m) => m[0]) } : { epoch: 0, members: [] }
   }
   viewOf(id) { const v = this.node(id).membership.view; return { epoch: v.epoch, members: v.members.map((m) => m[0]) } }
-  owner(row, id) { const v = id ? this.viewOf(id) : this.view(); if (!v.members.length) return ''; const r = new Ring(); r.build(v.epoch, v.members.map((m) => [m, `sim:${m}`])); return r.ownerOf(row) }
+  #ring = null; #ringKey = ''
+  owner(row, id) {
+    const v = id ? this.viewOf(id) : this.view(); if (!v.members.length) return ''
+    const key = v.epoch + '|' + v.members.join(',')
+    if (key !== this.#ringKey) { const r = new Ring(); r.build(v.epoch, v.members.map((m) => [m, `sim:${m}`])); this.#ring = r; this.#ringKey = key }
+    return this.#ring.ownerOf(row)
+  }
   object(id) { return toObject(this.node(id).state) }
   rows(id) { return Object.keys(this.object(id)) }
   cell(id, row) { return this.node(id).state.get(keyOf([row])) }

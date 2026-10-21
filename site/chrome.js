@@ -1,28 +1,47 @@
-// chrome.js — page furniture: the footer's build line, and in-page jumps that land where they point.
+// chrome.js — page furniture: the footer's build line, copy buttons, and in-page jumps that land where they point.
 import { attest } from './cluster.js'
 
 // the footer: the commit the kernel cone was stripped from, and its module count and size from lib/manifest.json
-// (strip.mjs's own list: a file that a Worker fetches again is not counted twice)
+// (strip.mjs's own list), and the package version from data/manifest.json (tools/manifest.mjs: package.json)
 fetch('./lib/manifest.json').then((r) => r.json()).then((m) => {
-  attest(document.querySelector('#head'), m.head, 'build')
+  // the commit the kernel was stripped from: a tooltip on the line, not text on the page (no hex on the main path)
+  const line = document.querySelector('#engine-line'); if (line && m.head) line.title = 'kernel stripped from fero at commit ' + m.head
   if (Array.isArray(m.modules)) attest(document.querySelector('#mods'), m.modules.length, 'build')
   if (m.bytes > 0) attest(document.querySelector('#kb'), Math.round(m.bytes / 1024), 'build')
 }).catch(() => {})
-
-// links to the data site wait until its fero card is fixed (CONCEPT §0, question 4): data/lede/links.json (BUILD:
-// tools/lede-links.mjs) checks that site for CONCEPT §8's claims about fero. Until it says ok, the footer says "built on
-// data" in plain words and 07's card shows no link; the lede holds back its own link the same way (sections/lede.js).
-// The links open in a new tab, so a click never unloads this page and its live cluster.
-fetch('./data/lede/links.json').then((r) => (r.ok ? r.json() : null)).then((l) => {
-  if (l?.data?.ok !== true) return
-  for (const el of document.querySelectorAll('.data-site')) el.hidden = false
-  for (const el of document.querySelectorAll('.data-site-held')) el.hidden = true
+fetch('./data/manifest.json').then((r) => r.json()).then((m) => {
+  if (m.version) attest(document.querySelector('#foot-version'), m.version, 'build')
 }).catch(() => {})
 
-// in-page jumps: the browser jumps first, then the sections above the target build their content (on a phone the
-// centrepiece and 02 grow by hundreds of px as the jump passes them), and the target slides down out of view. So after
-// a jump (a click on a #link, or a load with a hash) keep the target at the top while <main> changes size, until the
-// reader scrolls, taps or presses a key, or six seconds pass (a section can settle a few seconds after load).
+// copy buttons: <button data-copy="npm i fero">copy</button> copies its text and says so for a moment (to a screen
+// reader too). Where the clipboard is refused, the text is selected so the reader can copy it by hand. A button that
+// sits away from its text names it: data-copy-from="<id>" (what to select) and data-copy-name (what to say aloud,
+// e.g. a file's name rather than the whole file).
+const announce = (s) => { const a = document.querySelector('#announce'); if (a) { a.textContent = ''; requestAnimationFrame(() => { a.textContent = s }) } }
+function selectFor(b) {
+  const from = b.getAttribute('data-copy-from')
+  const target = (from && document.getElementById(from)) || b.closest('.install')?.querySelector('.cmd, code') || b.closest('.install') || b.parentElement
+  if (!target) return
+  const r = document.createRange(); r.selectNodeContents(target)
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r)
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('button[data-copy]')
+  if (!b) return
+  const text = b.getAttribute('data-copy'), was = b.textContent
+  const done = (ok) => {
+    if (!ok) selectFor(b)
+    b.textContent = ok ? 'copied' : 'select it'
+    announce(ok ? 'Copied: ' + (b.getAttribute('data-copy-name') ?? text) : 'Selected. Copy it with your keyboard.')
+    setTimeout(() => { b.textContent = was }, 1400)
+  }
+  try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)) } catch { done(false) }
+})
+
+// in-page jumps: the browser jumps first, then the sections above the target build their content (the live cluster
+// and the story grow as the jump passes them), and the target slides down out of view. So after a jump (a click on a
+// #link, or a load with a hash) keep the target at the top while <main> changes size, until the reader scrolls, taps
+// or presses a key, or six seconds pass.
 let release = null
 function land(id) {
   const el = id && document.getElementById(id), main = document.querySelector('main')

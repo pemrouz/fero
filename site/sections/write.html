@@ -1,0 +1,79 @@
+<section class="sec" id="write" aria-labelledby="write-h">
+  <div class="sec-head"><span class="sec-no">01</span><h2 id="write-h">How a write travels</h2></div>
+  <p class="point">Your write goes to its row's&nbsp;owner first, then to every copy.</p>
+  <p class="sub">Each top-level key, like <code>luna</code>, is a row. Each row has one <b>owner</b>: the one server that takes the row's writes first and puts them in order.</p>
+
+  <!-- the four steps of one write. sections/write.js fills them from the shared cluster (the latest write of luna):
+       in place for most writes, and now and then (the first write you see, any write you make) lit in order from the
+       kernel's own events -->
+  <div class="figure wr-steps" role="list" aria-label="One write to luna, in four steps">
+
+    <div class="wr-step" role="listitem" data-step="1">
+      <div class="wr-top"><span class="step-no" data-literal>1</span><h3 class="wr-title">You assign</h3></div>
+      <div class="wr-vis">
+        <div class="wr-assign">
+          <span class="wr-chip wr-me"><span class="nm" data-wr="writer">…</span><span class="r" data-wr="role">client</span></span>
+          <pre class="wr-code"><span class="c">// luna's new mood</span>
+cafe.data.luna = <span class="w">{
+    mood: <span data-wr="mood">'…'</span>
+}</span></pre>
+        </div>
+      </div>
+      <p class="wr-cap"><b>Nothing shows</b> until the owner has it, not even in your own copy.</p>
+    </div>
+
+    <div class="wr-arrow" aria-hidden="true"><svg viewBox="0 0 30 14" focusable="false"><path class="ln" d="M1 7H22"/><path class="hd" d="M20 2.2L28 7l-8 4.8z"/><circle class="dot" cx="3" cy="7" r="3.2"/></svg></div>
+
+    <div class="wr-step" role="listitem" data-step="2">
+      <div class="wr-top"><span class="step-no" data-literal>2</span><h3 class="wr-title">The owner takes it</h3></div>
+      <div class="wr-vis">
+        <div class="wr-own">
+          <!-- always takes its line: "through n02, c1's server", or "straight from c1" when c1's server is the owner -->
+          <span class="wr-via off">through …</span>
+          <svg class="wr-down off" viewBox="0 0 14 22" aria-hidden="true" focusable="false"><path class="ln" d="M7 1V15"/><path class="hd" d="M2.2 13L7 21l4.8-8z"/></svg>
+          <span class="wr-chip lg owner"><span class="nm" data-wr="owner">…</span><span class="owner-star" aria-label="owns luna">★</span><span class="badge x" aria-hidden="true" hidden>✕</span></span>
+          <span class="wr-own-k">owner of luna</span>
+          <span class="wr-why off"></span>
+        </div>
+      </div>
+      <p class="wr-cap">Two writes to one field: <b>the later one wins</b>. Nothing merges.</p>
+    </div>
+
+    <div class="wr-arrow" aria-hidden="true"><svg viewBox="0 0 30 14" focusable="false"><path class="ln" d="M1 7H22"/><path class="hd" d="M20 2.2L28 7l-8 4.8z"/><circle class="dot" cx="3" cy="7" r="3.2"/></svg></div>
+
+    <div class="wr-step" role="listitem" data-step="3">
+      <div class="wr-top"><span class="step-no" data-literal>3</span><h3 class="wr-title">It goes to every copy</h3></div>
+      <div class="wr-vis">
+        <div class="wr-fan">
+          <svg class="wr-fan-lines" aria-hidden="true" focusable="false"></svg>
+          <ul class="wr-to" aria-label="The other copies"></ul>
+        </div>
+      </div>
+      <p class="wr-cap">Servers and clients alike, <b>yours too</b>.</p>
+    </div>
+
+    <div class="wr-arrow" aria-hidden="true"><svg viewBox="0 0 30 14" focusable="false"><path class="ln" d="M1 7H22"/><path class="hd" d="M20 2.2L28 7l-8 4.8z"/><circle class="dot" cx="3" cy="7" r="3.2"/></svg></div>
+
+    <div class="wr-step" role="listitem" data-step="4">
+      <div class="wr-top"><span class="step-no" data-literal>4</span><h3 class="wr-title">It shows everywhere</h3></div>
+      <div class="wr-vis">
+        <div class="wr-result">
+          <span class="wr-cat" aria-hidden="true"></span>
+          <div class="wr-big"><span data-wr="n">…</span> of <span data-wr="of">…</span></div>
+          <div class="wr-say"><span class="wr-ok" aria-hidden="true">✓</span> copies say <span class="wr-mood" data-wr="say">…</span></div>
+          <div class="wr-note" data-wr="note"></div>
+        </div>
+      </div>
+      <p class="wr-cap">Every process that opens <code>cafe</code> sees <b>the same object</b>.</p>
+    </div>
+
+  </div>
+
+  <details class="more wr-door">
+    <summary>How the owner puts writes in order</summary>
+    <div class="wr-door-body">
+      <p>The owner stamps each write with three things: the view's number (the view is the agreed list of servers), a counter, and its own name. The counter is a clock, not a count: a server moves it up to the biggest number it has seen, so gaps are normal. After a restart it starts above every number the server used before. Each copy keeps, for every field, the write with the biggest stamp. So every copy picks the same write, and nothing merges.</p>
+      <p class="wr-stamp">luna's latest stamp: <span class="wr-st" data-wr="stamp">…</span>, held by <span data-wr="sn">…</span> of <span data-wr="sm">…</span> copies.</p>
+    </div>
+  </details>
+</section>

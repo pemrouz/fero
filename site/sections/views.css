@@ -1,0 +1,44 @@
+/* 05 Live views — one figure: the live two-liner, and nothing else. The answer shows once, as the first comment: the
+   cats the filter holds right now. The figure is the code card itself (calm.css pre.code).
+   Colour means state (calm.css): the value a write sets, and a cat that a write just put in `hungry`, are violet for a
+   moment; red only in the caption, if the data library cannot load, stops, or its rows ever differ from the check by
+   hand. data's link is data's orange, the one place it appears in this section. */
+
+/* the sub keeps the page's measure (62ch, like every section's sub): two lines at 1440 */
+#views p.vw-sub { text-wrap: pretty; }
+#views a.vw-data { color: var(--data); border-bottom-color: rgba(255, 94, 58, 0.45); white-space: nowrap; margin-left: 0.15rem; }
+#views a.vw-data:hover { color: var(--data); border-bottom-color: var(--data); }
+
+/* the code: the page's code padding (1.25rem at the sides, as 03's files) and calm.css's line height */
+#views .vw-fig { margin: 2.2rem 0 0; }
+#views .vw-code { padding: 1.15rem 1.25rem; line-height: 1.65; }
+#views .vw-code .vw-n { color: var(--ink); }
+#views .vw-code .vw-n.new { animation: vw-new 1.6s ease-out; }
+#views .vw-code .vw-eff { color: var(--dim); }
+#views .vw-code .vw-l2.fresh { animation: vw-fresh 1.6s ease-out; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* until c1's first write shows, the card keeps the second statement's room, empty: one line, or as many as a write
+   takes when the statements break (views.js sets data-keep and --vw-keep). So the card never grows when it lands.
+   1.65em is the code's line height (the line above). */
+#views .vw-code[data-keep]::after { content: ''; display: block; height: calc(var(--vw-keep, 1) * 1.65em); }
+@keyframes vw-new { 0%, 55% { color: var(--accent); } 100% { color: var(--ink); } }
+@keyframes vw-fresh { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
+
+#views .vw-cap { margin-top: 1rem; }
+#views .vw-status .bad { color: var(--neg); }
+
+/* the door: calm.css draws it (the summary, the spacing, the body's left rule); this sets only the words inside */
+#views .vw-door-body p { font-size: var(--t-small); margin: 0 0 0.7rem; text-wrap: pretty; }
+#views .vw-door-body b { color: var(--ink); font-weight: 500; }
+#views .vw-tally { white-space: nowrap; }   /* "N of N agree so far." moves as one piece */
+
+@media (max-width: 640px) { #views .vw-code { padding-inline: 1rem; } }
+/* touch: the link grows only its hit box to 44 px (vertical padding on an inline box moves no line); its border, now
+   at the foot of the taller box, turns clear and the underline is drawn under the words instead (as 03's link) */
+@media (pointer: coarse) {
+  #views a.vw-data { padding-block: 0.8rem; border-bottom-color: transparent;
+    text-decoration: underline 1px rgba(255, 94, 58, 0.45); text-underline-offset: 0.3em; }
+  #views a.vw-data:hover { border-bottom-color: transparent; text-decoration-color: var(--data); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #views .vw-code .vw-n.new, #views .vw-code .vw-l2.fresh { animation: none; }
+}

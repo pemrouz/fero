@@ -1,0 +1,124 @@
+<section class="sec demo" id="demo" aria-labelledby="demo-h">
+  <div class="sec-head"><h2 id="demo-h">Try it</h2></div>
+  <p class="point">This is fero's real kernel, running in your tab on a simulated network.</p>
+  <p class="demo-sub">Each box is a process with its own copy of the café. Servers hold the data; the client sends its writes up. Play the story, or press a button under a box.</p>
+
+  <div class="story" id="demo-story">
+    <div class="story-ctl">
+      <button class="btn primary" type="button" data-story="play"><span aria-hidden="true">▶</span> <span class="lbl">Play the story</span></button>
+      <button class="btn" type="button" data-story="next" hidden>Next <span aria-hidden="true">→</span></button>
+      <button class="btn quiet" type="button" data-story="over" hidden><span aria-hidden="true">↺</span> Start over</button>
+      <p class="story-tag" hidden>Your turn</p>
+    </div>
+    <div class="story-list">
+      <div class="chap">
+        <p class="chap-h">One write</p>
+        <ol>
+          <li data-step="1"><span class="no" data-literal>1</span><span class="t">You write one line</span></li>
+          <li data-step="2"><span class="no" data-literal>2</span><span class="t">It goes to the owner first</span></li>
+          <li data-step="3"><span class="no" data-literal>3</span><span class="t">It reaches every copy, yours too</span></li>
+        </ol>
+      </div>
+      <div class="chap">
+        <p class="chap-h">One crash</p>
+        <ol>
+          <li data-step="4"><span class="no" data-literal>4</span><span class="t">Now crash the owner</span></li>
+          <li data-step="5"><span class="no" data-literal>5</span><span class="t">A new write waits</span></li>
+          <li data-step="6"><span class="no" data-literal>6</span><span class="t"><span class="nm" data-name="heir">n02</span> takes over, the write lands</span></li>
+          <li data-step="7"><span class="no" data-literal>7</span><span class="t">Restart <span class="nm" data-name="owner">n01</span>, it catches up</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- on a phone the step list scrolls away while the story plays: the step that is playing, over the narrator -->
+  <div class="story-now" id="demo-now" hidden>
+    <span class="step-no" data-literal></span>
+    <span class="t"></span>
+    <button class="btn" type="button" data-story="next">Next <span aria-hidden="true">→</span></button>
+  </div>
+
+  <!-- the narrator: the box keeps three lines (so the figure never jumps); the violet rule hugs the sentence -->
+  <div class="say"><p class="narrator" id="demo-say">Every few seconds the client sets luna's mood. Watch the write travel: to luna's owner first, then out to every copy.</p></div>
+  <p class="sr-only" id="demo-say-sr" aria-live="polite" aria-atomic="true"></p>
+
+  <div class="fig" id="demo-fig">
+    <svg class="wires" aria-hidden="true" focusable="false">
+      <defs>
+        <marker id="demo-arrow" class="m-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0.8 L10,5 L0,9.2 z"/></marker>
+        <marker id="demo-tail" class="m-tail" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse"><circle cx="5" cy="5" r="4.2"/></marker>
+        <marker id="demo-arrow-w" class="m-arrow-w" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0.8 L10,5 L0,9.2 z"/></marker>
+        <marker id="demo-tail-w" class="m-tail-w" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse"><circle cx="5" cy="5" r="4.2"/></marker>
+      </defs>
+      <g class="guides"><path class="g-w"/><path class="g-c"/></g>
+      <g class="cutmarks"></g>
+      <g class="lit"></g>
+      <g class="dots"></g>
+    </svg>
+    <span class="wire-label wl-w" aria-hidden="true">write</span>
+    <span class="wire-label wl-c" aria-hidden="true">copies</span>
+    <div class="nodes" role="list" aria-label="The live cluster: luna's mood in every copy">
+      <div class="node client" role="listitem" data-id="c1">
+        <div class="role">Client</div>
+        <div class="name"><span class="nm">c1</span><span class="owner-star" hidden><span aria-hidden="true">★</span><span class="sr-only">, owns luna</span></span></div>
+        <div class="row">luna.mood</div>
+        <div class="value">…</div>
+        <div class="state"></div>
+        <span class="cat" aria-hidden="true"></span>
+        <span class="badge x" aria-hidden="true" hidden>✕</span>
+      </div>
+      <div class="node" role="listitem" data-id="n01">
+        <div class="role">Server</div>
+        <div class="name"><span class="nm">n01</span><span class="owner-star" hidden><span aria-hidden="true">★</span><span class="sr-only">, owns luna</span></span></div>
+        <div class="row">luna.mood</div>
+        <div class="value">…</div>
+        <div class="state"></div>
+        <span class="cat" aria-hidden="true"></span>
+        <span class="badge x" aria-hidden="true" hidden>✕</span>
+      </div>
+      <div class="node" role="listitem" data-id="n02">
+        <div class="role">Server</div>
+        <div class="name"><span class="nm">n02</span><span class="owner-star" hidden><span aria-hidden="true">★</span><span class="sr-only">, owns luna</span></span></div>
+        <div class="row">luna.mood</div>
+        <div class="value">…</div>
+        <div class="state"></div>
+        <span class="cat" aria-hidden="true"></span>
+        <span class="badge x" aria-hidden="true" hidden>✕</span>
+      </div>
+      <div class="node" role="listitem" data-id="n03">
+        <div class="role">Server</div>
+        <div class="name"><span class="nm">n03</span><span class="owner-star" hidden><span aria-hidden="true">★</span><span class="sr-only">, owns luna</span></span></div>
+        <div class="row">luna.mood</div>
+        <div class="value">…</div>
+        <div class="state"></div>
+        <span class="cat" aria-hidden="true"></span>
+        <span class="badge x" aria-hidden="true" hidden>✕</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls" id="demo-ctl">
+    <button class="btn primary" type="button" data-do="write" data-id="c1">Write luna</button>
+    <button class="btn" type="button" data-do="crash" data-id="n01"><span class="verb">Crash</span> <span class="nm">n01</span></button>
+    <button class="btn" type="button" data-do="stop" data-id="n02"><span class="verb">Ctrl-C</span> <span class="nm">n02</span><span class="tail"></span></button>
+    <button class="btn" type="button" data-do="cut" data-id="n03"><span class="verb">Cut off</span> <span class="nm">n03</span></button>
+  </div>
+
+  <div class="band live-stats" id="demo-stats">
+    <div class="stat"><div class="v ok" id="demo-agree">…</div><div class="k">copies agree</div><div class="k2" id="demo-agree-why"></div></div>
+    <div class="stat"><div class="v" id="demo-wait">…</div><div class="k" id="demo-wait-k">writes waiting</div><div class="k2" id="demo-wait-why"></div></div>
+    <div class="stat"><div class="v ok" id="demo-broken">…</div><div class="k">rules broken</div><div class="k2">it checks <span id="demo-rules">eleven</span> after every event</div></div>
+    <div class="broke" id="demo-broke" role="status" hidden>
+      <p class="broke-rule"><span class="tag">rule broken</span> <span class="rule-t"></span></p>
+      <p class="broke-what"></p>
+    </div>
+  </div>
+
+  <details class="more" id="demo-door">
+    <summary>What the kernel did</summary>
+    <div class="door-body">
+      <p class="door-note">The last few things the kernel did, newest last, each with its simulated time. The page runs the kernel, not <code>fero()</code> itself: a button posts the record that an assignment becomes. A commit line ends with the write's stamp: the view's number (the view is the agreed list of servers), a counter, and the owner that stamped it. The counter is a clock, not a count: a server moves it up to the biggest number it has seen, so gaps are normal. After a restart it starts above every number the server used before.</p>
+      <ol class="klog" id="demo-log"></ol>
+    </div>
+  </details>
+</section>

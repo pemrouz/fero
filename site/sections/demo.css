@@ -1,0 +1,179 @@
+/* sections/demo.css — Try it: the live cluster (A's figure) and the seven-step story (B's player), on one picture.
+   Builds on calm.css (.node, .btn, .band, details.more, .step-no). Only the six type steps. Colour means state:
+   violet = a write and luna's owner (★), green = copies agree, amber = waiting, red = down, cut or broken. */
+
+#demo p.demo-sub { margin: 0; }
+
+/* ---------- the story: the controls on the left, the seven steps in two short chapters ---------- */
+#demo .story { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); gap: 1.4rem 2.6rem; margin-top: 2.2rem; padding: 0.5rem 0 0.6rem; scroll-margin-top: 24px; }
+#demo .story-ctl { display: flex; flex-direction: column; align-items: stretch; gap: 0.65rem; }
+#demo .story-ctl .btn { justify-content: flex-start; }
+#demo .story-ctl .btn.quiet { color: var(--dim); }
+#demo p.story-tag { margin: 0.2rem 0 0; font: 500 var(--t-label) var(--mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent); }
+#demo .story-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2.6rem; }
+#demo .chap-h { display: flex; align-items: center; gap: 0.9rem; margin: 0 0 0.35rem; max-width: none;
+  font: 500 var(--t-label) var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+#demo .chap-h::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+#demo .story-list ol { list-style: none; margin: 0; padding: 0; }
+/* the step numbers line up with the chapter label; the bar of the step that plays sits in the gutter to their left */
+#demo .story-list li { position: relative; display: grid; grid-template-columns: 1.7rem minmax(0, 1fr); align-items: baseline;
+  padding: 0.28rem 0; font: 400 var(--t-body)/1.45 var(--sans); color: var(--dim); transition: color 0.25s; }
+#demo .story-list li .no { font: 500 var(--t-small)/1 var(--mono); color: var(--faint); }
+#demo .story-list li .nm { font-family: var(--mono); font-size: 1em; }
+#demo .story.playing li { color: var(--faint); }
+#demo .story.playing li.done { color: var(--dim); }
+#demo .story.playing li.on { color: var(--ink); }
+#demo .story-list li.on .no { color: var(--accent); }
+#demo .story-list li.on::before { content: ''; position: absolute; left: -0.95rem; top: 0.3rem; bottom: 0.3rem; width: 3px; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 14px rgba(157, 123, 255, 0.6); }
+
+/* the phone's one row for the step that plays (the list above has scrolled away by then) */
+/* two lines of a step title tall, so a title that wraps never moves the narrator or the figure */
+#demo .story-now { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.6rem; min-height: calc(var(--t-body) * 1.35 * 2); }
+#demo .story-now.blank { visibility: hidden; }
+#demo .story-now .t { flex: 1; min-width: 0; font: 400 var(--t-body)/1.35 var(--sans); color: var(--ink); }
+#demo .story-now .t .nm { font-family: var(--mono); line-height: 1; }
+#demo .story-now .btn { flex: none; }
+@media (min-width: 701px) { #demo .story-now { display: none !important; } }
+
+/* ---------- the narrator: one sentence about what just happened ---------- */
+/* the box keeps three lines of the narrator (the longest story step), so the figure never jumps; the violet rule is
+   on the sentence itself, so it is as tall as what it says */
+#demo .say { margin-top: 1.9rem; min-height: calc(var(--t-lead) * 1.5 * 3); }
+#demo p.narrator { font: 400 var(--t-lead)/1.5 var(--sans); color: var(--ink); max-width: 56ch;
+  margin: 0; padding-left: 1.1rem; border-left: 2px solid var(--accent); text-wrap: pretty; }
+#demo .narrator .nm { font-family: var(--mono); font-size: 1em; }
+/* a mono name, code or the ★ never makes its line taller (each line stays one line of the narrator) */
+#demo .narrator .nm, #demo .narrator code, #demo .narrator .star { line-height: 1; }
+#demo .narrator code { font-size: var(--t-body); white-space: nowrap; }
+#demo .narrator .star { color: var(--accent); }
+#demo .narrator .mood { color: var(--ink); font-weight: 500; }
+#demo .narrator .ok { color: var(--pos); }
+
+/* ---------- the figure: four boxes in a row, the write path over the top, the copies path under ---------- */
+#demo .fig { position: relative; margin-top: 1.6rem; padding: 50px 0 50px; }
+/* the lines get their own layer: a dot moving every frame then repaints only the lines, never the boxes under them */
+#demo svg.wires { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; will-change: transform; }
+#demo .wires path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#demo .wires .guides path { stroke: rgba(157, 123, 255, 0.24); stroke-width: 1.5; }
+#demo .wires .lit path { stroke: var(--accent); stroke-width: 2; }
+#demo .wires .lit path.held { stroke: var(--wait); stroke-dasharray: 6 5; }
+#demo .wires .m-arrow path { fill: var(--accent); }
+#demo .wires .m-tail circle { fill: var(--accent); }
+#demo .wires .m-arrow-w path, #demo .wires .m-tail-w circle { fill: var(--wait); }
+/* a dot's glow is a wide, soft stroke (a blur filter per dot per frame was the story's biggest paint cost) */
+#demo .wires .dots circle { fill: #c9b6ff; stroke: rgba(157, 123, 255, 0.55); stroke-width: 7; paint-order: stroke; }
+#demo .wires .dots circle.held { fill: #fbe7a6; stroke: rgba(245, 211, 107, 0.5); }
+#demo .wires .cutmarks path { stroke: var(--neg); stroke-width: 2; stroke-dasharray: 6 6; }
+#demo .wire-label { position: absolute; z-index: 3; left: 0; top: 0; transform: translate(-50%, -50%); background: var(--bg); padding: 0 0.7rem;
+  font: 500 var(--t-label)/1 var(--mono); letter-spacing: 0.06em; color: var(--accent); white-space: nowrap; transition: color 0.2s; }
+#demo .wire-label.wait { color: var(--wait); }
+
+#demo .nodes { display: flex; column-gap: 3.5%; }
+#demo .nodes .node { flex: 1 1 0; min-width: 0; height: 214px; display: flex; flex-direction: column; padding: 1.05rem 1.1rem 1.1rem 1.25rem;
+  transition: border-color 0.25s, background-color 0.25s, box-shadow 0.25s; }
+#demo .nodes .node.client { margin-right: 4%; }
+#demo .node .name { display: flex; align-items: baseline; }
+#demo .node .row { margin-top: auto; }
+#demo .node .value { margin-top: 0.15rem; white-space: nowrap; transition: color 0.35s; }
+#demo .node .state { margin-top: 0.8rem; white-space: nowrap; }
+#demo .node .state .cutw { color: var(--neg); }
+#demo .node .state .dimw { color: var(--dim); }
+#demo .node .state.catch { color: var(--wait); }
+#demo .node .state.left { color: var(--dim); }
+#demo .node .state.send { color: var(--ink); }
+/* down (calm.css: only the value dims) or left (calm.css .gone: a dashed box, like one that is no longer there);
+   the ★ of an owner that is down or gone dims with it */
+#demo .node.down .owner-star, #demo .node.gone .owner-star { opacity: 0.6; }
+#demo .node.gone { background: transparent; box-shadow: none; border-color: var(--rule-2); }
+#demo .node.gone .value { opacity: 0.42; }
+#demo .node.gone .state { color: var(--dim); }
+#demo .node.cut .state { color: var(--dim); }
+/* narrow screens: a box glows for a moment as a write or a copy reaches it, so the route reads top to bottom */
+#demo .node.rx { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-line), 0 0 22px -6px rgba(157, 123, 255, 0.7); }
+/* a waiting client keeps its amber border (calm.css .wait-on) above the violet glow */
+#demo .node.wait-on.rx { border-color: rgba(245, 211, 107, 0.75); box-shadow: 0 0 0 1px rgba(245, 211, 107, 0.45), 0 0 22px -6px rgba(157, 123, 255, 0.7); }
+
+/* the cat: a small face per mood, decoration only (the word stays visible) */
+#demo .node .cat { position: absolute; top: 0.85rem; right: 0.9rem; width: 34px; height: 29px; color: var(--faint); }
+#demo .node .cat svg { display: block; width: 100%; height: 100%; overflow: visible; }
+#demo .node .cat path, #demo .node .cat circle, #demo .node .cat ellipse { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#demo .node .cat .fill { fill: currentColor; stroke: none; }
+#demo .node.fresh .cat { color: var(--accent); }
+#demo .node.down .cat, #demo .node.gone .cat { display: none; }
+#demo .node .cat.hop { animation: demo-hop 0.45s ease-out; }
+@keyframes demo-hop { 0% { transform: translateY(0); } 35% { transform: translateY(-5px) rotate(-4deg); } 70% { transform: translateY(0) rotate(2deg); } 100% { transform: none; } }
+
+/* the buttons sit under the boxes they act on */
+#demo .controls { display: flex; column-gap: 3.5%; margin-top: 0.85rem; }
+#demo .controls .btn { flex: 1 1 0; min-width: 0; justify-content: center; }
+#demo .controls .btn:first-child { margin-right: 4%; }
+#demo .controls .btn .nm { margin-left: 0.15em; }
+
+/* the three big numbers (calm.css's band), and a note under them when a rule breaks */
+#demo .live-stats { margin-top: 2.4rem; }
+#demo .stat .v { transition: color 0.25s; }
+#demo .stat .k2 { font: var(--t-label)/1.45 var(--mono); color: var(--faint); margin-top: 0.3rem; min-height: 1.45em; }
+/* calm: the red is the number above and the state word; the note itself is an explanation, ruled like a door's body */
+#demo .broke { grid-column: 1 / -1; border-top: 1px solid var(--rule); padding: 1.1rem 0 1.2rem 1.1rem; position: relative; }
+#demo .broke::before { content: ''; position: absolute; left: 0; top: 1.1rem; bottom: 1.2rem; width: 2px; background: var(--rule-2); }
+#demo .broke p { max-width: 70ch; margin: 0; }
+#demo .broke .broke-rule { color: var(--ink); }
+#demo .broke .tag { font: 500 var(--t-label) var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--neg); margin-right: 0.5rem; }
+#demo .broke .broke-what { margin-top: 0.35rem; color: var(--dim); }
+#demo .broke .nm { font-family: var(--mono); }
+
+/* the one door (calm.css styles it: the body after the summary gets its spacing and its left rule) */
+#demo p.door-note { margin: 0 0 0.8rem; max-width: 70ch; font-size: var(--t-small); color: var(--dim); }
+#demo p.door-note code { font-size: 1em; }
+#demo .klog { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); font: var(--t-small)/1.5 var(--mono); }
+#demo .klog li { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--rule); color: var(--dim); }
+#demo .klog .at { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+#demo .klog .tx { overflow-wrap: anywhere; }
+#demo .klog .stamp { white-space: nowrap; }   /* a commit's stamp never splits, as 01's door keeps it */
+
+/* ---------- narrower screens: the boxes stack, the write path runs down the left, the copies down the right ---------- */
+@media (max-width: 960px) {
+  #demo .story { grid-template-columns: minmax(0, 1fr); }
+  /* one row: the button and "Your turn" side by side, so neither moves the page when it appears */
+  #demo .story-ctl { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 0.9rem; }
+  #demo p.story-tag { margin: 0; }
+  #demo .fig { padding: 34px 26px 6px; }
+  #demo .nodes { flex-direction: column; row-gap: 14px; }
+  #demo .nodes .node { flex: none; height: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 1rem;
+    grid-template-areas: "role row" "name value" "state value"; padding: 0.8rem 1.05rem 0.85rem; }
+  #demo .nodes .node.client { margin: 0 0 14px; }
+  #demo .node .role { grid-area: role; }
+  #demo .node .name { grid-area: name; }
+  #demo .node .row { grid-area: row; margin: 0; text-align: right; }
+  #demo .node .value { grid-area: value; margin: 0; text-align: right; align-self: end; }
+  #demo .node .state { grid-area: state; margin-top: 0.3rem; }
+  #demo .node .cat { display: none; }
+  #demo .node .badge { position: static; grid-area: row; justify-self: end; }
+  #demo .node.down .row { display: none; }
+  #demo .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 1.2rem; }
+  #demo .controls .btn, #demo .controls .btn:first-child { margin: 0; padding-left: 0.5rem; padding-right: 0.5rem; }
+}
+@media (min-width: 641px) and (max-width: 780px) {
+  /* the narrator is narrower here than its 56ch: the longest story steps take four lines, so keep four */
+  #demo .say { min-height: calc(var(--t-lead) * 1.5 * 4); }
+}
+@media (max-width: 700px) {
+  /* the row over the narrator has its own Next */
+  #demo .story.playing .story-ctl [data-story=next] { display: none; }
+  #demo .story-now:not([hidden]) + .say { margin-top: 0.9rem; }
+}
+@media (max-width: 640px) {
+  #demo .story-list { grid-template-columns: minmax(0, 1fr); gap: 0.9rem; }
+  #demo .say { min-height: calc(var(--t-body) * 1.5 * 6); }
+  #demo p.narrator { font-size: var(--t-body); }
+  #demo .narrator code { font-size: var(--t-small); white-space: normal; }
+  #demo .live-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #demo .live-stats .stat:first-child { grid-column: 1 / -1; }
+  #demo .live-stats .stat + .stat { padding-left: 0; border-left: 0; }
+  #demo .live-stats .stat:nth-child(3) { padding-left: 1.2rem; border-left: 1px solid var(--rule); }
+  #demo .klog li { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+  #demo .klog .at { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { #demo .node .cat.hop { animation: none; } }

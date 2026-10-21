@@ -4,11 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>fero — plain assignment replicates</title>
-  <meta name="description" content="fero: distributed, replicated reactive resources for JavaScript. await fero(name) gives you a live object; read it like a plain object, change it by plain assignment, and every process that opens the same name sees the same object.">
+  <meta name="description" content="fero gives you a live object: read it like a plain object, change it by plain assignment, and every process that opens the same name sees the same object, on one box or across a cluster.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0c0d'/%3E%3Ctext x='8' y='12.5' text-anchor='middle' font-family='monospace' font-size='13' font-weight='600' fill='%239d7bff'%3E%E2%88%B4%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./v2.css">
-  <link rel="stylesheet" href="./fero.css">
-  <link rel="stylesheet" href="./variants.css">
+  <link rel="stylesheet" href="./calm.css">
 <!-- @styles -->
 </head>
 <body>
@@ -18,11 +16,11 @@
 <div class="wrap">
 
   <header class="masthead">
-    <a class="mark" href="./index.html" title="∴ — three members plus dir, the README's deployment rule"><b>∴</b> fero</a>
+    <a class="mark" href="./index.html" title="∴ — three servers, each with a disk: the deployment rule"><b>∴</b> fero</a>
     <span class="rule"></span>
-    <span class="date">distributed, replicated reactive resources for javascript</span>
-    <nav class="mast-nav">
+    <nav aria-label="Sections">
 <!-- @nav -->
+      <a class="icon-link" href="https://github.com/pemrouz/fero/tree/main" target="_blank" rel="noopener" aria-label="fero on GitHub" title="fero on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
     </nav>
   </header>
 
@@ -30,18 +28,21 @@
 <!-- @sections -->
   </main>
 
-  <footer>
-    <span class="engine-line"><span id="kernel">kernel · loading</span> · this page runs fero's kernel, simulator and debugger model, types stripped, at <b id="head" data-attested="build">—</b> (<b id="mods" data-attested="build">—</b> modules · <b id="kb" data-attested="build">—</b> KB) · not <code>fero()</code> itself</span>
-    <span class="spacer"></span>
-    <!-- the link waits for data/lede/links.json to find the data site free of CONCEPT §8's claims about fero (chrome.js) -->
-    <a class="data-site" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" title="data — the reactive engine fero's live views come from" hidden>built on data ↗</a>
-    <span class="data-site-held" title="data — the reactive engine fero's live views come from">built on data</span>
+  <footer class="foot">
+    <span><b>∴</b> fero · <span id="foot-version" data-attested="build">—</span> · MIT</span>
+    <nav aria-label="Elsewhere">
+      <a href="https://github.com/pemrouz/fero/tree/main" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/fero" target="_blank" rel="noopener">npm</a>
+      <a href="https://github.com/pemrouz/fero/tree/main/examples" target="_blank" rel="noopener">examples</a>
+      <a class="data-link" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" title="data: the engine fero's live views come from">built on the data library</a>
+    </nav>
+    <span class="engine-line" id="engine-line"><span id="kernel">kernel · loading</span> · fero's kernel runs in this tab (<span id="mods" data-attested="build">—</span> modules · <span id="kb" data-attested="build">—</span> KB)</span>
   </footer>
 
 </div>
 
-<noscript><p class="muted" style="padding:2rem 0">This page runs fero's kernel in your browser and needs JavaScript.</p></noscript>
-<script src="./variants.js"></script>
+<p class="sr-only" id="announce" aria-live="polite"></p>
+<noscript><p class="muted" style="padding:2rem 0;text-align:center">This page runs fero's kernel in your browser, so it needs JavaScript.</p></noscript>
 <script type="module" src="./chrome.js"></script>
 <!-- @scripts -->
 </body>

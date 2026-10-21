@@ -1,0 +1,51 @@
+<section class="sec" id="trust" aria-labelledby="trust-h">
+  <div class="sec-head"><span class="sec-no">04</span><h2 id="trust-h">Why trust it</h2></div>
+  <p class="point"><span data-tr="lead"><span data-tr="seeds">—</span> runs</span> on an unreliable, simulated network: <span data-tr="tail">every copy ends the same, every time.</span></p>
+  <p class="tr-sub">The simulator runs the same kernel code as the servers, on a network with uneven delays, repeated messages and, on every other run, a cut that heals. It checks <span data-tr="rules">eleven</span> rules after every event. Every random choice comes from one number, so a failing run replays exactly.</p>
+
+  <!-- one figure: three numbers counted when this page was made (data/manifest.json, BUILD), and under them the first
+       runs of the same sweep, run again in a Worker in this tab (sections/trust/sweep.worker.js over lib/, RUNTIME +
+       MEASURED) -->
+  <div class="figure tr-fig">
+    <div class="band tr-band">
+      <div class="stat">
+        <div class="v ok"><span data-tr="green">—</span> <span class="tr-of">of</span> <span data-tr="of">—</span></div>
+        <div class="k">simulated runs green, each with <span data-tr="nodes">—</span>&nbsp;servers and <span data-tr="writes">—</span>&nbsp;writes</div>
+      </div>
+      <div class="stat">
+        <div class="v" data-tr="tests">—</div>
+        <div class="k">tests pass, crashes and restarts included</div>
+      </div>
+      <div class="stat">
+        <div class="v" data-tr="pins">—</div>
+        <div class="k">speed checks every change must pass</div>
+      </div>
+    </div>
+
+    <div class="tr-run">
+      <p class="tr-what">The first <span data-literal>100</span> of those <span data-tr="seeds2">—</span> runs. Run them again here, on the kernel in your tab.</p>
+      <button class="btn primary tr-go" type="button" data-runs="100"><span class="tr-go-t"><span aria-hidden="true">▶ </span>Run <span data-literal>100</span> runs in your tab</span></button>
+      <!-- one square per run, drawn for the eye; the grid's own sentence says the same in words, and carries its source -->
+      <div class="tr-grid"><span class="sr-only tr-grid-say">One square per run.</span></div>
+      <p class="tr-key" hidden><span class="tr-key-i"><span class="tr-sq ok" aria-hidden="true"></span>green</span><span class="tr-key-i"><span class="tr-sq ok cut" aria-hidden="true"></span>green, after a cut that healed</span></p>
+      <!-- the result, three rows in every state, so the column keeps one height: at rest the runs as they ran when this
+           page was made (BUILD), after a press this tab's run (RUNTIME, MEASURED) and how it compares -->
+      <div class="tr-out" hidden>
+        <p class="tr-big"><span class="tr-n" data-tr="n">—</span> <span class="tr-of">of</span> <span class="tr-m" data-tr="m">—</span> <span class="tr-k" data-tr="k">runs green</span></p>
+        <p class="tr-line"></p>
+        <p class="tr-same"></p>
+      </div>
+      <ul class="tr-fails" hidden></ul>
+      <p class="sr-only" aria-live="polite" data-tr="said"></p>
+    </div>
+  </div>
+
+  <details class="more tr-door">
+    <summary>The <span data-tr="rules2">eleven</span> rules it checks</summary>
+    <div class="tr-door-body">
+      <p class="tr-lead">After every event, it checks that:</p>
+      <ol class="tr-rules"></ol>
+      <p class="tr-end">And when a run ends: every copy is the same, and nothing is left waiting to be sent.</p>
+    </div>
+  </details>
+</section>
