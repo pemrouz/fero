@@ -25,7 +25,7 @@ import { Caller, Host, SYSTEM, handle, reapStopped, takesKey, type Context } fro
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, commit, errText, snapshot as snapshotOf, unfoldable, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
-import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
+import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, v6Hint } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
 import type { Door } from '../kernel/door.ts'
 import type { JEvent } from '../kernel/journal.ts'
@@ -412,7 +412,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (config.server !== undefined && typeof config.server !== 'boolean')
     throw new Error(`fero('${name}'): server must be true (pin the server role) or false (pin the client role)${at('server')} — omit it and a bare fero is a client`)
   if (config.listen !== undefined && config.listen !== false && !isAddr(config.listen, true))
-    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${at('listen')}`)
+    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${v6Hint(config.listen)}${at('listen')}`)
   if (config.hosts !== undefined && !Array.isArray(config.hosts))
     throw new Error(`fero('${name}'): hosts must be an array of 'host:port' strings${at('hosts')}`)
   //! every entry is checked as an ADDRESS and the bad one is NAMED: a role file that reads its ports off
@@ -424,7 +424,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const i = (config.hosts as unknown[]).findIndex((h) => !isAddr(h) && !isBox(h))
     if (i !== -1) {
       const h = (config.hosts as unknown[])[i]
-      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address (nor a bare host, which asks that box's directory)${at('hosts')}`)
+      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address (nor a bare host, which asks that box's directory)${v6Hint(h)}${at('hosts')}`)
     }
   }
   if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
@@ -481,11 +481,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // resource meets none. A malformed env value is refused HERE, loudly, not deep in the shell.
   if (config.rendezvous !== undefined && config.rendezvous !== false && !isAddr(config.rendezvous))
     throw new Error(from('rendezvous') === 'FERO_RENDEZVOUS'
-      ? `fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')`
-      : `fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory${at('rendezvous')}`)
+      ? `fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${v6Hint(config.rendezvous)}`
+      : `fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory${v6Hint(config.rendezvous)}${at('rendezvous')}`)
   const envDefault = config.rendezvous === undefined && !isSystem ? rendezvousDefault() : false
   if (envDefault !== false && !isAddr(envDefault))
-    throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')`)
+    throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${v6Hint(envDefault)}`)
   const rendezvous: string | false = isSystem ? false : ((config.rendezvous as string | false | undefined) ?? envDefault)
   //! the effective topology: a server without an address binds a FREE loopback port (the OS picks,
   // the directory publishes it) — the demo's two terminals need zero addresses, real deployments keep

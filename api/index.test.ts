@@ -947,6 +947,22 @@ test("the client key (§15) over real TCP: two clients with the key and a member
   assert.ok(!wrong.join('\n').includes(S))
 })
 
+test('an IPv6 address goes in brackets: a server on [::1]:0 prints its listen back with them, a client dials that printed form and sees the data; an IPv6 host without brackets is refused with the bracket hint', async () => {
+  const s = await fero('r', { uuid: 'aa', listen: '[::1]:0', data: { w: 1 }, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let c: Fero | undefined
+  try {
+    const l = (snapshot(s.cluster) as { me: { listen: string } }).me.listen
+    assert.match(l, /^\[::1\]:\d+$/, `the printed listen keeps its brackets: ${l}`)
+    assert.notEqual(l, '[::1]:0', 'the real port, not 0')
+    c = await fero('r', { uuid: 'cc', hosts: [l], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => (c!.snapshot as { w?: number }).w === 1, 8000), `the client dialed ${l} and was fed`)
+  } finally { await c?.destroy(); await s.destroy() }
+  const hint = /an IPv6 address goes in brackets: '\[::1\]:4000', or '\[fdaa::3\]' for a bare host/
+  await assert.rejects(fero('r', { listen: '::1:0' }), hint, "'::1:0' could be the address ::1:0 with no port")
+  await assert.rejects(fero('r', { hosts: ['fdaa::3'] }), hint, "a bare 'fdaa::3' would read as host 'fdaa:', port 3")
+  await assert.rejects(fero('r', { listen: '[nothost]:0' }), /listen must be a 'host:port' string/, 'brackets hold an IPv6 literal only')
+})
+
 test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time', async () => {
   await assert.rejects(fero('r', { uuid: '' }), /uuid must be a non-empty string/)
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)

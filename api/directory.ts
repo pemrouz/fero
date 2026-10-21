@@ -54,7 +54,10 @@ export const rendezvousDefault = (): string | false => {
 }
 
 //! isAddr — 'host:port' with a non-empty host and an all-digit port 1–65535; `zero` admits port 0
-// (the free-port LISTEN default — never a dialable rendezvous)
+// (the free-port LISTEN default — never a dialable rendezvous). An IPv6 host goes in BRACKETS, the one
+// spelling fero reads and prints ('[::1]:4000', the URL form; the shell takes them off for `net`, and a
+// port-0 listen prints back with them). A host with a colon and no brackets is refused: '::1:4000' could
+// be the address ::1:4000 with no port, and a bare 'fdaa::3' would read as host 'fdaa:', port 3.
 export const isAddr = (a: unknown, zero = false): a is string => {
   if (typeof a !== 'string') return false
   const i = a.lastIndexOf(':')
@@ -62,9 +65,18 @@ export const isAddr = (a: unknown, zero = false): a is string => {
   const port = a.slice(i + 1)
   if (!/^\d{1,5}$/.test(port)) return false
   const p = Number(port)
-  return (p >= 1 || (zero && p === 0)) && p <= 65535
+  if (!((p >= 1 || (zero && p === 0)) && p <= 65535)) return false
+  const host = a.slice(0, i)
+  return !(host.includes(':') || host.startsWith('[')) || (host.length > 2 && host.endsWith(']') && net.isIP(host.slice(1, -1)) === 6)
+}
+//! v6Hint — the words a refusal adds when the bad address looks like an IPv6 literal without its brackets
+export const v6Hint = (a: unknown): string => {
+  if (typeof a !== 'string' || a.startsWith('[') || a.split(':').length < 3) return ''
+  return ` (an IPv6 address goes in brackets: '[::1]:4000', or '[fdaa::3]' for a bare host)`
 }
 export const hostOf = (a: string): string => a.slice(0, a.lastIndexOf(':'))
+//! netHost — a host as the net module takes it: a bracketed IPv6 literal without its brackets
+export const netHost = (h: string): string => (h.length > 2 && h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h)
 export const portOf = (a: string): string => a.slice(a.lastIndexOf(':') + 1)
 //! unmap — an IPv4-mapped IPv6 spelling as the IPv4 address it stands for: `[::ffff:127.0.0.1]`,
 // `::FFFF:127.0.0.1`, `0:0:0:0:0:ffff:127.0.0.1` and the hex form `::ffff:7f00:1` all dial (and bind)
@@ -561,7 +573,7 @@ export class Directory {
   // errno on failure: EADDRINUSE is the ordinary outcome (someone hosts, or a squatter); anything
   // else (EACCES — a reserved band; EADDRNOTAVAIL — an interface that is not here …) is recorded.
   #probe(): Promise<string | null> {
-    const host = hostOf(this.#o.addr), port = Number(portOf(this.#o.addr))
+    const host = netHost(hostOf(this.#o.addr)), port = Number(portOf(this.#o.addr))
     return new Promise((res) => {
       const s = net.createServer()
       s.once('error', (err: NodeJS.ErrnoException) => res(err.code ?? 'EUNKNOWN'))
