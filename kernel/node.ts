@@ -575,7 +575,10 @@ export class Node {
   // owes each client link. A word is one frame on a client link, and a clear takes the whole queue — so a FEED {e} or
   // {x} a clear took (#clearCover reads every dropped frame's verb) is remembered here, and so is the end of a fold that
   // ran while the link was NOT synced (no {b}, no forward and no {e} go out on an unsynced link; the answer that syncs it
-  // ships the fold, scope.ts onAcqDone → owe). The words are said again right after the next answer that syncs the link,
+  // ships the fold, scope.ts onAcqDone → owe). Only a link the spoke has been ANSWERED on owes (a cover or a torn
+  // answer, Link.torn): a link never answered since admit carries nothing of this feeder, so there is nothing at the
+  // spoke to drop or judge, and its first answer is a resync's, whose end judges by the reply (the second review's SK9:
+  // a spare link owed one end per fold, said as a burst after a later failover). The words are said again right after the next answer that syncs the link,
   // after its whole ship and its reply (#answer → #payOwed): the first moment the spoke holds this feeder's fed subset
   // above the cover again, so an {e} said there judges against a complete kernel. An owed {e} is said while p is HELD
   // (a latch open for p again says its own end; an orphan's or a gone partition's exit is a shed's or an abort's {x});
@@ -2614,11 +2617,16 @@ export class Node {
   // meanwhile is lowered into the ceiling by indexInsert (the link joins #covered here); a second clear lowers the same
   // ceiling again, never raises it. The cost: one header read per frame the clear took (the clear is cold), and the
   // answer re-sends a lowered lane's suffix above the lowest lost record.
-  //! THE OWED WORDS (wave 6c, clause 3; see #owed): a FEED frame the clear took is owed — read before the cover's early
-  // return below, since a word on an unsynced link with no cover is lost all the same. {b} owes nothing: its end does.
+  //! THE OWED WORDS (wave 6c, clause 3; see #owed): a FEED frame the clear took is owed — on a link that leaves here
+  // with a cover, which is every link the spoke has been answered on. A link never answered since admit (not synced, no
+  // torn answer) leaves without one and owes nothing: the spoke holds nothing of this feeder on it, a spare's word is
+  // dropped there, and its first answer is a resync's or a fresh spoke's. {b} owes nothing: its end does.
   #clearCover = (link: Link, dropped: Uint8Array[], wasSynced: boolean): void => {
     let t = link.torn
-    if (t === null && wasSynced) t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined, c: true }
+    if (t === null) {
+      if (!wasSynced) return
+      t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined, c: true }
+    }
     for (const b of dropped) {
       const f = new Frame(b)
       if (f.verb === VERB.FEED) {
@@ -2627,12 +2635,12 @@ export class Node {
         if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.owe(link, 'x', p)
         continue
       }
-      if (t === null || f.verb !== VERB.RECORDS) continue
+      if (f.verb !== VERB.RECORDS) continue
       const p = f.prov()
       if (p === null) continue
       if ((t.d[p.origin] ?? 0) >= p.baseSeq) t.d[p.origin] = p.baseSeq - 1
     }
-    if (t !== null) this.#covered.add(link)
+    this.#covered.add(link)
   }
 
   //! owe — remember a FEED word for a client link (#owed): `e` the end of a fold for p, `x` p left this feeder.

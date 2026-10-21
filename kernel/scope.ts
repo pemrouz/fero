@@ -901,13 +901,17 @@ export class Scope {
     // clear, a torn answer), or unsynced by a clear inside the flush above — got no {b}, no forward and gets no end: the
     // answer that syncs it ships p (the cover sits under p's rows: indexInsert, #forwardWhole), and the feeder OWES the
     // end, said after that answer's whole ship and reply (node.ts owe / #payOwed; the rule's clause 3). A spoke whose
-    // group lost its end lands it on the next later-step frame and judges nothing until this word comes.
+    // group lost its end lands it on the next later-step frame and judges nothing until this word comes. Owed only on
+    // a link the spoke has been ANSWERED on (a cover or a torn answer, `torn`): a link never answered since admit — a
+    // spare's, or a spoke's before its first digest — carries nothing of this node, so the spoke has nothing to judge,
+    // and its first answer is a fresh spoke's or a failover's resync, whose end judges by the reply. Owing there was
+    // one end per fold per spare link, said as a burst of stray ends after a later failover (the second review's SK9).
     if (taps)
       for (const cl of node.clientLinks) {
         cl.flush(node.env.sink, j)
         if (cl.state !== LS.admitted || cl.dead) continue
         if (cl.synced) cl.ship(encodeControl(VERB.FEED, { e: p }), node.env.sink, j)
-        else node.owe(cl, 'e', p)
+        else if (cl.torn !== null) node.owe(cl, 'e', p)
       }
     //! durable: the base entered memory only — arm the snapshot swap so it reaches disk atomically
     // (never persistRun: interior rows condemn the chain), and dirty until the echo

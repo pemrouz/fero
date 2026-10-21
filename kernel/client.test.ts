@@ -2868,6 +2868,73 @@ test('wave 6c — clause 2\'s failover exit: kept cells, then the feeder dies wi
   assert.deepEqual(kernelCells(S), screenCells(S))
 })
 
+//! the second review's SK9: a word is owed only to a link the spoke has been ANSWERED on (a cover or a torn answer).
+// aa is a spare of the spoke (link 7 admitted, never synced) and folds px while the spoke is fed by qq: the rework owed
+// that link the end, one per fold, never paid while it stayed a spare, and said them as a burst of stray ends after the
+// failover's answer. Red on the rework at "no end is owed": FEED [{e: px}], JK.fed [[px, 0, 0]].
+test('wave 6c — no end is owed to a link the spoke was never answered on: a spare link gets nothing for a fold at that server, and the failover\'s resync onto it says no stray end', () => {
+  const L = latching()
+  const { F, S, p, link, teach } = L
+  onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3], ['c', 3, 7, 5], ['d', 4, 9, 7]])
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  teach(2, [{ seq: 7, rec: PX('c', 3), pp: 5 }, { seq: 9, rec: PX('d', 4), pp: 7 }], 9)
+  assert.equal(F.node.scope!.held('px'), true, 'the fold')
+  assert.equal(link.synced, false, 'the spare link was never answered')
+  assert.equal(link.torn, null)
+  p.settle()
+  assert.deepEqual(F.sentOn(7, VERB.FEED), [], 'nothing on the spare')
+  //! later qq dies: the spoke resyncs onto aa, whose answer carries px whole
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  p.settle()
+  L.beat(5)
+  assert.deepEqual(F.sentOn(7, VERB.FEED), [], 'no end is owed to a spoke that was never answered on this link')
+  assert.deepEqual(S.jk(JK.fed), [])
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, undefined]], 'the end swept nothing: aa holds every cell')
+  assert.deepEqual(kernelCells(S), kernelCells(F))
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
+
+//! the same for a shed's word (the branch the rework had: #clearCover read the dropped FEED frames even where it left no
+// cover). aa, a spare of the spoke, sheds px and then qx while link 7 is paused with a queue of one: the second word
+// clears the first, and #clearCover leaves no cover on a link never synced and owes nothing. When qq dies, the resync
+// onto aa sweeps both partitions by its own end. Red on the rework at "no stray word": FEED [{x: [px, qx]}] after the
+// answer, JK.unfed [[px, 0], [qx, 0]].
+test('wave 6c — a shed\'s word cleared from a never-answered client link is not owed: the spoke holds nothing of this feeder, and its first answer is a resync whose end sweeps', () => {
+  const L = latching({ tune: { queued: 1 } })
+  const { F, S, p, link } = L
+  onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3]], 6)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+  assert.equal(link.synced, false, 'the spare link was never answered')
+  F.node.step({ kind: 'pause', link: 7 })
+  for (const [q, tail] of [['px', 5], ['qx', 6]] as const) {
+    F.node.writes.ring.place(q, 'bb', 'cc')
+    F.node.scope!.rescope(F.node)
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [q]: { bb: tail } } }) })
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [q]: { bb: tail } } }) })
+  }
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px', 'qx'])
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'the second word cleared the queue of one: both words went')
+  assert.equal(link.torn, null, 'no cover on a link never synced')
+  assert.deepEqual(link.queued, [])
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  //! qq dies: the spoke resyncs onto aa, which holds nothing now; the end sweeps every cell
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  p.settle()
+  L.beat(5)
+  assert.deepEqual(F.sentOn(7, VERB.FEED), [], 'no stray word after the answer: nothing was owed to the never-answered link')
+  assert.deepEqual(S.jk(JK.unfed), [])
+  assert.deepEqual(kernelCells(F), [])
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[3, undefined]], 'the end swept px.a, px.b and qx.z')
+  assert.deepEqual(screenCells(S), [])
+  assert.deepEqual(kernelCells(S), [])
+})
+
 //! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
 // flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
 // paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
