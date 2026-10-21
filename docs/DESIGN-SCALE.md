@@ -1708,6 +1708,197 @@ window test is the R2 check stage 4 is handed above. The nit: I11 below
 still said the seed is rewritten at the echo; it now says it is written
 when the compaction-armed swap is issued.
 
+**Note, 2026-10-21 (wave 6c: the spoke edges the M12 oracle found).**
+Four STATUS lines close, all on the spoke side of a scoped cluster (a
+spoke is a client fed by one scoped server, its feeder). They share one
+new verb, FEED (28): a feeder's word to its spokes, read from the
+PRIMARY link only (a spare's word says nothing about what the feeder
+holds; a server drops it). One verb, the op inside the value, as DIGEST
+carries `r`. Unscoped nodes never send it.
+
+*The shed tells its spokes (STATUS "a spoke keeps showing the rows of a
+partition that moved off its feeder").* A join moved a partition off the
+feeder; the feeder's copy froze into an orphan and was shed once every
+current holder attested its tails; nothing told the spoke, so its rows
+stayed on the screen, frozen (the orphan gate-dropped every new record),
+until a failover's resync wiped them. `spokeStale` counted 6, 5, 1, 2
+and 1 such rows on A12 seeds 3, 5, 6, 8 and 11. Now `evaluateSheds`
+ships one FEED {x: [p…]} per admitted client link naming what it shed,
+synced or not (a spoke whose answer is still torn held the rows too),
+and the spoke drops each partition with its feeder (node.ts `#unfeed`):
+its cells, versions and deep-index entries, its lane entries (a kept
+entry would make the dual fence drop a later re-feed of the same record
+as present, so the rows would never come back when the feeder
+re-acquires the partition), its place in an open resync's sweep set and
+in the kept cells below, and its screen rows through the ghost sweep's
+own removal (`#ghost`, now shared). The versions of the partition's
+unindexed tombstones stay: a tombstone is sound LWW memory, and finding
+them would cost a walk of every version. Every seed of A12 1-12 reads 0;
+the pin flips to 0 on the five ALWAYS seeds; with the spoke's handler
+off, seed 3 reads 6 again. Journal `unfed` (82). Not taken: the spoke's
+digest answer carrying the feeder's held set (a walk of every held
+partition per heartbeat per client; the shed is one frame, cold); the
+word at the freeze (the feeder's own screen keeps the frozen rows until
+the shed, and the spoke should mirror it).
+
+*The ceiling crosses a failover (STATUS "on an unscoped feeder, a row
+can still be lost when a spoke fails over between the drain and the
+capped answer").* V4-49 left a clear's ceiling on the feeder's link and
+used it up at the spoke's reply to the drain digest. A spoke that failed
+over after that digest and before the capped answer asked its next
+feeder with its own tails, which sit above the hole; on an unscoped
+feeder (a scoped failover resyncs: d = {}) the records the clear took
+were lost for good. Now a drain digest after a clear carries the ceiling
+(`c`); the spoke keeps it (`#ceiling`) and every digest it sends while
+it holds one — the drain exchange's answer, a heartbeat's answer, the
+failover's ask — carries the lower of its tails and the ceiling, lane by
+lane. It answers the carrying drain digest with an r=1 of its own so a
+reply comes, and the first reply at or above the first capped ask's q
+drops the ceiling: any later ask to any feeder carried the cap, so that
+answer fills the hole wherever it comes from. A resync drops it. The
+feeder's own cap stays for older spokes. The test is the review's shape:
+V4-51's cuts of one run in one flush, a queue of one, the clear taking
+the first two cuts and the third surviving, the failover between the
+drain digest and the answer; red before at "the hole is filled by the
+next feeder" (the spoke held w5, w6). Cost: one optional key on a drain
+digest after a clear and one extra r=1/r=0 exchange there; every other
+digest is the frame it was; with no ceiling the spoke's digests are
+byte-identical.
+
+*The fold group (STATUS "a spoke can show a removed row for a few events
+when its feeder acquires that partition").* The forward of a latch fold
+(V4-53) left in lane order, one frame per contiguous run, so an older
+value of a row and its later remove on one lane arrived in separate
+events: the spoke showed the row between them (A12 seed 4, p27 at two
+older stamps in two events). Now `onAcqDone` ships FEED {b: p} on every
+synced client link before the forward (after a flush, so the group holds
+the fold's frames alone) and FEED {e: p} after it; the spoke (node.ts
+`group`) keeps the RECORDS frames between them, each its own copy of the
+bytes, and lands them as ONE apply at the end (`#groupLand`, through the
+RECORDS handler's body, now `#ingest`). A lost end is closed by the next
+frame that proves the feeder's step ended (its digest, a PING or PONG);
+a {b} while a group is open lands the open one first; a failover drops
+an open group (the resync onto the next feeder brings the partition
+whole). Bounded by the fold's size, which the spoke is about to hold in
+its lanes anyway. Not taken: one frame per fold (a RECORDS frame is one
+run; a multi-run frame is a new encoding) and a continuation mark on
+RECORDS (a codec change that touches unscoped bytes). What it costs: two
+control frames per fold per synced spoke; on a paused link with a nearly
+full queue the group's three frames can force a clear one frame earlier
+than before (the clear's cover heals it as ever; one client test runs
+with a queue of four where it ran with two, pinning the same clear). The
+scoped sweep, the spoked families on seeds 1-12 and sim/scale-probes did
+not move: the markers ride behind the fold's forward.
+
+*What M1 reads for a spoke of a scoped feeder.* From wave 6a to now it
+read nothing per event: the forward's flicker made the spoke's applied
+watermark a false claim. The watermark is no claim even with the flicker
+gone — a spoke's copy of each lane is the feeder's held subset, sparse by
+design, and a lost owner-to-holder frame leaves the FEEDER lawfully
+showing a row whose remove the spoke's fence already sits above (A13's
+repair shape: an applied reading fires at the spoke while the feeder,
+judged by its floor, is green). What is a claim is V4-53's rule: a
+synced spoke holds the whole of every partition its feeder feeds it. So
+M1 now reads a scoped spoke's coverage of (lane, partition) as its
+FEEDER's possession floor, once everything the feeder sent has landed:
+the spoke not in resync, the feeder's link to it synced and flowing with
+an empty queue, nothing from the feeder on the wire (sim.inflight), no
+fold group open at the spoke. The ledger's walk sees a cell once, at the
+pass where it changed, and at that pass a frame is often in flight, so a
+scoped spoke's changed cell waits in a small map and is judged at the
+first quiet pass after the change, or dropped when it changed again, the
+spoke resynced, or it is gone. The plant (sim/scale-probes.test.ts): a
+removed cell put back at the spoke at its older stamp is silent while
+the feeder's link to it is paused and named at the first quiet pass
+after the drain, against the feeder's floor; with the old reading
+restored, red. The spoked families 1-12, monitor-walk (the scoped and
+full walks agree) and the probes are green under it.
+
+*The vanish-and-return (STATUS "a spoke that fails over onto a feeder
+that is repairing a partition, or holding it as an orphan, loses that
+partition's rows from its screen at the resync's end, until the fold
+forwards them back"), the rule argued.* The failover's resync answer
+carries what the new feeder holds of each FED partition when it builds
+it; the rows it is about to fold — a latch's staged delta, a re-entry's
+whole partition, a from-zero acquire — are not in it, and the spoke had
+them from its first feeder, so the ghost sweep at the end took them from
+the screen and the fold's forward brought them back. Today's base, on
+sighting 3's schedule over seeds 2, 4, 5, 6 × fourteen offsets (56
+runs): the end swept 7 to 20 of forty cells on 12 runs, M11 on the two
+pinned offsets. The two shapes the plan named: (a) the answer carries an
+open latch's staged records as a provisional tail the fold confirms or
+withdraws; (b) the spoke keeps its rows across the end until the fold
+lands, under a mark the end sweep respects. (a) was not taken: it cannot
+carry what the feeder does not have yet — the teacher's delta lands over
+one or more steps after the latch opens, and a from-zero or re-entry
+latch has nothing staged until its ACQ frames arrive — so in that window
+the rows still vanish and return; it also ships records the feeder may
+never fold (a latch that aborts), which the spoke would then hold under a
+partition its feeder does not. (b) is the rule: the resync's ask says
+`f: 1` (scoped spokes only; the unscoped ask is the frame it was), the
+feeder's reply names the partitions IN FLIGHT at that moment
+(`Scope.inFlight`: every open latch, whatever its base, and every orphan
+the ring still assigns it — a re-entry in waiting, which the next round
+latches; an orphan the ring does not assign is on its way to a shed and
+not in flight), and the end KEEPS a ghost cell of a named partition on
+the screen (`#deferred`, under the stamp it held at the reset) instead
+of removing it. The fold's end for that partition (FEED {e}) judges
+them: a kept cell the group brought is back in the kernel and done; one
+the group did not bring is a ghost once the feeder has shown the spoke
+its lane past the cell's stamp (the spoke's applied for that lane: the
+fold that just landed is the feeder's whole partition and did not carry
+it), else it waits — a record in flight to the feeder at the fold is
+tapped right behind the group — and is judged again after each frame
+while kept cells remain. A shed drops a partition's kept cells with the
+rest; a failover folds them into the next resync's sweep set with their
+stamps. A kept cell is screen-only (the kernel lacks it), so the sweep's
+screen check names one that never gets judged — a liveness finding, not
+a silent gap. The in-flight walk runs once per resync (only for a reply
+to an ask that said `f: 1`), never per heartbeat. M11 skips the rows of
+the named partitions (the spoke keeps them by design; the rows M11 is
+for, swept while the feeder holds them, are not swept) and counts them
+(`resyncKept`). What stays open in the rule: a record lost TWICE (its
+frame to the feeder lost, the spoke's first feeder had it, the repair of
+that loss not yet folded when the feeder's lane moves past it) is judged
+a ghost and comes back at the repair's fold — a double fault, named
+here, not pinned.
+
+*Measured.* The 56-run probe on this tree: swept 0 on 56, kept on the
+same 12 runs the base sweeps on (7 to 20 of forty; 9, 10, 7, 8 at the
+cut 0 on the four pinned seeds, where the base swept 9, 10, 7, 8), ghosts
+judged 0, M11 0, M12 green and screen = kernel on all 56. The two KNOWN
+offsets (seed 2 at 1 ms: kept 7; seed 6 at 10 ms: kept 20) are CLOSED
+pins now: swept 0, judged 0, no monitor, M11 counting 7 and 10 of the
+kept rows (the other ten on seed 6 are re-entries from orphans, which
+M11 never judges). The kernel test (kernel/client.test.ts): a spoke
+first fed by qq fails over onto aa mid-repair; the end keeps three cells
+(JK.resynced c=3), the fold's end confirms two, and the third — a record
+aa never gets — leaves once the lane moves past it (JK.fed, b=0 c=1).
+Red on the tree before at "no cell left the screen at the resync's end"
+(three removes). Seven pinned scoped resync asks re-recorded with
+`f: 1`; the unscoped pins did not move.
+
+*What moves.* Scoped trajectories with a spoke: a FEED {x} per shed, two
+FEED frames per fold forwarded, `f: 1` on a scoped spoke's resync ask
+and the list on its reply, `c` on a drain digest after a clear and the
+r=1 it buys. The scoped sweep's counts stand (16/16 green: spokeStale
+reads 0 where it read 6; sighting 3's swept counts are kept counts now;
+the mutation pins did not move). Unscoped: byte-identical where no clear
+ever happened on a client link (FEED and `f` are armed-only; `c` rides
+only a drain digest after a clear, which the golden, the 300-seed sweep,
+59,500 and 104,050 never see).
+
+*Left for its own change.* The api line (a spoke's write can settle
+before its value shows when its feeder dies between the WACK and the tap
+and the next feeder lags the record): the pieces are here now — the
+reply's `f` says which partitions the new feeder is folding, and the
+spoke's lanes after the re-download say which it feeds — so the end
+could wait for the tap instead of settling through `acked` when the
+write's partition is named or fed; the attempt's partition is not kept
+on a client's awaiting entry yet (write.ts `#awaiting`, `p` is '' there)
+and the known-cost pin in sim/feeder-death.test.ts would flip. Not built
+in this wave.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
