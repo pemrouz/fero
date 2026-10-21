@@ -623,7 +623,10 @@ test('clients and members that left are judged right: a client against its feede
   assert.ok(w0, 'the client applied a write of that row — the fixture is what it claims')
   zm.state = zm.state.filter(([k]) => k !== k0)
   zm.logs[w0.origin] = (zm.logs[w0.origin] ?? []).filter((x) => x.seq !== w0.seq)
-  zm.journal = zm.journal.filter((e) => !(e.kind === cap.vocab.applyInbound && e.a === w0.origin && e.b === w0.seq))
+  //! every trace of the record's arrival goes: its apply row and any dup row (a heartbeat digest answer crossing the live
+  // tap re-ships a record the spoke just got, and its lane drops the copy — wave 6c moved this run's trajectory onto that
+  // crossing for this row; a record that never arrived left no dup row either)
+  zm.journal = zm.journal.filter((e) => !((e.kind === cap.vocab.applyInbound || e.kind === cap.vocab.dupDrop) && e.a === w0.origin && e.b === w0.seq))
   const ma = agreement(missing) as Agreement
   assert.deepEqual(ma.off, ['zc1'], 'the client alone is off')
   assert.deepEqual(ma.groups[0].bad, [p0], 'on exactly the row it lacks')
