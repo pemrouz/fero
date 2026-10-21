@@ -1846,8 +1846,8 @@ feeder's reply names the partitions IN FLIGHT at that moment
 the ring still assigns it — a re-entry in waiting, which the next round
 latches; an orphan the ring does not assign is on its way to a shed and
 not in flight), and the end KEEPS a ghost cell of a named partition on
-the screen (`#deferred`, under the stamp it held at the reset) instead
-of removing it. A kept cell is screen-only (the kernel lacks it), so the
+the screen (`#deferred`) instead of removing it. A kept cell is
+screen-only (the kernel lacks it), so the
 rule must give it a BOUNDED life, and the first build did not: the
 skeptic's review of 2026-10-21 showed three ways a kept cell stayed for
 good, each a deterministic probe green on the base and red on the build
@@ -1896,9 +1896,22 @@ the fold's end judges); not assigned, it is on its way to a shed, and
 the shed's FEED {x} is the word. An ASSIGNED ORPHAN loses its assignment
 at an install: the shed's word (an orphan the ring assigns is never
 shed, "never shed our own duty"). The FEEDER DIES, or the spoke moves:
-the failover's resync folds the kept cells into its sweep set with their
-stamps, and the next reply says which to keep again. Nothing else leaves
-the in-flight set.
+the failover's resync folds the kept cells into its sweep set, and the
+next reply says which to keep again. THE LINK IS LOST AND THE FEEDER
+LIVES ON (a blip; the spoke re-dials the same feeder): the word for p
+went to the dead link, or to no admitted link at all, so the re-admit's
+first ask is a resync whenever the spoke holds anything a reply must
+judge: a non-empty kernel, stranded writes, or kept cells (node.ts, the
+admit arm; `#deferred` joins the sweep set there as at a failover), and
+the reply says which to keep again. The first build resynced on a
+non-empty kernel alone, and a spoke whose only fed rows were in flight
+has an EMPTY kernel: it asked plainly, and its kept cells stayed for
+good (the second review's SK2, a fold during the blip; SK3, a clean
+abort during it). Nothing else leaves the in-flight set: an entry is in
+flight while it is acquiring or an orphan the ring assigns; it leaves
+those states only through a fold, an abort or a shed, each with its
+word above; and a word reaches the spoke unless the link is lost (this
+exit) or a clear takes it (clause 3).
 
 (3) NOTHING A CLEAR CAN TAKE IS THE ONLY THING THAT ENDS A KEPT CELL. A
 FEED word is one frame on a client link, and a clear takes the whole
@@ -1908,16 +1921,45 @@ the feeder REMEMBERS the words it owes each client link (node.ts
 `#owed`: the partitions whose {e} or {x} a clear took, read in
 `#clearCover`'s walk of the dropped frames, which reads every frame's
 verb already; and the partitions whose fold ended while the link was not
-synced, where no {b}, no forward and no {e} go out at all) and says them
+synced but answered, where no {b}, no forward and no {e} go out at all)
+and says them
 again right after the next answer that syncs the link: after its whole
 ship and its reply (`#answer`, the untorn path). That is the first
 moment the spoke holds the feeder's fed subset above the cover again:
 the clear's cover was lowered under every record the clear took (V4-49),
 and a fold on an unsynced link lowers it under the fold's rows (V4-53),
-so an {e} said there judges against a complete kernel. An owed {e} is
-said only while p is still held (a new latch for p says its own end; a
-shed says {x}); an owed {x} always; a word a clear takes again is owed
-again; the link's death drops the debt. A group whose end was lost is
+so an {e} said there judges against a complete kernel. An owed word
+leaves AFTER the answer, out of the order it was queued in, so it is
+said only while it is still TRUE at that moment. An owed {e} while p is
+held (a latch open for p again says its own end; an orphan's or a gone
+partition's exit is an {x}). An owed {x} while p has NO ENTRY at the
+feeder: it left and has not come back. Once p is back in any state the
+word is stale. Held, or acquiring on a held base: the answer that healed
+the link shipped p's rows (the fold lowered the cover under them), and a
+drop after it takes a partition the feeder holds and never brings it
+back (the second review's SK1, a regression of the rework: the shed's
+{x} cleared, p placed back and folded on the unsynced link, the heal
+re-sent p's rows, then said {e: p} and {x: [p]}; the spoke's lane
+entries for p were gone and its tails equalled the feeder's, so no
+exchange ever re-sent them). Acquiring from zero: the fold about to land
+brings p whole and its end judges. An orphan: its own exit says its own
+word (the shed's {x}, or a re-entry's whole forward), and an assigned
+one is in flight, whose kept cells wait for that fold's end (clause 2).
+The debt is consumed word by word as each one ships: a word the clear
+takes is owed again by `#clearCover`'s read of the dropped frames, and
+the words behind it were never taken out of the debt; a word is never
+pushed into a full paused queue (the next answer pays: a word there
+would force a clear of the reply it follows); the link's death drops the
+debt. And a word is owed only to a link the spoke has been ANSWERED on
+(a cover or a torn answer: `Link.torn`). A link never answered since
+admit carries nothing of this feeder: the spoke holds nothing of it to
+drop or judge, a spare's word is dropped at the spoke, and the link's
+first answer is a fresh spoke's or a failover's resync, whose end sweeps
+or keeps by the reply. Owing there was one end per fold per spare link,
+never paid while the link stayed a spare and said as a burst of stray
+ends after a later failover (SK9); and `#clearCover` reads the dropped
+frames only where it leaves a cover, as before the rework. A group
+whose end was lost is
 closed at the spoke by the feeder's next frame of a later step (a
 digest, a PING, a PONG, a FEED {x}): its frames land and it judges
 NOTHING, the end is owed and comes after the heal. Weighed and not
@@ -1982,7 +2024,17 @@ never judging; the abort's word off; the owe at the fold off; the owe in
 #clearCover off; #payOwed off; the ask flag used up; the {x} landing
 off; the held filter off; a lost end judging) each turn their test red.
 Seven pinned scoped resync asks carry `f: 1`; the unscoped pins did not
-move.
+move. The second review (2026-10-21, SK1-SK9) added the shapes above:
+the stale {x} (SK1, red on the rework at "the spoke holds what its
+feeder holds"), the blip onto the same feeder with an empty kernel (SK2
+and SK3, red at "the screen mirrors the feeder"), the failover exit
+pinned (SK8; the mutant that leaves the kept cells out of the sweep set
+was green on every test before it), the never-answered link (SK9, red
+at "no word is owed"; and a never-answered link whose clear took two
+shed words), and the debt paid into a paused queue (a queue of two: the
+reply fills it and no word forces a clear; a queue of three: the second
+word overflows, the clear takes it and the reply, the third stays owed
+and the drain exchange pays all three).
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
