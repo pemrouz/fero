@@ -1341,6 +1341,44 @@ test('the drain digest never fills a full queue (the third re-check\'s B): a res
   assert.equal(F.jk(JK.dropOldest).length, 0)
 })
 
+//! the same at the BYTE bound: the resume ends with its reply alone in a queue whose queuedBytes is 1, and the drain
+// digest is owed. Read with the drain digest's guard counting frames only, the digest went into the byte-full queue
+// and its ship cleared the reply.
+test('the drain digest never fills a byte-full queue: a resume ends with its reply alone holding queuedBytes and a digest owed — the digest waits for the next drain, nothing is cleared', () => {
+  const F = feeder('ff', 7, { tune: { queuedBytes: 1 } })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:ff'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:ff' })
+  const p = pump(F, 7, S, 2)
+  F.arm(2)
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'ff', i: 1, l: 'sim:ff', c: SCOPED }) })
+  p.toA()
+  const link = F.node.links.get(7)!
+  assert.deepEqual(link.torn && link.torn.d.bb, 6, 'seqs 1 and 3 sent, 5 queued: stopped before 7')
+  p.toB()
+  //! the spoke's heartbeat floor reaches the paused feeder: swallowed, and the drain digest is owed
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: { bb: 3 }, r: 0 }) })
+  assert.equal(link.droppedWhilePaused, true)
+  F.arm(8) // the drain sends 5, then the resume 7..19: the socket fills on 19, and the reply alone is queued
+  const m1 = p.mark()
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(p.wire(m1), Array(8).fill('RECORDS'), 'the queue and the rest of the lane reached the socket')
+  assert.equal(link.queued.length, 1, 'the reply alone, which holds queuedBytes')
+  assert.equal(link.torn, null)
+  assert.equal(F.jk(JK.dropOldest).length, 0, 'the drain digest did not overflow the queue')
+  assert.equal(link.droppedWhilePaused, true, 'it is still owed')
+  const m2 = p.mark()
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(p.wire(m2), ['DIGEST{"d":{"bb":19},"r":0,"w":0,"q":1}', 'DIGEST{"d":{"bb":19},"r":1,"w":0,"h":1}'], 'the reply, THEN the drain digest')
+  p.settle()
+  assert.deepEqual(cells(S), ROWS)
+  assert.deepEqual(screenOf(S), ROWS)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [3, 7], 'ten records shipped once')
+  assert.equal(F.jk(JK.dropOldest).length, 0)
+})
+
 //! the reply is one more frame: when the ship's last frame fills the queue, the answer stops before its reply rather
 // than overflow the queue with it (which would clear the four frames it just queued and re-send them)
 test('the reply never overflows the queue: a ship whose last frame fills the paused queue stops before its reply — the drain sends the queue, then the reply alone', () => {
@@ -1358,6 +1396,27 @@ test('the reply never overflows the queue: a ship whose last frame fills the pau
   p.settle()
   whole(S, s0, ROWS)
   assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [10], 'one ship; the resume had nothing left to ship')
+})
+
+//! the same at the BYTE bound: the last frame of the ship alone fills a queue whose queuedBytes is 1, so the reply waits
+// for the drain. Read with the reply's stop counting frames only, the reply went into the byte-full queue: its ship
+// cleared the queue, the last frame and the reply with it.
+test('the reply never overflows the queue at the BYTE bound: a ship whose last frame alone holds queuedBytes stops before its reply — nothing is cleared, the drain sends the frame, then the reply', () => {
+  const F = feeder('ff', 7, { tune: { queuedBytes: 1 } })
+  const { S, p, s0, link } = failover(F)
+  F.arm(9) // pause inside the 9th of 10 frames: 19 alone fills the queue — no room for the reply
+  p.toA()
+  assert.equal(link.queued.length, 1)
+  assert.equal(F.jk(JK.dropOldest).length, 0, 'no overflow')
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.r, link.torn.q], [19, 1, 2], 'every lane shipped: only the reply waits')
+  assert.equal(link.synced, false, 'unsynced until the reply goes')
+  const m1 = p.mark()
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(p.wire(m1), ['RECORDS', 'DIGEST{"d":{"bb":19},"r":0,"w":0,"q":2}'])
+  p.settle()
+  whole(S, s0, ROWS)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [10], 'one ship')
+  assert.equal(F.jk(JK.dropOldest).length, 0)
 })
 
 //! E: two lanes; the ship stops in the SECOND, and between the stop and the drain the FIRST (already walked) gains a
@@ -1840,6 +1899,28 @@ test('a torn answer between two cuts of one run: the cover names the first recor
   assert.deepEqual(wireOf(F, 7, m).filter((x) => x !== 'DIGEST').flatMap((x) => x.split('+').map(Number)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'every row once')
   assert.equal(link.synced, true)
   assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [8, 2], 'the records each round handed over')
+})
+
+//! the same stop at the BYTE bound (Link.full, tune row queuedBytes): with queuedBytes 1 one queued cut fills the queue,
+// whatever the count bound says, so the ship stops between two cuts of the run instead of queuing the rest. Read with
+// the stop between cuts counting frames only, the run went on into the queue and stopped only before the reply.
+test('a torn answer between two cuts of one run at the BYTE bound: one queued cut fills the queue, the ship stops inside the run, the drain resumes there, every row once, the reply last', () => {
+  let armed = false, count = 0
+  const F: H = bigFeeder({ frame: 4096, queuedBytes: 1 }, (link) => { if (link === 7 && armed && ++count === 2) { armed = false; F.node.step({ kind: 'pause', link: 7 }) } })
+  const link = F.node.links.get(7)!
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  armed = true
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  assert.deepEqual(wireOf(F, 7, m), ['1+2', '3+4'], 'the socket took two cuts, then said it was full')
+  assert.deepEqual(link.queued.map((b) => new Framer().push(b.slice())[0].records().map((rv) => rv.seq).join('+')), ['5+6'], 'one cut waits: it holds queuedBytes')
+  assert.deepEqual(link.torn && [link.torn.d.ff, link.torn.r, link.torn.q], [6, 1, 1], 'the ship stopped INSIDE the run, before 7: the cover is 6')
+  assert.deepEqual(F.jk(JK.dropOldest), [], 'never cleared')
+  const d = F.of('send').filter((e) => e[1] === 7).length
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(wireOf(F, 7, d), ['5+6', '7+8', '9+10', 'DIGEST'], 'the queue, the rest of the run from 7, then the reply')
+  assert.deepEqual(wireOf(F, 7, m).filter((x) => x !== 'DIGEST').flatMap((x) => x.split('+').map(Number)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'every row once')
+  assert.equal(link.synced, true)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [6, 4])
 })
 
 //! ── the review of wave 6a (2026-10-12): a spoke that SYNCS while its feeder is not holding a partition it has rows of.
