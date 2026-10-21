@@ -968,6 +968,13 @@ test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)
 })
 
+test('the uuid is bounded at 64 bytes (UTF-8): a longer one is refused at fero() time with the bound and its size (the FERO_UUID refusal: tests/config.test.ts); 64 bytes compose', async () => {
+  await assert.rejects(fero('r', { uuid: 'x'.repeat(65), listen: false }), /^Error: fero\('r'\): uuid must be at most 64 bytes \(UTF-8\), got 65 — it names this node's lane in every record frame it sends$/)
+  await assert.rejects(fero('r', { uuid: 'é'.repeat(33), listen: false }), /uuid must be at most 64 bytes \(UTF-8\), got 66/, 'bytes, not characters: 33 two-byte characters')
+  const f = await fero('r', { uuid: 'x'.repeat(64), listen: false })
+  try { assert.equal((snapshot(f.cluster) as { me: { uuid: string } }).me.uuid.length, 64) } finally { await f.destroy() }
+})
+
 test('v4.1 f.snapshot: the synchronous dense value — data\'s [value] read surfaced first-class', async () => {
   const f = await fero('r', { uuid: 'aa', listen: false })
   try {

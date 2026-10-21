@@ -35,7 +35,7 @@ import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
 import { tuneOf, type Tune } from './tune.ts'
 import { RING } from './ring.ts'
-import { NONCE_MIN, NONCE_MAX, PROOF_LEN, addressOk, contractDiff, prove, verify, type Door, type HelloKeys } from './door.ts'
+import { NONCE_MIN, NONCE_MAX, PROOF_LEN, UUID_MAX, addressOk, contractDiff, prove, utf8Len, verify, type Door, type HelloKeys } from './door.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -1671,6 +1671,14 @@ export class Node {
         const v = f.value as { u?: unknown; i?: unknown; l?: unknown }
         if (typeof v?.u !== 'string' || typeof v.i !== 'number' || typeof v.l !== 'string') {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-hello')
+        }
+        //! the uuid's size (door.ts UUID_MAX): it becomes the origin of every record this peer stamps and the issuer of
+        // every attempt it forwards, so a longer one could make its records unsendable once stamped. Malformed, with
+        // the bound in the journal row.
+        if (utf8Len(v.u) > UUID_MAX) {
+          j.armed && j.emit(JK.frameDrop, link.id, `malformed hello: uuid over ${UUID_MAX} bytes`)
           link.dead = true
           return this.env.sink.close(link.id, 'malformed-hello')
         }

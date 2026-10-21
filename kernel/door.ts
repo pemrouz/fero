@@ -35,6 +35,26 @@ export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: u
 // hex characters; anything outside 16..64 is a malformed HELLO.
 export const NONCE_MIN = 16
 export const NONCE_MAX = 64
+//! UUID_MAX — the most UTF-8 bytes a node's uuid may take. Every frame that carries a record carries its origin (the
+// uuid, or uuid~N past the first life), and a committed attempt's frame its issuer too, so the two names must fit the
+// envelope room the codec keeps beside a record (roomOf, kernel/codec.ts): never less than 256 bytes, at the smallest
+// frame (FRAME_MIN). At 64 the worst envelope is 200 bytes: the origin and the issuer, each a length byte plus 64 + 1
+// + 16 (the '~' and the largest incarnation) = 82, then baseSeq, epoch and baseCid (8 each at 2^53), the record count
+// (4) and a pp varint (8). 128 would take 292 and break that room. A HELLO whose uuid is longer is malformed; fero()
+// refuses one at compose time (api/index.ts). A default uuid is 8 hex characters, a UUID 36.
+export const UUID_MAX = 64
+//! utf8Len — a string's UTF-8 byte count without encoding it (a lone surrogate counts 3, as TextEncoder writes it)
+export const utf8Len = (s: string): number => {
+  let n = 0
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && (s.charCodeAt(i + 1) & 0xfc00) === 0xdc00) { n += 4; i++ }
+    else n += 3
+  }
+  return n
+}
 //! PROOF_LEN — HMAC-SHA256 as base64url (§2): the one place the proof's length lives. A DOOR whose `p` is
 // not exactly this long is a malformed frame; a right-length wrong value is `bad-proof`.
 export const PROOF_LEN = 43
