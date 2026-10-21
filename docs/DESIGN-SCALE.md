@@ -2069,11 +2069,13 @@ R3-1 to R3-6) found the owed {x} held back while the partition was a
 latch from zero or an orphan (R3-6 and R3-2: the spoke showed px.b,
 removed at the cluster, until the fold or the shed) and the second shed
 word of one pause said twice (R3-1); the rule now reads "while the
-answer shipped nothing of p", with three shapes (a latch from zero at
-the heal, red on the second round at "mid-latch the spoke shows nothing
-of px"; an orphan the ring no longer assigns, red at "the spoke shows
-nothing of px until the shed"; an orphan the ring assigns, whose
-re-entry fold brings px whole), and the repeated word is named above.
+answer shipped nothing of p", with three shapes, each red on the second
+round with the spoke showing px.a and px.b: a latch from zero at the
+heal ("mid-latch the spoke shows nothing of px"); an orphan the ring no
+longer assigns ("between the heal and the shed the spoke shows nothing
+of px"); an orphan the ring assigns ("nothing of px at the spoke while
+aa holds it frozen"), whose re-entry fold then brings px whole. The
+repeated word is named above.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
