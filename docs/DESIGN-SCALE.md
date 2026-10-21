@@ -1725,8 +1725,8 @@ until a failover's resync wiped them. `spokeStale` counted 6, 5, 1, 2
 and 1 such rows on A12 seeds 3, 5, 6, 8 and 11. Now `evaluateSheds`
 ships one FEED {x: [p…]} per admitted client link naming what it shed,
 synced or not (a spoke whose answer is still torn held the rows too;
-a word a clear takes is owed and said again after the answer that heals
-the link: the vanish-and-return below, clause 3),
+a word a clear takes is owed and said again at the answer that heals
+the link, before its ship: the vanish-and-return below, clause 3),
 and the spoke drops each partition with its feeder (node.ts `#unfeed`):
 its cells, versions and deep-index entries, its lane entries (a kept
 entry would make the dual fence drop a later re-feed of the same record
@@ -1923,64 +1923,96 @@ the feeder REMEMBERS the words it owes each client link (node.ts
 verb already; and the partitions whose fold ended while the link was not
 synced but answered, where no {b}, no forward and no {e} go out at all)
 and says them
-again right after the next answer that syncs the link: after its whole
-ship and its reply (`#answer`, the untorn path). That is the first
-moment the spoke holds the feeder's fed subset above the cover again:
-the clear's cover was lowered under every record the clear took (V4-49),
-and a fold on an unsynced link lowers it under the fold's rows (V4-53),
-so an {e} said there judges against a complete kernel. An owed word
-leaves AFTER the answer, out of the order it was queued in, so it is
-said only while it is still TRUE at that moment. An owed {e} while p is
-held (a latch open for p again says its own end; an orphan's or a gone
-partition's exit is an {x}). An owed {x} while the answer that healed
-the link SHIPPED NOTHING OF p (node.ts `#payOwed`: the feeder does not
-feed p, `feeds`, or holds no row of it, `byPart`). What the spoke holds
-of p is then from before the word was queued: the feeder dropped p at
-the shed or held nothing of it at the abort, and nothing of p has
-reached the spoke since (the clear took the whole queue, an unsynced
-link is not tapped, and the answer walks the FED partitions alone). So
-the word is as true as when it was queued, and what follows brings p
-whole or says the word again. No entry: nothing follows. A latch from
-zero (fed, but no row here yet): the fold's group brings p whole. An
-orphan the ring no longer assigns: the shed says the same word, a no-op
-at the spoke. An orphan the ring assigns, or a re-entry latch from one
-(a frozen copy is no spoke's): the re-entry's whole forward brings p.
-The one cost is the kept cells of a partition the reply named in flight:
-they leave with the word and come back with the fold, a vanish-and-return
-in this one narrow case (an owed word, and the partition in flight at
-the heal), and an honest one, since the feeder fed nothing of p at the
-heal. Back HELD, or acquiring on a HELD base (a repair), the word is
-stale: the answer shipped p's rows (the fold lowered the cover under
-them, V4-53), and a drop after it takes a partition the feeder holds and
-never brings it back (the second review's SK1, a regression of the
-rework: the shed's {x} cleared, p placed back and folded on the unsynced
-link, the heal re-sent p's rows, then said {e: p} and {x: [p]}; the
-spoke's lane entries for p were gone and its tails equalled the feeder's,
-so no exchange ever re-sent them). The second fix round read the test as
-"while p has no entry" and held the word back for a latch from zero and
-for an orphan too: the spoke kept its rows from before the shed, a row
-the cluster had removed among them, until the fold landed or the orphan
-shed (the third review's R3-6 and R3-2), and once stage 4 releases
-tombstones on scoped nodes a from-zero fold may no longer carry the
-remove, so such a row would have stayed until a resync. "No row of p
-here" is read off the per-partition index (`byPart` drops an emptied
-partition), not the latch's `preState`: a re-latch of an unsealed
-durable base looks like a latch from zero there, and the answer shipped
-its rows. Weighed and not taken: saying the owed {x} BEFORE the answer's
-ship, in its original place in the order, and letting the answer re-send
-what the feeder feeds of p. Sound, since the clear took the whole queue,
-but it drops p and brings it back inside the heal exchange whenever p is
-held again, the common case, and drops the kept cells with it. A word
-may be said twice: a shed inside one pause whose first {x} a clear took
-and whose second went out direct reaches the spoke as the direct word at
-the drain, then the owed one after the heal; the second drops nothing
-(JK.unfed with b = 0; the third review's R3-1). The debt is consumed
+again at the next answer that syncs the link (`#answer`, the untorn
+path), EACH AT ITS OWN PLACE IN THE ORDER. The two kinds of word sit at
+different places. An owed {e} leaves AFTER the answer's whole ship and
+its reply, and only while p is HELD (a latch open for p again says its
+own end; an orphan's or a gone partition's exit is an {x}): that is the
+first moment the spoke holds the feeder's fed subset above the cover
+again (the clear's cover was lowered under every record the clear took,
+V4-49, and a fold on an unsynced link lowers it under the fold's rows,
+V4-53), so the end judges against a complete kernel. An owed {x} leaves
+BEFORE the answer's ship, unfiltered (`#answer` → `#payOwed(link, 'x')`,
+then the ship, the reply, then `#payOwed(link, 'e')`): that is where
+the word stood when the clear took it, in front of everything of p the
+feeder has sent since. A word said there is true when said: p LEFT the
+feeder when the word was queued (a shed filters p's rows out of every
+lane, scope.ts `#shed`; a clean abort held none), so what the spoke
+holds of p is from before the word. And the answer that follows
+re-sends whatever of p the feeder feeds NOW. Every record of p at the
+feeder at the heal arrived after the word was queued, and each sits
+above the lower of the spoke's tail and the cover on its lane, which is
+where the answer walks from: a record tapped onto the link behind the
+word was taken by the same clear (a paused queue lets nothing out, and
+a clear takes the whole queue), and `#clearCover` lowered the cover
+under it; a record appended after the clear sits above the spoke's
+tail (a spoke's lanes are its feeder's fed subset, so its tail on a
+lane never passes the feeder's); a record spliced or folded after the
+clear lowered the cover under itself (`indexInsert` on a covered link);
+a re-entry's whole partition lowered it under every entry of p
+(`#forwardWhole`). So at the end of the heal exchange the spoke holds
+exactly what its feeder feeds, kernel and screen, in every state p can
+be in: no entry; a latch from zero, with or without the owner's own
+mid-latch commits; held again, by a fold or by one minted first record;
+a repair latch open on a held base; an orphan, assigned or not; and a
+fold that carries no remove of a row the spoke once held, because the
+holders released the partition's tombstones while it was off this
+feeder (stage 4's `gcRow`). The word is one frame straight to the
+socket: `#answer` runs on a flowing link only (the DIGEST handler marks
+a paused link's debt instead of answering, and the drain resumes a torn
+answer only once its flush left the link flowing), so the {x} half
+never meets the full-queue guard; the {e} half, after a ship that may
+have paused the link, does, and the next untorn answer pays it. The
+cost, taken on purpose: when p is held again at the heal, p's rows
+leave with the word and come back with the same answer, a
+vanish-and-return INSIDE the heal exchange. One flicker, on a cold path
+(a paused client link whose queue a clear emptied), bounded to one
+exchange, visible (M12 reads it), and never a ghost; and the kept cells
+of a partition in flight leave with the word and come back with the
+fold, as before. Why the two kinds sit at different places: an {x} said
+AFTER the answer drops what the answer just re-sent, and nothing brings
+it back — the spoke's tails equal the feeder's, so no later exchange
+re-sends p (the second review's SK1: the shed's {x} cleared, p placed
+back and folded on the unsynced link, the heal re-sent p's rows, then
+said {e: p} and {x: [p]}; p was gone from the spoke for good); an {e}
+said BEFORE the answer would judge the kept cells against a kernel the
+clear left incomplete, and sweep rows the answer is about to bring.
+
+Why not a filter. Two rounds kept the {x} after the answer and held it
+back where it looked stale, and the stale test was wrong each time.
+"While p has no entry" (the second fix round) held it back for a latch
+from zero and for an orphan, where the answer ships nothing of p, so
+the spoke kept a row the cluster had removed until the fold landed or
+the orphan shed (the third review's R3-2 and R3-6). "While the feeder
+feeds p and some lane holds a row of it" (the third fix round,
+`feeds(p) && byPart.has(p)`) held it back for a from-zero latch at the
+OWNER with one own mid-latch commit, and for a partition held again by
+one minted first record: entries with no base, where the answer ships
+that one row alone and the spoke kept its rows from before the shed, a
+removed one among them, next to it until the fold or the repair (the
+fourth review's R4-1 and R4-2). "While p is not held" loses the base of
+a repair latch for good (the fourth review's R4-3 on that mutant).
+Every such filter is a rule a reader cannot check without the lane
+states at the feeder: which entries exist, which lane holds a row of p,
+what the cover sits under. And a word held back where it was still true
+can leave a GHOST: once stage 4 releases a partition's tombstones at its
+holders while the partition is off this feeder, a from-zero fold
+carries no remove, so a row the held-back word would have dropped stays
+on the spoke for good, past every exchange, until a resync (the fourth
+review's R4-4: the held shape, the teacher's fold shipping px.a alone
+with no trace of px.b's remove; the release census sees holders, never
+spokes). The order rule carries no such state: the word says what was
+true at its place, and the answer says the rest. A word may be said
+twice: a shed inside one pause whose first {x} a clear took and whose
+second went out direct reaches the spoke as the direct word at the
+drain, then the owed one before the heal answer's ship; the second
+drops nothing (JK.unfed with b = 0; the third review's R3-1). The debt is consumed
 word by word as each one ships: a word the clear
 takes is owed again by `#clearCover`'s read of the dropped frames, and
 the words behind it were never taken out of the debt; a word is never
 pushed into a full paused queue (the next answer pays: a word there
-would force a clear of the reply it follows); the link's death drops the
-debt. And a word is owed only to a link the spoke has been ANSWERED on
+would force a clear of the reply it follows; one guard, both kinds);
+the link's death drops the debt. And a word is owed only to a link the spoke has been ANSWERED on
 (a cover or a torn answer: `Link.torn`). A link never answered since
 admit carries nothing of this feeder: the spoke holds nothing of it to
 drop or judge, a spare's word is dropped at the spoke, and the link's
@@ -2075,14 +2107,36 @@ heal ("mid-latch the spoke shows nothing of px"); an orphan the ring no
 longer assigns ("between the heal and the shed the spoke shows nothing
 of px"); an orphan the ring assigns ("nothing of px at the spoke while
 aa holds it frozen"), whose re-entry fold then brings px whole. The
-repeated word is named above.
+fourth review (2026-10-21, R4-1 to R4-4) found that filter wrong too
+(R4-1, R4-2: entries with no base; R4-4: a ghost for good once a fold
+carries no remove) and the rule became the ORDER rule above: the {x}
+before the answer's ship, unfiltered. Its tests in kernel/client.test.ts
+(the owed shed word, eight shapes, each asserting the spoke equal to its
+feeder on kernel and screen at the exchange's end and at the end): back
+and HELD (the cost pinned: JK.unfed [px, 2] at the word, the rows back
+with the answer, FEED [{x}, {e}]); a latch from zero; an orphan the
+ring no longer assigns (R3-2's shape, px.b removed at the cluster); an
+orphan it assigns; a from-zero latch at the owner with one own
+mid-latch commit (R4-1; red on the filter at "between the heal and the
+fold the spoke never shows a row its feeder does not hold"); held again
+by one minted first record (R4-2; red at the same line, "the repair");
+a repair latch open on a held base (R4-3; red on the filter at the FEED
+line, no {x}, and on the old order with the base lost for good); the
+stage-4 shape, a fold with no remove of a row the spoke kept (R4-4; red
+on the filter at "the spoke holds what its feeder holds", px.b for
+good). The cleared-shed-word test pins the wire: the drain digest, the
+owed word, the capped answer, the reply. Two mutants of the order each
+turn tests red: the {x} said after the reply (the old order: the held
+test and R4-3 lose rows for good, the wire line moves); any filter put
+back on the {x} half (`feeds && byPart`: R4-1, R4-2, R4-4; `!held`:
+the held test, R4-2, R4-4). The repeated word is named above.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
-words after an answer that heals a client link (one {e} per partition
-whose end a clear took or whose fold ran while the link was unsynced,
-one {x} for the partitions a clear's word named that the answer shipped
-nothing of), `f: 1` on a scoped spoke's resync ask and the list on its
+words at an answer that heals a client link (one {x} before its ship
+for the partitions a cleared word named, one {e} after its reply per
+partition whose end a clear took or whose fold ran while the link was
+unsynced and that is still held), `f: 1` on a scoped spoke's resync ask and the list on its
 reply, `c` on a drain digest
 after a clear and the r=1 it buys. The scoped sweep's counts stand
 (16/16 green before and after the rework: spokeStale reads 0 where it
