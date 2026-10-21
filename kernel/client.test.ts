@@ -2745,6 +2745,47 @@ test('wave 6c — the shed\'s word is owed when a clear takes it: FEED {x} queue
   assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
 })
 
+//! the second review's SK1 (a regression of the rework): the owed words leave AFTER the heal's answer, out of their
+// original order. A shed's {x} the clear took was said after px had come BACK to aa (placed back, latched from zero and
+// folded on the unsynced link) and after the answer had re-sent px's rows: the spoke dropped a partition its feeder
+// holds, and its tails equalled the feeder's, so no exchange ever re-sent them. Now an owed {x} is said only while px
+// has no entry at the feeder (clause 3: a word only while it is still true); the owed end is said (px is held) and
+// judges nothing. With the latch still open at the heal (acquiring from zero) the word is stale too: the fold brings px
+// whole. Red on the rework at the FEED line: [{e: px}, {x: [px]}] / [{x: [px]}, {b: px}, {e: px}], JK.unfed [[px, 2]].
+for (const foldedBeforeHeal of [true, false])
+  test(`wave 6c — an owed shed word is not said once the partition is back at the feeder (${foldedBeforeHeal ? 'folded on the unsynced link before the heal' : 'still acquiring from zero at the heal'}): the heal re-sends or the fold brings its rows, and no stale {x} drops them`, () => {
+    const L = latching({ tune: { queued: 2 } })
+    const { F, S, p, connect, beat, teach } = L
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+    connect()
+    assert.deepEqual(kernelCells(S), kernelCells(F))
+    F.node.step({ kind: 'pause', link: 7 })
+    F.node.writes.ring.place('px', 'bb', 'cc')
+    F.node.scope!.rescope(F.node)
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+    assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px'], 'aa shed px')
+    for (let s = 7; s < 12 && F.jk(JK.dropOldest).length === 0; s++) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y' + s, s), s, s - 1, VERB.RECORDS) })
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear took the word: it is owed')
+    //! px comes back to aa before the link heals: cc's announcement opens a from-zero latch
+    F.node.writes.ring.place('px', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5 } } }) })
+    assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'the from-zero latch')
+    const fold = () => teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('b', 2), pp: 3 }], 5)
+    if (foldedBeforeHeal) { fold(); assert.equal(F.node.scope!.held('px'), true, 'aa holds px again; its end is owed too (the link is unsynced)') }
+    F.node.step({ kind: 'drain', link: 7 })
+    p.settle()
+    if (!foldedBeforeHeal) { fold(); p.settle() }
+    beat(10)
+    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), foldedBeforeHeal ? [{ e: 'px' }] : [{ b: 'px' }, { e: 'px' }], foldedBeforeHeal ? 'the owed end alone (px is held): the stale {x} is not said' : 'the fold\'s own markers alone: no stale {x} before them')
+    assert.deepEqual(S.jk(JK.unfed), [], 'nothing was unfed')
+    assert.deepEqual(kernelCells(F), ['px.a', 'px.b', 'qx.y7', 'qx.y8', 'qx.z'])
+    assert.deepEqual(kernelCells(S), kernelCells(F), 'the spoke holds what its feeder holds')
+    assert.deepEqual(screenCells(S), kernelCells(F))
+  })
+
 //! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
 // flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
 // paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
