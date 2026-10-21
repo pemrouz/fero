@@ -224,8 +224,10 @@ export class Membership {
   // above the view ride behind it (Vote.prior)
   votedFor       = { e: 0, p: '', h: '' }
   //! `oldEpoch` is the epoch of the view the ballot is over (the PROPOSE carries it as `o`, form (β)); `joint` the held
-  // views (member lists) this ballot must ALSO carry a majority of — my own holds, and those a refusal named (`hm`)
-  #proposal                                                                                                                                        = null
+  // views (member lists) this ballot must ALSO carry a majority of — my own holds, and those a refusal named (`hm`);
+  // `leaver` names a LEAVE ballot (a knock's, or my own exit) by who is leaving, so the tick can re-read it against the
+  // redial chains (#leaveView) — no ballot rule reads it
+  #proposal                                                                                                                                                         = null
   //! #remember — a new vote: the latest, with every other vote still above my view kept behind it, minus the one at
   // the same epoch (the same proposer's replacement ballot — at most one of its ballots at an epoch commits)
   #remember(v      ) {
@@ -353,6 +355,14 @@ export class Membership {
   //! suspicion: consecutive ticks each member has been unreachable
   #suspectTicks = new Map                ()
   #suspects = new Set        ()
+  //! #gaveUp — the suspects whose redial chain has given up at least once since the suspicion: #leaveView's reading of
+  // dead (the round-4 review of wave 6b, 2026-10-20). Set at the tick that sees a suspect's chain given up — before the
+  // same step's revival (V4-20) re-arms it — and kept while that revived chain dials: a dial in flight to a member whose
+  // chain already gave up once is not a member back. Forgotten exactly as the suspicion is: the link back (the suspicion
+  // loop), or the member out of my view (the install). The eviction keeps its own reading (#dead, this chain gave up):
+  // its hold is the churn guard of V4-39 and its timing is pinned across the sweeps; a leave ballot has a leaver's window
+  // to meet, so it reads the evidence it already has.
+  #gaveUp = new Set        ()
   //! epoch-staleness gate state
   epochStale = false
   #staleWant = 0
@@ -367,7 +377,11 @@ export class Membership {
   // scoped leaver's second wait: defined while `left` is held for the new holders, counting its own ticks
   // against tune.drainTicks; `clean` is the view half's verdict it carries (the echo came: true; bounded out:
   // false), so the final `left` is clean only when BOTH halves were — set with `drain`, read when the drain ends.
-  leaving                                                                                          = null
+  // `why` is the view half's reason when it was not clean, RECORDED the moment it ends (#finishLeave) and carried to
+  // the `left` row: `unanswered` (the vote never came back; still in its own view then) or `unechoed` (committed here,
+  // no survivor echoed). Recorded, not re-derived at the exit: a late vote can commit the shrunk view here during the
+  // drain, and the word would then read `unechoed` for a leave whose verdict was the window (the first review's nit).
+  leaving                                                                                                                           = null
   //! #leavers — members this node has heard are LEAVING: they knocked LEAVE at it (onLeave) or proposed their own
   // exit to it (onPropose: a ballot that leaves its proposer out). A fellow leaver can commit nothing, so its link
   // does not keep a knock window open (DESIGN-LEAVE §10.7). In-memory only: pruned of non-members on every install
@@ -438,11 +452,18 @@ export class Membership {
     // The formation set is the hosts this node was told to dial — or, for a listener given NONE, the
     // members that dialed it (I-22, 2026-09-28): in a one-sided static pair (`{ listen }` + `{ listen,
     // hosts: [it] }`) the hostless side never proposed, so whenever its uuid sorted lowest the pair sat at
-    // epoch 0 for good. One admitted member link is enough; a later arrival joins at the next epoch (V4-3).
+    // epoch 0 for good. One admitted member link is enough; a later arrival joins at the next epoch (V4-3). A host
+    // that answered this node's HELLO for ANOTHER RESOURCE NAME (node.refused) is not waited for (DESIGN-DIRECTORY
+    // §13, 2026-10-12): another resource can never be in a view with me, and a squatter the directory handed out once
+    // held the first view for good. Every other host IS waited for — one that merely never answers (dead and cut look
+    // the same from here) AND one that refused my contract or my proof (the same process with its config fixed is one
+    // of us; counting it out let two halves of one host list each form a view at epoch 1, and they never merged): two
+    // halves of one host list must never each form a view, so genesis waits, and the composer says so on stderr.
     if (!node.client && this.view.epoch === 0 && !this.#proposal && !this.rejoining() && !this.epochStale) {
-      const hosts = node.hosts
+      let want = 0
+      for (const h of node.hosts) if (!node.refused(h)) want++
       const links = this.#admitted(node).filter((l) => !l.client) // dedup-race losers are dead and excluded (review: a dead twin once double-counted)
-      if (links.length >= Math.max(1, hosts.length) && [node.uuid, ...links.map((l) => l.uuid)].sort()[0] === node.uuid) {
+      if (links.length >= Math.max(1, want) && [node.uuid, ...links.map((l) => l.uuid)].sort()[0] === node.uuid) {
         const byUuid = new Map                ([[node.uuid, node.listen]])
         for (const l of links) byUuid.set(l.uuid, l.listen)
         this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
@@ -451,12 +472,13 @@ export class Membership {
     //! suspicion: a committed-view member with no admitted link for suspectTicks (SUSPECT_TICKS) ticks is suspect
     if (!node.client && this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
       const suspectTicks = node.tune.suspectTicks
-      for (const [uuid] of this.view.members) {
+      for (const [uuid, listen] of this.view.members) {
         if (uuid === node.uuid) continue
         const id = node.byUuid.get(uuid)
         const live = id !== undefined && node.links.get(id)?.state === LS.admitted && !node.links.get(id)?.dead
         if (live) {
           this.#suspectTicks.delete(uuid)
+          this.#gaveUp.delete(uuid)
           if (this.#suspects.delete(uuid) && this.#proposal && !this.#proposal.view.members.some((m) => m[0] === uuid) && this.isMember(uuid))
             this.#proposal = null //! the suspect came BACK: abandon the eviction ballot before a post-heal vote commits it against a live member
           continue
@@ -467,6 +489,7 @@ export class Membership {
           this.#suspects.add(uuid)
           j.armed && j.emit(JK.suspect, uuid)
         }
+        if (this.#suspects.has(uuid) && !node.dialing(listen)) this.#gaveUp.add(uuid) // the give-up, remembered before the revival below re-arms the chain
       }
       //! eviction: the lowest-uuid LIVE member proposes the shrunk view. A suspect the proposer is STILL
       // DIALING is held back (node.dialing): an un-exhausted backoff chain — the pending-redial window
@@ -474,11 +497,20 @@ export class Membership {
       // evict/rejoin churn cycle into a plain re-admit. Give-up ends the hold.
       if (this.#suspects.size && !this.#proposal && !this.epochStale) {
         const live = this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))
-        const evictable = this.view.members.filter(([u, listen]) => this.#suspects.has(u) && !node.dialing(listen))
+        const evictable = this.view.members.filter(([u, listen]) => this.#dead(node, u, listen))
         if (evictable.length && live[0] === node.uuid && live.length * 2 > this.view.members.length) {
           const gone = new Set(evictable.map((m) => m[0]))
           this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => !gone.has(u)) })
         }
+      }
+      //! a LEAVE ballot in flight is re-read against the chains (#leaveView): a suspect whose chain gave up since the
+      // ballot opened leaves the ballot too, at the same epoch (my vote there is my own: the same-proposer case, which
+      // the voters re-grant; a grant for the dropped ballot echoes its identity and counts for nothing). The re-read
+      // starts from the ballot in flight, so it only ever removes (the drop is sticky): the revival below re-arms a
+      // dropped member's chain in this very step, and that must not put it back next tick
+      else if (this.#suspects.size && !this.epochStale && this.#proposal !== null && this.#proposal.leaver !== undefined) {
+        const m = this.#leaveView(node, this.#proposal.leaver, this.#proposal.view.members)
+        if (hashOf(m) !== this.#proposal.h) { const leaver = this.#proposal.leaver; this.#proposal = null; this.#propose(node, { epoch: this.#nextEpoch(node), members: m }, leaver) }
       }
       //! THE OPENER (DESIGN-LEAVE §10.10.4, the fifth review, 2026-10-12): supersession needs a ballot, and every other
       // ballot here answers a membership change — a suspect, a knock, a leave, a rejoin. A linked member of my view
@@ -628,9 +660,63 @@ export class Membership {
     const leaver = link.uuid
     node.journal.armed && node.journal.emit(JK.leave, leaver)
     this.#leavers.add(leaver) // this peer is leaving: its link no longer keeps my own knock window open (§10.7)
-    if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
+    if (node.client || this.view.epoch === 0) return
+    //! a knock from a member my view no longer holds: its leave committed and it never saw the VIEW (lost on the wire;
+    // or it knocked at a member that learned the view before it did) — answer with the view, so the leaver reads its exit
+    // proof and drains instead of knocking until its bound ends (the scoped leaver's fate, DESIGN-LEAVE §10.7's note of
+    // 2026-10-12). A committed view is a fact whoever holds it: a non-member or an epoch-stale member answers too.
+    if (!this.isMember(leaver)) { link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal); return }
+    if (!this.isMember(node.uuid) || this.epochStale || this.rejoining()) return
     if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
-    this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
+    this.#propose(node, { epoch: this.#nextEpoch(node), members: this.#leaveView(node, leaver) }, leaver)
+  }
+
+  //! #dead — a suspect whose redial chain gave up: evictable (the tick). #leaveView reads one more thing: a suspect whose
+  // chain gave up once since the suspicion (#gaveUp) is dead to a leave ballot while the revival dials it again
+  #dead(node      , u        , listen        )          { return this.#suspects.has(u) && !node.dialing(listen) }
+
+  //! #leaveView — THE EVICTION RIDES WITH THE LEAVE (DESIGN-LEAVE §10.7's note of 2026-10-12). A leave ballot is the
+  // view without the leaver; the plain ballot stands only while the members of it that are NOT SUSPECTS — the votes
+  // that can come — are a majority of it; otherwise, on a bare majority (three members with one crashed and not yet
+  // voted out, five with two), its new-set majority would need a dead member's vote and it can never commit, so every
+  // dead suspect (#dead) leaves it as well, provided the live members are a majority of the view (the eviction's own
+  // guard: with no live majority nothing can commit, and the ballot is today's). A suspect whose chain is still on its
+  // FIRST try since the suspicion is not dropped — its vote may still come — and not counted either: THE DROP COUNTS
+  // WHAT CAN VOTE, NOT WHAT IS DIALING (the round-4 review of wave 6b, 2026-10-20). As first built the plain ballot
+  // stood while the members not DEAD were a majority of it, so with two dead chains it dropped them only when both read
+  // dead at one tick; the heartbeat's revival (node.ts) re-arms a given-up chain in the step that saw it dead, so two
+  // give-ups a heartbeat apart were never both dead at one tick — the ballot stayed plain, needed a dead vote, and the
+  // stop wedged for good (n=5 with two crashed: 7 of 30 seeds with n03 stopping, 8 of 30 with n01, at 16 and 64 ticks
+  // alike). Now each dead member leaves at the tick that first sees its give-up, the sticky re-read keeps it out while
+  // the revival dials, and a give-up once seen is REMEMBERED on the suspect (#gaveUp) so a ballot opened while the revived
+  // chain dials — a knock, or the lowest member's exit, landing then — leaves it out at once instead of waiting a second
+  // chain through (n=5 at a 40 ms pair, n03 stopping and n01 at t0+700: n01's exit took epoch 2 and n03's leave at the
+  // next lowest opened as the plain {n02,n04}@3 over n04's revived chain, 680 ms from its next give-up, past n03's
+  // window). A ballot of one suspect (n=3) reads as before. Why: the plain ballot aged out, and the leaver's next knock, landing between ticks,
+  // reopened it before the tick's eviction branch ran, so the dead member was never evicted while the leaver knocked and
+  // the leaver went unclean at the window's end. And why ONE ballot rather than the eviction first and the leave after
+  // (the first build of this rule): the chain's give-up can land late in the leaver's window — the sweep's family 2,
+  // seed 47: at 776 ms of an 850 ms window — and the eviction then takes the window's last tick, the leaver goes unclean
+  // and the stayer is left alone in a TWO-member view with the leaver dead in it, where the base's three-member view let
+  // the stayer and the returning third member evict the leaver. One ballot commits in one round trip. Safety: the
+  // old-set majority is unchanged; the new set is smaller, so it needs fewer votes, never a dead one; the ballot is two
+  // or more apart from the view, so V4-55 holds its granters — the leaver, and a stayer — until the VIEW lands, exactly
+  // as for a two-suspect eviction today, and a granter cut before the VIEW stays read-only (the CP answer, §10.10.4).
+  // A leave whose plain ballot the live members CAN carry is byte-identical with before: one apart, no hold.
+  //! THE DROP IS STICKY (the note's amendment of 2026-10-12, the first review of wave 6b): `ballot` is the leave ballot
+  // in flight for this leaver, when there is one, and the re-read starts from IT, not from the view — a re-read may
+  // only REMOVE members from a ballot in flight, never put one back. Without it the heartbeat's give-up revival (V4-20),
+  // which runs right after membership.tick in the same step, re-armed the dropped member's chain; the next tick read it
+  // as dialing again — not #dead — computed the plain ballot from the view and re-proposed it, discarding the vote in
+  // flight: the dropped ballot lived one heartbeat, and a vote whose round trip was longer than that never committed
+  // (the review's probe: a 30 ms link on a 50 ms heartbeat, unclean at the window's end like the base). A member comes
+  // BACK only by its link: the tick's suspicion branch abandons a ballot that leaves a re-admitted member out, and the
+  // next knock opens a fresh one from the view — the eviction's own rule, which the revival never cancels either.
+  #leaveView(node      , leaver        , ballot                     )                     {
+    const base = ballot ?? this.view.members.filter(([u]) => u !== leaver)
+    if (base.filter(([u]) => !this.#suspects.has(u)).length * 2 > base.length) return base // its non-suspects carry it
+    if (this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 <= this.view.members.length) return base // no live majority: nothing can commit
+    return base.filter(([u, l]) => !this.#dead(node, u, l) && !this.#gaveUp.has(u)) // every dead member out — this chain given up, or one before it since the suspicion; a suspect on its first chain stays
   }
 
   onPropose(node      , link      , v                                                        ) {
@@ -803,8 +889,8 @@ export class Membership {
     // hold (the suspects are still suspects, a knock is re-sent every tick, a leaver re-knocks — V4-6's rebase was this
     // rule for one case) instead of waiting proposalAge ticks for it to age out.
     this.#proposal = null
-    for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
-    if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
+    for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u); this.#gaveUp.delete(u) }
+    if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear(); this.#gaveUp.clear() } // an evictee's grudges expire with its membership
     for (const u of [...this.#leavers]) if (!this.isMember(u)) this.#leavers.delete(u) // hygiene: a leaver out of the view is no longer "leaving" (§10.7); #answerable checks membership first, so this changes no answer
     //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
     // unless a redial chain is still trying it: that chain owns the target until it ends. A dial over it
@@ -902,11 +988,24 @@ export class Membership {
       this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.LEAVE, {}))
       return
     }
-    const shrunk = this.view.members.filter(([u]) => u !== node.uuid)
-    if (shrunk.length === 0) { this.#finishLeave(node, true); return } // the last member simply goes
+    if (this.view.members.length === 1) { this.#finishLeave(node, true); return } // the last member simply goes
     if (this.#lowestLive() === node.uuid) {
+      //! the view without me — and without the dead, when the live cannot carry it (#leaveView). Any OTHER ballot of
+      // mine in flight is replaced (leaving outranks), but my exit LEAVES OUT every member that ballot left out — THE
+      // EXIT MAY ONLY SHRINK TOO (DESIGN-LEAVE §10.7's note of 2026-10-12, the rework review): an eviction's evictees,
+      // or the dead members another leaver's ballot dropped at its re-read. They were left out on evidence (a chain
+      // that gave up), and the heartbeat's revival (V4-20) has those chains dialing again by the time I knock, so
+      // #dead alone would read them live and put them back — a second give-up before my exit could commit, and at the
+      // default window both stops unclean (the review's probe B3). The other leaver itself stays IN my exit: it was out
+      // of its own ballot by its knock, not on evidence, and the next lowest answers its knock once my exit commits.
+      // My own exit already in flight is re-read from ITSELF (the drop is sticky): a member it left out stays out
+      const p = this.#proposal
+      const mine = p !== null && p.leaver === node.uuid ? p.view.members : undefined
+      const leftOut = p !== null && p.leaver !== node.uuid ? new Set(this.view.members.filter(([u]) => u !== p.leaver && !p.view.members.some((m) => m[0] === u)).map((m) => m[0])) : null
+      const read = this.#leaveView(node, node.uuid, mine)
+      const shrunk = leftOut === null ? read : read.filter(([u]) => !leftOut.has(u))
       if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
-      if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk })
+      if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk }, node.uuid)
       return
     }
     this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), encodeControl(VERB.LEAVE, {}))
@@ -926,12 +1025,20 @@ export class Membership {
   // (leaveTicks unlinked, leaveWindow with a survivor linked) its partitions are orphans with reachable new holders all the same (third review, 2026-10-10 — before, at
   // R=1 the only copy went with it, uncounted). The drain then carries the view half's verdict: the final
   // `left` is b=0 even when every row was handed over, since the commit was never proved to have reached a
-  // survivor. Still in its own view (the vote never came back), nothing froze: it goes like a crash, drains
-  // nothing and counts nothing — `undrained` is the drain window's count only.
+  // survivor. Still in its OWN view (the vote never came back — `unanswered`) nothing froze, but what it holds
+  // goes with it all the same, so it asks the same last question over its HELD partitions (scope.undrained reads a
+  // held entry's live tails against the ring's other holders): at R=1 there is no other holder and every partition
+  // with content is stranded — counted in `undrained`, `left` b=0 at once; at R≥2 it waits for each reachable
+  // co-holder to attest covering its tails, bounded by drainTicks, and counts what none did (wave 6b, 2026-10-12;
+  // before, it went like a crash and `undrained` read 0 while at R=1 its rows went with it).
   #finishLeave(node      , clean         ) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
-    if (node.armed && (clean || !this.isMember(node.uuid)) && this.#exit(node, clean)) return
+    //! the view half's reason, read NOW (a late vote may change the view during the drain). At epoch 0 nothing was ever
+    // proposed and there is no list to be dropped from — genesis waiting on a host that never came — so the honest word
+    // is `unanswered` (the rework review of wave 6b; isMember alone read false there and said `unechoed`)
+    if (!clean) this.leaving.why = this.view.epoch === 0 || this.isMember(node.uuid) ? 'unanswered' : 'unechoed'
+    if (node.armed && this.#exit(node, clean)) return
     this.#left(node, clean, 0)
   }
 
@@ -943,7 +1050,7 @@ export class Membership {
   #exit(node      , clean = true)          {
     const { waiting, stranded } = node.scope .undrained(node)
     if (waiting > 0 && node.heartbeats) { this.leaving .drain = 0; this.leaving .clean = clean; return true }
-    if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded); return true }
+    if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded, clean); return true }
     return false
   }
 
@@ -954,18 +1061,23 @@ export class Membership {
     const l = this.leaving
     if (!l || l.drain === undefined) return
     const { waiting, stranded } = node.scope .undrained(node)
-    if (waiting === 0) this.#left(node, l.clean === true && stranded === 0, stranded)
-    else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded)
+    if (waiting === 0) this.#left(node, l.clean === true && stranded === 0, stranded, l.clean === true)
+    else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded, l.clean === true)
   }
 
   //! #left — the exit itself, once per leave: the `undrained` row (when any partition goes with the leaver),
   // then `left` (b = clean) and the env's effect. `clean` now means the whole stop was clean: the view without
-  // this node committed and echoed AND (scoped) everything it held was proved held elsewhere.
-  #left(node      , clean         , undrained        ) {
-    this.leaving .drain = undefined
+  // this node committed and echoed AND (scoped) everything it held was proved held elsewhere. `viewClean` is the
+  // view half's own verdict; when it failed the row says why (c): `unanswered` — the vote never came back and this
+  // node was still in its own view when the window ended — or `unechoed` — it committed the view without itself and
+  // no survivor echoed it. The word is the one #finishLeave recorded on `leaving` (never re-derived here: a late vote
+  // may have committed the shrunk view during the drain).
+  #left(node      , clean         , undrained        , viewClean = clean) {
+    const l = this.leaving 
+    l.drain = undefined
     const j = node.journal
     if (undrained > 0) j.armed && j.emit(JK.undrained, undrained, this.view.epoch)
-    j.armed && j.emit(JK.left, this.view.epoch, clean ? 1 : 0)
+    if (j.armed) { if (viewClean) j.emit(JK.left, this.view.epoch, clean ? 1 : 0); else j.emit(JK.left, this.view.epoch, 0, l.why ) } // every viewClean=false path came through #finishLeave(false), which recorded it
     node.env.sink.left?.(clean)
   }
 
@@ -980,7 +1092,7 @@ export class Membership {
     return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? this.votedFor.e - 1 : this.votedFor.e) + 1
   }
 
-  #propose(node      , view      ) {
+  #propose(node      , view      , leaver         ) {
     //! proposing SPENDS your vote — and a vote already spent on another proposer for this epoch cannot
     // be spent again here (the review's critical: double-voting via propose committed two views/epoch).
     // The refusal records the burn so the next attempt escalates past it instead of wedging forever.
@@ -992,7 +1104,7 @@ export class Membership {
     this.#remember({ e: view.epoch, p: node.uuid, h }) // my own vote, the earlier ones above my view kept behind it
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
     const joint = this.#jointViews(node) // refusals (`hm`) add more
-    this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint }
+    this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint, ...(leaver !== undefined ? { leaver } : {}) }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
     //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode
     if (majority(this.#proposal.old, this.#proposal.votes) && majority(view.members.map((m) => m[0]), this.#proposal.votes) && this.#jointOk(this.#proposal)) {
