@@ -14,11 +14,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, type NodeOpts } from './node.ts'
-import { VERB, Framer, encodeControl, encodeFrame } from './codec.ts'
+import { VERB, Framer, encodeControl, encodeFrame, encodeRuns } from './codec.ts'
 import { JK } from './journal.ts'
 import { LS } from './link.ts'
-import { PROOF_LEN, UUID_MAX, proofMsg, utf8Len } from './door.ts'
-import { TAG, type EffectSink, type Env } from './env.ts'
+import { ISSUER_MAX, PROOF_LEN, UUID_MAX, proofMsg, utf8Len } from './door.ts'
+import { REC, TAG, type EffectSink, type Env } from './env.ts'
 import { toyDoor, toyClientDoor, toyClientKey } from '../sim/door.ts'
 import { mulberry32 } from '../sim/exec.ts'
 
@@ -208,6 +208,35 @@ test('a HELLO whose uuid is over UUID_MAX (64 UTF-8 bytes) is malformed: frameDr
   }
   //! utf8Len is TextEncoder's count, a lone surrogate included
   for (const t of ['', 'abc', 'é', '€', '😀', '\ud800', '\udc00x', 'a😀é€']) assert.equal(utf8Len(t), new TextEncoder().encode(t).length, JSON.stringify(t))
+})
+
+test('a WRITE whose issuer is over ISSUER_MAX (uuid + \'~\' + 16 digits = 81 bytes) is malformed: the relay never stamps it, on a client link or a member link; 81 bytes commit', () => {
+  //! the issuer is the WRITE frame's own claim, not the admitted uuid, so the HELLO bound alone left the relay open: a
+  // client admitted as 'cl' could send an issuer of 1,002 bytes, the relay stamped it, and the encoder threw out of
+  // node.step at the commit fan-out (the 2026-10-21 review's probe, at frame 1024)
+  assert.equal(ISSUER_MAX, UUID_MAX + 17)
+  const write = (issuer: string, cid: number, key: string) =>
+    encodeRuns([{ rec: { type: REC.update, key: [key], value: 1 }, origin: issuer, seq: cid, epoch: 0 }], VERB.WRITE)[0]
+  for (const [r, issuer] of [[1, 'X'.repeat(1000) + '~1'], [1, 'c'.repeat(65) + '~' + '9'.repeat(16)], [1, 'é'.repeat(41)], [undefined, 'X'.repeat(1000) + '~1']] as const) {
+    const { node, closes, rows, up } = harness('aa', { tune: { frame: 1024 } })
+    up(1)
+    helloWith(1, node, { u: 'cl', l: r === 1 ? '' : 'sim:cl', ...(r !== undefined ? { r } : {}) })
+    assert.deepEqual(node.admitted(), ['cl'])
+    node.step({ kind: 'bytesIn', link: 1, bytes: write(issuer, 1, 'mine') })
+    assert.deepEqual(closes(), [[1, 'malformed-write']], `${r === 1 ? 'client' : 'member'}, ${utf8Len(issuer)} bytes`)
+    assert.deepEqual(rows(JK.frameDrop), [[1, `malformed write: issuer over ${ISSUER_MAX} bytes`, null]])
+    assert.equal(node.state.size, 0, 'nothing stamped')
+    assert.equal(rows(JK.writeRelay).length, 0, 'refused before the relay')
+  }
+  //! the bound itself: an issuer of exactly 81 bytes (the longest an honest node can be) and a short one commit
+  for (const issuer of ['c'.repeat(64) + '~' + '9'.repeat(16), 'cl~1', 'é'.repeat(40) + '~']) {
+    const { node, closes, up } = harness('aa', { tune: { frame: 1024 } })
+    up(1)
+    helloWith(1, node, { u: 'cl', l: '', r: 1 })
+    node.step({ kind: 'bytesIn', link: 1, bytes: write(issuer, 1, 'mine') })
+    assert.deepEqual(closes(), [], `${utf8Len(issuer)} bytes`)
+    assert.deepEqual([...node.state.keys()], [JSON.stringify(['mine'])], `${utf8Len(issuer)} bytes committed`)
+  }
 })
 
 test('contract mismatch: both carry c and differ → contractReject names the first key that differs and THEIR value; the link closes contract-mismatch; a dialed target is parked and revived at heartbeat cadence', () => {

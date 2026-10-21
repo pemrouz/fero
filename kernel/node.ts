@@ -35,7 +35,7 @@ import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
 import { tuneOf, type Tune } from './tune.ts'
 import { RING } from './ring.ts'
-import { NONCE_MIN, NONCE_MAX, PROOF_LEN, UUID_MAX, addressOk, contractDiff, prove, utf8Len, verify, type Door, type HelloKeys } from './door.ts'
+import { NONCE_MIN, NONCE_MAX, PROOF_LEN, UUID_MAX, ISSUER_MAX, addressOk, contractDiff, prove, utf8Len, verify, type Door, type HelloKeys } from './door.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -1891,6 +1891,16 @@ export class Node {
           j.armed && j.emit(JK.frameDrop, link.id, 'write before hello')
           link.dead = true
           return this.env.sink.close(link.id, 'write-before-hello')
+        }
+        //! the issuer's size (door.ts ISSUER_MAX): the issuer is the frame's own claim, so the HELLO's uuid bound does
+        // not cover it; a longer one would be stamped by the relay and then throw from the encoder. Malformed, closed.
+        // prov() is cached, so onWrite's own read costs nothing more; a string no longer than ISSUER_MAX / 3
+        // characters cannot pass the bound, so an honest issuer is two compares.
+        const iss = f.prov()?.origin
+        if (iss !== undefined && iss.length * 3 > ISSUER_MAX && (iss.length > ISSUER_MAX || utf8Len(iss) > ISSUER_MAX)) {
+          j.armed && j.emit(JK.frameDrop, link.id, `malformed write: issuer over ${ISSUER_MAX} bytes`)
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-write')
         }
         this.writes.onWrite(this, link, f)
         this.membership.settle(this)
