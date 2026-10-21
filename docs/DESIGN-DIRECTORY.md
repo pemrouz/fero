@@ -723,3 +723,44 @@ every seed. `tests/door.test.ts` — on real sockets the refusal line of a targe
 member's proof before any view formed carries "the first view waits on it". The `#directory`
 example checks are unchanged. The STATUS line narrows to the loud same-name squatter and the
 operator's dead static host.
+
+## §14 Two small lines: IPv6 in brackets, and I-19 argued closed (2026-10-21, wave 6c)
+
+### IPv6 in brackets
+
+`'[::1]:4000'` passed `isAddr`, and then the shell handed `[::1]` to `net`, so `fero()` failed with
+`getaddrinfo ENOTFOUND [::1]`. The directory's bind probe did the same with a bracketed rendezvous.
+Brackets are the spelling the code already spoke (`localish`, `canon`, `isBox` and the squat guard
+all name `[::1]` and `[::]`), so they are now parsed, not refused: the shell's `split` and the
+directory's probe take them off for `net`, and a port-0 listen prints back as it was written, so
+`cluster.me.listen` reads `[::1]:40123` and a peer dials that very string. The bare form still reads by
+the last colon when what is left is a whole IPv6 literal (`::1:4000`, and V4-45's
+`::ffff:127.0.0.1:0`). A host with a colon that is not one is refused with a hint (`fdaa::3` would read
+as host `fdaa:`, port 3), and brackets hold an IPv6 literal only. Pinned: `isAddr`'s cases; a server on
+`[::1]:0` and a client that dials its printed listen (api/index.test.ts); an IPv6 rendezvous hosted and
+used by a bare client (api/directory.test.ts, red with the probe's strip removed); the hint from a flag
+(tests/config.test.ts).
+
+### I-19, argued closed
+
+I-19 was one `TypeError: c.methods.lookup is not a function` from a server's `fero()`, 2026-09-13, about
+300 ms after the host was SIGKILLed; never seen again (§12's probe, 30 runs, the race tests). The
+argument that no window is left in today's code:
+
+- A client's `methods` is a Proxy whose namespace is OPEN: any name that is not a built-in writer is a
+  handle maker (api/index.ts, `methodSurface`). So `lookup` is a function on every client, before its
+  link is up, while it is down, and whatever answers at the far end. A lookup opened while the link is
+  down is held and replayed on the next primary (the Caller), which is the "wait" the filing asked for.
+- `lookup` can be missing only on a SERVER's methods (its own table). The `#directory` client is
+  composed from a literal config (`hosts`, `heartbeat`, `redial`, no server marker), and the role is a
+  pure function of the config (V4-5's role rule), so it is a client every time.
+- The one way a config the directory did not write could reach that compose is the layer, and system
+  resources bypass it (api/index.ts `compose`, `isSystem`).
+- The two candidate causes the filing named are ruled out: the method table does not "land" on a
+  client (nothing is discovered), and the survivor-races-the-newcomer path was run for real in §12.
+
+What stays: `#client`'s guard fails typed, naming the role, if it ever recurs. New pin: the config tier
+(tests/config.test.ts) composes a server with `FERO_SERVER`, `FERO_LISTEN` and `FERO_REPLICAS` set and
+the directory on: it hosts, and its directory client composes as a client; with the bypass removed
+`fero()` rejects with the guard's line. What did throw on 2026-09-13 cannot be shown now; the code of that
+day had the same open namespace and the same literal config.

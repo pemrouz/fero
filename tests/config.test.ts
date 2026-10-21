@@ -131,6 +131,21 @@ test('redial.tries (the tune table\'s one config key): the default shows as 10, 
   assert.match((await run('shop', { argv: ['--fero.redial.tries', '1.5'], call: { server: true } })).err ?? '', /redial\.tries must be an integer ≥ 0 \(from --fero\.redial\.tries\)/)
 })
 
+//! I-19 (`c.methods.lookup is not a function`, seen once on 2026-09-13, never reproduced): a client's methods are an
+// OPEN namespace (any name is a handle maker), so `lookup` can be missing only on a `#directory` client that composed
+// as a SERVER, and the role is a pure function of the config. The one way a config the directory did not write could
+// reach that compose is the layer, which system resources bypass. This pins the bypass with the directory ON: every
+// server marker a variable can carry is set, and the box directory's client still composes as a client (with the
+// bypass removed, fero() rejects with the I-19 guard's line: the directory client composed as a server).
+test('the #directory compose is out of the layer\'s reach (I-19): FERO_SERVER, FERO_LISTEN and FERO_REPLICAS set and the directory on — the server hosts the box directory and its directory client composes as a client', async () => {
+  const p = await ports.free()
+  const r = await run('shop', { env: { FERO_RENDEZVOUS: `127.0.0.1:${p}`, FERO_SERVER: 'true', FERO_LISTEN: '127.0.0.1:0', FERO_REPLICAS: '1', FERO_HEARTBEAT_MS: '50' } })
+  assert.equal(r.err, null, r.err ?? '')
+  const me = r.lines[0].me as Line['me'] & { rendezvous: { addr: string; hosting: boolean; error?: string } }
+  assert.equal(me.role, 'server')
+  assert.deepEqual([me.rendezvous.addr, me.rendezvous.hosting, me.rendezvous.error], [`127.0.0.1:${p}`, true, undefined], 'it hosts the box directory, and nothing is wrong with it')
+})
+
 test('refusals name their source: the legacy FERO_RENDEZVOUS text, a non-number, a stray old spelling, a typo', async () => {
   assert.match((await run('shop', { env: { FERO_RENDEZVOUS: 'garbage' }, call: { server: true } })).err ?? '', /FERO_RENDEZVOUS='garbage' is not a 'host:port' address \(or 'off'\)/)
   assert.match((await run('shop', { env: { FERO_HEARTBEAT_MS: 'abc' }, call: { server: true } })).err ?? '', /heartbeat\.ms must be a finite number of milliseconds ≥ 0 \(0 = heartbeats off\) \(from FERO_HEARTBEAT_MS\)/)
