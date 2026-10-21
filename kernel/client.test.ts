@@ -1056,6 +1056,38 @@ test('a torn answer that stops again at the resume: the second drain ships the r
   assert.deepEqual(screenOf(S), ROWS)
 })
 
+//! the byte bound stops the ship the same way (tune row queuedBytes, Link.full): with queuedBytes 1 the queue is full
+// as soon as it holds one frame, whatever the count bound says — the ship stops before the next frame instead of
+// clearing the queue, and each drain delivers the queue and resumes past it until the reply goes out.
+test('a torn answer at the BYTE bound: the ship stops when the queue holds queuedBytes (one frame here, the count bound 256 far off), nothing is cleared, and the drains finish the answer with every row', () => {
+  const F = feeder('ff', 7, { tune: { queuedBytes: 1 } })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:pp', 'sim:ff'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:pp' })
+  S.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'pp', i: 1, l: 'sim:pp', c: SCOPED }) })
+  S.digestFrom(1)
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:ff' })
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'ff', i: 1, l: 'sim:ff', c: SCOPED }) })
+  for (const b of encodeRuns(sparse('bb', 10))) S.node.step({ kind: 'bytesIn', link: 1, bytes: b })
+  const p = pump(F, 7, S, 2)
+  S.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  F.arm(2)
+  p.toA()
+  const link = F.node.links.get(7)!
+  assert.equal(link.queued.length, 1, 'one frame queued: the queue holds queuedBytes, so it is full')
+  assert.deepEqual(link.torn && link.torn.d.bb, 6, 'seqs 1 and 3 sent, 5 queued: stopped before 7')
+  for (let i = 0; i < 10 && (link.torn !== null || link.queued.length); i++) { F.arm(2); F.node.step({ kind: 'drain', link: 7 }) }
+  assert.equal(link.torn, null, 'the drains finished the answer')
+  assert.equal(F.jk(JK.dropOldest).length, 0, 'never cleared')
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b).reduce((a, b) => a + b, 0), 10, 'ten records shipped once')
+  p.settle()
+  assert.equal(S.node.resync, null)
+  assert.deepEqual(cells(S), ROWS)
+  assert.deepEqual(screenOf(S), ROWS)
+})
+
 //! the older case the re-check named: a spoke's FIRST connect (it holds nothing, its ask is d = {} and no resync is
 // on) tore the same way on base and lost the same rows. The spoke is out of resync, so it answers the drain digest
 // with its real tails — which sit at the tear, because the ship stopped there — and the resume had already brought

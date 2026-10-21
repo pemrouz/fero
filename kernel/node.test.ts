@@ -1027,6 +1027,54 @@ test('M6 arming predicate: scoped is config, armed requires a committed view —
   assert.equal(restored.armed, true, 'scoped ∧ epoch > 0 ⇒ armed')
 })
 
+//! ── the paused queue's byte bound (tune row queuedBytes) ─────────────────────────
+// The count bound alone let a paused link hold 256 frames of up to the frame cap each (64 GiB at 256 MiB). The byte
+// bound clears the queue when a frame meets a queue that already holds queuedBytes; a queue of small frames still
+// fills to the count. Both are read off the same push (Link.full), and the drain heals either clear the same way.
+test('the paused queue is bounded by bytes too: big frames clear at the byte bound, small frames still fill to the count, and the drain heals both', () => {
+  const tune = { frame: 4096, queued: 256, queuedBytes: 64 * 1024 }
+  const run = (recs: number, size: number, perWrite: number) => {
+    const A = harness('aa', { tune })
+    const B = harness('bb', { tune: { frame: 4096 } })
+    A.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+    B.node.step({ kind: 'linkUp', link: 1, dialed: false })
+    let ai = 0, bi = 0
+    const pump = () => {
+      for (let round = 0; round < 8; round++) {
+        const as = A.of('send'), bs = B.of('send')
+        for (; ai < as.length; ai++) B.node.step({ kind: 'bytesIn', link: 1, bytes: as[ai][2] as Uint8Array })
+        for (; bi < bs.length; bi++) A.node.step({ kind: 'bytesIn', link: 1, bytes: bs[bi][2] as Uint8Array })
+      }
+    }
+    pump()
+    const la = A.node.links.get(1)!
+    assert.equal(la.synced, true)
+    A.node.step({ kind: 'pause', link: 1 })
+    let most = 0, mostBytes = 0, at = -1
+    for (let w = 0; w < recs / perWrite; w++) {
+      A.node.step({ kind: 'write', recs: Array.from({ length: perWrite }, (_, i) => ({ type: REC.update, key: [`r${w * perWrite + i}`], value: new Uint8Array(size).fill(1) })) })
+      most = Math.max(most, la.queued.length); mostBytes = Math.max(mostBytes, la.queuedBytes)
+      if (at < 0 && A.node.journal.read().some((e) => e.kind === JK.dropOldest)) at = w
+    }
+    const drop = A.node.journal.read().find((e) => e.kind === JK.dropOldest)
+    A.node.step({ kind: 'drain', link: 1 })
+    pump()
+    assert.equal(B.node.state.size, recs, 'the drain digest re-shipped the lost tail')
+    return { most, mostBytes, drop: drop?.b, left: la.queuedBytes }
+  }
+  //! big: one 3 KB frame per write (two 1.5 KB records); 22 of them pass 64 KiB, so the 23rd clears — the count is far off
+  const big = run(60, 1500, 2)
+  assert.equal(big.drop, 23, 'the byte bound cleared the queue at its 23rd frame (256 is the count bound)')
+  assert.equal(big.most, 22)
+  assert.ok(big.mostBytes >= 64 * 1024 && big.mostBytes < 64 * 1024 + 4096 + 64, `held under the bound plus one frame: ${big.mostBytes}`)
+  //! small: one ~40-byte frame per write; 256 of them are ~10 KB, so the count clears at the 257th, as before
+  const small = run(300, 8, 1)
+  assert.equal(small.drop, 257, 'small frames still fill to the count')
+  assert.equal(small.most, 256)
+  assert.ok(small.mostBytes < 64 * 1024, `far under the byte bound: ${small.mostBytes}`)
+  assert.equal(small.left, 0, 'the drain zeroes the byte count')
+})
+
 //! ── V4-51: a flush that clears the queue ships nothing more ─────────────────────
 // A run bigger than the frame cap leaves in several frames, so one flush can now ship several. If the paused queue
 // overflows at one of them, the rest of the flush must not follow it into the queue: those frames would sit ABOVE the
