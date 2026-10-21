@@ -2327,6 +2327,23 @@ const screenRows = (h: H): string[] => {
   }
   return Object.keys(root).filter((k) => typeof root[k] !== 'object' || Object.keys(root[k] as object).length > 0).sort()
 }
+//! screenCells — the same fold, two levels deep ('row.field' per live field, 'row' for a scalar row), for a spoke harness
+const screenCells = (h: H): string[] => {
+  const root: Record<string, unknown> = {}
+  for (const e of h.of('apply')) {
+    const r = e[1] as Rec
+    const k = r.key
+    if (k.length === 1) { if (r.type === REC.remove) delete root[k[0]]; else root[k[0]] = r.value; continue }
+    if (r.type === REC.remove) { const o = root[k[0]]; if (typeof o === 'object' && o !== null) delete (o as Record<string, unknown>)[k[1]]; continue }
+    if (typeof root[k[0]] !== 'object' || root[k[0]] === null) root[k[0]] = {}
+    ;(root[k[0]] as Record<string, unknown>)[k[1]] = r.value
+  }
+  const out: string[] = []
+  for (const [a, v] of Object.entries(root)) if (typeof v === 'object' && v !== null) for (const b of Object.keys(v)) out.push(a + '.' + b); else out.push(a)
+  return out.sort()
+}
+//! kernelCells — the kernel's cells as 'row.field', for a screen comparison
+const kernelCells = (h: H): string[] => [...h.node.state.keys()].map((k) => (JSON.parse(k) as string[]).join('.')).sort()
 test('wave 6c — a shed tells the spokes: a partition that moved off the feeder (an orphan at the install, shed once every holder attested it) leaves the spoke with it — its cells, lane entries and screen rows go; a FEED from a spare link is dropped; a later re-acquire brings the partition back whole', () => {
   const { F, S, p, link, connect, cells, laneAt, teach } = latching()
   F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
@@ -2532,11 +2549,12 @@ test('wave 6c — the fold group: a write and its later remove forwarded in sepa
 // lane; the teacher's delta still to come). The resync's answer ships what aa holds of px; the end used to sweep px.c,
 // px.d and px.z from the screen, and the fold's forward brought px.c and px.d back. Now the ask says `f: 1`, aa's reply
 // names px in flight, the end KEEPS the three cells on the screen (JK.resynced c=3), the fold's group lands px.c and
-// px.d (back in the kernel, done) and judges px.z: its stamp bb#11 is above the spoke's lane (9) — a record aa may still
-// get — so it waits; the next frame on lane bb (qx at 13) moves the lane past it and it leaves the screen, a ghost: qq had
-// a record aa never gets. Red on the tree before at "no cell left the screen at the resync's end": three removes.
-test('wave 6c — the vanish-and-return: a spoke failing over onto a feeder mid-repair keeps the partition\'s cells on its screen across the resync end (the reply names the partition in flight), the fold\'s end confirms what it brought, and a cell the feeder never gets leaves once the lane moves past it', () => {
-  const { F, S, p, connect, cells, laneAt, teach } = latching()
+// px.d (back in the kernel, done) and judges px.z gone at once: the fold did not bring it — qq had a record aa never
+// gets. (The first build kept px.z waiting until lane bb moved past 11; the review's PROBE5 killed bb instead, and the
+// cell stayed for good. Clause 1 of the rule: the end judges every kept cell.) Red on the tree before at "no cell left
+// the screen at the resync's end": three removes; red on the first build at "px.z left the screen at the fold's end".
+test('wave 6c — the vanish-and-return: a spoke failing over onto a feeder mid-repair keeps the partition\'s cells on its screen across the resync end (the reply names the partition in flight), the fold\'s end confirms what it brought and judges the rest gone at once — nothing waits on a lane that may never move again', () => {
+  const { F, S, p, connect, cells, laneAt, beat, teach } = latching()
   //! the first feeder qq, hand-driven on link 3: admitted first, so it is the primary; it serves px whole and qx
   S.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:qq' })
   S.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'qq', i: 1, l: 'sim:qq', c: SCOPED }) })
@@ -2576,13 +2594,15 @@ test('wave 6c — the vanish-and-return: a spoke failing over onto a feeder mid-
   p.settle()
   assert.deepEqual(laneAt(S, 'bb'), [3, 5, 7, 8, 9])
   assert.deepEqual(cells(S), cells(F), 'px.c and px.d are back in the kernel: the group brought them')
-  assert.deepEqual(removes(), [], 'still nothing left the screen: px.z waits — bb#11 is above the lane the feeder has shown (9)')
-  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0]], 'the fold\'s end: two frames, no ghost yet')
-  //! the lane moves on at aa (qx at bb#13, tapped): px.z is below it now and aa never got it — a ghost, off the screen
-  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('w', 7), 13, 8, VERB.RECORDS) })
+  assert.deepEqual(removes(), [JSON.stringify(['px', 'z'])], 'px.z left the screen at the fold\'s end: the fold did not bring it (it waited for lane bb to pass 11 before, and a lane can stop for good)')
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 1]], 'the fold\'s end: two frames landed, one kept cell judged a ghost')
+  assert.deepEqual(screenCells(S), kernelCells(F), 'the screen mirrors the feeder')
+  //! the review's PROBE5: the owner of lane bb dies — the lane never moves again — and nothing is left waiting on it
+  F.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   p.settle()
-  assert.deepEqual(removes(), [JSON.stringify(['px', 'z'])], 'px.z left the screen once the lane passed its stamp')
-  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0], ['px', 0, 1]], 'judged later: no frame, one ghost')
+  beat(10)
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 1]], 'no later judgement: there was nothing left to judge')
   assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder')
+  assert.deepEqual(screenCells(S), kernelCells(F))
   assert.deepEqual(screenRows(S), ['px', 'qx'])
 })

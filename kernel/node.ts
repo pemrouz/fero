@@ -547,19 +547,23 @@ export class Node {
   // fold. A failover's resync answer carries what the new feeder holds of each FED partition when it builds it; the rows
   // it is about to fold (a repair latch's staged delta, a re-entry's whole partition, a from-zero acquire) are not in
   // it, and the spoke had them from its first feeder, so the ghost sweep at the end took them from the screen and the
-  // fold's forward brought them back (STATUS; sighting 3: 7 to 20 of forty cells on 22 of 56 runs, M11 on two). Now a
-  // resync's ask says `f: 1`, the reply names the partitions in flight at the feeder (`f`: Scope.inFlight — every open
-  // latch and every orphan the ring still assigns there), and the sweep KEEPS a ghost cell of such a partition on the
-  // screen (#deferred, with the stamp it held at the reset: #oldStamps) instead of removing it. The fold's end for that
-  // partition (FEED {e}, #groupLand) judges them: a kept cell the group brought is back in the kernel and done; one it
-  // did not bring is a ghost once the feeder has shown this spoke its lane past the cell's stamp (the spoke's applied for
-  // that lane: the feeder's lane moved on and the fold did not carry it), else it waits for the lane (a record in flight
-  // to the feeder at the fold, tapped right after; judged again after each frame while kept cells remain). A shed of the
-  // partition drops its kept cells with the rest (#unfeed); a failover folds them into the next resync's sweep set; a
-  // kept cell is screen-only — the kernel lacks it — so M12's screen check names one that never gets judged.
-  #deferred = new Map<string, { ended: boolean; cells: Map<string, { seq: number; origin: string }> }>()
-  //! the stamps the cells of `resync.old` had at the reset (the fold is wiped there): what a kept cell is judged by
-  #oldStamps = new Map<string, { seq: number; origin: string }>()
+  // fold's forward brought them back (STATUS; sighting 3: 7 to 20 of forty cells on 12 of 56 runs; M11 fires on the two
+  // pinned offsets, which are the pins' own and not on the grid). Now a resync's ask says `f: 1`, the reply names the
+  // partitions in flight at the feeder (`f`: Scope.inFlight — every open latch and every orphan the ring still assigns
+  // there), and the sweep KEEPS a ghost cell of such a partition on the screen (#deferred) instead of removing it. A kept
+  // cell is screen-only (the kernel lacks it), so its life is BOUNDED by rule (DESIGN-SCALE, the wave-6c note, three
+  // clauses): it waits for its partition to stop being in flight AND for this spoke to hold the feeder's whole partition
+  // after that. (1) The fold's end for the partition (FEED {e}, #groupLand → #judge) judges EVERY kept cell of it at
+  // once: one the group brought is back in the kernel and done; every other one is a ghost and leaves the screen — no
+  // waiting for the lane (the first build waited until the feeder's lane had moved past the cell's stamp, and a lane
+  // whose owner died with the spoke's first feeder never moves again: the cell stayed for good). The cost, a record in
+  // flight TO the feeder at that moment, is one bounded vanish-and-return and never more than the base swept. (2) Every
+  // way out of in flight sends a word: a fold (FEED {e}); a clean latch abort (FEED {x: [p]}, scope.ts #abort); an
+  // abort to an orphan (still in flight while assigned, else the shed's FEED {x}); a failover folds the kept cells into
+  // the next resync's sweep set (#resyncBegin). (3) Nothing a clear can take is the only exit: the feeder owes the words
+  // a clear took and the end of a fold on an unsynced link, and says them after the answer that syncs the link again
+  // (#owed, #payOwed); a group whose end was lost lands and judges nothing. Keyed by partition: the cells kept.
+  #deferred = new Map<string, Set<string>>()
   //! #askF (servers) — the client links whose latest ask said `f: 1`: their reply carries the in-flight list; kept across a
   // torn or queued answer so the resumed reply carries it too
   #askF = new Set<Link>()
@@ -1399,11 +1403,11 @@ export class Node {
   // the partial re-download's cells join it; the fold is wiped again (the new feeder's held subset is the truth).
   #resyncBegin(link: Link) {
     const old = this.resync !== null ? this.resync.old : new Set<string>()
-    for (const k of this.state.keys()) { old.add(k); const v = this.versions.get(k); if (v !== undefined) this.#oldStamps.set(k, v) }
-    //! the cells kept back by an earlier end (#deferred, wave 6c) are on the screen too: they join the sweep set with the
-    // stamps they were kept under, and the next feeder's reply says which to keep again
+    for (const k of this.state.keys()) old.add(k)
+    //! the cells kept back by an earlier end (#deferred, wave 6c) are on the screen too: they join the sweep set, and the
+    // next feeder's reply says which to keep again (clause 2's failover exit)
     if (this.#deferred.size) {
-      for (const g of this.#deferred.values()) for (const [k, st] of g.cells) { old.add(k); this.#oldStamps.set(k, st) }
+      for (const g of this.#deferred.values()) for (const k of g) old.add(k)
       this.#deferred.clear()
     }
     this.journal.armed && this.journal.emit(JK.resync, old.size)
@@ -1441,37 +1445,32 @@ export class Node {
       }
       if (f !== null && f.has(path[0])) {
         let g = this.#deferred.get(path[0])
-        if (g === undefined) this.#deferred.set(path[0], g = { ended: false, cells: new Map() })
-        g.cells.set(cell, this.#oldStamps.get(cell) ?? { seq: 0, origin: '' })
+        if (g === undefined) this.#deferred.set(path[0], g = new Set())
+        g.add(cell)
         kept++
         continue
       }
       ghosts++
       this.#ghost(cell, path)
     }
-    this.#oldStamps.clear()
     this.journal.armed && this.journal.emit(JK.resynced, ghosts, undefined, kept || undefined)
     //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
     // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
     this.writes.settleStranded(this)
   }
 
-  //! #judge (clients, wave 6c) — the kept cells of partition p (#deferred), once the fold's end for p has come (`ended`):
-  // a cell back in the kernel is done; one the feeder's lane has moved past (the spoke's applied for the cell's lane is
-  // at or above its stamp: the fold that just landed is the feeder's whole p, and it did not carry the cell) is a ghost
-  // and leaves the screen through #ghost — unless an ancestor is live now (the row came back whole: covered); one above
-  // the lane waits (a record in flight to the feeder at the fold, tapped right behind the group) and is judged again
-  // after each frame that lands here (#judgeEnded). Returns the ghosts removed.
-  #judge(p: string, ended: boolean): number {
+  //! #judge (clients, wave 6c, clause 1) — the fold's end for p has come: every kept cell of p (#deferred) is judged now.
+  // A cell back in the kernel is done (the group, or the answer before it, brought it); every other one is a ghost — the
+  // feeder holds p whole at its fold's end and did not carry the cell — and leaves the screen through #ghost, unless an
+  // ancestor is live now (the row came back whole: covered). Nothing waits: a record in flight to the feeder at this
+  // moment leaves and returns when it lands (the rule's one cost, bounded). Returns the ghosts removed.
+  #judge(p: string): number {
     const g = this.#deferred.get(p)
     if (g === undefined) return 0
-    if (ended) g.ended = true
-    if (!g.ended) return 0
+    this.#deferred.delete(p)
     let ghosts = 0
-    for (const [cell, st] of g.cells) {
-      if (this.state.has(cell)) { g.cells.delete(cell); continue }
-      if (st.seq > (this.streams.get(st.origin)?.applied ?? 0)) continue
-      g.cells.delete(cell)
+    for (const cell of g) {
+      if (this.state.has(cell)) continue
       const path = JSON.parse(cell) as string[]
       let covered = false
       for (let d = 1; d < path.length && !covered; d++) covered = this.state.has(JSON.stringify(path.slice(0, d)))
@@ -1479,16 +1478,7 @@ export class Node {
       ghosts++
       this.#ghost(cell, path)
     }
-    if (g.cells.size === 0) this.#deferred.delete(p)
     return ghosts
-  }
-  //! #judgeEnded — after a frame landed: every ended partition's waiting cells are judged again (cold: only while kept cells remain)
-  #judgeEnded() {
-    for (const [p, g] of this.#deferred) {
-      if (!g.ended) continue
-      const ghosts = this.#judge(p, false)
-      if (ghosts) this.journal.armed && this.journal.emit(JK.fed, p, 0, ghosts)
-    }
   }
 
   //! #ghost — one cell leaves the SCREEN without a remove record existing anywhere (the ghost sweep's removal, shared
@@ -1524,7 +1514,7 @@ export class Node {
     if (this.resync !== null) for (const k of this.resync.old) if (((JSON.parse(k) as string[])[0] ?? '') === p) { this.resync.old.delete(k); shown.add(k) }
     //! the cells a resync end kept back for p (#deferred) are on the screen too: they go with the partition
     const kept = this.#deferred.get(p)
-    if (kept !== undefined) { for (const k of kept.cells.keys()) shown.add(k); this.#deferred.delete(p) }
+    if (kept !== undefined) { for (const k of kept) shown.add(k); this.#deferred.delete(p) }
     this.dropCell(row); this.versions.delete(row)
     for (const k of fields) { this.dropCell(k); this.versions.delete(k) }
     let dropped = 0
@@ -1585,11 +1575,14 @@ export class Node {
       for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
   }
 
-  //! #groupLand (clients, wave 6c) — the fold group's end: every frame it held goes through #ingest in order, in this one
-  // step. Called by FEED {e}, by FEED {b} when a group is still open (a lost end), by the primary's next digest, PING or
-  // PONG (frames of a later step at the feeder: the end was lost with a clear), and dropped — not landed — at a primary
-  // failover (the resync onto the next feeder brings the partition whole). Returns the frames landed.
-  #groupLand(link: Link): number {
+  //! #groupLand (clients, wave 6c) — the fold group lands: every frame it held goes through #ingest in order, in this one
+  // step. `ended` is true from FEED {e} alone (the fold's end: the kept cells of p are judged now, #judge). A group closed
+  // by any other frame of a later step at the feeder — a FEED {b} or {x}, the primary's next digest, PING or PONG — lost
+  // its end to a clear: its frames land and NOTHING is judged (the feeder owes the end and says it again after the
+  // answer that heals the link, #payOwed; a judgement here would run against a kernel the clear left incomplete). An
+  // open group is dropped, not landed, at a primary failover (the resync onto the next feeder brings the partition
+  // whole). Returns the frames landed; JK.fed c is the ghosts judged, absent when nothing was judged.
+  #groupLand(link: Link, ended: boolean): number {
     const g = this.group
     if (g === null) return 0
     this.group = null
@@ -1598,8 +1591,7 @@ export class Node {
       const prov = f.prov()
       if (prov !== null) this.#ingest(link, f, prov)
     }
-    //! the fold's end for p: the cells a resync end kept back for p are judged now (wave 6c)
-    this.journal.armed && this.journal.emit(JK.fed, g.p, g.frames.length, this.#judge(g.p, true))
+    this.journal.armed && this.journal.emit(JK.fed, g.p, g.frames.length, ended ? this.#judge(g.p) : undefined)
     return g.frames.length
   }
 
@@ -2061,7 +2053,6 @@ export class Node {
         // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes
         if (this.group !== null && link.id === this.primary) { this.group.frames.push(f.buf.slice()); return }
         this.#ingest(link, f, prov)
-        if (this.#deferred.size && link.id === this.primary) this.#judgeEnded() // kept cells waiting for the lane (wave 6c)
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -2148,14 +2139,14 @@ export class Node {
       }
       case VERB.PING:
         //! a heartbeat frame from the primary is a later step's: a fold group still open at this client lost its end (wave 6c)
-        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link)
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link, false)
         //! a server's PONG toward a CLIENT link carries its write-gate (`w`, wave 6b): on a link where the client's uuid
         // is the lower one the client PINGs and no digest flows to it (it floors only its primary, and the server
         // waits for the lower side), so without this word a client could not know the gate of a server it does not
         // follow. An old client ignores the body (V4-14). Every other PONG is the bare frame it always was.
         return link.ship(encodeControl(VERB.PONG, link.client && !this.client ? { w: this.membership.gate(this).open ? 1 : 0 } : undefined), this.env.sink, j)
       case VERB.PONG:
-        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link) // as at PING (wave 6c)
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link, false) // as at PING (wave 6c)
         //! proof of life — and, at a CLIENT, a server's gate word (wave 6b): read it, and move if the rule says so
         if (this.client && !link.client && link.state === LS.admitted) this.#gateWord(link, (f.value as { w?: unknown } | undefined)?.w)
         return
@@ -2211,8 +2202,9 @@ export class Node {
           // the failover its linkDown runs asks the next one for everything this digest would have settled.
           this.#gateWord(link, v.w)
           if (link.dead) return
-          //! a digest is a frame of a later step at the feeder: a fold group still open here lost its end (wave 6c)
-          if (this.group !== null) this.#groupLand(link)
+          //! a digest is a frame of a later step at the feeder: a fold group still open here lost its end (wave 6c); its
+          // frames land, nothing is judged — the feeder owes the end and says it after the heal
+          if (this.group !== null) this.#groupLand(link, false)
           //! a ceiling on the feeder's drain digest (`c`, wave 6c): keep it, and ask every feeder with it until a reply
           // at or above the first capped ask lands (#ceiling). In resync the ask is d = {} already: nothing to keep.
           if (v.r === 1 && v.h === 1 && typeof v.c === 'object' && v.c !== null) {
@@ -2347,12 +2339,13 @@ export class Node {
         const v = f.value as { x?: unknown; b?: unknown; e?: unknown } | undefined
         if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
         //! {b: p}: a fold group begins — an open one lost its end (the next frames are a later step's): land it first
-        if (typeof v?.b === 'string') { this.#groupLand(link); this.group = { p: v.b, frames: [] } }
-        //! {e: p}: the group lands as one apply (and judges the kept cells of its partition); with no group open — its
-        // {b} was lost, or the fold forwarded nothing — the kept cells of p are judged all the same
+        if (typeof v?.b === 'string') { this.#groupLand(link, false); this.group = { p: v.b, frames: [] } }
+        //! {e: p}: the fold's end — the group lands as one apply and every kept cell of p is judged (clause 1); with no
+        // group open (its {b} was lost, the fold forwarded nothing, or the fold ran on an unsynced link and this is the
+        // end the feeder owed, said after the answer that healed the link) the kept cells of p are judged all the same
         if (typeof v?.e === 'string') {
-          if (this.group !== null) this.#groupLand(link)
-          else j.armed && j.emit(JK.fed, v.e, 0, this.#judge(v.e, true))
+          if (this.group !== null) this.#groupLand(link, true)
+          else j.armed && j.emit(JK.fed, v.e, 0, this.#judge(v.e))
         }
         return
       }
