@@ -29,7 +29,7 @@
 import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW, DRAIN_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
-import { MAX_QUEUED } from './link.ts'
+import { MAX_QUEUED, MAX_QUEUED_BYTES } from './link.ts'
 import { COMPACT_AT } from './log.ts'
 import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.ts'
 import { MAX_FRAME } from './codec.ts'
@@ -98,6 +98,9 @@ export interface Tune {
   probes: number
   //! queued — frames a paused link may hold before the whole queue drops
   queued: number
+  //! queuedBytes — bytes a paused link may hold before the whole queue drops (the next frame clears it); a lone frame
+  // always fits, so the queue holds less than queuedBytes plus one frame
+  queuedBytes: number
   //! compactAt — per-origin log entries that arm a compaction pass
   compactAt: number
   //! snapshotAt — WAL rows since the last snapshot that arm a whole-WAL swap
@@ -139,6 +142,7 @@ export const TUNE: Readonly<Tune> = Object.freeze({
   issuers: MAX_ISSUERS,
   probes: MAX_PROBES,
   queued: MAX_QUEUED,
+  queuedBytes: MAX_QUEUED_BYTES,
   compactAt: COMPACT_AT,
   snapshotAt: SNAPSHOT_AT,
   lamportLease: LAMPORT_LEASE,

@@ -29,6 +29,12 @@ import type { HelloKeys } from './door.ts'
 //! MAX_QUEUED: frames a paused link may hold before drop-oldest kicks in. M0 policy — M1 replaces the drop with spill-to-log (the log IS the retransmit buffer).
 // The default of the tune row `queued` (kernel/tune.ts): a Link has no node, so the node hands its row in at construction (Link.maxQueued).
 export const MAX_QUEUED = 256
+//! MAX_QUEUED_BYTES: the paused queue's second bound, in bytes — the default of the tune row `queuedBytes`. One frame
+// cap (MAX_FRAME, 256 MiB): a frame is never pushed onto a queue that already holds this much, so a paused link holds
+// less than one frame cap plus one frame (512 MiB) whatever its frames weigh. The count bound alone let 256 frames of
+// up to 256 MiB each sit there (64 GiB) once V4-51 cut big records into big frames. A queue of small frames still
+// fills to the count first: 256 frames reach 256 MiB only at 1 MiB a frame.
+export const MAX_QUEUED_BYTES = MAX_FRAME
 
 //! LinkState: the admission ladder. M0 collapses identified→admitted (no membership yet); the distinct states exist so M2 can insert a view-admission step without reshaping the machine.
 //! LS.diag (M7): the authenticated diagnostics latch — a state, not a field. An LS.diag link is
@@ -53,6 +59,8 @@ export class Link {
   //! backpressure — paused mirrors the env's socket-buffer state; queued holds finished frames while paused (bounded)
   paused = false
   queued: Uint8Array[] = []
+  //! queuedBytes — the bytes `queued` holds now (kept beside it: ship adds, a clear and the drain zero it)
+  queuedBytes = 0
   //! synced: live records flow on this link ONLY after the peer's digest has been received. The seed sweeps
   // proved why (24% of seeds diverged without it): a live frame sent between admit and the digest-triggered
   // suffix ship LEAPFROGS the suffix on the wire; the receiver's monotone high-water then discards the older
@@ -132,13 +140,19 @@ export class Link {
   id: number
   dialed: boolean
   to?: string
-  //! maxQueued — the paused-queue bound, the node's tune row `queued` handed in at construction (a Link has no node);
-  // `frame` likewise — the most body bytes one of this link's frames may hold
+  //! maxQueued / maxBytes — the paused-queue bounds, the node's tune rows `queued` and `queuedBytes` handed in at
+  // construction (a Link has no node); `frame` likewise — the most body bytes one of this link's frames may hold
   maxQueued: number
-  constructor(id: number, dialed: boolean, to?: string, maxQueued = MAX_QUEUED, frame = MAX_FRAME) {
-    this.id = id; this.dialed = dialed; this.to = to; this.maxQueued = maxQueued
+  maxBytes: number
+  constructor(id: number, dialed: boolean, to?: string, maxQueued = MAX_QUEUED, frame = MAX_FRAME, maxBytes = MAX_QUEUED_BYTES) {
+    this.id = id; this.dialed = dialed; this.to = to; this.maxQueued = maxQueued; this.maxBytes = maxBytes
     this.outbox = new Outbox(frame)
   }
+
+  //! full — the next frame shipped while paused would clear the queue: it holds `maxQueued` frames, or `maxBytes`
+  // bytes. The ONE predicate ship clears on and the callers that must never overflow (node.ts #answer, the drain
+  // digest) stop on.
+  full(): boolean { return this.queued.length >= this.maxQueued || this.queuedBytes >= this.maxBytes }
 
   //! addRecord: append to the step's RECORDS frame, opening it with this run's provenance (and, for
   // committed attempt runs, its attempt identity) on first use. Run continuity is CHECKED, not
@@ -187,12 +201,17 @@ export class Link {
   ship(bytes: Uint8Array, sink: EffectSink, j: Journal): boolean {
     if (this.dead) return false
     if (!this.paused) { sink.send(this.id, bytes); return true }
+    //! the bound is read BEFORE the push: a frame onto a full queue clears it (by count this is exactly the old
+    // push-then-`length > maxQueued`), so a lone frame up to the frame cap always fits
+    const over = this.full()
     this.queued.push(bytes)
-    if (this.queued.length > this.maxQueued) {
+    this.queuedBytes += bytes.length
+    if (over) {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
       const dropped = this.onClear !== null ? this.queued : null
       if (dropped !== null) this.queued = []
       else this.queued.length = 0
+      this.queuedBytes = 0
       const wasSynced = this.synced
       this.droppedWhilePaused = true
       this.synced = false
@@ -209,6 +228,7 @@ export class Link {
     j.armed && j.emit(JK.drain, this.id)
     for (const bytes of this.queued) sink.send(this.id, bytes)
     this.queued.length = 0
+    this.queuedBytes = 0
     this.inQueue = null // every queued frame has left: an answer is past the reach of a clear once its reply is out
   }
 }

@@ -809,7 +809,7 @@ export class Node {
         return
       }
       case 'linkUp': {
-        const link = new Link(e.link, e.dialed, e.to, this.tune.queued, this.tune.frame)
+        const link = new Link(e.link, e.dialed, e.to, this.tune.queued, this.tune.frame, this.tune.queuedBytes)
         this.links.set(e.link, link)
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
@@ -958,7 +958,7 @@ export class Node {
         // follow the drain with a digest exchange so the loss heals within two round-trips instead of lingering until the
         // next admit. Never into a FULL queue (the resume can end with its tail and reply filling it): that digest would
         // clear the very reply it follows — the debt stays, and the next drain sends it.
-        if (link.droppedWhilePaused && link.state === LS.admitted && !(link.paused && link.queued.length >= link.maxQueued)) {
+        if (link.droppedWhilePaused && link.state === LS.admitted && !(link.paused && link.full())) {
           link.droppedWhilePaused = false
           //! toward a member (armed): it re-syncs the link and ships nothing — the round below repairs. Toward a CLIENT it
           // says `h: 1`: this link dropped frames, so a spoke whose resync ask got no reply asks again (see `resync`)
@@ -2272,7 +2272,7 @@ export class Node {
         while (lo < hi) { const mid = (lo + hi) >>> 1; if (entries[mid].seq > theirs) hi = mid; else lo = mid + 1 }
         let i = lo
         while (i < entries.length) {
-          if (link.paused && link.queued.length >= link.maxQueued) { tear = origin; tearSeq = entries[i].seq; break lanes }
+          if (link.paused && link.full()) { tear = origin; tearSeq = entries[i].seq; break lanes }
           //! one run, by the codec's own rule: the split is exactly encodeRuns' over the held subset — one frame, or
           // several cuts past the frame cap (armed AE answers carry each entry's STORED pp — the floor law: the receiver's
           // floors advance only through chain-verified spans; unscoped answers stay flag-free, bytes unchanged)
@@ -2287,7 +2287,7 @@ export class Node {
           if (!run.length) break
           for (let k = 0; k < run.length;) {
             //! a stop between two cuts of one run (the stop between runs is the check above, at k = 0)
-            if (k > 0 && link.paused && link.queued.length >= link.maxQueued) { tear = origin; tearSeq = run[k].seq; break lanes }
+            if (k > 0 && link.paused && link.full()) { tear = origin; tearSeq = run[k].seq; break lanes }
             if (link.paused && link.inQueue === null) {
               link.inQueue = { d: this.#cover(d, origin, run[k].seq), r, q }
               if (link.client) this.#covered.add(link)
@@ -2302,7 +2302,7 @@ export class Node {
       }
     }
     //! the reply is one more frame: it never overflows the queue either
-    if (tear === null && r === 1 && link.paused && link.queued.length >= link.maxQueued) tear = ''
+    if (tear === null && r === 1 && link.paused && link.full()) tear = ''
     if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
     if (tear === null) {
       link.synced = true
