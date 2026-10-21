@@ -2352,7 +2352,13 @@ export class Node {
         if (!this.client) { j.armed && j.emit(JK.frameDrop, link.id, 'feed at a server'); return }
         if (link.id !== this.primary) { j.armed && j.emit(JK.frameDrop, link.id, 'feed from a spare'); return }
         const v = f.value as { x?: unknown; b?: unknown; e?: unknown } | undefined
-        if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
+        //! {x: [p…]}: a frame of a later step at the feeder — a fold group still open here lost its end, and lands FIRST
+        // (nothing judged), so the unfeed runs on the landed kernel in this one step. The review's PROBE6: the group
+        // landed after the unfeed, at the next digest, and put a row of the shed partition back for good.
+        if (Array.isArray(v?.x)) {
+          if (this.group !== null) this.#groupLand(link, false)
+          for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
+        }
         //! {b: p}: a fold group begins — an open one lost its end (the next frames are a later step's): land it first
         if (typeof v?.b === 'string') { this.#groupLand(link, false); this.group = { p: v.b, frames: [] } }
         //! {e: p}: the fold's end — the group lands as one apply and every kept cell of p is judged (clause 1); with no
