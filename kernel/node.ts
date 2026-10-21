@@ -2650,30 +2650,31 @@ export class Node {
     o[kind].add(p)
   }
   //! #payOwed — the answer that syncs the link has shipped whole and replied: say the owed words, {e} per partition
-  // still held, then one {x}. Never into a full paused queue (the reply before it was placed never to overflow one;
-  // the spoke's next heartbeat answer is an untorn answer too, and pays within a tick). A word a clear takes on its way
-  // out is owed again by #clearCover; the ones not yet shipped behind it are owed again here.
+  // still held, then one {x} for the partitions still gone. The debt is CONSUMED WORD BY WORD as each one ships: a word
+  // the clear takes on its way out is owed again by #clearCover's read of the dropped frames, and the words behind it
+  // were never taken out of the debt (the rework took the whole debt out first and put the rest back after a failed
+  // ship: one more branch than the rule needs). Never into a full paused queue: the reply before it was placed never
+  // to overflow one, and a word pushed there would clear that very reply; the next untorn answer — the drain's, or a
+  // heartbeat's — pays within a tick.
   #payOwed(link: Link) {
     const o = this.#owed.get(link)
     if (o === undefined) return
     if (link.paused && link.queued.length >= link.maxQueued) return
-    this.#owed.delete(link)
-    const es = [...o.e], xs = [...o.x]
-    for (let i = 0; i < es.length; i++) {
-      const p = es[i]
+    for (const p of [...o.e]) {
+      o.e.delete(p)
       if (this.scope === null || !this.scope.held(p)) continue // held strictly (never feeds): acquiring again, that fold says its own end; an orphan or gone, a shed's or an abort's {x} is the exit
-      if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) {
-        for (const q of es.slice(i + 1)) this.owe(link, 'e', q)
-        for (const q of xs) this.owe(link, 'x', q)
-        return
-      }
+      if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) return
     }
-    //! an {x} only while p has NO entry here (clause 3: a word only while it is still true) — p back in any state makes
-    // the word stale: held or acquiring on a base, this answer shipped p's rows; from zero, the fold brings p whole; an
-    // orphan, its own exit says its own word (the shed's {x} or a re-entry's whole forward), and an assigned one is in
-    // flight, whose kept cells wait for that fold's end (clause 2)
-    const gone = this.scope === null ? xs : xs.filter((p) => !this.scope!.entries.has(p))
-    if (gone.length) link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
+    if (o.x.size) {
+      //! an {x} only while p has NO entry here (clause 3: a word only while it is still true) — p back in any state makes
+      // the word stale: held or acquiring on a base, this answer shipped p's rows; from zero, the fold brings p whole; an
+      // orphan, its own exit says its own word (the shed's {x} or a re-entry's whole forward), and an assigned one is in
+      // flight, whose kept cells wait for that fold's end (clause 2)
+      const gone = [...o.x].filter((p) => this.scope === null || !this.scope.entries.has(p))
+      o.x.clear()
+      if (gone.length) link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
+    }
+    if (!o.e.size && !o.x.size) this.#owed.delete(link)
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is

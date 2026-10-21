@@ -2935,6 +2935,70 @@ test('wave 6c — a shed\'s word cleared from a never-answered client link is no
   assert.deepEqual(kernelCells(S), [])
 })
 
+//! the debt is paid into a paused queue (clause 3; the second review's M12 and M13). Three folds at aa while its spoke's
+// link is paused and, from the first clear on, unsynced with a cover: three ends owed (px, qx, rx). The drain exchange's
+// capped ask is answered live until the hook pauses the link after the one frame (bb#7, 8, 9): the reply queues. With a
+// queue of one the reply fills it and no word is pushed in (a word there would clear the reply it follows): the drain
+// sends the reply, and the next heartbeat answer pays all three. With a queue of two the first word fits, the second
+// overflows — the clear takes the reply and both words, owed again by #clearCover — and the third was never taken out of
+// the debt: the drain resumes the torn answer and its reply pays all three. Red with the whole debt taken out before the
+// first word ships (the rework's shape, queue of two): rx's end is never said; red without the full-queue guard (queue of
+// one): a second clear, forced by the word.
+for (const queued of [1, 2])
+  test(`wave 6c — three owed ends paid into a paused queue of ${queued}: ${queued === 1 ? 'the reply fills it, no word forces a clear, the next heartbeat answer pays' : 'the second word overflows and the clear takes it with the reply, the third stays owed, the resumed answer pays all three'}`, () => {
+    let armed = false
+    let Fh: H | null = null
+    const L = latching({ tune: { queued } }, (l) => { if (l === 7 && armed && Fh) { armed = false; Fh.node.step({ kind: 'pause', link: 7 }) } })
+    const { F, S, p, link, connect, beat } = L
+    Fh = F
+    F.node.writes.ring.place('rx', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+    connect()
+    assert.deepEqual(kernelCells(S), ['px.a', 'px.b', 'qx.z'])
+    F.node.step({ kind: 'pause', link: 7 })
+    //! three latches from cc's announcements: px and qx repaired on their held bases, rx from zero; every end is owed
+    const fold = (q: string, rec: Rec, seq: number, pp: number) => {
+      F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [q]: { bb: seq } } }) })
+      assert.equal(F.node.scope!.entries.get(q)!.state, SCOPE.acquiring, `${q} latched`)
+      F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeRuns([{ rec, origin: 'bb', seq, epoch: 1, pp }], VERB.ACQ, true)[0] })
+      F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: q, e: 1, t: { bb: seq }, n: 1 }) })
+      assert.equal(F.node.scope!.held(q), true, `${q} folded`)
+    }
+    fold('px', PX('c', 3), 7, 5)
+    fold('qx', QX('w', 7), 8, 6)
+    fold('rx', { type: REC.update, key: ['rx', 'a'], value: 1 }, 9, 0)
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'one clear: the first group overflowed the queue')
+    assert.equal(link.synced, false)
+    assert.deepEqual(link.torn, { d: { bb: 6 }, r: undefined, q: undefined, c: true }, 'the cover sits under bb#7')
+    assert.deepEqual(F.sentOn(7, VERB.FEED), [], 'no end reached the socket')
+    //! the heal: the drain digest carries the cover, the spoke asks capped, and the answer pauses after its one frame
+    F.node.step({ kind: 'drain', link: 7 })
+    p.toB()
+    armed = true
+    p.toA()
+    const kinds = () => link.queued.map((b) => new Framer().push(b.slice())[0].verb)
+    if (queued === 1) {
+      assert.deepEqual(kinds(), [VERB.DIGEST], 'the reply fills the queue; no owed word is pushed into it')
+      assert.equal(F.jk(JK.dropOldest).length, 1, 'no clear forced by a word')
+    } else {
+      assert.deepEqual(kinds(), [], 'the second word overflowed: the clear took the reply and both words')
+      assert.equal(F.jk(JK.dropOldest).length, 2)
+      assert.equal(link.torn?.r, 1, 'the answer is torn at its reply, resumed at the drain')
+    }
+    assert.deepEqual(F.sentOn(7, VERB.FEED), [], 'nothing on the socket yet')
+    F.node.step({ kind: 'drain', link: 7 })
+    p.settle()
+    beat(5)
+    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => (f.value as { e: string }).e).sort(), ['px', 'qx', 'rx'], 'every owed end said, once each')
+    assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]).sort(), [['px', 0, 0], ['qx', 0, 0], ['rx', 0, 0]])
+    assert.deepEqual(kernelCells(F), ['px.a', 'px.b', 'px.c', 'qx.w', 'qx.z', 'rx.a'])
+    assert.deepEqual(kernelCells(S), kernelCells(F))
+    assert.deepEqual(screenCells(S), kernelCells(F))
+    assert.equal(F.jk(JK.dropOldest).length, queued === 1 ? 1 : 2, 'no clear beyond the designed ones')
+  })
+
 //! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
 // flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
 // paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
