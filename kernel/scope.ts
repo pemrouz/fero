@@ -897,10 +897,17 @@ export class Scope {
     //! one flush per fold on each client link, as the RECORDS handler flushes once per frame: the forwarded teacher
     // records and the replayed live span (inbound added them to the same outbox; before wave 6a nothing flushed them
     // here, so they left with the feeder's next frame or commit) leave in this step
+    //! the group's end, FEED {e: p}, on every synced link. A link that is NOT synced here — unsynced before the fold (a
+    // clear, a torn answer), or unsynced by a clear inside the flush above — got no {b}, no forward and gets no end: the
+    // answer that syncs it ships p (the cover sits under p's rows: indexInsert, #forwardWhole), and the feeder OWES the
+    // end, said after that answer's whole ship and reply (node.ts owe / #payOwed; the rule's clause 3). A spoke whose
+    // group lost its end lands it on the next later-step frame and judges nothing until this word comes.
     if (taps)
       for (const cl of node.clientLinks) {
         cl.flush(node.env.sink, j)
-        if (cl.state === LS.admitted && cl.synced && !cl.dead) cl.ship(encodeControl(VERB.FEED, { e: p }), node.env.sink, j) // the group's end (a clear in the flush unsynced the link: no end, the drain digest closes the group)
+        if (cl.state !== LS.admitted || cl.dead) continue
+        if (cl.synced) cl.ship(encodeControl(VERB.FEED, { e: p }), node.env.sink, j)
+        else node.owe(cl, 'e', p)
       }
     //! durable: the base entered memory only — arm the snapshot swap so it reaches disk atomically
     // (never persistRun: interior rows condemn the chain), and dirty until the echo
