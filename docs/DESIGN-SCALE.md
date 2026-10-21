@@ -2125,11 +2125,14 @@ line, no {x}, and on the old order with the base lost for good); the
 stage-4 shape, a fold with no remove of a row the spoke kept (R4-4; red
 on the filter at "the spoke holds what its feeder holds", px.b for
 good). The cleared-shed-word test pins the wire: the drain digest, the
-owed word, the capped answer, the reply. Two mutants of the order each
-turn tests red: the {x} said after the reply (the old order: the held
-test and R4-3 lose rows for good, the wire line moves); any filter put
-back on the {x} half (`feeds && byPart`: R4-1, R4-2, R4-4; `!held`:
-the held test, R4-2, R4-4). The repeated word is named above.
+owed word, the capped answer, the reply. Six one-line mutants of the
+order each turn tests red (kernel/client.test.ts, 91 tests): the {x}
+said after the reply, the old order (six: the held test and R4-3 lose
+rows for good, the wire line moves); the {x} half off (nine); each
+filter put back on the {x} half ('no entry': eight; `feeds && byPart`:
+five, the held test and R4-1 to R4-4; `!held`: three, the held test,
+R4-2 and R4-4); the full-queue guard off (the queue-of-one pin: a word
+forces a clear). The repeated word is named above.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
