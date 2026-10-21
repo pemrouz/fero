@@ -1075,6 +1075,39 @@ test('the paused queue is bounded by bytes too: big frames clear at the byte bou
   assert.equal(small.left, 0, 'the drain zeroes the byte count')
 })
 
+//! the drain zeroes the byte count: pause and drain cycles that each queue UNDER the byte bound never clear, however
+// many there are. Read without the drain's zero, the count grew by every cycle's frames (1 frame, 2, 3 ... of 3 KB) and
+// the queue cleared at the cycle that carried it past the bound, with no overflow in that cycle at all.
+test('the paused queue\'s byte count starts again at every drain: cycles that each queue under queuedBytes never clear, and every write arrives', () => {
+  const A = harness('aa', { tune: { frame: 4096, queued: 256, queuedBytes: 16 * 1024 } })
+  const B = harness('bb', { tune: { frame: 4096 } })
+  A.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  B.node.step({ kind: 'linkUp', link: 1, dialed: false })
+  let ai = 0, bi = 0
+  const pump = () => {
+    for (let round = 0; round < 8; round++) {
+      const as = A.of('send'), bs = B.of('send')
+      for (; ai < as.length; ai++) B.node.step({ kind: 'bytesIn', link: 1, bytes: as[ai][2] as Uint8Array })
+      for (; bi < bs.length; bi++) A.node.step({ kind: 'bytesIn', link: 1, bytes: bs[bi][2] as Uint8Array })
+    }
+  }
+  pump()
+  const la = A.node.links.get(1)!
+  assert.equal(la.synced, true)
+  let n = 0
+  for (let cycle = 0; cycle < 8; cycle++) {
+    A.node.step({ kind: 'pause', link: 1 })
+    //! three 3 KB frames a cycle: about 9 KB, under the 16 KiB bound; eight cycles carry about 72 KB
+    for (let w = 0; w < 3; w++, n++) A.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`r${n}`], value: new Uint8Array(3000).fill(1) }] })
+    assert.equal(la.queued.length, 3, `cycle ${cycle}: three frames queued`)
+    A.node.step({ kind: 'drain', link: 1 })
+    assert.equal(la.queuedBytes, 0, `cycle ${cycle}: the drain zeroes the byte count`)
+    pump()
+  }
+  assert.deepEqual(A.node.journal.read().filter((e) => e.kind === JK.dropOldest), [], 'never cleared')
+  assert.equal(B.node.state.size, n, 'every write arrived')
+})
+
 //! ── V4-51: a flush that clears the queue ships nothing more ─────────────────────
 // A run bigger than the frame cap leaves in several frames, so one flush can now ship several. If the paused queue
 // overflows at one of them, the rest of the flush must not follow it into the queue: those frames would sit ABOVE the
