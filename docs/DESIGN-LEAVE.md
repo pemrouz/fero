@@ -1811,7 +1811,7 @@ stopping at t0 + 200, seeds 1..30): n03 stopping, 7 of 30 unclean at 16 ticks (s
   commit — the crash-at-two class (§7). A dropped member comes back as before, by its link, through a fresh ballot: the
   suspicion loop forgets the memory with the suspicion and abandons any ballot that leaves the returned member out.
 - *What n=3's shape does.* One suspect: the ballot's one non-suspect is no majority of two, so the dead rule decides —
-  the plain `{aa,cc}@2` while cc's first chain dials, `{aa}@2` once it gave up — exactly as before; `starved` and its
+  the plain `{aa,cc}@2` while cc's first chain dials, `{aa}@2` once it gave up — as before, except that a knock landing over cc's REVIVED chain with no ballot in flight (the eviction aged out unanswered) opens `{aa}@2` at once on the give-up remembered, where the pre-fix kernel opened the plain `{aa,cc}@2` and waited a second chain through (the sixth review's nit); `starved` and its
   slow-link pin did not move, nor did the sweep's family lists or the harness's.
 - *Measured.* The scan reads 0 of 30 unclean for both stoppers at 16 and at 64 ticks (violations 0): the straddle seeds
   are clean 509-520 ms after the stop, as the seeds whose give-ups shared a tick always were (`G4 G5 P(2,2)`). The
