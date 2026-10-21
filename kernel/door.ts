@@ -38,11 +38,15 @@ export const NONCE_MAX = 64
 //! UUID_MAX — the most UTF-8 bytes a node's uuid may take. Every frame that carries a record carries its origin (the
 // uuid, or uuid~N past the first life), and a committed attempt's frame its issuer too, so the two names must fit the
 // envelope room the codec keeps beside a record (roomOf, kernel/codec.ts): never less than 256 bytes, at the smallest
-// frame (FRAME_MIN). At 64 the worst envelope is 200 bytes: the origin and the issuer, each a length byte plus 64 + 1
-// + 16 (the '~' and the largest incarnation) = 82, then baseSeq, epoch and baseCid (8 each at 2^53), the record count
-// (4) and a pp varint (8). 128 would take 292 and break that room. A HELLO whose uuid is longer is malformed; fero()
-// refuses one at compose time (api/index.ts). A default uuid is 8 hex characters, a UUID 36.
+// frame (FRAME_MIN). At 64 the worst envelope is 204 bytes: the origin and the issuer, each 3 length bytes (Writer.str
+// always spends 3) plus 64 + 1 + 16 (the '~' and the largest incarnation) = 84, then baseSeq, epoch and baseCid (8 each
+// at 2^53), the record count (4) and a pp varint (8). 128 would take 332 and break that room. A HELLO whose uuid is
+// longer is malformed; fero() refuses one at compose time (api/index.ts). A default uuid is 8 hex characters, a UUID 36.
 export const UUID_MAX = 64
+//! ISSUER_MAX — the most UTF-8 bytes an attempt's issuer may take: a uuid, '~' and the incarnation's 16 digits. The
+// issuer is the WRITE frame's own claim (its provenance origin), not the admitted uuid, so the HELLO bound does not
+// reach it: node.ts checks it on every WRITE before the relay can stamp it. A longer one is a malformed WRITE.
+export const ISSUER_MAX = UUID_MAX + 17
 //! utf8Len — a string's UTF-8 byte count without encoding it (a lone surrogate counts 3, as TextEncoder writes it)
 export const utf8Len = (s: string): number => {
   let n = 0
