@@ -1,6 +1,6 @@
 {
- "builtAt": "2026-10-21T00:04:35.543Z",
- "head": "a28ede5",
+ "builtAt": "2026-10-21T01:02:15.643Z",
+ "head": "6ca5542",
  "branch": "v4",
  "version": "4.0.0",
  "dependencies": [
@@ -45,18 +45,18 @@
  "checks": 28,
  "kernel": {
   "modules": 23,
-  "bytes": 907747,
-  "head": "a28ede5"
+  "bytes": 923043,
+  "head": "d455e4a"
  },
  "npm": {
   "fero": "1.7.1",
   "data": "4.0.0"
  },
  "test": {
-  "at": "2026-10-21T00:27:34+01:00",
+  "at": "2026-10-21T02:02:15+01:00",
   "fero": {
-   "tests": 1108,
-   "pass": 1108,
+   "tests": 1129,
+   "pass": 1129,
    "fail": 0
   },
   "contract": {
@@ -67,7 +67,7 @@
   "exit": 0
  },
  "perf": {
-  "at": "2026-10-21T00:46:45+01:00",
+  "at": "2026-10-21T02:02:15+01:00",
   "tests": 62,
   "pass": 62,
   "fail": 0
@@ -76,7 +76,7 @@
   "seeds": 1000,
   "green": 1000,
   "events": 209313,
-  "line": "1000/1000 seeds green \u00b7 3 nodes \u00b7 40 writes/run \u00b7 209,313 events",
+  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 209,313 events",
   "runs": [
    {
     "seed": 0,
