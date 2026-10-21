@@ -1737,7 +1737,7 @@ own removal (`#ghost`, now shared). The versions of the partition's
 unindexed tombstones stay: a tombstone is sound LWW memory, and finding
 them would cost a walk of every version. Every seed of A12 1-12 reads 0;
 the pin flips to 0 on the five ALWAYS seeds; with the spoke's handler
-off, seed 3 reads 6 again. Journal `unfed` (82). Not taken: the spoke's
+off, seed 3 reads 6 again. Journal `unfed` (84). Not taken: the spoke's
 digest answer carrying the feeder's held set (a walk of every held
 partition per heartbeat per client; the shed is one frame, cold); the
 word at the freeze (the feeder's own screen keeps the frozen rows until
