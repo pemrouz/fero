@@ -2665,6 +2665,52 @@ test('wave 6c — the shed\'s word is owed when a clear takes it: FEED {x} queue
   assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 2]])
 })
 
+//! the ask flag (the review's PROBE2): a scoped spoke's resync ask says `f: 1` and the reply names the partitions in
+// flight. The first build used the flag up at the first reply (#askF deleted there), so a reply a clear took from the
+// paused queue resumed at the drain WITHOUT `f`, and the end swept the partition under repair: the vanish-and-return
+// came back through the clear. Now the flag lives until the spoke's next digest on the link. Red on the first build at
+// "no px cell left the screen at the resync end": actual [px.c, px.d] removed (and back at the fold).
+test('wave 6c — the in-flight list survives a cleared reply: the feeder pauses inside the answer, live taps overflow the queue and the clear takes the queued reply with its `f`; the resumed reply at the drain carries the list again and the end keeps the partition under repair', () => {
+  let armed = false
+  let Fh: H | null = null
+  const L = latching({ tune: { queued: 4 } }, (link) => { if (link === 7 && armed && Fh) { armed = false; Fh.node.step({ kind: 'pause', link: 7 }) } })
+  const { F, S, p, link, cells, teach } = L
+  Fh = F
+  onQQ(L, [['a', 1, 3, 0], ['b', 2, 5, 3], ['c', 3, 7, 5], ['d', 4, 9, 7]])
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 8, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'aa is repairing px')
+  //! the failover: the ask lands while the link flows, and the socket fills inside the answer's first send
+  const a0 = S.of('apply').length
+  S.node.step({ kind: 'linkDown', link: 3, reason: 'close' })
+  armed = true
+  p.toA()
+  assert.equal(link.paused, true, 'paused inside the answer')
+  const queued = () => link.queued.map((b) => new Framer().push(b.slice())[0]).filter((f) => f.verb === VERB.DIGEST).map((f) => f.value)
+  assert.deepEqual(queued(), [{ d: { bb: 8 }, r: 0, w: 1, q: 2, f: ['px'] }], 'the reply waits in the queue, with the list')
+  //! live qx records tapped onto the paused link (synced now) overflow the queue: the clear takes the reply
+  for (let s = 10; s < 16 && F.jk(JK.dropOldest).length === 0; s++) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y' + s, s), s, s === 10 ? 8 : s - 1, VERB.RECORDS) })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear took the queued reply')
+  assert.deepEqual(link.torn && [link.torn.r, link.torn.q], [1, 2], 'the answer is torn at its first queued frame: resumed at the drain')
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'still repairing px at the drain')
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  const replies = F.sentOn(7, VERB.DIGEST).map((f) => f.value as { r: number; q?: number; f?: string[] })
+  assert.deepEqual(replies.filter((r) => r.r === 0).map((r) => [r.q, r.f]), [[2, ['px']]], 'the resumed reply carries the list (it had none on the first build)')
+  assert.equal(S.node.resync, null, 'the resync ended')
+  const removes = () => S.of('apply').slice(a0).map((e) => e[1] as Rec).filter((r) => r.type === REC.remove).map((r) => JSON.stringify(r.key))
+  assert.deepEqual(removes(), [], 'no px cell left the screen at the resync end (the reply named px in flight)')
+  assert.deepEqual(S.jk(JK.resynced).map((e) => [e.a, e.c]), [[0, 2]], 'px.c and px.d kept')
+  teach(2, [{ seq: 7, rec: PX('c', 3), pp: 5 }, { seq: 9, rec: PX('d', 4), pp: 7 }], 9)
+  p.settle()
+  assert.deepEqual(cells(S), cells(F), 'the fold brought them back into the kernel')
+  assert.deepEqual(removes(), [], 'and nothing ever left the screen')
+  assert.deepEqual(S.jk(JK.fed).map((e) => [e.a, e.b, e.c]), [['px', 2, 0]])
+  assert.deepEqual(screenCells(S), kernelCells(F))
+})
+
 //! the vanish-and-return (STATUS "a spoke that fails over onto a feeder that is repairing a partition ... loses that
 // partition's rows from its screen at the resync's end, until the fold forwards them back"): a spoke first fed by qq holds
 // px whole (bb#3, 5, 7, 9, 11) and qx; qq dies while aa, its next feeder, is RE-LATCHING px (its base bb#3, bb#5 in the
