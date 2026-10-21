@@ -564,8 +564,11 @@ export class Node {
   // a clear took and the end of a fold on an unsynced link, and says them after the answer that syncs the link again
   // (#owed, #payOwed); a group whose end was lost lands and judges nothing. Keyed by partition: the cells kept.
   #deferred = new Map<string, Set<string>>()
-  //! #askF (servers) — the client links whose latest ask said `f: 1`: their reply carries the in-flight list; kept across a
-  // torn or queued answer so the resumed reply carries it too
+  //! #askF (servers) — the client links whose latest digest was an ask that said `f: 1`: their reply carries the in-flight
+  // list. The flag lives until the spoke's NEXT digest on the link (the DIGEST handler sets or clears it on every client
+  // digest), never used up by a reply: a reply a clear took from the paused queue resumes at the drain as a fresh
+  // #sendDigest, and the first build had forgotten the flag by then — the resumed reply carried no `f`, and the end
+  // swept the partition under repair (the review's PROBE2: the vanish-and-return back through the clear).
   #askF = new Set<Link>()
   //! #owed (servers, wave 6c 2026-10-21, the rule's clause 3 — DESIGN-SCALE's wave-6c note): the FEED words this feeder
   // owes each client link. A word is one frame on a client link, and a clear takes the whole queue — so a FEED {e} or
@@ -2267,7 +2270,7 @@ export class Node {
         //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
         // its ship stops at a full queue or a clear takes it). A client's r=1 carries `q`; the reply echoes it (only clients send one).
         //! a client's ask that says `f: 1` (a scoped spoke's resync, wave 6c) gets the in-flight list on its reply (#sendDigest);
-        // remembered on the link, so a torn or queued answer's resumed reply carries it too
+        // remembered on the link until the client's next digest, so a torn or cleared answer's resumed reply carries it too
         if (link.client) { if (v.f === 1) this.#askF.add(link); else this.#askF.delete(link) }
         //! a clear's ceiling (`c`, #clearCover, wave 5f) caps this digest's tails lane by lane, and this answer uses it up:
         // a lane the clear took a record from is answered from just under it, every other lane from the spoke's own tail
@@ -2559,7 +2562,7 @@ export class Node {
           link.inQueue = { d: this.#cover(d, null, 0), r, q }
           if (link.client) this.#covered.add(link)
         }
-        this.#sendDigest(link, 0, q, undefined, this.#askF.delete(link))
+        this.#sendDigest(link, 0, q, undefined, this.#askF.has(link))
       }
       if (link.client && this.#owed.size) this.#payOwed(link) // the owed FEED words, after the whole ship and the reply (wave 6c)
       return
