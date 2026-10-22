@@ -1064,7 +1064,7 @@ export class Node {
           const link = meta.link !== undefined ? this.links.get(meta.link) : undefined
           if (link === undefined || link.dead || link.state !== LS.proving) return
           link.proveTimer = -1
-          j.armed && j.emit(JK.doorReject, link.id, 'timeout', link.to ?? '')
+          j.armed && j.keep(JK.doorReject, link.id, 'timeout', link.to ?? '')
           this.#refuse(link, 'door-timeout')
         }
         else if (meta.tag === TAG.heartbeat) {
@@ -1760,7 +1760,7 @@ export class Node {
     {
       const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)  : undefined
       if (r !== 1 && squatter !== undefined && squatter.client) {
-        j.armed && j.emit(JK.doorReject, existingId , 'uuid-taken', v.u)
+        j.armed && j.keep(JK.doorReject, existingId , 'uuid-taken', v.u)
         squatter.dead = squatter.noRedial = true
         this.env.sink.close(existingId , 'uuid-taken')
         existingId = undefined // admit below; the evicted link's linkDown echo sees byUuid pointing at the new link and leaves it
@@ -1864,7 +1864,7 @@ export class Node {
     const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)  : undefined
     if (!this.membership.isMember(v.u) && (squatter === undefined || squatter.client)) return false
     const j = this.journal
-    j.armed && j.emit(JK.doorReject, link.id, 'uuid-taken', v.u)
+    j.armed && j.keep(JK.doorReject, link.id, 'uuid-taken', v.u)
     if (this.door !== undefined) link.ship(encodeControl(VERB.DOOR, { e: 'uuid-taken' }), this.env.sink, j)
     link.dead = link.noRedial = true
     this.env.sink.close(link.id, 'uuid-taken')
@@ -1984,7 +1984,7 @@ export class Node {
         // BEFORE the self-reject and the proof, so a config mistake never reads as a bad secret.
         if (typeof c === 'string' && this.contract !== undefined && r !== 1 && c !== this.contract) {
           const [key, theirs] = contractDiff(this.contract, c)
-          j.armed && j.emit(JK.contractReject, link.id, key, theirs)
+          j.armed && j.keep(JK.contractReject, link.id, key, theirs)
           return this.#refuse(link, 'contract-mismatch')
         }
         if (v.u === this.uuid) {
@@ -1998,7 +1998,7 @@ export class Node {
         // door and the peer sent `k` → 'peer-secret'. Both ends see the mismatch, so both refuse and
         // both print. The row's c is the dial target, or the listen the peer claimed.
         if ((door !== undefined) !== (k !== undefined)) {
-          j.armed && j.emit(JK.doorReject, link.id, door !== undefined ? 'no-secret' : 'peer-secret', link.to ?? hello.l)
+          j.armed && j.keep(JK.doorReject, link.id, door !== undefined ? 'no-secret' : 'peer-secret', link.to ?? hello.l)
           return this.#refuse(link, 'door')
         }
         if (door !== undefined) {
@@ -2006,7 +2006,7 @@ export class Node {
           // came from the directory or a committed view — both carry the peer's own listen — so the
           // acceptor must claim exactly the address I dialed, or someone between us is answering for it.
           if (!addressOk(link, this.#opts.hosts, hello.l)) {
-            j.armed && j.emit(JK.doorReject, link.id, 'address', hello.l)
+            j.armed && j.keep(JK.doorReject, link.id, 'address', hello.l)
             return this.#refuse(link, 'door')
           }
           //! stash and prove (§3 step 10): the HELLO waits on the Link, the link sits in `proving`
@@ -2058,7 +2058,7 @@ export class Node {
             link.dead = true
             return this.env.sink.close(link.id, 'malformed-door')
           }
-          j.armed && j.emit(JK.doorReject, link.id, v.e === 'uuid-taken' ? 'uuid-taken' : 'refused', link.to ?? '')
+          j.armed && j.keep(JK.doorReject, link.id, v.e === 'uuid-taken' ? 'uuid-taken' : 'refused', link.to ?? '')
           return this.#refuse(link, 'door')
         }
         if (typeof v?.p !== 'string' || v.p.length !== PROOF_LEN) {
@@ -2068,7 +2068,7 @@ export class Node {
         }
         const door = this.door , hello = link.hello 
         if (!verify(door, link, this.uuid, hello, v.p)) {
-          j.armed && j.emit(JK.doorReject, link.id, 'bad-proof', link.to ?? hello.l)
+          j.armed && j.keep(JK.doorReject, link.id, 'bad-proof', link.to ?? hello.l)
           link.ship(encodeControl(VERB.DOOR, { e: 'denied' }), this.env.sink, j)
           return this.#refuse(link, 'door')
         }
