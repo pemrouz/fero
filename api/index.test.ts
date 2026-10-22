@@ -1001,6 +1001,13 @@ test('the name is bounded at 255 bytes (UTF-8, kernel/door.ts NAME_MAX): a longe
   try {
     fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'aa', name: 'r'.repeat(300), epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
     await refuses(fero('r', { dir, listen: false }), /^Error: fero\('r'\): this dir's boot record carries a name over 255 bytes \(UTF-8; got 300\) — repair boot\.json$/)
+    //! …and a name that is not a string at all (a hand edit) is refused in words, never a TypeError, and the refusal gives
+    // the dir back: a second fero() on it meets the same refusal, not "held by this process already"
+    for (const [bad, what] of [[Array(300).fill('a'), 'an array'], [{ length: 300 }, 'an object'], [7, 'a number']] as const) {
+      fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'aa', name: bad, epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+      for (const time of ['first', 'second'])
+        await refuses(fero('r', { dir, listen: false }), new RegExp(`^Error: fero\\('r'\\): this dir's boot record carries a name that is not a string \\(${what}\\) — repair boot\\.json$`), `${what}, the ${time} time`)
+    }
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })
 

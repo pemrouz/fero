@@ -581,7 +581,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
   // wire exists one layer down — fero('other', {dir-of-'r'}) would fold r's WAL into 'other' and
   // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
-  //! (its size first: a hand edit may hold a name over NAME_MAX, and the refusal below would print all of it)
+  //! (its type and size first: a hand edit may hold a name that is not a string, which the size check cannot read and
+  // which would throw a TypeError past refuse(), leaving the dir locked; or a name over NAME_MAX, which the refusal
+  // below would print whole)
+  const restoredName: unknown = restored.name
+  if (restoredName !== undefined && typeof restoredName !== 'string') {
+    const kind = Array.isArray(restoredName) ? 'an array' : typeof restoredName === 'object' ? 'an object' : `a ${typeof restoredName}`
+    refuse(`fero('${name}'): this dir's boot record carries a name that is not a string (${kind}) — repair boot.json`)
+  }
   if (restored.name !== undefined && overBytes(restored.name, NAME_MAX))
     refuse(`fero('${name}'): this dir's boot record carries a name over ${NAME_MAX} bytes (UTF-8; got ${utf8Len(restored.name)}) — repair boot.json`)
   if (restored.name !== undefined && restored.name !== name)
