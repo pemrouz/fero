@@ -647,9 +647,11 @@ export const drained = (sim     )                => {
 //
 //   M1 stamp-oracle    (per event, every node)  a cell shown with stamp s while a remove of it, or of an
 //                      ancestor, stamped r > s is BELOW this node's coverage of r's lane (an armed node's
-//                      possession floor for (lane, partition); an unscoped node's or a client's applied
-//                      watermark; nothing for a spoke in resync — see `covers`). Fires at the exact event
-//                      a resurrection lands. Red today on the two unscoped probes (sim/scale-probes.test.ts).
+//                      possession floor for (lane, partition); an unscoped node's or an unscoped spoke's
+//                      applied watermark; a scoped spoke's FEEDER's floor once everything the feeder sent
+//                      has landed, wave 6c; nothing for a spoke in resync — see `covers`). Fires at the
+//                      exact event a resurrection lands. Red today on the two unscoped probes
+//                      (sim/scale-probes.test.ts).
 //   M2 frontier-sound  (per event, armed)       an entry compaction dropped at an armed node was not its
 //                      cell's winner and sits at or below every CURRENT holder's REAL crash-stable floor
 //                      for its (lane, partition): a durable holder at its durable floor (pe.d), a memory
@@ -703,8 +705,10 @@ export const drained = (sim     )                => {
 //                      lane — the reply's `d` map is the feeder's tails when it built the reply) is
 //                      contained-or-covered at the spoke: in its log, or a version at the cell or an
 //                      ancestor at or above the feeder's. A record above that tail was applied after the
-//                      reply and is on the wire behind it: excused. A stale end fails this at once: the
-//                      ghost sweep removed rows the feeder holds, and the rows the re-download then
+//                      reply and is on the wire behind it: excused. So is a row of a partition the reply
+//                      named IN FLIGHT at the feeder (`f`, wave 6c): the spoke keeps it on the screen and
+//                      the fold's end judges it (counted, resyncKept). A stale end fails this at once:
+//                      the ghost sweep removed rows the feeder holds, and the rows the re-download then
 //                      re-applies land at older stamps first. It sees nothing between the reset and the
 //                      end, and nothing the screen shows that the kernel does not: that is the horizon's
 //                      screen check (`screenMatches`, run per spoke by the scoped sweep).
@@ -743,18 +747,51 @@ const inLane = (n      , origin        , seq        )          => {
 // #splice, the client leg). The screen lawfully shows a row at an older stamp until its newer record lands —
 // the re-download flicker, a design property noted in STATUS — and M1 would read that as a resurrection.
 // Coverage returns with the end (#resyncEnd), where M10 and M11 judge the result.
-//! A spoke of a SCOPED feeder covers nothing per event either (wave 6a, 2026-10-12): its copy of each lane is the
-// feeder's held subset, sparse by design, and an interior record lawfully lands at any time — the feeder forwards
-// what it folds through the latch (kernel/scope.ts onAcqDone), a partition's history in lane order, one frame per
-// contiguous run, so an older value of a row and its later remove on one lane arrive in separate events while the
-// spoke's fence already sits above both (other partitions' records raised it): the row shows for as many events as
-// there are frames between them (A12 seeds 2, 4 and 5 under the old reading; seed 4 showed p27 at two older stamps in
-// two events before its remove). The kernel's own client leg says the same (write.ts #splice: a scoped feeder
-// re-forwards out of seq order), so the applied watermark there is a dedup fence, not a claim on what is below it. The
-// spoke's oracle is M12 (spokeMirror) at the quiet point, cell for cell against its feeder — which M1's horizon form,
-// M3 and M6 judge. An UNSCOPED spoke's applied is still coverage: its feeder shows it whole lanes.
-const covers = (n      , origin        , p        )         =>
-  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : n.client && (n.resync !== null || n.feederScoped) ? 0 : (n.streams.get(origin)?.applied ?? 0)
+//! A spoke of a SCOPED feeder covers (lane, partition) exactly as far as its FEEDER does, once everything the feeder sent
+// it has landed (wave 6c, 2026-10-21; from wave 6a to then it covered nothing per event). Its own applied watermark is
+// no claim: its copy of each lane is the feeder's held subset, sparse by design, and an interior record lawfully lands
+// at any time — the feeder forwards what it folds through the latch (kernel/scope.ts onAcqDone) below the fence other
+// partitions' records raised, and a lost owner-to-holder frame leaves the FEEDER lacking a remove its spoke's fence
+// already sits above (A13's shape: the applied reading fires at the spoke while the feeder lawfully shows the row
+// under its own floor). The kernel's own client leg says the same (write.ts #splice: a scoped feeder re-forwards out
+// of seq order), so `applied` there is a dedup fence, not a claim on what is below it. What IS a claim: the rule of
+// V4-53 — a synced spoke holds the whole of every partition its feeder feeds it — so once every frame the feeder sent
+// has landed, the spoke holds every record of (lane, p) the feeder holds, and the feeder's possession floor for (lane,
+// p) is the spoke's coverage too. `spokeCovers` reads the feeder's floor when that holds, else 0: the spoke not in
+// resync, the feeder's link to it synced (an unsynced link is owed an answer), not paused and with an empty queue,
+// nothing from the feeder on the wire (sim.inflight, kept only on a watched run), and no fold group open at the spoke
+// (FEED {b} without its {e}: frames held back, node.ts `group`). Since wave 6c the fold's forward lands as one apply,
+// so no event shows a row a later frame of the same fold removes — the flicker that made the blanket excuse — and the
+// window a repair opens is excused exactly while a frame is in flight. An UNSCOPED spoke's applied is still coverage:
+// its feeder shows it whole lanes. The spoke's horizon oracle stays M12 (spokeMirror), cell for cell against its
+// feeder — which M1's horizon form, M3 and M6 judge.
+const covers = (sim     , n      , origin        , p        )         =>
+  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0)
+    : !n.client ? (n.streams.get(origin)?.applied ?? 0)
+    : n.resync !== null ? 0
+    : n.feederScoped ? spokeCovers(sim, n, origin, p)
+    : (n.streams.get(origin)?.applied ?? 0)
+//! spokeQuiet — the feeder of a scoped spoke when everything the feeder sent has landed (the conditions above), else null
+const spokeQuiet = (sim     , n      )              => {
+  if (!sim.watch || n.primary === null || n.group !== null || n.resync !== null) return null
+  const pl = n.links.get(n.primary)
+  const F = pl !== undefined ? sim.nodes.get(pl.uuid) : undefined
+  if (F === undefined || !F.armed) return null
+  let landed = false
+  for (const l of F.links.values()) {
+    if (l.uuid !== n.uuid || l.state !== LS.admitted || l.dead) continue
+    if (!l.synced || l.paused || l.queued.length) return null
+    landed = true
+    break
+  }
+  if (!landed) return null
+  for (const x of sim.inflight.values()) if (x.from === F.uuid && x.to === n.uuid) return null
+  return F
+}
+const spokeCovers = (sim     , n      , origin        , p        )         => {
+  const F = spokeQuiet(sim, n)
+  return F === null ? 0 : (F.streams.get(origin)?.parts?.get(p)?.s ?? 0)
+}
 const isRemove = (rec     ) => rec.type === REC.remove
 
 export class Ledger {
@@ -764,7 +801,7 @@ export class Ledger {
   //! released — cell → the newest tombstone stamp any node ever released for it (M3's memory, M6's trigger)
   released = new Map               ()
   pending                                                                  = []
-  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0, resyncRows: 0 }
+  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0, resyncRows: 0, resyncKept: 0 }
   #cursors = new Map                                                   ()
   #snap = new Map                          ()
   #floors = new Map                           ()
@@ -902,23 +939,54 @@ const framesIn = (bytes            ) => { try { return new Framer().push(bytes) 
 export const scaleMonitors = () => [
   {
     name: 'stamp-oracle',
-    check: (sim     )                => {
-      const L = ledgerOf(sim)
-      L.scan(sim); L.walk(sim)
-      for (const { id, node: n, cell, v } of L.changed) {
-        L.counts.cells++
+    //! a scoped spoke's changed cell is judged at the first QUIET moment after the change (wave 6c; see `covers`): the walk
+    // sees a cell once, at the pass where it changed, and at that pass a frame from the feeder is often in flight — so the
+    // cell waits in `later` and is judged against the feeder's floor at the first pass where everything the feeder sent
+    // has landed, or dropped when it changed again (the walk re-judges it), the spoke resynced (the fold is wiped; M11
+    // and the next changes judge) or the spoke is gone. Every other node is judged at the change, as before.
+    check: (() => {
+      const later = new Map                                                 ()
+      const judge = (sim     , L        , id        , n      , cell        , v       )                => {
         const path = JSON.parse(cell)            
         for (let d = path.length; d >= 1; d--) {
           const c = d === path.length ? cell : JSON.stringify(path.slice(0, d))
           const rs = L.removes.get(c)
           if (!rs) continue
           for (const r of rs)
-            if (newer(r.epoch, r.seq, r.origin, v) && covers(n, r.origin, r.p) >= r.seq)
-              return `${id} shows ${cell} @${stampOf(v)} while the ${c === cell ? 'remove' : 'ancestor remove ' + c} @${stampOf(r)} is at or below its ${n.armed ? 'floor' : 'applied'} for lane ${r.origin} — resurrected`
+            if (newer(r.epoch, r.seq, r.origin, v) && covers(sim, n, r.origin, r.p) >= r.seq)
+              return `${id} shows ${cell} @${stampOf(v)} while the ${c === cell ? 'remove' : 'ancestor remove ' + c} @${stampOf(r)} is at or below its ${n.armed ? 'floor' : n.client && n.feederScoped ? "feeder's floor" : 'applied'} for lane ${r.origin} — resurrected`
         }
+        return null
       }
-      return null
-    },
+      return (sim     )                => {
+        const L = ledgerOf(sim)
+        L.scan(sim); L.walk(sim)
+        for (const { id, node: n, cell, v } of L.changed) {
+          L.counts.cells++
+          if (n.client && !n.armed && n.feederScoped && n.resync === null && spokeQuiet(sim, n) === null) {
+            let w = later.get(n)
+            if (w === undefined) later.set(n, w = { id, cells: new Map() })
+            w.cells.set(cell, v)
+            continue
+          }
+          const bad = judge(sim, L, id, n, cell, v)
+          if (bad !== null) return bad
+        }
+        if (later.size)
+          for (const [n, w] of later) {
+            if (sim.nodes.get(w.id) !== n || n.resync !== null) { later.delete(n); continue }
+            if (spokeQuiet(sim, n) === null) continue
+            for (const [cell, v] of w.cells) {
+              w.cells.delete(cell)
+              if (n.versions.get(cell) !== v || !n.state.has(cell)) continue
+              const bad = judge(sim, L, w.id, n, cell, v)
+              if (bad !== null) return bad
+            }
+            later.delete(n)
+          }
+        return null
+      }
+    })(),
   },
   {
     name: 'frontier-sound',
@@ -1068,7 +1136,7 @@ export const scaleMonitors = () => [
       for (const { node: N, id, cell, p, t } of rels) {
         L.counts.census++
         const under = (c        ) => c === cell || c.startsWith(cell.slice(0, -1) + ',')
-        const lacks = (origin        , seq        , part        ) => !inLane(N, origin, seq) && covers(N, origin, part) < seq
+        const lacks = (origin        , seq        , part        ) => !inLane(N, origin, seq) && covers(sim, N, origin, part) < seq
         const bad = (origin        , seq        , epoch        , rec     , where        )                => {
           if (!newer(t.epoch, t.seq, t.origin, { epoch, seq, origin })) return null
           const path = pathOf(rec)
@@ -1117,7 +1185,7 @@ export const scaleMonitors = () => [
             for (const x of entries) if (x.seq > tail && pathOf(x.rec)[0] === p) tail = x.seq
             if (!tail) continue
             let kept = false
-            for (const [, m] of sim.nodes) { if (m === n || m.client) continue; if (inLane(m, o, tail) || covers(m, o, p) >= tail) { kept = true; break } }
+            for (const [, m] of sim.nodes) { if (m === n || m.client) continue; if (inLane(m, o, tail) || covers(sim, m, o, p) >= tail) { kept = true; break } }
             if (!kept) return `${uuid} left clean (R=${n.replicas}) while it alone held ('${p}', lane ${o}) up to seq ${tail} — the leave did not drain, that data goes with it`
           }
         }
@@ -1139,8 +1207,9 @@ class SpokeWire {
   // r=0 answers (the feeder replies inside the step that handled it, so its digestIn count names it), -1 for r=1
   answers = new Map                  ()
   //! spoke-side link id → per DIGEST the feeder sent on it, in order: its `d` map (the feeder's lane tails when it
-  // built the frame) for an r=0, null for an r=1 — M11 reads the ending reply's tails
-  ds = new Map                                           ()
+  // built the frame) and its `f` list (the partitions in flight at the feeder, wave 6c) for an r=0, null for an r=1 —
+  // M11 reads the ending reply's tails, and skips the partitions it named
+  ds = new Map                                                               ()
   //! spoke → the resync it is in (the kernel's object) and, per link, the index of the first r=1 sent since it began
   began = new Map                                                   ()
   last = new Map                     ()
@@ -1179,8 +1248,11 @@ class SpokeWire {
                                          
 const wires = new WeakMap                ()
 const wireOf = (sim     )            => { let w = wires.get(sim); if (!w) { w = new SpokeWire(); wires.set(sim, w) } return w }
-const digestValue = (b            )                                           => {
-  try { const v = new Frame(b).value                                              ; return { r: v.r ?? 0, d: v.d ?? {} } } catch { return { r: -1, d: {} } }
+const digestValue = (b            )                                                        => {
+  try {
+    const v = new Frame(b).value                                                           
+    return { r: v.r ?? 0, d: v.d ?? {}, f: Array.isArray(v.f) ? v.f.filter((p)              => typeof p === 'string') : [] }
+  } catch { return { r: -1, d: {}, f: [] } }
 }
 const digestR = (b            )         => digestValue(b).r
 
@@ -1198,9 +1270,9 @@ const spokeTap = (sim     , w           ) => (from        , to        , link    
       if (!st.first.has(link)) st.first.set(link, w.sent.get(link) .length - 1)
     }
   } else if (tn.client) {
-    const { r, d } = digestValue(b)
+    const { r, d, f } = digestValue(b)
     w.push(w.answers, peerLink, r === 0 ? w.digestIns(fn, link) - 1 : -1)
-    w.push(w.ds, peerLink, r === 0 ? d : null)
+    w.push(w.ds, peerLink, r === 0 ? { d, f } : null)
   }
 }
 
@@ -1254,8 +1326,14 @@ const resyncBehind = {
       const fu = n.links.get(link)?.uuid
       const F = fu !== undefined ? sim.nodes.get(fu) : undefined
       if (!F) continue
-      const D = w.ds.get(link)?.[w.digestIns(n, link) - 1]
-      if (!D) continue // the ending reply was not seen by the tap: nothing to judge against
+      const DF = w.ds.get(link)?.[w.digestIns(n, link) - 1]
+      if (!DF) continue // the ending reply was not seen by the tap: nothing to judge against
+      const D = DF.d
+      //! the partitions the reply named IN FLIGHT at the feeder (`f`, wave 6c: an open latch, a re-entry in waiting): the
+      // spoke KEEPS their cells on its screen across the end and the fold's end judges them (node.ts #resyncEnd, FEED
+      // {e}), so the kernel lawfully lags there and M11 does not judge them — the rows M11 is for (swept while the feeder
+      // holds them) are not swept. Counted (resyncKept); M12 judges the spoke at the horizon.
+      const inFlight = DF.f.length ? new Set(DF.f) : null
       const L = ledgerOf(sim)
       L.scan(sim)
       for (const cell of was.old) {
@@ -1263,6 +1341,7 @@ const resyncBehind = {
         if (vF === undefined || !F.state.has(cell) || vF.seq > (D[vF.origin] ?? 0) || !inLane(F, vF.origin, vF.seq)) continue
         const path = JSON.parse(cell)            
         if (F.armed && !F.scope .feeds(path[0])) continue
+        if (inFlight !== null && inFlight.has(path[0])) { L.counts.resyncKept++; continue }
         L.counts.resyncRows++
         const e = L.recs.get(vF.origin + '|' + vF.seq)
         if (e === undefined || containsOrCovers(L, n, e)) continue
@@ -1296,7 +1375,7 @@ export const stampOracle = (sim     )                => {
   const L = ledgerOf(sim)
   L.scan(sim)
   const live = [...sim.nodes.values()]
-  const counted = (e        )          => live.some((m) => inLane(m, e.origin, e.seq) || covers(m, e.origin, e.p) >= e.seq)
+  const counted = (e        )          => live.some((m) => inLane(m, e.origin, e.seq) || covers(sim, m, e.origin, e.p) >= e.seq)
   const win = new Map                ()
   for (const e of L.recs.values()) {
     if (!counted(e)) continue

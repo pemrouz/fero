@@ -159,6 +159,24 @@ export class Scope {
     return e !== undefined && (e.state === SCOPE.held || (e.state === SCOPE.acquiring && e.preState !== SCOPE.orphan))
   }
 
+  //! inFlight — THE PARTITIONS A SPOKE'S RESYNC WAITS FOR (wave 6c, 2026-10-21): every open latch (a repair of a held
+  // base, a re-entry from an orphan, a from-zero acquire) and every orphan the ring still assigns here (a re-entry in
+  // waiting: the next handshake round latches it, finding 26). The answer to a resync's ask carries what this node holds
+  // of each FED partition at that moment (node.ts #answer, `feeds`); what it is about to fold — a latch's staged
+  // records, an orphan's delta, a from-zero partition whole — is not in it, so a spoke that had those rows from its
+  // first feeder would lose them at the resync's end and see them return at the fold (the vanish-and-return, STATUS).
+  // The reply names these partitions (`f`) and the spoke keeps their cells on its screen until the fold's end judges
+  // them (node.ts #resyncEnd, FEED {e}). An orphan the ring does not assign is on its way to a shed: not in flight.
+  // Computed only for a reply the spoke asked for (`f: 1` on a resync's ask): O(entries), once per resync.
+  inFlight(node      )           {
+    const out           = []
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    for (const [p, e] of this.entries)
+      if (e.state === SCOPE.acquiring || (e.state === SCOPE.orphan && ring.holdsAny(node.uuid, p, node.replicas))) out.push(p)
+    return out
+  }
+
   //! verdict — THE INBOUND-GATE decision (write.ts ingest, armed only), the §0 law's first rows:
   // 1 = fold (held; a first-ever record to its lawful holder mints held), 2 = stage (an open latch
   // buffers live records for p), 0 = gate-drop (orphan freeze / not assigned / epoch skew).
@@ -791,6 +809,17 @@ export class Scope {
     // owner-to-holder frame repaired through the latch; an acquire in a hand-off).
     const taps = node.clientLinks.size !== 0
     const reentry = e.preState === SCOPE.orphan
+    //! THE FOLD GROUP (wave 6c, 2026-10-21): the forward below leaves in lane order, one frame per contiguous run, and
+    // before this each frame landed at the spoke in its own event — an older value of a row and its later remove on
+    // one lane in separate events, the row showing between them (STATUS; A12 seed 4). Now FEED {b: p} goes before the
+    // forward and FEED {e: p} after it on every synced client link (the forward's links), and the spoke buffers the
+    // frames between them until the end: a partition's history lands as ONE apply (node.ts `group`). The flush before
+    // {b} ships whatever an earlier handler of this step left in the outbox, so the group holds the fold's frames alone.
+    // The one hole (STATUS): a paused client link one frame short of full, where the forward's first frame overflows and
+    // the clear takes {b}; Link.flush ships on after a clear, so the later frames survive ungrouped and land one by one.
+    if (taps)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && cl.synced && !cl.dead) { cl.flush(node.env.sink, j); cl.ship(encodeControl(VERB.FEED, { b: p }), node.env.sink, j) }
     //! THE LANE RULE (wave 6b, 2026-10-12): a lane holds each (origin, seq) ONCE, so the scalar fence (streams.applied)
     // never sits below the lane's tail. The fast path appends at the tail on `seq > applied` alone (write.ts inbound), and
     // the teacher ships every entry of p it holds with its OWN floor as the cut — an entry above its floor (a gapped
@@ -870,7 +899,22 @@ export class Scope {
     //! one flush per fold on each client link, as the RECORDS handler flushes once per frame: the forwarded teacher
     // records and the replayed live span (inbound added them to the same outbox; before wave 6a nothing flushed them
     // here, so they left with the feeder's next frame or commit) leave in this step
-    if (taps) for (const cl of node.clientLinks) cl.flush(node.env.sink, j)
+    //! the group's end, FEED {e: p}, on every synced link. A link that is NOT synced here — unsynced before the fold (a
+    // clear, a torn answer), or unsynced by a clear inside the flush above — got no {b}, no forward and gets no end: the
+    // answer that syncs it ships p (the cover sits under p's rows: indexInsert, #forwardWhole), and the feeder OWES the
+    // end, said after that answer's whole ship and reply (node.ts owe / #payOwed; the rule's clause 3). A spoke whose
+    // group lost its end lands it on the next later-step frame and judges nothing until this word comes. Owed only on
+    // a link the spoke has been ANSWERED on (a cover or a torn answer, `torn`): a link never answered since admit — a
+    // spare's, or a spoke's before its first digest — carries nothing of this node, so the spoke has nothing to judge,
+    // and its first answer is a fresh spoke's or a failover's resync, whose end judges by the reply. Owing there was
+    // one end per fold per spare link, said as a burst of stray ends after a later failover (the second review's SK9).
+    if (taps)
+      for (const cl of node.clientLinks) {
+        cl.flush(node.env.sink, j)
+        if (cl.state !== LS.admitted || cl.dead) continue
+        if (cl.synced) cl.ship(encodeControl(VERB.FEED, { e: p }), node.env.sink, j)
+        else if (cl.torn !== null) node.owe(cl, 'e', p)
+      }
     //! durable: the base entered memory only — arm the snapshot swap so it reaches disk atomically
     // (never persistRun: interior rows condemn the chain), and dirty until the echo
     if (node.durable) node.spliced(p)
@@ -942,6 +986,16 @@ export class Scope {
       node.journal.armed && node.journal.emit(JK.orphaned, p, node.epoch)
     } else {
       this.entries.delete(p)
+      //! THE CLEAN ABORT'S WORD (wave 6c, 2026-10-21, the rule's clause 2 — DESIGN-SCALE's wave-6c note): nothing of p
+      // is here now, and the latch a spoke's resync reply named IN FLIGHT is gone with no fold, no orphan and no shed
+      // to follow — the review's PROBE1 (an install moved p off this node mid-acquire) left the spoke's kept cells of p
+      // on its screen for good. So the drop says what the shed says: FEED {x: [p]}, p LEFT this feeder, to every
+      // client link (the spoke drops p with its kept cells, node.ts #unfeed; a word a clear takes is owed and said
+      // again, node.ts #clearCover). If the ring still assigns p, the next round's latch re-feeds it whole through the
+      // fold's forward: a vanish-and-return in that rare case, and an honest one — this node held nothing of p between.
+      if (node.clientLinks.size)
+        for (const cl of node.clientLinks)
+          if (cl.state === LS.admitted && !cl.dead) cl.ship(encodeControl(VERB.FEED, { x: [p] }), node.env.sink, node.journal)
     }
     //! either leg changes the boot record's lists (an abort-to-orphan joins orphanParts; a clean
     // drop leaves both) — persist so a crash in the window classifies correctly (finding 31's class)
@@ -965,6 +1019,7 @@ export class Scope {
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     let released                             = null
+    let gone                  = null // the partitions shed in this evaluation: the spokes' word (FEED {x}), one frame per client link
     for (const [p, e] of this.entries) {
       if (e.state !== SCOPE.orphan) continue
       const tails = e.tails ??= this.#tailsOf(node, p) // captured at the freeze; rebuilt here only for legacy entries
@@ -988,6 +1043,7 @@ export class Scope {
         if (!xs) released.set(link, xs = [])
         xs.push(p)
       }
+      (gone ??= []).push(p)
       this.#shed(node, p, e)
     }
     if (released !== null)
@@ -995,6 +1051,15 @@ export class Scope {
         link.ship(encodeControl(VERB.HAVEQ, { e: node.epoch, q: {}, x }), node.env.sink, node.journal)
         link.flush(node.env.sink, node.journal)
       }
+    //! THE SHED'S WORD TO THE SPOKES (wave 6c, 2026-10-21): a spoke is a view of its feeder's held subset, and until now
+    // nothing told it that a partition LEFT — its rows of p stayed on the screen, frozen (the orphan gate-dropped every
+    // new record of p, so none reached the spoke), until a failover's resync wiped them (STATUS; M12's other direction,
+    // spokeStale, counted 6, 5, 1, 2 and 1 such rows on A12 seeds 3, 5, 6, 8 and 11). One FEED {x} per client link
+    // names every partition this evaluation shed; the spoke drops each with its feeder (node.ts #unfeed). Every
+    // admitted client link gets it, synced or not: a spoke whose answer is still torn held p's rows from before.
+    if (gone !== null && node.clientLinks.size)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && !cl.dead) cl.ship(encodeControl(VERB.FEED, { x: gone }), node.env.sink, node.journal)
     //! a DRAINING leaver (membership.ts, DESIGN-SCALE stage 1 (b)) re-reads its bar the instant marks moved or a
     // shed landed — one field read on every other armed node
     if (node.membership.leaving?.drain !== undefined) node.membership.drain(node)
