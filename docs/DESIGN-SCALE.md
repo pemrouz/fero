@@ -2392,7 +2392,8 @@ and A13 say 285 {x} and 197 folds directly). The battery runs A14 seeds
 1 and 18, each run clean and mutated (about 5 s).
 
 *Mutants (by hand on scratch copies, and one through the runner).* The
-answer's start not lowered: red on seed 32 alone of 1-72, the leapfrog
+answer's start not lowered: red on seed 32 alone of 1-72 (and on 120
+alone of 73-200, in the review's scan), the leapfrog
 on a lane the clear took nothing from (n90#34, a row of p10 written
 while it was away, survives the clear and is lost for good: "M12: s1
 lacks ["p10"]"). The owed {x} said after the ship: red on 18 of seeds
@@ -2408,12 +2409,27 @@ releases tombstones a fold may carry no remove, and that mutant would
 show there too.
 
 *Not reached.* The heal never found a shed partition an orphan at the
-feeder (0 of 72 seeds), and each shed partition came back through one
-latch from zero, with no write to it while that latch was open. So the
-shapes that need an orphan, a base or an own commit at the heal (an
-orphan the ring assigns or not, a repair latch open, the owner's own
-mid-latch commit, one minted first record) and the stage-4 fold with no
-remove stay pinned by kernel/client.test.ts alone.
+feeder (0 of 72 seeds, and 0 of seeds 73-200 in the review's scan), and
+each shed partition came back through one latch from zero, with no
+write to it while that latch was open. So the shapes that need an
+orphan, a base or an own commit at the heal (an orphan the ring assigns
+or not, a repair latch open, the owner's own mid-latch commit, one
+minted first record) and the stage-4 fold with no remove stay pinned by
+kernel/client.test.ts alone. Two more stay there too. First, the whole
+re-send's finer rules. A14's leapfrog onto an untouched lane has one
+entry of one partition on that lane (seeds 32 and 120 of 200). So it
+cannot tell a start lowered under the LOWEST entry from one lowered
+under the highest, or every named partition lowered from the first
+alone. The review's mutants of each are green on all 200 seeds and red
+in kernel/client.test.ts. Second, the fold's end. A14 owes and pays it,
+but on every seed that owes one, the same partition's {x} is owed too
+and is said first, so the spoke keeps nothing for the end to judge (a
+clear never takes an {e}, and every partition with an owed end is held
+at the heal). Four mutants of the end's rules pass every A14 check: the
+end said before the ship, said while the partition is not held, an end
+a clear took not owed, and scope.ts onAcqDone owing none. The battery
+catches the last one only by its count (owedE 0). kernel/client.test.ts
+catches all four.
 
 ## §0 The decision, in ten lines
 
