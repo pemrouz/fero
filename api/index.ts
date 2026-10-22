@@ -25,9 +25,9 @@ import { Caller, Host, SYSTEM, handle, reapStopped, takesKey, type Context } fro
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, commit, errText, snapshot as snapshotOf, unfoldable, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
-import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, v6Hint } from './directory.ts'
+import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, addrHint, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
-import { UUID_MAX, utf8Len, type Door } from '../kernel/door.ts'
+import { NAME_MAX, UUID_MAX, overBytes, utf8Len, type Door } from '../kernel/door.ts'
 import type { JEvent } from '../kernel/journal.ts'
 import type { Node } from '../kernel/node.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
@@ -328,6 +328,10 @@ fero.clientKey = clientKeyOf
 // passes false — the # prefix can never be taken by accident.
 const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise<Fero> => {
   if (typeof name !== 'string' || name === '') throw new Error(`fero(${JSON.stringify(name)}): name must be a non-empty string`)
+  //! its size (kernel/door.ts NAME_MAX): the name rides every HELLO and every directory row, and a peer refuses a HELLO
+  // with a longer one as malformed. The message shows the start of the name only.
+  if (overBytes(name, NAME_MAX))
+    throw new Error(`fero('${name.slice(0, 24)}…'): name must be at most ${NAME_MAX} bytes (UTF-8), got ${utf8Len(name)} — it rides every HELLO and every directory row`)
   if (!isSystem && name.startsWith('#')) throw new Error(`fero('${name}'): names starting with # are reserved for system resources (${DIRECTORY})`)
   //! every option is a DECLARED key (V4-5): a function-valued option is the pre-V4-5 method spelling —
   // refused with the pointer (moving it under `methods:` also declares the door, on purpose)
@@ -412,7 +416,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (config.server !== undefined && typeof config.server !== 'boolean')
     throw new Error(`fero('${name}'): server must be true (pin the server role) or false (pin the client role)${at('server')} — omit it and a bare fero is a client`)
   if (config.listen !== undefined && config.listen !== false && !isAddr(config.listen, true))
-    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${v6Hint(config.listen)}${at('listen')}`)
+    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${addrHint(config.listen)}${at('listen')}`)
   if (config.hosts !== undefined && !Array.isArray(config.hosts))
     throw new Error(`fero('${name}'): hosts must be an array of 'host:port' strings${at('hosts')}`)
   //! every entry is checked as an ADDRESS and the bad one is NAMED: a role file that reads its ports off
@@ -424,7 +428,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const i = (config.hosts as unknown[]).findIndex((h) => !isAddr(h) && !isBox(h))
     if (i !== -1) {
       const h = (config.hosts as unknown[])[i]
-      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address (nor a bare host, which asks that box's directory)${v6Hint(h)}${at('hosts')}`)
+      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address (nor a bare host, which asks that box's directory)${addrHint(h)}${at('hosts')}`)
     }
   }
   if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
@@ -481,11 +485,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // resource meets none. A malformed env value is refused HERE, loudly, not deep in the shell.
   if (config.rendezvous !== undefined && config.rendezvous !== false && !isAddr(config.rendezvous))
     throw new Error(from('rendezvous') === 'FERO_RENDEZVOUS'
-      ? `fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${v6Hint(config.rendezvous)}`
-      : `fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory${v6Hint(config.rendezvous)}${at('rendezvous')}`)
+      ? `fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${addrHint(config.rendezvous)}`
+      : `fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory${addrHint(config.rendezvous)}${at('rendezvous')}`)
   const envDefault = config.rendezvous === undefined && !isSystem ? rendezvousDefault() : false
   if (envDefault !== false && !isAddr(envDefault))
-    throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${v6Hint(envDefault)}`)
+    throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')${addrHint(envDefault)}`)
   const rendezvous: string | false = isSystem ? false : ((config.rendezvous as string | false | undefined) ?? envDefault)
   //! the effective topology: a server without an address binds a FREE loopback port (the OS picks,
   // the directory publishes it) — the demo's two terminals need zero addresses, real deployments keep
@@ -577,6 +581,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
   // wire exists one layer down — fero('other', {dir-of-'r'}) would fold r's WAL into 'other' and
   // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
+  //! (its size first: a hand edit may hold a name over NAME_MAX, and the refusal below would print all of it)
+  if (restored.name !== undefined && overBytes(restored.name, NAME_MAX))
+    refuse(`fero('${name}'): this dir's boot record carries a name over ${NAME_MAX} bytes (UTF-8; got ${utf8Len(restored.name)}) — repair boot.json`)
   if (restored.name !== undefined && restored.name !== name)
     refuse(`fero('${name}'): this dir belongs to resource '${restored.name}' — one dir, one resource (use a fresh dir)`)
   //! (after identity validation: a bad uuid is the earlier, more specific error) a client with nothing to dial is a dead-end — refuse loudly rather than boot a follower that can

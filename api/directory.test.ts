@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
-import { Directory, GRACE, MAX_PER_CALLER, WATCH_TICKS, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap } from './directory.ts'
+import { Directory, GRACE, MAX_PER_CALLER, WATCH_TICKS, addrHint, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap, v6Hint } from './directory.ts'
 import { proxy, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
@@ -113,6 +113,15 @@ test('host table: refusals are typed — bad name / uuid / listen, no caller ide
   assert.throws(() => methods.register({ name: 'r', uuid: 'u', listen: ':5' }, ctx('p')), /host:port/)
   assert.throws(() => methods.register({ name: 'r', uuid: 'u', listen: '127.0.0.1:1' }, ctx(undefined)), /no caller identity/, 'a local invoke has no caller')
   assert.throws(() => methods.lookup(7, ctx('p')), /non-empty string/)
+  //! the sizes (kernel/door.ts): a name over 255 bytes, a uuid over 64, a listen whose host is over 253 — each refused,
+  // so a runaway registrant's entries are bounded in size as MAX_PER_CALLER bounds their count; at the bounds they register
+  assert.throws(() => methods.register({ name: 'r'.repeat(256), uuid: 'u', listen: '127.0.0.1:1' }, ctx('q')), /^Error: register: name must be a non-empty user resource name \(no # prefix\) of at most 255 bytes$/)
+  assert.throws(() => methods.register({ name: 'é'.repeat(128), uuid: 'u', listen: '127.0.0.1:1' }, ctx('q')), /at most 255 bytes/, 'bytes, not characters')
+  assert.throws(() => methods.register({ name: 'r', uuid: 'u'.repeat(65), listen: '127.0.0.1:1' }, ctx('q')), /^Error: register: uuid must be a non-empty string without ~, of at most 64 bytes$/)
+  assert.throws(() => methods.register({ name: 'r', uuid: 'u', listen: 'h'.repeat(254) + ':1' }, ctx('q')), /^Error: register: listen must be 'host:port' with a non-empty host of at most 253 bytes and a port 1–65535$/)
+  assert.throws(() => methods.lookup('r'.repeat(256), ctx('q')), /^Error: lookup: name must be a non-empty string of at most 255 bytes$/)
+  assert.equal(methods.register({ name: 'r'.repeat(255), uuid: 'u'.repeat(64), listen: 'h'.repeat(253) + ':65535' }, ctx('q')), true)
+  assert.deepEqual(snapshot(methods.lookup('r'.repeat(255), ctx('q')) as never), { ['u'.repeat(64)]: 'h'.repeat(253) + ':65535' })
   for (let i = 0; i < MAX_PER_CALLER; i++) methods.register({ name: 'r', uuid: 'u' + i, listen: '127.0.0.1:1' }, ctx('p'))
   assert.throws(() => methods.register({ name: 'r', uuid: 'one-more', listen: '127.0.0.1:1' }, ctx('p')), /already holds/)
   assert.equal(methods.register({ name: 'r', uuid: 'u0', listen: '127.0.0.1:9' }, ctx('p')), true, 're-registering an owned entry is not a new one')
@@ -126,6 +135,14 @@ test('address helpers: isAddr (digits, 1–65535, port 0 only for listen), sameS
   for (const ok of ['::1:4000', '::ffff:127.0.0.1:5', 'fdaa::3:4000']) assert.ok(isAddr(ok), ok)
   for (const bad of ['fdaa::3', '1::2::3:4000', '[::1:4000', '::1]:4000', '[]:4000', '[nothost]:4000', '[127.0.0.1]:4000']) assert.equal(isAddr(bad), false, bad)
   assert.ok(isAddr('127.0.0.1:0', true), 'port 0 is a legal LISTEN (the free-port default)')
+  //! the host is at most 253 UTF-8 bytes (kernel/door.ts HOST_MAX), so a listen printed back with its port fits 259
+  assert.ok(isAddr('h'.repeat(253) + ':65535'))
+  assert.ok(isAddr('h'.repeat(253) + ':0', true))
+  for (const bad of ['h'.repeat(254) + ':1', 'é'.repeat(127) + ':1', 'x'.repeat(1 << 20) + ':1']) assert.equal(isAddr(bad), false, `${bad.length} characters`)
+  assert.equal(addrHint('h'.repeat(254) + ':1'), ' (its host is 254 bytes; a host is at most 253, the longest DNS name)')
+  assert.equal(addrHint('é'.repeat(127)), ' (its host is 254 bytes; a host is at most 253, the longest DNS name)', 'no colon: the whole string is the host')
+  assert.equal(addrHint('fdaa::3'), v6Hint('fdaa::3'), 'a short host gets the IPv6 words as before')
+  assert.equal(addrHint('nope'), '')
   for (const squat of ['0.0.0.0:3376', 'localhost:3376', '[::]:3376', '[::1]:3376', '127.0.0.2:3376', '127.0.0.1:3376'])
     assert.ok(sameSocket(squat, '127.0.0.1:3376'), `${squat} takes the directory's socket`)
   assert.equal(sameSocket('127.0.0.1:3377', '127.0.0.1:3376'), false)
@@ -915,6 +932,11 @@ setInterval(() => {}, 1000)
 test('cross-box helpers: a bare host (isBox) names a box, its directory sits at the rendezvous port, the same directory is spotted under either spelling, another box may not add loopback addresses, and leavesBox says exactly when a listen leaves this box', () => {
   for (const ok of ['10.0.0.5', 'box-b', 'box-b.lan', '127.0.0.2', '[fe80::1]', 'a']) assert.ok(isBox(ok), ok)
   for (const bad of ['', '50', '--fero.heartbeat.ms', '-box', 'box-', 'a b', '10.0.0.5:4000', '::1', 7, undefined]) assert.equal(isBox(bad), false, String(bad))
+  //! at most 253 bytes, as an address's host (kernel/door.ts HOST_MAX): labels of 63 make a 253-byte name and a 255-byte one
+  const dotted = (n: number) => ['h'.repeat(63), 'h'.repeat(63), 'h'.repeat(63), 'h'.repeat(n - 192)].join('.')
+  assert.equal(dotted(253).length, 253)
+  assert.ok(isBox(dotted(253)))
+  assert.equal(isBox(dotted(255)), false, '255 bytes')
   assert.equal(boxDirectory('10.0.0.5', '127.0.0.1:3376'), '10.0.0.5:3376', "the port is this instance's rendezvous port")
   assert.equal(boxDirectory('[fe80::1]', '127.0.0.1:4100'), '[fe80::1]:4100')
   assert.ok(sameDirectory('localhost:3376', '127.0.0.1:3376'), "'localhost' is this box's own directory")

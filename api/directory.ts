@@ -28,6 +28,7 @@
 // authenticate anyone. A routable rendezvous is an operator's explicit act, never a default.
 
 import net from 'node:net'
+import { HOST_MAX, NAME_MAX, UUID_MAX, overBytes, utf8Len } from '../kernel/door.ts'
 import { proxy, snapshot } from './substrate.ts'
 import type { Context } from './methods.ts'
 import type { Fero, FeroOpts } from './types.ts'
@@ -59,6 +60,8 @@ export const rendezvousDefault = (): string | false => {
 // was written, brackets and all. The bare form ('::1:4000', V4-45's '::ffff:127.0.0.1:0') still reads,
 // by the last colon, when what is left is a whole IPv6 literal. A host with a colon that is not one is
 // refused: a bare 'fdaa::3' would read as host 'fdaa:', port 3. Brackets hold an IPv6 literal only.
+//! The host is at most HOST_MAX (253) UTF-8 bytes, the longest DNS name (kernel/door.ts): so every address fero
+// accepts, its port printed back in at most 5 digits, fits the LISTEN_MAX a peer checks on every HELLO.
 export const isAddr = (a: unknown, zero = false): a is string => {
   if (typeof a !== 'string') return false
   const i = a.lastIndexOf(':')
@@ -68,6 +71,7 @@ export const isAddr = (a: unknown, zero = false): a is string => {
   const p = Number(port)
   if (!((p >= 1 || (zero && p === 0)) && p <= 65535)) return false
   const host = a.slice(0, i)
+  if (overBytes(host, HOST_MAX)) return false
   if (host.startsWith('[') || host.endsWith(']')) return host.length > 2 && host.startsWith('[') && host.endsWith(']') && net.isIP(host.slice(1, -1)) === 6
   return !host.includes(':') || net.isIP(host) === 6
 }
@@ -75,6 +79,16 @@ export const isAddr = (a: unknown, zero = false): a is string => {
 export const v6Hint = (a: unknown): string => {
   if (typeof a !== 'string' || a.startsWith('[') || a.split(':').length < 3) return ''
   return ` (an IPv6 address goes in brackets: '[::1]:4000', or '[fdaa::3]' for a bare host)`
+}
+//! addrHint — the words a refusal adds for an address that is not one: a host over HOST_MAX names its size (a string
+// with no colon is all host, the bare spelling), anything else gets v6Hint's
+export const addrHint = (a: unknown): string => {
+  if (typeof a === 'string') {
+    const i = a.lastIndexOf(':')
+    const host = i > 0 ? a.slice(0, i) : a
+    if (overBytes(host, HOST_MAX)) return ` (its host is ${utf8Len(host)} bytes; a host is at most ${HOST_MAX}, the longest DNS name)`
+  }
+  return v6Hint(a)
 }
 export const hostOf = (a: string): string => a.slice(0, a.lastIndexOf(':'))
 //! netHost — a host as the net module takes it: a bracketed IPv6 literal without its brackets
@@ -126,11 +140,11 @@ export const loopbackHost = (raw: string): boolean => {
 }
 //! isBox — a bare host with no port: a DNS name or dotted IPv4 (labels of letters, digits and inner
 // hyphens), or a bracketed IPv6. An all-digit entry is refused: it is a port missing its host, and a
-// flag such as `--fero.heartbeat.ms` read off argv is not a host either.
+// flag such as `--fero.heartbeat.ms` read off argv is not a host either. At most HOST_MAX bytes, as isAddr's host.
 const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
 const NAME = new RegExp(`^${LABEL}(?:\\.${LABEL})*$`)
 export const isBox = (h: unknown): h is string =>
-  typeof h === 'string' && ((NAME.test(h) && !/^\d+$/.test(h)) || /^\[[0-9A-Fa-f:.]+\]$/.test(h))
+  typeof h === 'string' && !overBytes(h, HOST_MAX) && ((NAME.test(h) && !/^\d+$/.test(h)) || /^\[[0-9A-Fa-f:.]+\]$/.test(h))
 //! canon — one spelling per host a dial lands on, so 'localhost', 'LOCALHOST', '0.0.0.0' and '127.0.0.1'
 // read as one box: names are case-blind, and a wildcard dialed reaches loopback (a wildcard directory
 // answers there too). '[::1]' stays apart from '127.0.0.1': two sockets, not one. An IPv4-mapped
@@ -244,9 +258,11 @@ export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefin
     methods: {
       register: (a: unknown, ctx: Context) => {
         const { name, uuid, listen } = (a ?? {}) as { name?: unknown; uuid?: unknown; listen?: unknown }
-        if (typeof name !== 'string' || name === '' || name.startsWith('#')) throw new Error('register: name must be a non-empty user resource name (no # prefix)')
-        if (typeof uuid !== 'string' || uuid === '' || uuid.includes('~')) throw new Error('register: uuid must be a non-empty string without ~')
-        if (!isAddr(listen)) throw new Error("register: listen must be 'host:port' with a non-empty host and a port 1–65535")
+        //! the sizes (kernel/door.ts NAME_MAX, UUID_MAX; HOST_MAX inside isAddr): MAX_PER_CALLER bounds how many entries a
+        // runaway registrant holds, these bound how big each one is — and every row goes out to every lookup of its name
+        if (typeof name !== 'string' || name === '' || name.startsWith('#') || overBytes(name, NAME_MAX)) throw new Error(`register: name must be a non-empty user resource name (no # prefix) of at most ${NAME_MAX} bytes`)
+        if (typeof uuid !== 'string' || uuid === '' || uuid.includes('~') || overBytes(uuid, UUID_MAX)) throw new Error(`register: uuid must be a non-empty string without ~, of at most ${UUID_MAX} bytes`)
+        if (!isAddr(listen)) throw new Error(`register: listen must be 'host:port' with a non-empty host of at most ${HOST_MAX} bytes and a port 1–65535`)
         if (ctx.peer === undefined || ctx.peer === selfOf()) throw new Error('register: only a directory client may register (no caller identity)')
         let mine = owners.get(ctx.peer)
         if (!mine) owners.set(ctx.peer, (mine = new Set()))
@@ -280,7 +296,7 @@ export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefin
         return true
       },
       lookup: (a: unknown) => {
-        if (typeof a !== 'string' || a === '') throw new Error('lookup: name must be a non-empty string')
+        if (typeof a !== 'string' || a === '' || overBytes(a, NAME_MAX)) throw new Error(`lookup: name must be a non-empty string of at most ${NAME_MAX} bytes`)
         return registry.get(a)
       },
     },
