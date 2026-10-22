@@ -2088,7 +2088,9 @@ export class Node {
           return
         }
         //! a fold group is open on this link (FEED {b}, wave 6c): the frame waits, as its own copy of the bytes, for the
-        // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes
+        // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes. (A clear
+        // on a paused link that takes the {b} leaves the forward's later frames with no group open: they land one by one,
+        // a row and its later remove in two events — STATUS names it.)
         if (this.group !== null && link.id === this.primary) { this.group.frames.push(f.buf.slice()); return }
         this.#ingest(link, f, prov)
         return

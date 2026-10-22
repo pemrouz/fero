@@ -815,6 +815,8 @@ export class Scope {
     // forward and FEED {e: p} after it on every synced client link (the forward's links), and the spoke buffers the
     // frames between them until the end: a partition's history lands as ONE apply (node.ts `group`). The flush before
     // {b} ships whatever an earlier handler of this step left in the outbox, so the group holds the fold's frames alone.
+    // The one hole (STATUS): a paused client link one frame short of full, where the forward's first frame overflows and
+    // the clear takes {b}; Link.flush ships on after a clear, so the later frames survive ungrouped and land one by one.
     if (taps)
       for (const cl of node.clientLinks)
         if (cl.state === LS.admitted && cl.synced && !cl.dead) { cl.flush(node.env.sink, j); cl.ship(encodeControl(VERB.FEED, { b: p }), node.env.sink, j) }
