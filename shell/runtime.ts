@@ -671,7 +671,17 @@ export class Runtime {
     this.node.step = (e) => { step(e); fn() }
   }
 
+  //! #wire — the one place every link socket passes, dialed (#dial, at 'connect') and accepted (#accept) alike, and
+  // so every link of every fero() in the process, the #directory's host and clients included (api/directory.ts
+  // opens no link of its own: its only socket is the bind probe, which listens and closes and carries no bytes).
+  //! setNoDelay FIRST, before any byte can leave (the kernel's linkUp, which sends HELLO, steps after this): it turns
+  // Nagle's algorithm off. With it on, the OS held a small frame back until the frame before it was acknowledged,
+  // and the peer held that acknowledgement for about 40 ms (delayed ACK). Every exchange that sends two frames in a
+  // row paid it: a method call that writes (the RESULT behind the record), a write forwarded to its row's owner.
+  // On loopback those took about 43 ms; with Nagle off, about 1 ms (V4-NN, tests/latency.perf.ts). The kernel
+  // already packs a step's records into as few frames as it can (the Outbox), so nothing else needs the OS to merge.
   #wire(sock: net.Socket, link: number) {
+    sock.setNoDelay(true)
     this.#sockets.set(link, sock)
     sock.on('data', (chunk: Buffer) => {
       //! re-view as plain Uint8Array: Buffer.slice is a VIEW (unlike Uint8Array.slice), and the codec's
