@@ -819,18 +819,19 @@ export class Runtime {
 // - a frame at or over the mark is never corked.
 // Why the frame limit: libuv hands the OS at most IOV_MAX = 1024 buffers in its first try at a writev (Linux and
 // macOS). A batch of at most 1024 frames leaves in that one try whenever the OS has room for its bytes, as the same
-// frames did one by one, and Node counts them out of writableLength at once. A bigger batch left the rest of its writev
-// for a later loop turn, Node kept counting all of it, and the next write() answered false where it answered true
-// uncorked: frames under 64 bytes reach the mark's 64 KiB only past 1024 frames, so a burst of tiny writes paused
-// the link (the wave 7 review: 3,000 frames of 30 bytes paused at write 1909, and anti-entropy healed the rest).
+// frames did one by one, and Node counts them out of writableLength at once. A bigger batch's writev finished only on
+// a later loop turn, even when its last bytes reached the OS at once: Node kept counting all of it, every later frame
+// of the run waited behind it in Node's buffer, and the next write() answered false where it answered true uncorked.
+// Frames under 64 bytes reach the mark's 64 KiB only past 1024 frames, so a burst of tiny writes paused the link (the
+// wave 7 review: 3,000 frames of 30 bytes paused at write 1909, and anti-entropy healed the rest).
 // Node's cork is a counter; a socket corks only when it is not in `batches`, so it never holds more than one cork,
 // and an uncork scheduled at or after it always opens it. A socket is in `batches` exactly while it is corked, with
 // the count of frames its batch holds; leaving it always uncorks.
 //! Every place the shell destroys a socket flushes it first (kill), and a process that exits inside a run flushes
 // every corked socket on its way out (the 'exit' hook). The flush is one writev of at most 1024 frames, which the OS
-// takes at once when it has room, so a frame the kernel shipped reaches the OS as it did uncorked (a batch of more
-// than 2048 frames lost the rest: libuv's second try is the last before it waits for the socket, and a destroy or an
-// exit never waits).
+// takes at once when it has room, so a frame the kernel shipped reaches the OS as it did uncorked. Without the frame
+// limit, the frames that waited behind a bigger batch were still in Node's buffer when the destroy or the exit came,
+// and neither waits: 952 of 3,000 tiny frames were lost (with a limit of 1025, 1,975 of them).
 const BATCH_FRAMES = 1024
 const batches = new Map<net.Socket, number>()
 let corkHooked = false
