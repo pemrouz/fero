@@ -106,9 +106,17 @@ const RESYNC_SEEDS: Record<string, number[]> = { 'A11-spoke': [2, 5, 6, 10] }
 // 2 and 1 rows, measured 2026-10-12 on seeds 1-12; seeds 1 and 2 read 0 since V4-55 moved seed 2's join and leave). Since
 // wave 6c (2026-10-21) a shed tells its spokes (FEED {x}, kernel/scope.ts evaluateSheds; the spoke drops the partition,
 // node.ts #unfeed) and every seed of 1-12 reads 0: the five run in every battery so the 0 below is never vacuous.
+// A14 seeds 18 and 32 (wave 8): seed 18 pays the owed word while the partition's latch from zero is open at the heal
+// (seeds 1 and 2 pay it while the partition is away and once it is back), and seed 32 is the leapfrog on a lane the
+// clear took nothing from: a frame of the re-latched p10 (n90#34, a row written while p10 was away) survives the clear,
+// reaches the spoke ahead of the word said again, and only the answer's lowered start brings it back. With the start
+// not lowered (kernel/node.ts #payOwed, by hand on a scratch copy, 2026-10-22) seed 32 is red at the heal exchange's end
+// and at the horizon, 'M12: s1 lacks ["p10"], which its feeder n01 holds = {away=number:2} @2/34/n90', the one seed of
+// 1-72 that catches it. The two run in every battery so that each shape is judged on every run.
 const ALWAYS: Record<string, number[]> = {
   'A7-down-to-one': [4],
   'A12-spoke-handoff': [3, 5, 6, 8, 11],
+  'A14-spoke-owed': [18, 32],
 }
 
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
@@ -132,11 +140,12 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   // exercises — its spoke is synced all along — sighting 3 and the kernel tests cover that.
   'A13-spoke-repair': (e) => e.repairFolds > 0 && e.reentryFolds > 0,
   //! A14: the feeder owed the spoke a shed's word (a clear took it from the paused queue) and paid it at the heal
-  // (sim/monitors.ts feedWords). Seeds 1-24 (measured 2026-10-22): 23 owe and pay it (1 to 20 partition-words each; seed
-  // 9's feeder lost no partition to the joiner, so nothing was shed); the word is paid while the partition is away on
-  // seeds 1 and 15, coming back (a latch from zero open) on 18 and 21, back and held on the other 19; frames of a
-  // re-latched partition survived a clear and reached the spoke ahead of the word said again (the leapfrog) on 4, 7, 17
-  // and 23; the fold's end was owed and paid on 19 of them.
+  // (sim/monitors.ts feedWords). Seeds 1-72 (measured 2026-10-22, all safe and live, at the horizon and at the heal
+  // exchange's end): 71 owe and pay it (1 to 20 partition-words each, 576 in all; seed 9's feeder lost no partition to
+  // the joiner, so nothing was shed), and 57 owe and pay the fold's end too (488); the word is paid while the partition
+  // is away on 7 seeds (1, 15, 28, 38, 43, 56, 62), coming back (a latch from zero open) on 7 (18, 21, 33, 39, 46, 53,
+  // 64), back and held on 57; frames of a re-latched partition survived a clear and reached the spoke ahead of the word
+  // said again (the leapfrog) on 11 (4, 7, 17, 23, 32, 35, 37, 47, 48, 51, 65).
   'A14-spoke-owed': (e) => e.owedX > 0 && e.paidX > 0,
 }
 //! SPOKED — the families with a spoke: M12 (spokeMirror) must have compared something on every one of them
@@ -146,7 +155,7 @@ for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live (lanes bounded), M8's tombstone half red today on every seed, compaction engaged, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
     let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0, lanePairs = 0, compactions = 0
-    const words = { owedX: 0, paidX: 0, owedE: 0, paidE: 0, healEnds: 0 }
+    const words = { owedX: 0, paidX: 0, owedE: 0, paidE: 0, healEnds: 0, healGone: 0, healAcquiring: 0, healHeld: 0, survivors: 0 }
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -197,12 +206,15 @@ for (const fam of FAMILIES) {
       // 6 again (mutation-checked).
       assert.equal(spokeStale, 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (a shed tells its spokes since wave 6c)`)
     }
-    //! A14 (wave 8): the owed words were owed and paid on these seeds, both kinds, and the heal-end check judged the spoke
-    // (non-vacuity: on seeds 1 and 2, 14 shed words owed and paid, 7 ends owed and paid, 2 heal ends judged); the spoke
-    // keeps no row of a partition that left its feeder at the horizon, as on A12
+    //! A14 (wave 8): the owed words were owed and paid on these seeds, both kinds, the heal-end check judged the spoke, and
+    // the word was paid in each state its partition can be in here: away (seed 1), coming back (seed 18), back and held
+    // (seeds 2 and 32), with the leapfrog's survivors on the wire (seed 32). Non-vacuity on seeds 1, 2, 18 and 32: 24 shed
+    // words and 15 ends owed and paid, 4 heal ends judged. The spoke keeps no row of a partition that left its feeder at
+    // the horizon, as on A12.
     if (fam.name === 'A14-spoke-owed') {
       assert.ok(words.owedX > 0 && words.paidX > 0 && words.owedE > 0 && words.paidE > 0, `non-vacuity: owed and paid words over the seeds (${JSON.stringify(words)})`)
       assert.ok(words.healEnds > 0, `non-vacuity: the heal-end check judged ${words.healEnds} heal exchanges`)
+      assert.ok(words.healGone > 0 && words.healAcquiring > 0 && words.healHeld > 0 && words.survivors > 0, `non-vacuity: the word was paid with its partition away, coming back and held, and the leapfrog reached the spoke (${JSON.stringify(words)})`)
       assert.equal(spokeStale, 0, `the spoke kept ${spokeStale} rows of partitions that left its feeder`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
