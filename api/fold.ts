@@ -61,10 +61,12 @@ export interface Rows { c: Claims; att: string[] | null }
 // held ∪ orphan scope, plus the attestation set for the coverage sweep. Tombstones ride from the
 // versions map (a removed cell's stamp without a live value); acquiring partitions contribute
 // nothing (their base is not yet this node's to attest) and are NOT attested.
-//! `p` — one partition only (V4-NN: a keyed read during a handover, Gather.keyed): the same answer cut to that row's
-// cells, its attestation cut to `p`. One string test per cell and no parse: a cell is JSON.stringify(key), so a cell
-// of `p` starts with `["p"` and goes on with `]` or `,` (inside, below). Still one walk of every version this node
-// holds — a cold path (a handover), and the walk is what makes the cut answer exactly the whole answer's part.
+//! `p` — one partition only (V4-NN: Gather.keyed, a keyed read on the row's owner while it does not hold the row — a
+// handover, or a read of an absent row, which no node holds): the same answer cut to that row's cells, its attestation
+// cut to `p`. One string test per cell and no parse: a cell is JSON.stringify(key), so a cell of `p` starts with `["p"`
+// and goes on with `]` or `,` (inside, below). Still one walk of every version this node holds, which is what makes
+// the cut answer exactly the whole answer's part; far cheaper than the whole share it replaces (no parse per cell, and
+// only the row's cells are sent).
 export const rowsPartial = (rt: Runtime, p?: string): Rows => {
   const node = rt.node
   const out: Claims = {}
