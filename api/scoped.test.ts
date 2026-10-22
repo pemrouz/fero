@@ -829,21 +829,25 @@ test('the system rows call with a partition answers that row alone over a real l
   let c: Fero | null = null
   try {
     assert.ok(await formed(nodes), 'formed')
-    //! replicas 1: each row has one holder. Find k1's, and read its `rows` through a client fed by it
-    nodes[0].data.k1 = { n: 1 }
-    await nodes[0].methods.update({ key: ['k1', 'm'], value: 2 })
+    //! replicas 1: each row has one holder. Twelve rows with a field each; read one row's `rows` through a client fed
+    // by a member that holds that row and at least one more, so the cut answer and the whole one differ
+    for (let i = 0; i < 12; i++) {
+      nodes[0].data['k' + i] = { n: i }
+      await nodes[0].methods.update({ key: ['k' + i, 'm'], value: i })
+    }
     const held = (f: Fero) => (diag(f)!.capture().held ?? []) as string[]
     const cells = (f: Fero) => (diag(f)!.capture().state as [string, unknown][]).map(([k]) => k)
-    assert.ok(await until(() => nodes.some((f) => held(f).includes('k1') && cells(f).includes(JSON.stringify(['k1', 'm']))), 8000), 'k1 and its field are held')
-    const holder = nodes.find((f) => held(f).includes('k1'))!
+    assert.ok(await until(() => Array.from({ length: 12 }, (_, i) => 'k' + i).every((k) => nodes.some((f) => held(f).includes(k) && cells(f).includes(JSON.stringify([k, 'm'])))), 8000), 'every row and its field are held')
+    const holder = nodes.find((f) => held(f).filter((k) => k.startsWith('k')).length >= 2)!
+    const k = held(holder).find((p) => p.startsWith('k'))!
     c = await fero('scoped', { uuid: 'zz', hosts: [(snapshot(holder.cluster) as { me: { listen: string } }).me.listen], heartbeat: { ms: 50 }, redial: { ms: 30 } })
     const rows = (c.methods as unknown as Record<string, (a?: unknown) => Promise<{ c: Record<string, unknown>; att: string[] | null }>>)['\u0000rows']
     const whole = await rows()
-    assert.ok(whole.att!.includes('k1') && whole.c[JSON.stringify(['k1'])] !== undefined && whole.c[JSON.stringify(['k1', 'm'])] !== undefined, JSON.stringify(whole))
-    const one = await rows('k1')
-    assert.deepStrictEqual(Object.keys(one.c).sort(), [JSON.stringify(['k1']), JSON.stringify(['k1', 'm'])].sort())
-    assert.deepStrictEqual(one.att, ['k1'])
-    assert.deepStrictEqual(Object.fromEntries(Object.entries(whole.c).filter(([k]) => (JSON.parse(k) as string[])[0] === 'k1')), one.c, 'the whole answer\'s part for the row')
+    assert.ok(whole.att!.filter((p) => p.startsWith('k')).length >= 2 && whole.c[JSON.stringify([k])] !== undefined && whole.c[JSON.stringify([k, 'm'])] !== undefined, JSON.stringify(whole))
+    const one = await rows(k)
+    assert.deepStrictEqual(Object.keys(one.c).sort(), [JSON.stringify([k]), JSON.stringify([k, 'm'])].sort(), `${k} alone`)
+    assert.deepStrictEqual(one.att, [k])
+    assert.deepStrictEqual(Object.fromEntries(Object.entries(whole.c).filter(([cell]) => (JSON.parse(cell) as string[])[0] === k)), one.c, 'the whole answer\'s part for the row')
   } finally {
     await c?.destroy()
     await Promise.all(nodes.map((n) => n.destroy()))
