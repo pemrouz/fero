@@ -802,28 +802,46 @@ export class Runtime {
 // Sent one segment each, 20,000 of them took about 2.3x the time they took with Nagle on between two processes,
 // and the receiver woke about 22 times as often. So the first small frame of a run corks its socket, and the uncork
 // is scheduled at the same moment (process.nextTick): the run's frames leave together, in one writev, as soon as the
-// run ends, whatever the run throws. No frame waits for a later turn of the event loop, so latency is untouched.
+// run ends, whatever the run throws.
+//! The trade: a frame waits for the end of the run that made it (never for a later turn of the event loop). Runs are
+// short (a socket read, a timer, a method call), so this costs nothing measurable and both latency pins hold. A long
+// synchronous run holds its frames for as long as it runs: a write followed by 300 ms of user code in the same run
+// reaches the peer after 300 ms, where with Nagle on its first small frame left at once (the wave 7 review). Such a
+// run also holds every read, timer and reply of the process, so its frames wait with everything else.
 // Corking around one kernel step instead was measured and does not help: in that burst every step makes one frame.
-//! Two rules keep write()'s answers what they were uncorked, so the kernel pauses a link exactly when it did:
+//! Three rules keep write()'s answers what they were uncorked, so the kernel pauses a link exactly when it did:
 // - a batch never reaches the socket's high-water mark: a frame that would take it there flushes the batch first
 //   and goes out on its own;
+// - a batch never holds more than BATCH_FRAMES (1024) frames: the next one flushes it and goes out on its own;
 // - a frame at or over the mark is never corked.
-// Node's cork is a counter; a socket corks only when it is not corked, so it never holds more than one, and the one
-// uncork scheduled with it always opens it. A socket that is corked is in `corked`; leaving it always uncorks.
+// Why the frame limit: libuv hands the OS at most IOV_MAX = 1024 buffers in its first try at a writev (Linux and
+// macOS). A batch of at most 1024 frames leaves in that one try whenever the OS has room for its bytes, as the same
+// frames did one by one, and Node counts them out of writableLength at once. A bigger batch left the rest of its writev
+// for a later loop turn, Node kept counting all of it, and the next write() answered false where it answered true
+// uncorked: frames under 64 bytes reach the mark's 64 KiB only past 1024 frames, so a burst of tiny writes paused
+// the link (the wave 7 review: 3,000 frames of 30 bytes paused at write 1909, and anti-entropy healed the rest).
+// Node's cork is a counter; a socket corks only when it is not in `batches`, so it never holds more than one cork,
+// and an uncork scheduled at or after it always opens it. A socket is in `batches` exactly while it is corked, with
+// the count of frames its batch holds; leaving it always uncorks.
 //! Every place the shell destroys a socket flushes it first (kill), and a process that exits inside a run flushes
-// every corked socket on its way out (the 'exit' hook): a frame the kernel shipped reaches the OS, as it did uncorked.
-const corked = new Set<net.Socket>()
+// every corked socket on its way out (the 'exit' hook). The flush is one writev of at most 1024 frames, which the OS
+// takes at once when it has room, so a frame the kernel shipped reaches the OS as it did uncorked (a batch of more
+// than 2048 frames lost the rest: libuv's second try is the last before it waits for the socket, and a destroy or an
+// exit never waits).
+const BATCH_FRAMES = 1024
+const batches = new Map<net.Socket, number>()
 let corkHooked = false
-const uncork = (sock: net.Socket) => { corked.delete(sock); sock.uncork() }
+const uncork = (sock: net.Socket) => { batches.delete(sock); sock.uncork() }
 const runBatch = (sock: net.Socket, len: number) => {
-  const mark = sock.writableHighWaterMark
-  if (sock.writableCorked === 0) {
-    if (len >= mark) return
-    if (!corkHooked) { corkHooked = true; process.on('exit', () => { for (const s of corked) { try { s.uncork() } catch { /* a socket already gone */ } } }) }
-    corked.add(sock)
+  const n = batches.get(sock)
+  if (n === undefined) {
+    if (len >= sock.writableHighWaterMark) return
+    if (!corkHooked) { corkHooked = true; process.on('exit', () => { for (const s of batches.keys()) { try { s.uncork() } catch { /* a socket already gone */ } } }) }
+    batches.set(sock, 1)
     process.nextTick(uncork, sock)
     sock.cork()
-  } else if (sock.writableLength + len >= mark) uncork(sock)
+  } else if (n >= BATCH_FRAMES || sock.writableLength + len >= sock.writableHighWaterMark) uncork(sock)
+  else batches.set(sock, n + 1)
 }
 //! kill — destroy a link socket after flushing what this run batched on it (close, destroy, drop)
 const kill = (sock: net.Socket) => { uncork(sock); sock.destroy() }
