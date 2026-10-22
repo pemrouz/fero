@@ -752,7 +752,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // the live reads it feeds (host.endLive), never a silent partial (plan §9).
   let gather: Gather | null = null
   const gatherOf = (): Gather =>
-    (gather ??= new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Rows>, fault,
+    (gather ??= new Gather(rt, (uuid, t, p) => memberCaller!.call(SYSTEM + 'rows', p, { timeout: t, to: uuid }) as Promise<Rows>, fault,
       (r) => { if (gather !== null) host?.endLive(gather.proxy, r) }))
 
   //! ── the scoped data facade (M6, DESIGN-M6 C6): §9's promise — an expression means the same at
@@ -795,7 +795,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // THE GATHER — parked claims include every unshed orphan's, absence is attested by the full
       // holder set, and an unreachable member is a typed error, never a silent partial. A truly
       // absent key answers fast (one fan-out round-trip); a local-shard undefined never leaks.
-      return await gatherOf().refresh(rt, { throwOnPartial: true, key: k })
+      //! One row's gather (V4-NN): every member is asked for k's partition only, folded beside the live union
+      // (fold.ts keyed), so a member whose whole share passes one frame no longer refuses the read.
+      return await gatherOf().keyed(k)
     }
     return bind.data.get(k)
   }
@@ -864,7 +866,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   //! the system plane: confirm-over-RPC — a spoke's ladder evidence is one digest wide (M5b residual),
   // so its probes run at the PRIMARY, which holds the full member evidence. `rows` (M6) answers the
-  // gather fan-out with this node's stamped claims (held ∪ orphan — an orphan claims until shed).
+  // gather fan-out with this node's stamped claims (held ∪ orphan — an orphan claims until shed); with an
+  // argument, the claims of that one partition (a keyed read during a handover, fold.ts keyed).
   // `read` (M6-review finding 5) is the KEYED read the internal machinery dispatches — off the
   // user-claimable namespace, so a user method named 'read' only ever changes the PUBLIC dispatch.
   const system: Record<string, (arg: unknown, ctx: Context) => unknown> = {
@@ -872,7 +875,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       const v = a as { o: string; s: number; l: number; t: number; pt?: string }
       return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000), v.pt)
     },
-    rows: () => rowsPartial(rt),
+    rows: (a) => rowsPartial(rt, a == null ? undefined : String(a)),
     read: takesKey((a) => keyedRead(String(a))),
   }
   //! the Host receives the SCOPED facade as ctx.data (M6-review finding 4): a handler's

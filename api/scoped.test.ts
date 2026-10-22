@@ -479,7 +479,7 @@ test("TOO-LARGE BY REAL SIZE [V4-51/52] — the gather refuses only a reply that
     await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) =>
       e.reason === 'too-large' && e.op === 'read' && /^the whole resource is bigger than one frame \(8 KiB\)/.test(e.hint))
     //! a keyed answer reads one row of that same union: answered
-    assert.deepStrictEqual(await g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'r250' }), row(250))
+    assert.deepStrictEqual(await g.keyed('r250'), row(250))
   } finally { g.destroy() }
 })
 
@@ -689,10 +689,10 @@ test('DRAIN, the verdict rides destroy(): an UNSCOPED pair resolves true on both
 })
 
 //! the fix check: a keyed refresh read the union with `all[key]`, so an absent 'constructor' row answered (or was
-// refused as) Object.prototype's function; a live tick built a whole-union answer nobody reads; a keyed read refused
-// because a member's whole share does not fit told its caller to read one key at a time — it did. Own rows only, no
-// answer for `want: false`, and a keyed caller is told to retry.
-test('a keyed gather reads only its own row, a refresh nobody reads builds no answer, and a keyed read refused for a member\'s share is told to retry', async () => {
+// refused as) Object.prototype's function; a live tick built a whole-union answer nobody reads. Own rows only, no
+// answer for `want: false`. (A keyed read refused for a member's WHOLE share was told to retry here; since V4-NN it
+// asks for the row's partition only — the KEYED HANDOVER test below.)
+test('a keyed gather reads only its own row, a refresh nobody reads builds no answer, and a keyed read is not refused for a member\'s whole share', async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {
     uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
@@ -702,19 +702,150 @@ test('a keyed gather reads only its own row, a refresh nobody reads builds no an
     versions: new Map(), state: new Map(),
   }
   const rows = { c: { [JSON.stringify(['a'])]: { v: { x: 1 }, st: [1, 1, 'h1'] }, [JSON.stringify(['big'])]: { v: { s: 'x'.repeat(9000) }, st: [1, 2, 'h1'] } }, att: ['a', 'big'] }
-  let h1: () => Promise<unknown> = async () => rows
-  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? h1() : { c: {}, att: ['a', 'big'] }) as never)
+  let h1: (p?: string) => Promise<unknown> = async () => rows
+  const g = new Gather({ node: fake } as never, async (uuid: string, _t: number, p?: string) => (uuid === 'h1' ? h1(p) : { c: {}, att: ['a', 'big'] }) as never)
   try {
     for (const key of ['constructor', 'toString', '__proto__', 'nope'])
-      assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: true, key }), undefined, key)
-    assert.deepStrictEqual(await g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), { x: 1 })
+      assert.equal(await g.keyed(key), undefined, key)
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 })
     assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: false, want: false }), undefined, 'no answer is built for nobody')
     //! the last check: one row bigger than one frame, read by its key, is told to read a smaller part of the row
-    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'big' }), (e: ScopedError) =>
+    await assert.rejects(g.keyed('big'), (e: ScopedError) =>
       e.reason === 'too-large' && e.op === 'read' && /^the answer is bigger than one frame \(8 KiB\), so fero cannot send it: read a smaller part of the row with a method that returns it$/.test(e.hint))
-    h1 = async () => { throw { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' } }
-    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), (e: ScopedError) => e.reason === 'too-large' && /this key is changing owner: retry in a moment$/.test(e.hint))
-    //! the last check: the stored refusal, which the next live whole read hears, keeps the whole read's words
+    //! h1's WHOLE share no longer fits; one partition of it does: the whole read is refused, the keyed read answers
+    h1 = async (p) => { if (p === undefined) throw { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' }; return rows }
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) => e.reason === 'too-large')
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 })
+    //! the last check: the stored refusal, which the next live whole read hears, keeps the whole read's words — a keyed read leaves it
     assert.match(g.refused!.hint, /so the whole-resource read cannot gather them: read one key at a time \(methods\.read\(key\)\)$/)
   } finally { g.destroy() }
+})
+
+//! V4-NN (STATUS: "A keyed read during a handover can be refused while a member's whole share is bigger than one
+// frame"): a keyed read on the row's owner while it is still taking the row over gathered EVERY member's whole share,
+// so one member whose share passed one frame refused its answer 'too-large' and the read was refused until the
+// handover ended. It asks each member for that row's partition only now, and folds the answers in a fold of its own,
+// beside the live union: a copy of the union's claims and last value for the row, never the union itself.
+test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s partition only: a member whose whole share passes one frame answers it; the fold is a copy beside the live union, parking included', async () => {
+  const { Gather } = await import('./fold.ts')
+  //! self owns `a` and is still taking it over (it holds nothing, attests nothing); h1 is the row's old holder, h2 a member
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['self', 'h1'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const A = JSON.stringify(['a']), AY = JSON.stringify(['a', 'y']), B = JSON.stringify(['b'])
+  const tooBig = { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' }
+  type Rows = { c: Record<string, unknown>; att: string[] }
+  //! each member answers its WHOLE share (p undefined) or one partition's; h1's whole share no longer fits one frame
+  let h1: { whole: Rows | null; a: Rows | 'big' }, h2: { whole: Rows; a: Rows | 'down' | 'ignores' }
+  const asked: (string | undefined)[] = []
+  const g = new Gather({ node: fake } as never, async (uuid: string, _t: number, p?: string) => {
+    asked.push(p)
+    if (uuid === 'h1') {
+      if (p === undefined) { if (h1.whole === null) throw tooBig; return h1.whole as never }
+      if (h1.a === 'big') throw tooBig
+      return h1.a as never
+    }
+    if (p !== undefined && h2.a === 'down') throw new Error('timeout')
+    return (p === undefined || h2.a === 'ignores' ? h2.whole : h2.a) as never
+  })
+  try {
+    //! gen 0: every share fits — the live union has the row
+    h1 = { whole: { c: { [A]: { v: { x: 1 }, st: [1, 1, 'h1'] }, [B]: { v: 1, st: [1, 2, 'h1'] } }, att: ['a', 'b'] }, a: 'big' }
+    h2 = { whole: { c: {}, att: ['b'] }, a: { c: {}, att: [] } }
+    await g.refresh({ node: fake } as never, { throwOnPartial: true })
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 1 }, b: 1 })
+    //! h1 now holds more than one frame: the whole read is refused, as V4-51 says…
+    h1 = { whole: null, a: { c: { [A]: { v: { x: 5 }, st: [1, 9, 'h1'] } }, att: ['a'] } }
+    h2 = { whole: { c: {}, att: ['b'] }, a: { c: { [AY]: { v: 2, st: [1, 10, 'h2'] } }, att: [] } }
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) => e.reason === 'too-large' && e.missing!.join() === 'h1')
+    //! …and the keyed read answers: each member was asked for `a` alone, and the answers fold across depth
+    asked.length = 0
+    assert.deepStrictEqual(await g.keyed('a'), { x: 5, y: 2 }, 'h1\'s row and h2\'s newer field')
+    assert.deepStrictEqual(asked, ['a', 'a'], 'every member was asked for the partition, none for its whole share')
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 1 }, b: 1 }, 'the live union is not written by a keyed read')
+    //! a member of an older version ignores the argument and sends its whole share: the fold sees the row alone
+    h2 = { whole: { c: { [AY]: { v: 2, st: [1, 10, 'h2'] }, [B]: { v: 7, st: [1, 11, 'h2'] } }, att: ['a', 'b'] }, a: 'ignores' }
+    assert.deepStrictEqual(await g.keyed('a'), { x: 5, y: 2 })
+    //! PARKING, copied from the live union: h1 answers in the skew window (no claim, no attestation for `a`) and
+    // nobody else claims the row — not covered, so the live union's last value stands, exactly as there
+    h1 = { whole: null, a: { c: {}, att: [] } }
+    h2 = { whole: { c: {}, att: ['b'] }, a: { c: {}, att: [] } }
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 }, 'the parked claim of the live union parks here too')
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 1 }, b: 1 }, 'still untouched')
+    //! attested absence by every holder (self is not one of them in this ring) drops it: a real delete
+    fake.writes.ring.holders = () => ['h1', 'h2']
+    h1 = { whole: null, a: { c: {}, att: ['a'] } }
+    h2 = { whole: { c: {}, att: ['a', 'b'] }, a: { c: {}, att: ['a'] } }
+    assert.equal(await g.keyed('a'), undefined, 'covered absence: the row is gone')
+    //! the refusals that stay: the row's own claims at a member pass one frame (retrying cannot help), and a member down
+    h1 = { whole: null, a: 'big' }
+    await assert.rejects(g.keyed('a'), (e: ScopedError) => {
+      assert.deepEqual({ ...e, hint: '' }, { scoped: true, op: 'gather', reason: 'too-large', replicas: 2, partition: 'a', missing: ['h1'], hint: '' })
+      assert.equal(e.hint, 'what h1 holds for this row is bigger than one frame (8 KiB), so fero cannot send it: read a smaller part of the row with a method that returns it')
+      return true
+    })
+    h1 = { whole: null, a: { c: {}, att: ['a'] } }
+    h2 = { whole: { c: {}, att: ['b'] }, a: 'down' }
+    await assert.rejects(g.keyed('a'), (e: ScopedError) => e.reason === 'unreachable' && e.partition === 'a' && e.missing!.join() === 'h2')
+  } finally { g.destroy() }
+})
+
+//! the member side of V4-NN: `rows` with a partition answers exactly the part of its whole answer for that row — the
+// row cell, its fields and their tombstones, a quoted key too — and attests that partition alone, or nothing
+test('rowsPartial with a partition is the whole answer\'s part for that row: its cells by their first key, its attestation cut to it', async () => {
+  const { rowsPartial } = await import('./fold.ts')
+  const st = (seq: number) => ({ epoch: 1, seq, origin: 'n1' })
+  const cell = (...k: string[]) => JSON.stringify(k)
+  const versions = new Map([
+    [cell('a'), st(1)], [cell('a', 'f'), st(2)], [cell('a', 'g'), st(3)], [cell('ab'), st(4)], [cell('a"b'), st(5)],
+    [cell('a', 'h', 'i'), st(6)], [cell('c'), st(7)], [cell('o'), st(8)],
+  ])
+  const state = new Map<string, unknown>([[cell('a'), { f: 1 }], [cell('a', 'f'), 1], [cell('ab'), 2], [cell('a"b'), 3], [cell('a', 'h', 'i'), 4], [cell('c'), 5], [cell('o'), 6]])
+  //! a, ab and a"b held; o an orphan (it claims until its shed); c still being taken over (no claim, no attestation)
+  const scope = { entries: new Map([['a', { state: 1 }], ['ab', { state: 1 }], ['a"b', { state: 1 }], ['o', { state: 3 }], ['c', { state: 2 }]]) }
+  const rt = { node: { armed: true, scope, versions, state } } as never
+  const whole = rowsPartial(rt)
+  assert.deepEqual(new Set(whole.att), new Set(['a', 'ab', 'a"b', 'o']))
+  for (const p of ['a', 'ab', 'a"b', 'o', 'c', 'nope']) {
+    const part = rowsPartial(rt, p)
+    const want = Object.fromEntries(Object.entries(whole.c).filter(([k]) => (JSON.parse(k) as string[])[0] === p))
+    assert.deepStrictEqual(part.c, want, p)
+    assert.deepStrictEqual(part.att, whole.att!.includes(p) ? [p] : [], p)
+  }
+  assert.deepStrictEqual(Object.keys(rowsPartial(rt, 'a').c), [cell('a'), cell('a', 'f'), cell('a', 'g'), cell('a', 'h', 'i')], 'the row, its fields and the field tombstone; never `ab` or `a"b`')
+  assert.deepStrictEqual(rowsPartial(rt, 'a').c[cell('a', 'g')], { st: [1, 3, 'n1'], t: 1 })
+  //! unscoped: the whole fold is local truth, and so is one partition of it
+  const flat = rowsPartial({ node: { armed: false, scope: null, versions, state } } as never, 'c')
+  assert.deepStrictEqual(flat, { c: { [cell('c')]: { v: 5, st: [1, 7, 'n1'] } }, att: null })
+})
+
+//! the wire of V4-NN: the system `rows` call carries the partition, and a real scoped server answers that row alone
+test('the system rows call with a partition answers that row alone over a real link', async () => {
+  const nodes = await spawn(2, 1)
+  let c: Fero | null = null
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    //! replicas 1: each row has one holder. Find k1's, and read its `rows` through a client fed by it
+    nodes[0].data.k1 = { n: 1 }
+    await nodes[0].methods.update({ key: ['k1', 'm'], value: 2 })
+    const held = (f: Fero) => (diag(f)!.capture().held ?? []) as string[]
+    const cells = (f: Fero) => (diag(f)!.capture().state as [string, unknown][]).map(([k]) => k)
+    assert.ok(await until(() => nodes.some((f) => held(f).includes('k1') && cells(f).includes(JSON.stringify(['k1', 'm']))), 8000), 'k1 and its field are held')
+    const holder = nodes.find((f) => held(f).includes('k1'))!
+    c = await fero('scoped', { uuid: 'zz', hosts: [(snapshot(holder.cluster) as { me: { listen: string } }).me.listen], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    const rows = (c.methods as unknown as Record<string, (a?: unknown) => Promise<{ c: Record<string, unknown>; att: string[] | null }>>)['\u0000rows']
+    const whole = await rows()
+    assert.ok(whole.att!.includes('k1') && whole.c[JSON.stringify(['k1'])] !== undefined && whole.c[JSON.stringify(['k1', 'm'])] !== undefined, JSON.stringify(whole))
+    const one = await rows('k1')
+    assert.deepStrictEqual(Object.keys(one.c).sort(), [JSON.stringify(['k1']), JSON.stringify(['k1', 'm'])].sort())
+    assert.deepStrictEqual(one.att, ['k1'])
+    assert.deepStrictEqual(Object.fromEntries(Object.entries(whole.c).filter(([k]) => (JSON.parse(k) as string[])[0] === 'k1')), one.c, 'the whole answer\'s part for the row')
+  } finally {
+    await c?.destroy()
+    await Promise.all(nodes.map((n) => n.destroy()))
+  }
 })
