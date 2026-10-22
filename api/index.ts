@@ -70,8 +70,10 @@ Object.defineProperty(WriteRejectError.prototype, 'name', { value: 'WriteRejectE
 const VERB_NAMES = ['update', 'insert', 'remove'] as const
 
 //! ── the refusal lines (DESIGN-DOOR §3, §14 Q4): one stderr line per peer address and reason, per process ──
-// Fed from the journal rows the composer's cursor reads after every step (the same read `cluster` folds
-// from): every `doorReject` reason and `contractReject`; `nameReject` stays silent as today. The rows
+// Fed from the refusal rows the kernel keeps beside its journal ring (kernel/journal.ts keep, V4-NN), which the
+// composer takes after every step: every `doorReject` reason and `contractReject`; `nameReject` stays silent as
+// today. They used to come from the post-step journal cursor, and a ring that overflowed inside the step that wrote
+// the row (journal.cap below the step's burst) lost the line; the row in the ring is the same object. The rows
 // carry no secret, nonce or proof. What a line PRINTS and what it is DEDUPED on are kept apart on purpose
 // (the review of 2026-10-09): a peer that can connect chooses its claimed listen, uuid and contract text,
 // so those fields are shown only through `shown` — control characters dropped (a newline would forge a
@@ -1088,12 +1090,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         else if (e.kind === JK.refeed) refed = true
         //! the drain gave up on this many partitions (DESIGN-SCALE stage 1 (b)): cluster.me says so before the teardown
         else if (e.kind === JK.undrained) { undrained = e.a as number; commit(fault, () => cluster.set('me', meRow())) }
-        //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
-        else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e, clientOnly)
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
         // ONLY when the gather was ever consumed (M6-review finding 41): `gather` stays null until
         // read()/`await data` materializes it, so an idle scoped cluster pays nothing on churn
         else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false, want: false }).catch(() => {})
+      }
+      //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process. Taken from
+      // the kept rows, never from `events`: the ring may have overwritten the row already (V4-NN). Inside this branch
+      // because a kept row was emitted too, so `n` moved: a step that journals nothing pays nothing more.
+      if (j.kept.length !== 0) {
+        for (const e of j.kept) sayRefusal(name, node, e, clientOnly)
+        j.kept.length = 0
       }
       if (node.primary !== lastPrimary) {
         lastPrimary = node.primary
