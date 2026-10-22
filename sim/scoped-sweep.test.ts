@@ -317,3 +317,28 @@ test('mutation runner: today\'s injected-drop class — each pinned schedule is 
     assert.deepEqual(winner, [], `${o.shape}: the mutation runner dropped a winning entry`)
   }
 })
+
+//! the owed-word mutation (wave 8): the runner's `owed-x-dropped` (every server's `owe` drops the kind 'x': the kernel
+// mutant "the {x} half off", made from outside, sim/scoped-sweep.ts) is caught by A14's heal-end check where the word is
+// paid while the partition is away or coming back: seeds 1 and 15 (away) and 18 and 21 (a latch from zero open), of
+// seeds 1-24. Where the partition is back and held at the heal, the answer re-sends it whole from the cover (the fold's
+// splices lowered it) and the fold carries every remove, so the spoke ends equal and nothing can tell — today; once
+// stage 4 releases tombstones a fold may carry no remove (kernel/client.test.ts, 'the stage-4 shape', pins that one).
+// The kernel's own mutants of the line (the start not lowered; the word said after the ship) cannot be made from outside
+// the kernel: they were run by hand on a scratch copy (the lane's report has the seeds and lines).
+const OWED_CAUGHT: [number, RegExp][] = [
+  [1, /^a14-heal-end @\d+: at the heal exchange's end: s1 shows .* a partition its feeder n\d+ has no entry for/],
+  [18, /^a14-heal-end @\d+: at the heal exchange's end: s1 shows .* which its feeder n\d+ feeds without that cell/],
+]
+test('the owed-word mutation: a feeder that never owes a shed\'s word is caught by A14\'s heal-end check, while the partition is away (seed 1) and while its latch from zero is open (seed 18)', () => {
+  const a14 = familyByName('A14-spoke-owed')
+  for (const [seed, red] of OWED_CAUGHT) {
+    const clean = runFamily(a14, seed)
+    assert.deepEqual(clean.unsafe, [], `${clean.shape}: green without the mutation`)
+    assert.ok(clean.eng.owedX > 0 && clean.eng.paidX === clean.eng.owedX, `${clean.shape}: the word was owed and paid (${clean.eng.owedX}, ${clean.eng.paidX})`)
+    const o = runFamily(a14, seed, 'owed-x-dropped')
+    assert.equal(o.eng.mutated, 1, `${o.shape}: the mutation dropped an owed word`)
+    assert.equal(o.eng.paidX, 0, `${o.shape}: no word was said again`)
+    assert.match(o.unsafe[0] ?? '', red, `${o.shape}: caught at the heal exchange's end (${o.unsafe.join(' | ') || 'green'})`)
+  }
+})
