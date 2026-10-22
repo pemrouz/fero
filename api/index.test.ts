@@ -1024,6 +1024,13 @@ test('an address\'s host is bounded at 253 bytes (UTF-8, kernel/door.ts HOST_MAX
   const dotted = (n: number) => ['h'.repeat(63), 'h'.repeat(63), 'h'.repeat(63), 'h'.repeat(n - 192)].join('.')
   await refuses(fero('r', { hosts: [dotted(255)] }), /hosts\[0\] .* is not a 'host:port' address .* \(its host is 255 bytes/)
   await refuses(fero('r', { rendezvous: 'h'.repeat(254) + ':3376', listen: false }), /rendezvous must be a 'host:port' string .* \(its host is 254 bytes/)
+  //! FERO_RENDEZVOUS, read here with the config layer off (the battery's pin), names the size too (the layer-on read:
+  // tests/config.test.ts 'refusals name their source')
+  const saved = process.env.FERO_RENDEZVOUS
+  try {
+    process.env.FERO_RENDEZVOUS = 'h'.repeat(254) + ':3376'
+    await refuses(fero('r', { server: true, heartbeat: { ms: 0 } }), /^Error: fero\('r'\): FERO_RENDEZVOUS='h{254}:3376' is not a 'host:port' address \(or 'off'\) \(its host is 254 bytes; a host is at most 253, the longest DNS name\)$/)
+  } finally { if (saved === undefined) delete process.env.FERO_RENDEZVOUS; else process.env.FERO_RENDEZVOUS = saved }
   //! the bound itself passes the address check, and meets the next rule: a routable listen needs a secret; a bare host
   // needs the directory (the battery runs it off)
   await refuses(fero('r', { listen: 'h'.repeat(253) + ':0' }), /is reachable from other machines and no secret is set/)

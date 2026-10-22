@@ -148,6 +148,8 @@ test('the #directory compose is out of the layer\'s reach (I-19): FERO_SERVER, F
 
 test('refusals name their source: the legacy FERO_RENDEZVOUS text, a non-number, a stray old spelling, a typo', async () => {
   assert.match((await run('shop', { env: { FERO_RENDEZVOUS: 'garbage' }, call: { server: true } })).err ?? '', /FERO_RENDEZVOUS='garbage' is not a 'host:port' address \(or 'off'\)/)
+  //! …and one whose host is over the longest DNS name says so (the layer-off read: api/index.test.ts 'bounded at 253')
+  assert.match((await run('shop', { env: { FERO_RENDEZVOUS: 'h'.repeat(254) + ':3376' }, call: { server: true } })).err ?? '', /FERO_RENDEZVOUS='h{254}:3376' is not a 'host:port' address \(or 'off'\) \(its host is 254 bytes; a host is at most 253, the longest DNS name\)/)
   assert.match((await run('shop', { env: { FERO_HEARTBEAT_MS: 'abc' }, call: { server: true } })).err ?? '', /heartbeat\.ms must be a finite number of milliseconds ≥ 0 \(0 = heartbeats off\) \(from FERO_HEARTBEAT_MS\)/)
   assert.match((await run('shop', { env: { FERO_HEARTBEATMS: '5' }, call: { server: true } })).err ?? '', /'heartbeatms' is spelled heartbeat: \{ ms \} since V4-10/)
   assert.match((await run('shop', { argv: ['--fero.replica', '2'], call: { server: true } })).err ?? '', /unknown option 'replica' from --fero\.replica — did you mean --fero\.replicas/)
