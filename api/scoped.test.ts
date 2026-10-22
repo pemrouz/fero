@@ -865,6 +865,12 @@ test('KEYED PARKING [V4-NN] — keyed reads park across each other and follow th
     assert.equal(g.keyedRows, 0, 'swept')
     gathers = true
     assert.deepStrictEqual(await g.keyed('a'), { x: 2 }, 'from the live union\'s copy: its parked value, without the field only a keyed read saw')
+    //! a live generation sweeps too, before it feeds the keyed side: once the handover has ended, the next generation
+    // empties the keyed side, so the generations after it pay the one size check again, not a walk of every answer cell
+    assert.equal(g.keyedRows, 1)
+    gathers = false
+    await g.refresh({ node: fake } as never, { throwOnPartial: true, want: false })
+    assert.equal(g.keyedRows, 0, 'the live generation swept it')
   } finally { g.destroy() }
 })
 
