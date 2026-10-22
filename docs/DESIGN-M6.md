@@ -385,11 +385,20 @@ the row folds onto it, and so does every live generation (its answers cut to the
 row in one pass). So the keyed state answers what one registry would answer
 for the row had it taken exactly the folds of that row: a claim that
 empties with no tombstone and no coverage keeps its last value, and a delete a
-keyed read saw stays deleted (pinned by a differential, api/scoped.test.ts). Two
-limits, stated exactly. A keyed read of ANOTHER row no longer refreshes this row:
+keyed read saw stays deleted (pinned by a differential, api/scoped.test.ts). One
+limit, stated exactly. A keyed read of ANOTHER row no longer refreshes this row:
 before, a keyed read was a whole refresh, so every row of the one registry heard
 every member. So the first keyed read of a row parks only what the live union
 holds of it, which is what the first generation of a whole read does too.
+
+The folds land in the order their fan-outs began (corrected by the round-3
+review): a keyed read queues on the refresh chain, as base's keyed refresh did.
+Off the chain, a read whose answers came back after a newer read's or a newer
+live generation's folded its OLDER answers last, and a later read in the skew
+window parked the older value after a read had already returned the newer one.
+On a real link each member answers in order, so that needed two fan-outs to
+different member sets (a view install between them); the chain makes the order
+hold whatever the links do (pinned: KEYED ORDER).
 
 The keyed state is dropped when a keyed read would no longer gather the row (this
 node holds it now, or another member owns it: the composer's own test, shared
@@ -406,6 +415,19 @@ which is nearly always, a live generation pays one size check.
 
 This node's own answer is taken last, after the others: within one view an
 orphan sheds only once every holder attests, this node among them, so an
-orphan's answer can lack the row only if this node already held it. What is
-still refused: a member whose claims for this one row pass one frame (the row
-cannot travel), and an unreachable member (typed, as before).
+orphan's answer can lack the row only if this node already held it (pinned:
+KEYED MID-READ, red on base, which took its own answer first). The order is
+right because this node is the row's owner, so within the view it is never the
+row's old holder. The whole read cannot copy it: there this node can be one
+row's old holder and another row's new one in the same gather, and each side
+wants this node's answer at the other end. So a first whole-read generation can
+still miss a row whose handover ends mid-gather (a STATUS line).
+
+This path is not only a handover's: a keyed read of an ABSENT row on its owner
+takes it too, since no node holds a row nobody has. Each such read asks every
+member, and each member walks all the versions it holds with one string test
+per cell and sends the row's cells alone; base sent and parsed every member's
+whole share. A read of a row nobody has leaves no keyed state.
+
+What is still refused: a member whose claims for this one row pass one frame
+(the row cannot travel), and an unreachable member (typed, as before).
