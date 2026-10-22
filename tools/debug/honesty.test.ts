@@ -142,7 +142,7 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
     if (/^capture has link #\d+, replay does not$/.test(r)) return true
     let m = /^capture has stream (.+), replay does not$/.exec(r)
     if (m) return allowed.has(m[1])
-    m = /^link #\d+ (uuid|dialed|admitted|synced|paused|queued|diag): (.+) vs (.+)$/.exec(r)
+    m = /^link #\d+ (uuid|dialed|admitted|synced|paused|queued|queuedBytes|diag): (.+) vs (.+)$/.exec(r)
     if (m) return [m[2], m[3]].every((v) => /^(true|false|null|\d+)$/.test(v) || allowed.has(v))
     m = /^stream (.+) ([asd]): (.+) vs (.+)$/.exec(r)
     if (m) return allowed.has(m[1]) && [m[3], m[4]].every((v) => /^(null|\d+)$/.test(v))
@@ -190,7 +190,7 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
     //! verifyTopology is the second prose-minting fold — the same carve-out, its own TYPED templates; its
     // `unverified` list may name only link fields
     for (const r of verifyTopology(cap) as { ok: boolean; uuid: string; reason?: string; unverified?: string[] }[]) {
-      for (const f of r.unverified ?? []) assert.ok(['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag'].includes(f), `unverified names a non-field: ${f}`)
+      for (const f of r.unverified ?? []) assert.ok(['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'queuedBytes', 'diag'].includes(f), `unverified names a non-field: ${f}`)
       if (r.ok) continue
       refusals++
       assert.ok(topoReasonOk(r.reason!, allowed), `verifyTopology prose outside its pinned templates: ${JSON.stringify(r.reason)}`)
