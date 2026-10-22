@@ -523,6 +523,84 @@ export class Node {
   // review measured 5 and 9 at 200 ms each way with a 50 ms heartbeat, one ordering each); now one on any link.
   resync                                         = null
   #dq = 0
+  //! #ceiling (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the ceiling a feeder's drain digest carried (`c`, see
+  // #sendDigest and #clearCover). V4-49 left a clear's ceiling on the FEEDER's link and used it up at the spoke's reply
+  // to the drain digest; if the spoke failed over after that digest and before the capped answer, the ceiling died
+  // with the link and the next feeder answered the spoke's own tails, which sit above the hole (the last review of
+  // V4-49; on an unscoped feeder, where a failover asks with tails — a scoped failover resyncs and asks for
+  // everything). So the spoke keeps it: every digest it sends while it holds one carries the LOWER of its tails and
+  // the ceiling, lane by lane — the drain exchange's answer, a heartbeat's answer, and the failover's ask to the next
+  // feeder — and it answers the carrying drain digest with an r=1 of its own (`q`), so a reply comes; the first reply
+  // at or above the first capped ask's q drops it (any later ask to any feeder carried the cap, so that answer fills the
+  // hole wherever it comes from). A resync drops it: the ask is d = {} there. Null when none is held.
+  #ceiling                                                   = null
+  //! group (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the fold group open on the primary link — the feeder said
+  // FEED {b: p} (kernel/scope.ts onAcqDone: a latch fold's forward begins) and its FEED {e: p} has not come. The RECORDS
+  // frames between them wait here, each its own copy of the bytes (a frame is a view on the receive chunk), and land
+  // as ONE apply at the end (#groupLand). Before this the forward landed frame by frame — a partition's history in lane
+  // order, one frame per contiguous run — so an older value of a row and its later remove on one lane arrived in
+  // separate events and the spoke showed the row between them (STATUS; A12 seed 4 showed p27 at two older stamps in
+  // two events). Bounded by the fold's size, which the spoke is about to hold in its lanes anyway. Public for the sim's
+  // monitors (a spoke with a group open covers nothing yet). Null when no group is open.
+  group                                             = null
+  //! THE KEPT CELLS (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the vanish-and-return at a resync ending across a
+  // fold. A failover's resync answer carries what the new feeder holds of each FED partition when it builds it; the rows
+  // it is about to fold (a repair latch's staged delta, a re-entry's whole partition, a from-zero acquire) are not in
+  // it, and the spoke had them from its first feeder, so the ghost sweep at the end took them from the screen and the
+  // fold's forward brought them back (STATUS; sighting 3: 7 to 20 of forty cells on 12 of 56 runs; M11 fires on the two
+  // pinned offsets, which are the pins' own and not on the grid). Now a resync's ask says `f: 1`, the reply names the
+  // partitions in flight at the feeder (`f`: Scope.inFlight — every open latch and every orphan the ring still assigns
+  // there), and the sweep KEEPS a ghost cell of such a partition on the screen (#deferred) instead of removing it. A kept
+  // cell is screen-only (the kernel lacks it), so its life is BOUNDED by rule (DESIGN-SCALE, the wave-6c note, three
+  // clauses): it waits for its partition to stop being in flight AND for this spoke to hold the feeder's whole partition
+  // after that. (1) The fold's end for the partition (FEED {e}, #groupLand → #judge) judges EVERY kept cell of it at
+  // once: one the group brought is back in the kernel and done; every other one is a ghost and leaves the screen — no
+  // waiting for the lane (the first build waited until the feeder's lane had moved past the cell's stamp, and a lane
+  // whose owner died with the spoke's first feeder never moves again: the cell stayed for good). The cost, a record in
+  // flight TO the feeder at that moment, is one bounded vanish-and-return and never more than the base swept. (2) Every
+  // way out of in flight sends a word: a fold (FEED {e}); a clean latch abort (FEED {x: [p]}, scope.ts #abort); an
+  // abort to an orphan (still in flight while assigned, else the shed's FEED {x}); a failover folds the kept cells into
+  // the next resync's sweep set (#resyncBegin), and so does the re-admit after a link blip onto the same feeder (the
+  // admit arm resyncs on kept cells too: the word went to the dead link). (3) Nothing a clear can take is the only exit: the feeder owes the words
+  // a clear took and the end of a fold on an unsynced link, and says them after the answer that syncs the link again
+  // (#owed, #payOwed); a group whose end was lost lands and judges nothing. Keyed by partition: the cells kept.
+  #deferred = new Map                     ()
+  //! #askF (servers) — the client links whose latest digest was an ask that said `f: 1`: their reply carries the in-flight
+  // list. The flag lives until the spoke's NEXT digest on the link (the DIGEST handler sets or clears it on every client
+  // digest), never used up by a reply: a reply a clear took from the paused queue resumes at the drain as a fresh
+  // #sendDigest, and the first build had forgotten the flag by then — the resumed reply carried no `f`, and the end
+  // swept the partition under repair (the review's PROBE2: the vanish-and-return back through the clear).
+  #askF = new Set      ()
+  //! #owed (servers, wave 6c 2026-10-21, the rule's clause 3 — DESIGN-SCALE's wave-6c note): the FEED words this feeder
+  // owes each client link. A word is one frame on a client link, and a clear takes the whole queue — so a FEED {e} or
+  // {x} a clear took (#clearCover reads every dropped frame's verb) is remembered here, and so is the end of a fold that
+  // ran while the link was NOT synced (no {b}, no forward and no {e} go out on an unsynced link; the answer that syncs it
+  // ships the fold, scope.ts onAcqDone → owe). Only a link the spoke has been ANSWERED on owes (a cover or a torn
+  // answer, Link.torn): a link never answered since admit carries nothing of this feeder, so there is nothing at the
+  // spoke to drop or judge, and its first answer is a resync's, whose end judges by the reply (the second review's SK9:
+  // a spare link owed one end per fold, said as a burst after a later failover). The words are said again at the next
+  // answer that syncs the link, EACH AT ITS OWN PLACE IN THE ORDER (#answer → #payOwed, twice). An owed {x} leaves
+  // BEFORE the answer's ship, unfiltered: where it stood when the clear took it, in front of everything of p the feeder
+  // has sent since. It is true when said (p LEFT the feeder when the word was queued, so what the spoke holds of p is
+  // from before), and the ship that follows re-sends the named partitions WHOLE: #payOwed lowers the answer's start on
+  // every lane under its lowest entry of a named partition, so every entry of p the feeder feeds is above the start
+  // (neither the cover nor the spoke's tails can stand in for that: a frame of p queued behind the word survives the
+  // clear on a client link, Link.flush, and reaches the spoke before the re-said word drops it; the fifth review's
+  // R5-1 and R5-2). So the spoke equals its feeder's fed subset at the exchange's end, at the reply, in every state p
+  // can be in, and the one cost is a vanish-and-return INSIDE the exchange when p is held again (its rows leave with
+  // the word and come back with the same answer), plus the lane suffix above p's lowest entry re-sent (rows the spoke
+  // holds dropped by its dual fence). An owed {e} leaves AFTER the
+  // whole ship and the reply, and only while p is HELD (a latch open for p again says its own end; an orphan's or a
+  // gone partition's exit is a shed's or an abort's {x}): the first moment the spoke holds the fed subset above the
+  // cover again, so the end judges against a complete kernel. Why not one place for both: an {x} said AFTER the
+  // answer dropped what the answer had just re-sent, for good (the second review's SK1), and the three filters that
+  // tried to hold it back where it looked stale were each wrong somewhere ('no entry': the third review's R3-2 and
+  // R3-6; 'feeds and byPart': the fourth review's R4-1 and R4-2, entries with no base; '!held': R4-3, a repair's
+  // base lost), while any held-back word leaves a removed row on the spoke for good once a fold carries no remove
+  // (R4-4, stage 4's tombstone release). A word a clear takes again is owed again; the link's death drops the debt.
+  // Without the debt, the review's PROBE3 (a shed's {x} cleared) kept a shed partition on the spoke for good and
+  // PROBE4 (a fold's {b}, frames and {e} cleared) never judged its kept cells.
+  #owed = new Map                                          ()
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
   // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
@@ -873,6 +951,8 @@ export class Node {
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
         this.#covered.delete(link)
+        this.#askF.delete(link)
+        this.#owed.delete(link)
         //! a client's link died: what this relay still held for it leaves the queue (wave 6b, write.ts dropVia) — the
         // client re-sends what it has in flight to its next relay, and a copy kept here would commit a second time
         if (link.client && link.state === LS.admitted) this.writes.dropVia(link.id)
@@ -896,6 +976,7 @@ export class Node {
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
         if (this.client && this.primary === e.link) {
           this.primary = null
+          this.group = null // a fold group the dead feeder left open is dropped, not landed: the resync onto the next feeder brings the partition whole (wave 6c)
           //! the dead feeder's taps die with it (wave 5e): every attempt its WACK cleared whose record has not
           // landed here is marked; the resync onto the next feeder settles what that feeder's ship does not bring
           this.writes.strand()
@@ -1358,8 +1439,15 @@ export class Node {
   #resyncBegin(link      ) {
     const old = this.resync !== null ? this.resync.old : new Set        ()
     for (const k of this.state.keys()) old.add(k)
+    //! the cells kept back by an earlier end (#deferred, wave 6c) are on the screen too: they join the sweep set, and the
+    // next feeder's reply says which to keep again (clause 2's failover exit)
+    if (this.#deferred.size) {
+      for (const g of this.#deferred.values()) for (const k of g) old.add(k)
+      this.#deferred.clear()
+    }
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
+    this.#ceiling = null // the ask below is d = {}: everything is re-asked, a ceiling has nothing left to cap
     const q = ++this.#dq
     this.resync = { old, q }
     this.#sendDigest(link, 1, q)
@@ -1373,10 +1461,12 @@ export class Node {
   // re-download applied the whole row, which is the truth, and a remove here would tear a field out of
   // it — or was held at the reset and is a ghost itself: its remove takes the field with it. A ghost
   // ROW whose newer fields came back has erased them downstream: they go back on top, as after a sweep.
-  #resyncEnd() {
+  //! `f` (wave 6c): the partitions the reply named in flight at the feeder — a ghost cell of one of them is KEPT on the
+  // screen (#deferred), not removed: the fold about to land there carries its rows, and its end judges what it did not.
+  #resyncEnd(f                    ) {
     const { old } = this.resync 
     this.resync = null
-    let ghosts = 0
+    let ghosts = 0, kept = 0
     for (const cell of old) {
       if (this.state.has(cell)) continue
       const path = JSON.parse(cell)            
@@ -1388,16 +1478,156 @@ export class Node {
         }
         if (covered) continue
       }
+      if (f !== null && f.has(path[0])) {
+        let g = this.#deferred.get(path[0])
+        if (g === undefined) this.#deferred.set(path[0], g = new Set())
+        g.add(cell)
+        kept++
+        continue
+      }
       ghosts++
-      this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
-      const back = this.#under(cell)
-      if (back.length) this.#reapply(back)
-      if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
+      this.#ghost(cell, path)
     }
-    this.journal.armed && this.journal.emit(JK.resynced, ghosts)
+    this.journal.armed && this.journal.emit(JK.resynced, ghosts, undefined, kept || undefined)
     //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
     // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
     this.writes.settleStranded(this)
+  }
+
+  //! #judge (clients, wave 6c, clause 1) — the fold's end for p has come: every kept cell of p (#deferred) is judged now.
+  // A cell back in the kernel is done (the group, or the answer before it, brought it); every other one is a ghost — the
+  // feeder holds p whole at its fold's end and did not carry the cell — and leaves the screen through #ghost, unless an
+  // ancestor is live now (the row came back whole: covered). Nothing waits: a record in flight to the feeder at this
+  // moment leaves and returns when it lands (the rule's one cost, bounded). Returns the ghosts removed.
+  #judge(p        )         {
+    const g = this.#deferred.get(p)
+    if (g === undefined) return 0
+    this.#deferred.delete(p)
+    let ghosts = 0
+    for (const cell of g) {
+      if (this.state.has(cell)) continue
+      const path = JSON.parse(cell)            
+      let covered = false
+      for (let d = 1; d < path.length && !covered; d++) covered = this.state.has(JSON.stringify(path.slice(0, d)))
+      if (covered) continue
+      ghosts++
+      this.#ghost(cell, path)
+    }
+    return ghosts
+  }
+
+  //! #ghost — one cell leaves the SCREEN without a remove record existing anywhere (the ghost sweep's removal, shared
+  // with #unfeed): a synthesized remove under this node's own name, seq 0 — never logged, never on the wire; the live
+  // fields under it go back on top (a ghost row erased them downstream), and a field's made-up levels are cleaned.
+  #ghost(cell        , path          ) {
+    this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
+    const back = this.#under(cell)
+    if (back.length) this.#reapply(back)
+    if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
+  }
+
+  //! #unfeed (clients, wave 6c 2026-10-21 — DECISIONS V4-NN) — the feeder said partition p LEFT it (FEED {x}, kernel/
+  // scope.ts evaluateSheds: its copy froze into an orphan at an install, and once every current holder attested the
+  // frozen tails the data left that node). A spoke is a view of its feeder's held subset, and nothing told it: its
+  // rows of p stayed on the screen, frozen (the orphan gate-dropped every new record of p, so none reached the spoke),
+  // until a failover's resync wiped them (STATUS; the scoped sweep's spokeStale count). Now p leaves the spoke with its
+  // feeder: its cells (state, versions, the deep index), its lane entries (a kept entry would make the dual fence drop
+  // a later re-feed of the same record as present, and the row would never come back when the feeder re-acquires p),
+  // its place in an open resync's sweep set, and its screen rows through the ghost sweep's own removal (#ghost): the
+  // row's remove takes its fields with it downstream; a field-only row goes field by field, shallowest first. The
+  // versions of p's UNINDEXED tombstones stay: a tombstone is sound LWW memory (a re-fed older write loses to it, as
+  // it should), and finding them would cost a walk of every version. A client has no byPart, so the lanes are
+  // scanned: a cold path, once per shed partition. Read from the PRIMARY only (a spare's shed says nothing about what
+  // the feeder holds); a server never reads it.
+  #unfeed(p        ) {
+    const row = JSON.stringify([p])
+    const fields = this.fields(p)
+    const shown = new Set        ()
+    if (this.state.has(row)) shown.add(row)
+    for (const k of fields) if (this.state.has(k)) shown.add(k)
+    //! a resync in flight: the cells of p it remembered from the reset are on the screen too, and leave the sweep set
+    if (this.resync !== null) for (const k of this.resync.old) if (((JSON.parse(k)            )[0] ?? '') === p) { this.resync.old.delete(k); shown.add(k) }
+    //! the cells a resync end kept back for p (#deferred) are on the screen too: they go with the partition
+    const kept = this.#deferred.get(p)
+    if (kept !== undefined) { for (const k of kept) shown.add(k); this.#deferred.delete(p) }
+    this.dropCell(row); this.versions.delete(row)
+    for (const k of fields) { this.dropCell(k); this.versions.delete(k) }
+    let dropped = 0
+    for (const [origin, entries] of this.logs) {
+      const gone             = []
+      for (const e of entries) if (partitionOf(e.rec) === p) gone.push(e)
+      if (!gone.length) continue
+      dropped += gone.length
+      this.logs.set(origin, gone.length === entries.length ? [] : entries.filter((e) => partitionOf(e.rec) !== p))
+      this.indexDrop(origin, gone)
+    }
+    if (shown.has(row)) this.#ghost(row, [p])
+    else {
+      const cells = [...shown].sort((a, b) => a.length - b.length)
+      const gone = new Set        ()
+      for (const k of cells) {
+        const path = JSON.parse(k)            
+        let under = false
+        for (let d = 1; d < path.length && !under; d++) under = gone.has(JSON.stringify(path.slice(0, d)))
+        if (under) continue
+        gone.add(k)
+        this.#ghost(k, path)
+      }
+    }
+    this.journal.armed && this.journal.emit(JK.unfed, p, dropped)
+  }
+
+  //! #ingest — one RECORDS frame into the fold (the RECORDS handler's body; a fold group's buffered frames take the same
+  // road when the group lands, #groupLand): the staleness contract, every record through write.ts inbound, the WAL row
+  // for a fresh append, the spoke feed's flush.
+  #ingest(link      , f       , prov                                        ) {
+    const j = this.journal
+    //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
+    // evidence of a view I missed — close the gate NOW and pull the view on this same link
+    if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
+    let fresh = 0
+    let maxSeq = 0
+    //! armed: reset the per-frame partition scratch — fast-path APPENDS record their per-partition
+    // maxes into it for the batch's durable-floor cover; SPLICES (flavor 2) deliberately don't
+    // (no-interior-rows: they reach disk via snapshot, and node.spliced() already armed it)
+    if (this.armed) { if (this.writes.rxParts) this.writes.rxParts.clear(); else this.writes.rxParts = new Map() }
+    for (const rv of f.records()) {
+      const flavor = this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
+      if (flavor === 1) { fresh++; maxSeq = rv.seq }
+      else if (flavor === 2) fresh++
+    }
+    //! WAL the frame when it carried a fresh APPEND (durable mode) — the received bytes ARE the row
+    // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
+    // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent. A
+    // splice-only frame persists NOTHING here (maxSeq would walk the chain backwards) — its bytes
+    // reach disk inside the armed snapshot swap.
+    if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
+    if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
+    //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
+    // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too (a run past
+    // this node's frame cap leaves in cuts, V4-51)
+    if (fresh && this.clientLinks.size)
+      for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
+  }
+
+  //! #groupLand (clients, wave 6c) — the fold group lands: every frame it held goes through #ingest in order, in this one
+  // step. `ended` is true from FEED {e} alone (the fold's end: the kept cells of p are judged now, #judge). A group closed
+  // by any other frame of a later step at the feeder — a FEED {b} or {x}, the primary's next digest, PING or PONG — lost
+  // its end to a clear: its frames land and NOTHING is judged (the feeder owes the end and says it again after the
+  // answer that heals the link, #payOwed; a judgement here would run against a kernel the clear left incomplete). An
+  // open group is dropped, not landed, at a primary failover (the resync onto the next feeder brings the partition
+  // whole). Returns the frames landed; JK.fed c is the ghosts judged, absent when nothing was judged.
+  #groupLand(link      , ended         )         {
+    const g = this.group
+    if (g === null) return 0
+    this.group = null
+    for (const b of g.frames) {
+      const f = new Frame(b)
+      const prov = f.prov()
+      if (prov !== null) this.#ingest(link, f, prov)
+    }
+    this.journal.armed && this.journal.emit(JK.fed, g.p, g.frames.length, ended ? this.#judge(g.p) : undefined)
+    return g.frames.length
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
@@ -1598,8 +1828,11 @@ export class Node {
         // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
         // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
         // A spoke with stranded writes (wave 5e: WACKed by the dead feeder, never tapped) resyncs too, even with an
-        // empty fold: the resync's end is where they settle.
-        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded)) this.#resyncBegin(link)
+        // empty fold: the resync's end is where they settle. And a spoke with KEPT CELLS (#deferred, wave 6c): its link
+        // to the feeder blipped and the fold's end or the abort's word went to the dead link or to none, so the cells
+        // join the resync's sweep set and the reply says which to keep again (the rule's link-loss exit, clause 2; a
+        // spoke whose only fed rows were in flight has an empty kernel and asked plainly before: the ghosts stayed).
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded || this.#deferred.size > 0)) this.#resyncBegin(link)
         else this.#sendDigest(link, 1)
       }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
@@ -1854,32 +2087,12 @@ export class Node {
           j.armed && j.emit(JK.frameDrop, link.id, 'records without prov')
           return
         }
-        //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
-        // evidence of a view I missed — close the gate NOW and pull the view on this same link
-        if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
-        let fresh = 0
-        let maxSeq = 0
-        //! armed: reset the per-frame partition scratch — fast-path APPENDS record their per-partition
-        // maxes into it for the batch's durable-floor cover; SPLICES (flavor 2) deliberately don't
-        // (no-interior-rows: they reach disk via snapshot, and node.spliced() already armed it)
-        if (this.armed) { if (this.writes.rxParts) this.writes.rxParts.clear(); else this.writes.rxParts = new Map() }
-        for (const rv of f.records()) {
-          const flavor = this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
-          if (flavor === 1) { fresh++; maxSeq = rv.seq }
-          else if (flavor === 2) fresh++
-        }
-        //! WAL the frame when it carried a fresh APPEND (durable mode) — the received bytes ARE the row
-        // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
-        // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent. A
-        // splice-only frame persists NOTHING here (maxSeq would walk the chain backwards) — its bytes
-        // reach disk inside the armed snapshot swap.
-        if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
-        if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
-        //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
-        // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too (a run past
-        // this node's frame cap leaves in cuts, V4-51)
-        if (fresh && this.clientLinks.size)
-          for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
+        //! a fold group is open on this link (FEED {b}, wave 6c): the frame waits, as its own copy of the bytes, for the
+        // group's end — a partition's history lands as ONE apply, and no event shows a row a later frame removes. (A clear
+        // on a paused link that takes the {b} leaves the forward's later frames with no group open: they land one by one,
+        // a row and its later remove in two events — STATUS names it.)
+        if (this.group !== null && link.id === this.primary) { this.group.frames.push(f.buf.slice()); return }
+        this.#ingest(link, f, prov)
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -1965,12 +2178,15 @@ export class Node {
         return this.env.sink.subRecs(v.id, v.recs         ) // deliberately un-journaled: per-delta volume
       }
       case VERB.PING:
+        //! a heartbeat frame from the primary is a later step's: a fold group still open at this client lost its end (wave 6c)
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link, false)
         //! a server's PONG toward a CLIENT link carries its write-gate (`w`, wave 6b): on a link where the client's uuid
         // is the lower one the client PINGs and no digest flows to it (it floors only its primary, and the server
         // waits for the lower side), so without this word a client could not know the gate of a server it does not
         // follow. An old client ignores the body (V4-14). Every other PONG is the bare frame it always was.
         return link.ship(encodeControl(VERB.PONG, link.client && !this.client ? { w: this.membership.gate(this).open ? 1 : 0 } : undefined), this.env.sink, j)
       case VERB.PONG:
+        if (this.client && link.id === this.primary && this.group !== null) this.#groupLand(link, false) // as at PING (wave 6c)
         //! proof of life — and, at a CLIENT, a server's gate word (wave 6b): read it, and move if the rule says so
         if (this.client && !link.client && link.state === LS.admitted) this.#gateWord(link, (f.value                               )?.w)
         return
@@ -1980,7 +2196,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value                                                                                                                
+        const v = f.value                                                                                                                                                          
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -2026,6 +2242,18 @@ export class Node {
           // the failover its linkDown runs asks the next one for everything this digest would have settled.
           this.#gateWord(link, v.w)
           if (link.dead) return
+          //! a digest is a frame of a later step at the feeder: a fold group still open here lost its end (wave 6c); its
+          // frames land, nothing is judged — the feeder owes the end and says it after the heal
+          if (this.group !== null) this.#groupLand(link, false)
+          //! a ceiling on the feeder's drain digest (`c`, wave 6c): keep it, and ask every feeder with it until a reply
+          // at or above the first capped ask lands (#ceiling). In resync the ask is d = {} already: nothing to keep.
+          if (v.r === 1 && v.h === 1 && typeof v.c === 'object' && v.c !== null) {
+            if (this.resync === null) {
+              const c                         = {}
+              for (const o in v.c) if (typeof v.c[o] === 'number') c[o] = v.c[o]          
+              this.#ceiling = { d: c }
+            }
+          } else if (this.#ceiling !== null && v.r === 0 && typeof v.q === 'number' && this.#ceiling.q !== undefined && v.q >= this.#ceiling.q) this.#ceiling = null
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin]          ) : 0)) return this.#resyncBegin(link)
@@ -2033,7 +2261,7 @@ export class Node {
           //! the end is the reply to a digest sent AFTER the resync began (q ≥ the resync's own; the failover's fresh
           // r=1 counts); a reply to an older digest is NOT the end — the re-download is still on its way behind it,
           // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
-          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
+          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd(Array.isArray(v.f) ? new Set(v.f.filter((p)              => typeof p === 'string')) : null)
           link.synced = true
           //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. In resync the ask is out on THIS
           // link (the single-feeder rule above: only the primary reaches here, and every ask goes to the primary) and
@@ -2047,8 +2275,10 @@ export class Node {
           // lands BEFORE this digest): that one is answered
           // with an r=1 of our own, so the exchange ships everything and its reply ends the resync, one exchange
           // after the drain (see `resync`).
+          //! Out of resync a drain digest that carried a ceiling is answered with an r=1 of our own (wave 6c): its
+          // reply is what lets the ceiling go; an r=0 would buy the capped re-send and no word that it landed.
           if (v.r === 1) {
-            if (this.resync === null) this.#sendDigest(link, 0)
+            if (this.resync === null) this.#sendDigest(link, v.h === 1 && this.#ceiling !== null ? 1 : 0)
             else if (v.h === 1) this.#sendDigest(link, 1)
           }
           return
@@ -2064,6 +2294,9 @@ export class Node {
         }
         //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
         // its ship stops at a full queue or a clear takes it). A client's r=1 carries `q`; the reply echoes it (only clients send one).
+        //! a client's ask that says `f: 1` (a scoped spoke's resync, wave 6c) gets the in-flight list on its reply (#sendDigest);
+        // remembered on the link until the client's next digest, so a torn or cleared answer's resumed reply carries it too
+        if (link.client) { if (v.f === 1) this.#askF.add(link); else this.#askF.delete(link) }
         //! a clear's ceiling (`c`, #clearCover, wave 5f) caps this digest's tails lane by lane, and this answer uses it up:
         // a lane the clear took a record from is answered from just under it, every other lane from the spoke's own tail
         const t = link.torn
@@ -2129,6 +2362,37 @@ export class Node {
         else if (f.verb === VERB.NACK) this.membership.onNack(this, link, v)
         else this.membership.onLeave(this, link)
         this.membership.settle(this)
+        return
+      }
+      //! FEED — a feeder's word to its spokes (wave 6c, 2026-10-21; DECISIONS V4-NN): read by a CLIENT from its PRIMARY
+      // link only. {x: [p…]}: these partitions left the feeder (a shed) — the spoke drops them (#unfeed). A FEED on a
+      // spare link is dropped (that server's shed says nothing about what the feeder holds), and a server drops every
+      // FEED (a spoke never feeds). Frame dropped, link kept, either way.
+      case VERB.FEED: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'feed before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'feed-before-hello')
+        }
+        if (!this.client) { j.armed && j.emit(JK.frameDrop, link.id, 'feed at a server'); return }
+        if (link.id !== this.primary) { j.armed && j.emit(JK.frameDrop, link.id, 'feed from a spare'); return }
+        const v = f.value                                                         
+        //! {x: [p…]}: a frame of a later step at the feeder — a fold group still open here lost its end, and lands FIRST
+        // (nothing judged), so the unfeed runs on the landed kernel in this one step. The review's PROBE6: the group
+        // landed after the unfeed, at the next digest, and put a row of the shed partition back for good.
+        if (Array.isArray(v?.x)) {
+          if (this.group !== null) this.#groupLand(link, false)
+          for (const p of v.x) if (typeof p === 'string') this.#unfeed(p)
+        }
+        //! {b: p}: a fold group begins — an open one lost its end (the next frames are a later step's): land it first
+        if (typeof v?.b === 'string') { this.#groupLand(link, false); this.group = { p: v.b, frames: [] } }
+        //! {e: p}: the fold's end — the group lands as one apply and every kept cell of p is judged (clause 1); with no
+        // group open (its {b} was lost, the fold forwarded nothing, or the fold ran on an unsynced link and this is the
+        // end the feeder owed, said after the answer that healed the link) the kept cells of p are judged all the same
+        if (typeof v?.e === 'string') {
+          if (this.group !== null) this.#groupLand(link, true)
+          else j.armed && j.emit(JK.fed, v.e, 0, this.#judge(v.e))
+        }
         return
       }
       //! M7 DIAG plane (cold cases, after every hot verb): per-frame auth is the LATCH state check
@@ -2279,6 +2543,15 @@ export class Node {
     let shipped = 0
     let tear                = null // the origin the ship stopped in ('' = the lanes are done, only the reply waits)
     let tearSeq = 0 // and the first seq it did not ship
+    //! the owed shed words first (wave 6c, clause 3; #owed): FEED {x} at its own place in the order, BEFORE the ship,
+    // and the ship re-sends the named partitions WHOLE: #payOwed lowers this answer's start on every lane to just under
+    // its lowest entry of a named partition. Neither the cover nor the spoke's tails can stand in for that (the fifth
+    // review): a frame of the partition queued BEHIND the word in the flush that cleared the queue survives the clear
+    // (Link.flush ships on after a clear on a client link), reaches the spoke at the drain, and the re-said word drops
+    // it; on a lane the clear took nothing from, the cover and the spoke's reply both sit at or above it. Every answer
+    // starts on a flowing link (the DIGEST handler marks a paused link's debt instead; the drain resumes a torn answer
+    // only once its flush left the link flowing), so the word goes straight to the socket, ahead of the first record.
+    if (link.client && this.#owed.size) d = this.#payOwed(link, 'x', d)
     if (!this.armed || link.client) {
       const scopedTo = this.armed ? (p        ) => this.scope .feeds(p) : null
       const run                                                                                                      = []
@@ -2329,8 +2602,9 @@ export class Node {
           link.inQueue = { d: this.#cover(d, null, 0), r, q }
           if (link.client) this.#covered.add(link)
         }
-        this.#sendDigest(link, 0, q)
+        this.#sendDigest(link, 0, q, undefined, this.#askF.has(link))
       }
+      if (link.client && this.#owed.size) this.#payOwed(link, 'e') // the owed ends, after the whole ship and the reply (wave 6c)
       return
     }
     link.synced = false
@@ -2367,6 +2641,11 @@ export class Node {
   // meanwhile is lowered into the ceiling by indexInsert (the link joins #covered here); a second clear lowers the same
   // ceiling again, never raises it. The cost: one header read per frame the clear took (the clear is cold), and the
   // answer re-sends a lowered lane's suffix above the lowest lost record.
+  //! THE OWED WORDS (wave 6c, clause 3; see #owed): a FEED frame the clear took is owed — on a link that leaves here
+  // with a cover, which is every link the spoke has been answered on — and said at the next answer that syncs the
+  // link, the {x} before its ship and the {e} after its reply (#answer → #payOwed). A link never answered since admit (not synced, no
+  // torn answer) leaves without one and owes nothing: the spoke holds nothing of this feeder on it, a spare's word is
+  // dropped there, and its first answer is a resync's or a fresh spoke's. {b} owes nothing: its end does.
   #clearCover = (link      , dropped              , wasSynced         )       => {
     let t = link.torn
     if (t === null) {
@@ -2375,12 +2654,76 @@ export class Node {
     }
     for (const b of dropped) {
       const f = new Frame(b)
+      if (f.verb === VERB.FEED) {
+        const v = f.value                                            
+        if (typeof v?.e === 'string') this.owe(link, 'e', v.e)
+        if (Array.isArray(v?.x)) for (const p of v.x) if (typeof p === 'string') this.owe(link, 'x', p)
+        continue
+      }
       if (f.verb !== VERB.RECORDS) continue
       const p = f.prov()
       if (p === null) continue
       if ((t.d[p.origin] ?? 0) >= p.baseSeq) t.d[p.origin] = p.baseSeq - 1
     }
     this.#covered.add(link)
+  }
+
+  //! owe — remember a FEED word for a client link (#owed): `e` the end of a fold for p, `x` p left this feeder.
+  owe(link      , kind           , p        ) {
+    let o = this.#owed.get(link)
+    if (o === undefined) this.#owed.set(link, o = { e: new Set(), x: new Set() })
+    o[kind].add(p)
+  }
+  //! #payOwed — say the owed words of one kind at their place in the order (#answer): 'x' BEFORE the answer's ship,
+  // one frame naming every partition whose shed word a clear took (the spoke drops them), AND THE SHIP RE-SENDS THEM
+  // WHOLE: the answer's start `d` (the peer's tails, capped by the cover) comes back lowered on every lane to just
+  // under its lowest entry of a named partition (the per-partition index, as #forwardWhole lowers a cover for a
+  // re-entry), so the walk from there ships every entry of those partitions this feeder feeds. Whatever of p the
+  // feeder holds at the word, on whichever lane, by whichever path it came, is above the start: the rule is this one
+  // line under the word, with no claim about what happened between the clear and the heal (the fifth review's
+  // leapfrog, R5-1 and R5-2: a frame of p queued behind the word survived the clear, reached the spoke first, and the
+  // word dropped it from a lane the cover and the spoke's reply both sat at the tail of). The cost: the lane suffix
+  // above p's lowest entry, rows the spoke holds among them (its dual fence drops them); an orphan's frozen rows lower
+  // the start too, for a ship that filters them out (a `feeds` test here would be a second predicate on the line).
+  // 'e' AFTER the whole ship and the reply, one frame per partition still held strictly (acquiring again, that fold
+  // says its own end; an orphan or gone, a shed's or an abort's {x} is the exit). The debt is CONSUMED WORD BY WORD
+  // as each one ships: a word the clear takes on its way out is owed again by #clearCover's read of the dropped
+  // frames, and the words behind it were never taken out (the rework took the whole debt out first and put the rest
+  // back after a failed ship: one more branch than the rule needs). Never into a full paused queue (Link.full: its frames
+  // or its bytes, V4-61), one guard for both kinds: a word pushed there would clear whatever waits, the reply it follows included; the next untorn
+  // answer — the drain's, or a heartbeat's — pays within a tick (the {x} half never meets the guard: every answer
+  // starts on a flowing link).
+                                                                                      
+                                       
+  #payOwed(link      , kind           , d                          )                                 {
+    const o = this.#owed.get(link)
+    if (o === undefined || !o[kind].size) return d
+    if (link.paused && link.full()) return d
+    if (kind === 'x') {
+      const gone = [...o.x]
+      o.x.clear()
+      link.ship(encodeControl(VERB.FEED, { x: gone }), this.env.sink, this.journal)
+      //! the start under every entry of the named partitions (a copy: `d` may be the decoded frame's map)
+      let start = d 
+      if (this.byPart !== null)
+        for (const p of gone) {
+          const per = this.byPart.get(p)
+          if (per === undefined) continue
+          for (const [origin, arr] of per) {
+            if (!arr.length) continue
+            const under = arr[0].seq - 1
+            if ((typeof start[origin] === 'number' ? (start[origin]          ) : 0) > under) { if (start === d) start = { ...d }; start[origin] = under }
+          }
+        }
+      d = start
+    } else
+      for (const p of [...o.e]) {
+        o.e.delete(p)
+        if (this.scope === null || !this.scope.held(p)) continue
+        if (!link.ship(encodeControl(VERB.FEED, { e: p }), this.env.sink, this.journal)) break
+      }
+    if (!o.e.size && !o.x.size) this.#owed.delete(link)
+    return d
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
@@ -2407,11 +2750,13 @@ export class Node {
   // the lane drops what it already has (write.ts #splice, dupDrop).
   //! `h` (the drain digest, see `resync`): toward a CLIENT, `h: 1` says this link dropped frames while paused — the one
   // event after which an ask of the spoke's may have no reply coming. Member digests never carry it: bytes unchanged.
-  #sendDigest(link      , r       , q         , h          ) {
+  #sendDigest(link      , r       , q         , h          , f          ) {
     const d                         = {}
     if (!(this.client && this.resync !== null))
       for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body                                                                                                          
+    //! a held ceiling caps every lane (wave 6c): the lower of this spoke's tail and what the clear's cover said
+    if (this.#ceiling !== null) for (const o in d) { const c = this.#ceiling.d[o]; if (c !== undefined && c < d[o]) d[o] = c }
+    let body                                                                                                                                                             
     if (this.durable) {
       const p                         = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -2420,9 +2765,26 @@ export class Node {
     //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
     // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
     if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
-    if (this.client && r === 1) body.q = q ?? ++this.#dq
+    if (this.client && r === 1) {
+      body.q = q ?? ++this.#dq
+      if (this.#ceiling !== null && this.#ceiling.q === undefined) this.#ceiling.q = body.q // the first capped ask: its reply drops the ceiling
+      //! a scoped spoke's resync ask asks which partitions are in flight at the feeder (`f: 1`, wave 6c): the reply's `f`
+      // tells the end which cells to keep (#deferred). An unscoped feeder folds nothing: its asks are the frames they were.
+      if (this.resync !== null && this.feederScoped) body.f = 1
+    }
     else if (q !== undefined) body.q = q
-    if (h === true && link.client) body.h = 1
+    //! the in-flight list (wave 6c): a reply to an ask that said `f: 1`, from an armed feeder — only then, so the walk of
+    // the scope entries costs one resync, never a heartbeat; omitted when nothing is in flight (the frame it was)
+    if (f === true && link.client && this.armed) { const fl = this.scope .inFlight(this); if (fl.length) body.f = fl }
+    if (h === true && link.client) {
+      body.h = 1
+      //! the ceiling rides the drain digest (wave 6c): a clear on this synced client link left a cover at my tails,
+      // lowered on every lane the clear took a record from (#clearCover, V4-49). It used to live on this link alone,
+      // used up by the spoke's reply; a spoke that failed over before that reply lost the hole for good. Now the spoke
+      // holds it too and asks every feeder with it (#ceiling). The feeder's own cap stays (an older spoke sends its
+      // real tails). Only a drain digest after a clear carries it: every other digest is the frame it always was.
+      if (link.torn !== null && link.torn.c === true) body.c = link.torn.d
+    }
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
