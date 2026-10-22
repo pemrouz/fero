@@ -11,7 +11,11 @@
 // waits for something again. What each pin catches, measured (medians of 60 calls, two runs each):
 //   method call that writes   43.71 / 43.57 ms with Nagle on   0.40 / 0.43 ms with it off
 //   forwarded update          43.66 / 43.22 ms                 0.79 / 0.59 ms
-// With the setNoDelay line removed both go red (44.17 and 43.65 ms on the run that checked it).
+// With the setNoDelay line removed both went red (44.17 and 43.65 ms) before the run batch landed. Since then the
+// forwarded pin is held by either fix: the owner's record and WACK leave in one write (shell/runtime.ts runBatch),
+// so with setNoDelay alone removed it stays fast (0.46 ms). The method call is not: the handler's record and the
+// RESULT leave in different runs, so it goes red with setNoDelay alone removed (44.10 ms). tests/links.test.ts
+// checks the setNoDelay line itself, on every link socket.
 
 import '../utils/battery.ts'
 

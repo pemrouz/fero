@@ -428,6 +428,8 @@ export class Runtime {
         send(link, bytes) {
           const sock = runtime.#sockets.get(link)
           if (!sock || sock.destroyed) return
+          //! the run batch (`runBatch` below): the small frames one run of the event loop makes on a link leave together
+          runBatch(sock, bytes.length)
           //! bytes are an owned copy per frame (codec Outbox contract), so handing them to the socket queue is safe.
           // The paused-guard matters: several false writes can precede one 'drain', and stacking a once-listener
           // per false write would deliver N drain events (and N spurious kernel drains) for one socket drain.
@@ -440,7 +442,7 @@ export class Runtime {
             })
           }
         },
-        close(link) { runtime.#sockets.get(link)?.destroy() },
+        close(link) { const sock = runtime.#sockets.get(link); if (sock) kill(sock) },
         left(clean) { runtime.#onLeft?.(clean) },
         timer(id, tag, ms) {
           runtime.#timers.set(id, setTimeout(() => {
@@ -678,8 +680,8 @@ export class Runtime {
   // Nagle's algorithm off. With it on, the OS held a small frame back until the frame before it was acknowledged,
   // and the peer held that acknowledgement for about 40 ms (delayed ACK). Every exchange that sends two frames in a
   // row paid it: a method call that writes (the RESULT behind the record), a write forwarded to its row's owner.
-  // On loopback those took about 43 ms; with Nagle off, about 1 ms (V4-NN, tests/latency.perf.ts). The kernel
-  // already packs a step's records into as few frames as it can (the Outbox), so nothing else needs the OS to merge.
+  // On loopback those took about 43 ms; with Nagle off, about 1 ms (V4-NN, tests/latency.perf.ts). What Nagle did
+  // that was worth keeping, merging many small frames into few segments, the run batch does (`runBatch` below).
   #wire(sock: net.Socket, link: number) {
     sock.setNoDelay(true)
     this.#sockets.set(link, sock)
@@ -737,7 +739,7 @@ export class Runtime {
     if (link === undefined) return false
     const sock = this.#sockets.get(link)
     if (!sock || sock.destroyed) return false
-    sock.destroy()
+    kill(sock)
     return true
   }
 
@@ -778,7 +780,7 @@ export class Runtime {
     const closed = this.#server ? new Promise<void>((resolve) => this.#server!.close(() => resolve())) : null
     for (const t of this.#timers.values()) clearTimeout(t)
     this.#timers.clear()
-    for (const s of this.#sockets.values()) s.destroy()
+    for (const s of this.#sockets.values()) kill(s)
     this.#sockets.clear()
     this.#paused.clear()
     //! FLUSH, then close: queued appends carry records the kernel already committed — a clean destroy
@@ -792,6 +794,39 @@ export class Runtime {
     if (closed) await closed
   }
 }
+
+//! ── the run batch (V4-NN): a link socket corks at the first small frame of a run and uncorks when the run ends ──
+// Nagle's algorithm is off (#wire), so a write leaves as its own segment the moment it is made. One run of the event
+// loop (a socket read, a timer, a stretch of user code, with every kernel step inside it) can make many small frames
+// on one link: a loop of plain assignments is one step per assignment, so one small frame per link per assignment.
+// Sent one segment each, 20,000 of them took about 2.3x the time they took with Nagle on between two processes,
+// and the receiver woke about 22 times as often. So the first small frame of a run corks its socket, and the uncork
+// is scheduled at the same moment (process.nextTick): the run's frames leave together, in one writev, as soon as the
+// run ends, whatever the run throws. No frame waits for a later turn of the event loop, so latency is untouched.
+// Corking around one kernel step instead was measured and does not help: in that burst every step makes one frame.
+//! Two rules keep write()'s answers what they were uncorked, so the kernel pauses a link exactly when it did:
+// - a batch never reaches the socket's high-water mark: a frame that would take it there flushes the batch first
+//   and goes out on its own;
+// - a frame at or over the mark is never corked.
+// Node's cork is a counter; a socket corks only when it is not corked, so it never holds more than one, and the one
+// uncork scheduled with it always opens it. A socket that is corked is in `corked`; leaving it always uncorks.
+//! Every place the shell destroys a socket flushes it first (kill), and a process that exits inside a run flushes
+// every corked socket on its way out (the 'exit' hook): a frame the kernel shipped reaches the OS, as it did uncorked.
+const corked = new Set<net.Socket>()
+let corkHooked = false
+const uncork = (sock: net.Socket) => { corked.delete(sock); sock.uncork() }
+const runBatch = (sock: net.Socket, len: number) => {
+  const mark = sock.writableHighWaterMark
+  if (sock.writableCorked === 0) {
+    if (len >= mark) return
+    if (!corkHooked) { corkHooked = true; process.on('exit', () => { for (const s of corked) { try { s.uncork() } catch { /* a socket already gone */ } } }) }
+    corked.add(sock)
+    process.nextTick(uncork, sock)
+    sock.cork()
+  } else if (sock.writableLength + len >= mark) uncork(sock)
+}
+//! kill — destroy a link socket after flushing what this run batched on it (close, destroy, drop)
+const kill = (sock: net.Socket) => { uncork(sock); sock.destroy() }
 
 //! CONDEMNED — the marker boot() leaves in a dir whose boot record failed mid-life (I-36); restoreOpts refuses it
 const CONDEMNED = 'condemned'
