@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21, 1185 on 2026-10-22 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -798,6 +798,15 @@ working as designed.
   (queuedBytes); UUID_MAX 64 and ISSUER_MAX 81 at the door, at fero() and before the relay, a restored uuid
   and life count checked at compose. Opus built, reviewed and re-checked three times. 1142/1142 + 18/18,
   perf 62/62, 1000/1000 seeds, sim:scale green.
+
+- 2026-10-22 — wave 6c part 2: the spoke edges as V4-62 — FEED `x` at a shed and a clean abort, the clear's
+  ceiling across a failover, a latch fold's forward as one apply between `b` and `e` (one narrow hole
+  listed), and a scoped spoke's resync end keeping the cells of the partitions its feeder is folding
+  (the reply's `f`) under three clauses: the fold's end judges them, every exit sends a word, an owed word
+  is said again at the healing answer (the shed's word before its ship, every named partition re-sent
+  whole). Fable built it and five fix rounds, Opus the last two and all eight reviews; at the merge the
+  owed word's queue guard became link.full() and the eighth review's relayed-write case became a test.
+  1185/1185 + 18/18, perf 62/62, 1000/1000 seeds, sim:scale green.
 
 ## The debug tool
 
