@@ -388,7 +388,7 @@ export class Writes {
     if (this.pending.delete(a.issuer + '|' + a.cid)) { this.released++; if (a.sent < 0) this.#queued-- }
   }
 
-  //! dropVia (wave 6b, DECISIONS V4-NN) — a CLIENT link died at this relay (node.ts linkDown): every attempt it was
+  //! dropVia (wave 6b, DECISIONS V4-58) — a CLIENT link died at this relay (node.ts linkDown): every attempt it was
   // relaying for that client leaves the queue, parked or in flight. The client's own queue is the source of truth —
   // an attempt leaves it only at its WACK or WNACK, and a client that moved (a failover, or the move off a shut
   // feeder) re-sends everything in flight to its next relay, where the owner's dedup absorbs what this relay already
