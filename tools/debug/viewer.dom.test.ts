@@ -482,6 +482,12 @@ test('a paused link shows what its parked frames weigh beside their count: the l
   dragTo(el, tPause)
   g(`expanded.add('g/nodes/n01'); expanded.add('g/nodes/n01/g/links'); render(); navTo('${lk}')`)
   assert.match(el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'unknown at t, never a guess')
+  assert.match(el('statusRight').innerHTML, /<span data-tip="unknown@t">bytes —<\/span>$/, 'the status bar: unknown at t')
+  assert.doesNotMatch(el('statusRight').innerHTML, /data-tip="queued-bytes"/, 'the status bar never shows a weight at t')
+  g(`navTo('g/nodes/n01')`)
+  const at = (el('insp').innerHTML as string).match(/<tr><td class="node">[^]*?<\/tr>/g)?.find((r) => r.includes(`#${id}<`)) ?? ''
+  assert.match(at, /<td data-tip="unknown@t">—<\/td><td data-tip="unknown@t">—<\/td><\/tr>$/, 'the node\'s link table: count and weight unknown at t')
+  assert.doesNotMatch(at, /data-tip="queued-bytes"/, 'the link table never shows a weight at t')
   //! a capture from before the field: its rows carry no queuedBytes, so the replay may not claim one either, even where
   // its fold would say 0 (a link not yet paused): unknown at t, as the end table shows it
   const older = JSON.parse(JSON.stringify(cap)) as typeof cap
