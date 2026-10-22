@@ -248,7 +248,9 @@ export class Gather {
     const v = pick(row.px, key)
     //! kept, unless it knows nothing (no cell, no value) and neither does the live union: a fresh copy is then the same
     // empty state, so dropping it changes no answer — and a read of a row nobody has leaves nothing behind. An empty
-    // state is kept while the live union still holds cells of the row: it stands for the fold that took them away.
+    // state is kept while the live union still holds cells of the row: it stands for the fold that took them away. A
+    // live generation that takes them from the live union too does not drop it: only the row's next keyed read, or a
+    // sweep, does (one small empty state, inside the bound #sweep states).
     if (row.reg.size !== 0 || v !== undefined || (liveKnew ?? this.#knows(key))) this.#rows.set(key, row)
     else this.#rows.delete(key)
     this.#sweep()
@@ -266,7 +268,8 @@ export class Gather {
   //! #sweep — drop the keyed state of every row a keyed read would no longer gather (`gathers`): this node holds it now
   // (keyedRead answers from its own data) or another member owns it (keyedRead asks that member). So after a sweep the
   // keyed side holds only rows this node owns and does not hold: the rows of its handovers that were read by key, and
-  // rows nobody has whose empty state still stands for a fold (keyed above). It runs after every keyed read and every
+  // rows nobody has whose empty state stands for a delete a keyed read saw (keyed above: it stays until the row's next
+  // keyed read or a sweep, even once the live union has seen the delete too). It runs after every keyed read and every
   // live generation that feeds it; between two sweeps it grows by at most one row per keyed read.
   #sweep() {
     const gathers = this.#gathers

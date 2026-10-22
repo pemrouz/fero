@@ -408,10 +408,16 @@ too when the live union knows nothing of the row, because a fresh copy is then
 the same empty state; so a read of a row nobody has leaves nothing behind. After
 a check the keyed side holds only rows this node owns and does not hold: the rows
 of its handovers that were read by key, and rows nobody has whose empty state
-still stands for a delete the live union has not seen. Between two checks it
-grows by at most one row per keyed read. Each state holds that row's claims (one
-per member per cell) and one copy of its value. While the keyed side is empty,
-which is nearly always, a live generation pays one size check.
+stands for a delete a keyed read saw. Such an empty state stays until the row's
+next keyed read (which drops it once the live union knows nothing of the row) or
+until a check finds the row held or owned elsewhere, so it can outlive the live
+union learning of the delete too (corrected by the round-4 review; one empty map
+per such row, inside the bound). Between two checks the keyed side grows by at
+most one row per keyed read. Each state holds that row's claims (one per member
+per cell) and one copy of its value. While the keyed side is empty, which is
+nearly always, a live generation pays one size check; the check at the start of
+each live generation that feeds the keyed side is what empties it once the
+handovers end (pinned: KEYED PARKING's last step, since the round-4 review).
 
 This node's own answer is taken last, after the others: within one view an
 orphan sheds only once every holder attests, this node among them, so an
@@ -430,4 +436,11 @@ per cell and sends the row's cells alone; base sent and parsed every member's
 whole share. A read of a row nobody has leaves no keyed state.
 
 What is still refused: a member whose claims for this one row pass one frame
-(the row cannot travel), and an unreachable member (typed, as before).
+(the row cannot travel), and an unreachable member (typed, as before). In a
+rolling upgrade a third case looks the same from the coordinator: a member of an
+older version ignores the partition and sends its whole share, and refuses it
+`too-large` when that share passes one frame. Its whole share that fits is cut
+to the row before the fold; one that does not fit says nothing of the row, and
+retrying helps once the handover ends. So the too-large hint names both: read a
+smaller part of the row, or, if that member runs an older fero, retry once the
+key has finished changing owner (since the round-4 review).
