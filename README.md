@@ -12,7 +12,7 @@ This is fero v4: package `fero` 4.0.0, branch `v4`, the repo root since 2026-08-
 npm install                                    # once after a clone: the one dependency (optcascade); Node 22.18 or later
 cd examples/01-two-servers && node server.ts   # the example series, 28 rungs: examples/README.md
 npm test                                       # 1185 tests + data's 18 contract clauses, the 28 example checks included
-npm run perf                                   # the 43 perf pins; perf:absolute / perf:pin for the persisted baseline (tools/perf/BASELINE.md)
+npm run perf                                   # the 62 perf pins; perf:absolute / perf:pin for the persisted baseline (tools/perf/BASELINE.md)
 npm run sim -- --seeds 1000                    # 1000 seeded chaos trajectories; a failing seed prints itself and reruns bit for bit
 npm run shrink -- --seed 42                    # shrink a failing seed to a few steps; --replay <capture> reruns the repro
 npm run debug                                  # the scenario dashboard at /, the debugger at /debug (http://localhost:4699)
