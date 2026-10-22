@@ -935,6 +935,33 @@ test('KEYED PARKING, differential [V4-NN] — the keyed state of a row is a one-
   assert.ok(checks > 700, `${checks} keyed reads compared`)
 })
 
+//! V4-NN, the round-3 review: a keyed read takes this node's OWN answer last, after every other member's is in. The
+// shape it is for: a handover that ENDS while the read is in flight. This node owns `a` and is still taking it over
+// when the read starts; while the answers travel it finishes (it holds `a` now), and the old holder h1 sheds before it
+// answers (no claim, no attestation). Taken first, as base's keyed read (a whole refresh) took it, this node's answer
+// says nothing of the row and h1's says nothing either: the read answers undefined for a row that exists, the silent
+// wrong answer plan §9 bans. Red on base, and red with the own answer moved back to before the fan-out.
+test('KEYED MID-READ [V4-NN] — a handover that ends while a keyed read is in flight: this node\'s own answer is taken last, so the read sees the row', async () => {
+  const { Gather } = await import('./fold.ts')
+  const A = JSON.stringify(['a'])
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['self', 'h2'] } },
+    scope: { entries: new Map([['a', { state: 2 }]]) }, // acquiring: no claim, no attestation
+    versions: new Map<string, unknown>(), state: new Map<string, unknown>(),
+  }
+  const g = new Gather({ node: fake } as never, async (u: string) => {
+    await new Promise((r) => setImmediate(r))
+    //! by the time h1 answers, this node holds `a` (the acquire landed) and h1 has shed it
+    if (u === 'h1') { fake.scope.entries.set('a', { state: 1 }); fake.versions.set(A, { epoch: 1, seq: 3, origin: 'h1' }); fake.state.set(A, { x: 1 }) }
+    return { c: {}, att: [] } as never
+  })
+  try {
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 }, 'the row, from this node\'s own answer taken after h1\'s')
+  } finally { g.destroy() }
+})
+
 //! the member side of V4-NN: `rows` with a partition answers exactly the part of its whole answer for that row — the
 // row cell, its fields and their tombstones, a quoted key too — and attests that partition alone, or nothing
 test('rowsPartial with a partition is the whole answer\'s part for that row: its cells by their first key, its attestation cut to it', async () => {
