@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21, 1185 then 1192 then 1199 on 2026-10-22 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21, 1185 then 1192 then 1199 then 1214 on 2026-10-22 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (64 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -822,6 +822,13 @@ working as designed.
   row, in the debugger (unknown under scrub) and in M0. Opus built it, reviewed it three times and fixed it
   twice; at the merge the first commit took its test fix, and two of the third review's probes became checks.
   1199/1199 + 18/18, perf 64/64, 1000/1000 seeds, sim:scale green.
+
+- 2026-10-22 — wave 7 part 3 (on Opus): the keyed handover read as V4-65 — the system `rows` call takes a
+  partition; a keyed read during a handover asks every member for its row alone and folds the answers into
+  the live union limited to that row (one registry, as in base: parking across keyed reads and live
+  generations, and a whole read never goes back past a keyed one). Split from the apilines lane, whose
+  write-loop item waits for Fable; five Opus fix rounds and five reviews (round 5 took the integrator's
+  direction: one registry, not a keyed state per row). 1214/1214 + 18/18, perf 64/64.
 
 ## The debug tool
 
