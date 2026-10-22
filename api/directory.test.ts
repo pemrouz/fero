@@ -954,6 +954,9 @@ test('cross-box helpers: a bare host (isBox) names a box, its directory sits at 
   // unless it is the very host the directory was reached on
   assert.deepEqual(fromBox('10.0.0.5:3376', { a: '10.0.0.5:4000', b: '127.0.0.1:4001', c: '0.0.0.0:4002', d: 'localhost:4003', e: '10.0.0.9:4004', f: 7 }), ['10.0.0.5:4000', '10.0.0.9:4004'])
   assert.deepEqual(fromBox('127.0.0.2:3376', { a: '127.0.0.2:4000', b: '127.0.0.1:4001' }), ['127.0.0.2:4000'], 'the loopback IP the directory answered on is that box')
+  //! …and an address whose host is over 253 bytes (isAddr, kernel/door.ts HOST_MAX): this build's register refuses one,
+  // but another box may run an older build. Dialed, it could only fail: no DNS name is that long.
+  assert.deepEqual(fromBox('10.0.0.5:3376', { a: 'h'.repeat(254) + ':4000', b: 'h'.repeat(253) + ':4000' }), ['h'.repeat(253) + ':4000'], 'a host over the longest DNS name is dropped')
   //! leavesBox — the explicit-listen rule's trigger, every case
   assert.equal(leavesBox('127.0.0.1:3376', []), null, 'nothing set: the one-box shape, no rule')
   assert.equal(leavesBox(false, ['127.0.0.1:4801', 'localhost:4802', '127.0.0.2']), null, 'every host on this box')
