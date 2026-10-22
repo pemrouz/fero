@@ -1,4 +1,4 @@
-//! A client whose feeder's write-gate SHUTS while another linked server's gate is open (wave 6b, DECISIONS V4-NN).
+//! A client whose feeder's write-gate SHUTS while another linked server's gate is open (wave 6b, DECISIONS V4-58).
 // Before: a client moved only when its feeder's link died. Fed by a member the others had refused (the r2 platform
 // spike, 2026-10-11), it timed out 80 of 80 calls over 20 s while two members took writes, and all 80 landed later —
 // the relay parks a write behind its closed gate, and nothing on the link said "go elsewhere". Now the client keeps

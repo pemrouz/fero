@@ -1,4 +1,4 @@
-//! ── tests/latency.perf — two round trips on real loopback sockets (V4-NN, the Nagle stall) ──────────
+//! ── tests/latency.perf — two round trips on real loopback sockets (V4-63, the Nagle stall) ──────────
 // Two calls that each send two small frames in a row on one link: a client's method call that writes a row
 // (the server answers with the record and the RESULT) and a server's update forwarded to the row's owner (the
 // owner answers with the record and the WACK). With Nagle's algorithm on, the OS held the second frame back

@@ -101,7 +101,7 @@ export const VERB = {
   // holds no ballot of that identity and no view at or above it. The vote stays spent; it warns no more. An older peer
   // drops the frame and keeps the link (an unknown verb is not a wire fault).
   NACK: 27,
-  //! FEED (2026-10-21, wave 6c, DECISIONS V4-NN): a feeder's word to its spokes, read by a CLIENT from its PRIMARY link
+  //! FEED (2026-10-21, wave 6c, DECISIONS V4-62): a feeder's word to its spokes, read by a CLIENT from its PRIMARY link
   // only (a spare's word says nothing about what the feeder holds; a server drops the frame). One verb, the op inside
   // the value (the DIGEST-r idiom): {x: [p…]} these partitions LEFT the feeder (a shed, kernel/scope.ts) — the spoke
   // drops them; {b: p} a latch fold's forward for p begins — the spoke buffers the RECORDS frames that follow until

@@ -523,7 +523,7 @@ export class Node {
   // review measured 5 and 9 at 200 ms each way with a 50 ms heartbeat, one ordering each); now one on any link.
   resync: { old: Set<string>; q: number } | null = null
   #dq = 0
-  //! #ceiling (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the ceiling a feeder's drain digest carried (`c`, see
+  //! #ceiling (clients, wave 6c 2026-10-21 — DECISIONS V4-62): the ceiling a feeder's drain digest carried (`c`, see
   // #sendDigest and #clearCover). V4-49 left a clear's ceiling on the FEEDER's link and used it up at the spoke's reply
   // to the drain digest; if the spoke failed over after that digest and before the capped answer, the ceiling died
   // with the link and the next feeder answered the spoke's own tails, which sit above the hole (the last review of
@@ -534,7 +534,7 @@ export class Node {
   // at or above the first capped ask's q drops it (any later ask to any feeder carried the cap, so that answer fills the
   // hole wherever it comes from). A resync drops it: the ask is d = {} there. Null when none is held.
   #ceiling: { d: Record<string, number>; q?: number } | null = null
-  //! group (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the fold group open on the primary link — the feeder said
+  //! group (clients, wave 6c 2026-10-21 — DECISIONS V4-62): the fold group open on the primary link — the feeder said
   // FEED {b: p} (kernel/scope.ts onAcqDone: a latch fold's forward begins) and its FEED {e: p} has not come. The RECORDS
   // frames between them wait here, each its own copy of the bytes (a frame is a view on the receive chunk), and land
   // as ONE apply at the end (#groupLand). Before this the forward landed frame by frame — a partition's history in lane
@@ -543,7 +543,7 @@ export class Node {
   // two events). Bounded by the fold's size, which the spoke is about to hold in its lanes anyway. Public for the sim's
   // monitors (a spoke with a group open covers nothing yet). Null when no group is open.
   group: { p: string; frames: Uint8Array[] } | null = null
-  //! THE KEPT CELLS (clients, wave 6c 2026-10-21 — DECISIONS V4-NN): the vanish-and-return at a resync ending across a
+  //! THE KEPT CELLS (clients, wave 6c 2026-10-21 — DECISIONS V4-62): the vanish-and-return at a resync ending across a
   // fold. A failover's resync answer carries what the new feeder holds of each FED partition when it builds it; the rows
   // it is about to fold (a repair latch's staged delta, a re-entry's whole partition, a from-zero acquire) are not in
   // it, and the spoke had them from its first feeder, so the ghost sweep at the end took them from the screen and the
@@ -1384,7 +1384,7 @@ export class Node {
     this.bootDirty.clear()
   }
 
-  //! #gateWord (clients, wave 6b — DECISIONS V4-NN) — a server said its write-gate on this link (`w` on a digest or a
+  //! #gateWord (clients, wave 6b — DECISIONS V4-58) — a server said its write-gate on this link (`w` on a digest or a
   // PONG toward a client link; anything else is no word): keep it on the link and apply the move rule.
   #gateWord(link: Link, w: unknown) {
     if (w !== 1 && w !== 0) return
@@ -1526,7 +1526,7 @@ export class Node {
     if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
   }
 
-  //! #unfeed (clients, wave 6c 2026-10-21 — DECISIONS V4-NN) — the feeder said partition p LEFT it (FEED {x}, kernel/
+  //! #unfeed (clients, wave 6c 2026-10-21 — DECISIONS V4-62) — the feeder said partition p LEFT it (FEED {x}, kernel/
   // scope.ts evaluateSheds: its copy froze into an orphan at an install, and once every current holder attested the
   // frozen tails the data left that node). A spoke is a view of its feeder's held subset, and nothing told it: its
   // rows of p stayed on the screen, frozen (the orphan gate-dropped every new record of p, so none reached the spoke),
@@ -2364,7 +2364,7 @@ export class Node {
         this.membership.settle(this)
         return
       }
-      //! FEED — a feeder's word to its spokes (wave 6c, 2026-10-21; DECISIONS V4-NN): read by a CLIENT from its PRIMARY
+      //! FEED — a feeder's word to its spokes (wave 6c, 2026-10-21; DECISIONS V4-62): read by a CLIENT from its PRIMARY
       // link only. {x: [p…]}: these partitions left the feeder (a shed) — the spoke drops them (#unfeed). A FEED on a
       // spare link is dropped (that server's shed says nothing about what the feeder holds), and a server drops every
       // FEED (a spoke never feeds). Frame dropped, link kept, either way.

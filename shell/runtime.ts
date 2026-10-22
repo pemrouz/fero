@@ -60,7 +60,7 @@ const writeAll = (fd: number, b: Uint8Array): void => { for (let off = 0; off < 
 // time, a bigger row goes straight to the fd
 const STAGE = 1 << 20
 
-//! ── the dir lock (wave 6b, DECISIONS V4-NN) ──
+//! ── the dir lock (wave 6b, DECISIONS V4-59) ──
 // One process at a time holds a `dir`. Before this nothing locked the folder: a second process started on a dir the
 // first still held restored it, ran as the SAME uuid, and both appended rows to one log (the platform spikes,
 // 2026-10-12); with sockets the two would also claim one identity on the wire. The lock is a file, `lock`, beside
@@ -680,7 +680,7 @@ export class Runtime {
   // Nagle's algorithm off. With it on, the OS held a small frame back until the frame before it was acknowledged,
   // and the peer held that acknowledgement for about 40 ms (delayed ACK). Every exchange that sends two frames in a
   // row paid it: a method call that writes (the RESULT behind the record), a write forwarded to its row's owner.
-  // On loopback those took about 43 ms; with Nagle off, about 1 ms (V4-NN, tests/latency.perf.ts). What Nagle did
+  // On loopback those took about 43 ms; with Nagle off, about 1 ms (V4-63, tests/latency.perf.ts). What Nagle did
   // that was worth keeping, merging many small frames into few segments, the run batch does (`runBatch` below).
   #wire(sock: net.Socket, link: number) {
     sock.setNoDelay(true)
@@ -798,7 +798,7 @@ export class Runtime {
   }
 }
 
-//! ── the run batch (V4-NN): a link socket corks at the first small frame of a run and uncorks when the run ends ──
+//! ── the run batch (V4-63): a link socket corks at the first small frame of a run and uncorks when the run ends ──
 // Nagle's algorithm is off (#wire), so a write leaves as its own segment the moment it is made. One run of the event
 // loop (a socket read, a timer, a stretch of user code, with every kernel step inside it) can make many small frames
 // on one link: a loop of plain assignments is one step per assignment, so one small frame per link per assignment.
