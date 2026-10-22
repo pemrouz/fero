@@ -129,6 +129,9 @@ export const JK = {
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
 export interface JEvent { t: number; kind: number; a?: number | string; b?: number | string; c?: number | string }
 
+//! KEPT_MAX — how many rows keep() holds beside the ring for a reader that has not taken them (oldest out past it)
+export const KEPT_MAX = 64
+
 //! Journal: bounded drop-oldest ring + monotone counter + surfaced drop count.
 export class Journal {
   #ring: (JEvent | undefined)[]
@@ -141,6 +144,20 @@ export class Journal {
     const t = this.n++
     if (t >= this.#cap) this.dropped++
     this.#ring[t % this.#cap] = { t, kind, a, b, c }
+  }
+  //! kept / keep — the rows a reader must not lose to the ring (DECISIONS V4-NN): the door's and the contract's
+  // refusals (doorReject, contractReject), written through keep() at their few cold sites in kernel/node.ts. The ring
+  // can overwrite a row inside the very step that wrote it, when journal.cap is below that step's burst (a member that
+  // evicts a client squatting on a member's uuid goes on to admit the member in the same step); this list holds the
+  // same row objects until the composer takes them after the step (api/index.ts fold) and empties it. The ring and
+  // its rows are unchanged: keep() is emit() and one push of the row emit() made. Capped at KEPT_MAX, oldest out, so
+  // a node nobody reads (the sim, a bare kernel) holds no more than that. No other emit site touches it: nothing on
+  // the hot path pays for it.
+  kept: JEvent[] = []
+  keep(kind: number, a?: number | string, b?: number | string, c?: number | string) {
+    this.emit(kind, a, b, c)
+    if (this.kept.length >= KEPT_MAX) this.kept.shift()
+    this.kept.push(this.#ring[(this.n - 1) % this.#cap]!)
   }
   //! read(from): all retained events with t >= from, in order — cursor-style consumption (relay/fold read by cursor, never by draining a shared array: v2's 10%-temporal-coverage bug class).
   read(from = 0): JEvent[] {

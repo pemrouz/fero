@@ -713,6 +713,37 @@ const rawHello = (addr: string, hello: Record<string, unknown>, ms = 1500): Prom
   setTimeout(finish, ms).unref()
 })
 
+//! V4-NN (STATUS: "The refusal lines can skip a line on a journal ring overflow"): the lines were fed from the
+// composer's post-step journal cursor, so a refusal row the ring overwrote inside its own step never printed. The
+// shape: a member that evicts a client squatting on a member's uuid goes on to admit that member IN THE SAME STEP
+// (identified, the digest, the join…), so below a few rows of journal.cap the eviction's row is gone by the fold.
+// The refusal rows are kept beside the ring now (kernel/journal.ts keep) and the composer reads them from there.
+test('a refusal line survives the journal ring overflowing inside its own step: a member with journal.cap 1 evicts a client squatting on a joining member\'s uuid, and says so', async () => {
+  const p = await ports.free()
+  const A = `127.0.0.1:${p}`
+  const a = await fero('ringcap', { uuid: 'aa', listen: A, heartbeat: { ms: 50 }, redial: { ms: 30 }, journal: { cap: 1 } })
+  let b: Fero | null = null
+  //! the squatter: a raw client that took the uuid bb before any member had it, and never re-dials
+  let sock: net.Socket | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      sock = net.connect(p, '127.0.0.1', () => { sock!.write(encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: '', r: 1 })) })
+      sock.on('error', () => {})
+      type Peer = { client: boolean }
+      const peer = () => (view(a).peers as Record<string, Peer | undefined>).bb
+      assert.ok(await until(() => peer()?.client === true, 8000), 'the squatter is admitted as a client')
+      b = await fero('ringcap', { uuid: 'bb', server: true, hosts: [A], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      assert.ok(await until(() => peer()?.client === false && Object.keys(view(a).members).length === 2, 8000), 'the member bb took its uuid back, and joined')
+      assert.equal(diag(a)!.journal().events.some((e) => e.kind === JK.doorReject), false, 'the ring did not keep the eviction row')
+    } finally {
+      ;(sock as net.Socket | null)?.destroy()
+      await b?.destroy()
+      await a.destroy()
+    }
+  })
+  assert.deepEqual(lines.filter((l) => l.startsWith("fero('ringcap')")), ["fero('ringcap'): refused a client claiming uuid bb — that uuid belongs to a member (a shared FERO_UUID?)"], 'the line, though its row is gone')
+})
+
 test('the refusal lines print nothing a peer chose unfiltered: a connecting socket\'s claimed listen with a newline and an escape gives ONE line, cut and clean (100k characters is a malformed HELLO and prints nothing); another socket with another claim prints nothing new (inbound refusals print once per reason); an open server\'s forged contract value is cut and clean too', async () => {
   const S = 'index-test-secret-KILO-11'
   const p = await ports.free(), p2 = await ports.free()
