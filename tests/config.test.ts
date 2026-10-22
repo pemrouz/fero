@@ -155,6 +155,8 @@ test('refusals name their source: the legacy FERO_RENDEZVOUS text, a non-number,
   //! an IPv6 listen that does not read as host:port names the bracket form; a uuid over the bound names the bound, its size and the variable
   assert.match((await run('shop', { argv: ['--fero.listen', 'fdaa::3'], call: { server: true } })).err ?? '', /listen must be a 'host:port' string .* \(an IPv6 address goes in brackets: '\[::1\]:4000', or '\[fdaa::3\]' for a bare host\) \(from --fero\.listen\)/)
   assert.match((await run('shop', { env: { FERO_UUID: 'u'.repeat(65) }, call: { server: true } })).err ?? '', /uuid must be at most 64 bytes \(UTF-8\), got 65 — it names this node's lane in every record frame it sends \(from FERO_UUID\)/)
+  //! a listen whose host is over the longest DNS name names the bound, the size and the flag
+  assert.match((await run('shop', { argv: ['--fero.listen', 'h'.repeat(254) + ':0'], call: { server: true } })).err ?? '', /listen must be a 'host:port' string .* \(its host is 254 bytes; a host is at most 253, the longest DNS name\) \(from --fero\.listen\)/)
 })
 
 test('server: false pins the client role: a server marker or server: true from a flag is refused naming both sources', async () => {
