@@ -993,6 +993,9 @@ test('the name is bounded at 255 bytes (UTF-8, kernel/door.ts NAME_MAX): a longe
   await refuses(fero('s'.repeat(256), { listen: false }), /^Error: fero\('s{24}…'\): name must be at most 255 bytes \(UTF-8\), got 256 — it rides every HELLO and every directory row$/)
   await refuses(fero('é'.repeat(128), { listen: false }), /name must be at most 255 bytes \(UTF-8\), got 256/, 'bytes, not characters')
   await refuses(fero('x'.repeat(1 << 20), { listen: false }), /got 1048576/, 'a long one is refused without a megabyte message')
+  //! the message's cut never splits a character in two: 'a' and 11 emoji are 23 UTF-16 units, so a cut at 24 would keep
+  // half of the 12th (a lone surrogate, which prints as U+FFFD)
+  await refuses(fero('a' + '😀'.repeat(200), { listen: false }), /^Error: fero\('a(?:😀){11}…'\): name must be at most 255 bytes \(UTF-8\), got 801 /, 'cut at a whole character')
   const f = await fero('s'.repeat(255), { listen: false })
   await f.destroy()
   //! a restored dir: the name a hand edit put in boot.json is refused for its size, not printed whole by the

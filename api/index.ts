@@ -329,9 +329,12 @@ fero.clientKey = clientKeyOf
 const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise<Fero> => {
   if (typeof name !== 'string' || name === '') throw new Error(`fero(${JSON.stringify(name)}): name must be a non-empty string`)
   //! its size (kernel/door.ts NAME_MAX): the name rides every HELLO and every directory row, and a peer refuses a HELLO
-  // with a longer one as malformed. The message shows the start of the name only.
-  if (overBytes(name, NAME_MAX))
-    throw new Error(`fero('${name.slice(0, 24)}…'): name must be at most ${NAME_MAX} bytes (UTF-8), got ${utf8Len(name)} — it rides every HELLO and every directory row`)
+  // with a longer one as malformed. The message shows the start of the name only: 24 UTF-16 units, one less when the
+  // 24th is the first half of a pair, so the cut never leaves half a character (which prints as U+FFFD).
+  if (overBytes(name, NAME_MAX)) {
+    const head = name.slice(0, (name.charCodeAt(23) & 0xfc00) === 0xd800 ? 23 : 24)
+    throw new Error(`fero('${head}…'): name must be at most ${NAME_MAX} bytes (UTF-8), got ${utf8Len(name)} — it rides every HELLO and every directory row`)
+  }
   if (!isSystem && name.startsWith('#')) throw new Error(`fero('${name}'): names starting with # are reserved for system resources (${DIRECTORY})`)
   //! every option is a DECLARED key (V4-5): a function-valued option is the pre-V4-5 method spelling —
   // refused with the pointer (moving it under `methods:` also declares the door, on purpose)
