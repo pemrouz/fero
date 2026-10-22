@@ -980,10 +980,19 @@ test('the uuid is bounded at 64 bytes (UTF-8): a longer one is refused at fero()
   try { assert.equal((snapshot(f.cluster) as { me: { uuid: string } }).me.uuid.length, 64) } finally { await f.destroy() }
 })
 
+//! refuses — fero() must reject with `re`. If it composes instead (a check gone), the instance is destroyed first, so a
+// missing check is a red line, never a test process held open by a live instance until the battery's time limit
+const refuses = async (p: Promise<Fero>, re: RegExp, msg?: string): Promise<void> => {
+  let f: Fero
+  try { f = await p } catch (e) { assert.match(String(e), re, msg); return }
+  await f.destroy()
+  assert.fail(`fero() composed; expected a refusal matching ${re}${msg ? ` (${msg})` : ''}`)
+}
+
 test('the name is bounded at 255 bytes (UTF-8, kernel/door.ts NAME_MAX): a longer one is refused at fero() time with the bound and its size, and so is a dir whose boot record carries one; 255 bytes compose', async () => {
-  await assert.rejects(fero('s'.repeat(256), { listen: false }), /^Error: fero\('s{24}…'\): name must be at most 255 bytes \(UTF-8\), got 256 — it rides every HELLO and every directory row$/)
-  await assert.rejects(fero('é'.repeat(128), { listen: false }), /name must be at most 255 bytes \(UTF-8\), got 256/, 'bytes, not characters')
-  await assert.rejects(fero('x'.repeat(1 << 20), { listen: false }), /got 1048576/, 'a long one is refused without a megabyte message')
+  await refuses(fero('s'.repeat(256), { listen: false }), /^Error: fero\('s{24}…'\): name must be at most 255 bytes \(UTF-8\), got 256 — it rides every HELLO and every directory row$/)
+  await refuses(fero('é'.repeat(128), { listen: false }), /name must be at most 255 bytes \(UTF-8\), got 256/, 'bytes, not characters')
+  await refuses(fero('x'.repeat(1 << 20), { listen: false }), /got 1048576/, 'a long one is refused without a megabyte message')
   const f = await fero('s'.repeat(255), { listen: false })
   await f.destroy()
   //! a restored dir: the name a hand edit put in boot.json is refused for its size, not printed whole by the
@@ -991,24 +1000,24 @@ test('the name is bounded at 255 bytes (UTF-8, kernel/door.ts NAME_MAX): a longe
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-name-'))
   try {
     fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'aa', name: 'r'.repeat(300), epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
-    await assert.rejects(fero('r', { dir, listen: false }), /^Error: fero\('r'\): this dir's boot record carries a name over 255 bytes \(UTF-8; got 300\) — repair boot\.json$/)
+    await refuses(fero('r', { dir, listen: false }), /^Error: fero\('r'\): this dir's boot record carries a name over 255 bytes \(UTF-8; got 300\) — repair boot\.json$/)
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('an address\'s host is bounded at 253 bytes (UTF-8, kernel/door.ts HOST_MAX, the longest DNS name) wherever an address is given — listen, hosts (with a port or bare), rendezvous — so every listen fits the 259 bytes a peer checks; 253 bytes pass the check', async () => {
   const long = / \(its host is 254 bytes; a host is at most 253, the longest DNS name\)$/
-  await assert.rejects(fero('r', { listen: 'h'.repeat(254) + ':0' }), /^Error: fero\('r'\): listen must be a 'host:port' string/)
-  await assert.rejects(fero('r', { listen: 'h'.repeat(254) + ':0' }), long)
-  await assert.rejects(fero('r', { listen: 'é'.repeat(127) + ':4000' }), long, 'bytes, not characters')
-  await assert.rejects(fero('r', { hosts: ['h'.repeat(254) + ':4000'] }), /hosts\[0\] .* is not a 'host:port' address .* \(its host is 254 bytes/)
+  await refuses(fero('r', { listen: 'h'.repeat(254) + ':0' }), /^Error: fero\('r'\): listen must be a 'host:port' string/)
+  await refuses(fero('r', { listen: 'h'.repeat(254) + ':0' }), long)
+  await refuses(fero('r', { listen: 'é'.repeat(127) + ':4000' }), long, 'bytes, not characters')
+  await refuses(fero('r', { hosts: ['h'.repeat(254) + ':4000'] }), /hosts\[0\] .* is not a 'host:port' address .* \(its host is 254 bytes/)
   //! a bare host is a dotted DNS name: labels of 63, 255 bytes in all
   const dotted = (n: number) => ['h'.repeat(63), 'h'.repeat(63), 'h'.repeat(63), 'h'.repeat(n - 192)].join('.')
-  await assert.rejects(fero('r', { hosts: [dotted(255)] }), /hosts\[0\] .* is not a 'host:port' address .* \(its host is 255 bytes/)
-  await assert.rejects(fero('r', { rendezvous: 'h'.repeat(254) + ':3376', listen: false }), /rendezvous must be a 'host:port' string .* \(its host is 254 bytes/)
+  await refuses(fero('r', { hosts: [dotted(255)] }), /hosts\[0\] .* is not a 'host:port' address .* \(its host is 255 bytes/)
+  await refuses(fero('r', { rendezvous: 'h'.repeat(254) + ':3376', listen: false }), /rendezvous must be a 'host:port' string .* \(its host is 254 bytes/)
   //! the bound itself passes the address check, and meets the next rule: a routable listen needs a secret; a bare host
   // needs the directory (the battery runs it off)
-  await assert.rejects(fero('r', { listen: 'h'.repeat(253) + ':0' }), /is reachable from other machines and no secret is set/)
-  await assert.rejects(fero('r', { hosts: [dotted(253)] }), /has no port, which means "ask that box's directory" — but the directory is off/)
+  await refuses(fero('r', { listen: 'h'.repeat(253) + ':0' }), /is reachable from other machines and no secret is set/)
+  await refuses(fero('r', { hosts: [dotted(253)] }), /has no port, which means "ask that box's directory" — but the directory is off/)
 })
 
 test('v4.1 f.snapshot: the synchronous dense value — data\'s [value] read surfaced first-class', async () => {
