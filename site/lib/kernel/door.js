@@ -47,6 +47,25 @@ export const UUID_MAX = 64
 // issuer is the WRITE frame's own claim (its provenance origin), not the admitted uuid, so the HELLO bound does not
 // reach it: node.ts checks it on every WRITE before the relay can stamp it. A longer one is a malformed WRITE.
 export const ISSUER_MAX = UUID_MAX + 17
+//! HOST_MAX — the most UTF-8 bytes the host of an address may take: a DNS name is at most 253 characters written out
+// (RFC 1035 §2.3.4: 255 bytes on the wire, which spends a length byte before the first label and a zero byte at the
+// end). A bracketed IPv6 literal is at most 47 (45 and the brackets), 63 with a zone (an interface name is at most 15
+// bytes on Linux and macOS, a number on Windows), so the DNS name is the longest host there is. The kernel never reads
+// a host; api/directory.ts isAddr refuses an address whose host is longer, everywhere an address enters.
+export const HOST_MAX = 253
+//! LISTEN_MAX — the most UTF-8 bytes a HELLO's listen (`l`) may take: the longest host, ':' and a port of 5 digits.
+// The listen is the address peers dial this node at: it goes into the views every member stores and ships (formation
+// reads it off the link), into a redial target when an accepted link drops, and into journal rows. A HELLO is the one
+// frame a stranger or a client gets to send, so it is checked there: a longer one is a malformed HELLO. Every address
+// fero() accepts fits (isAddr: a host of at most HOST_MAX, a port 0-65535 printed back in at most 5 digits).
+export const LISTEN_MAX = HOST_MAX + 6
+//! NAME_MAX — the most UTF-8 bytes a resource name may take (a HELLO's `n`, fero()'s first argument, a directory row's
+// name). 255 is the longest file name on every common file system (Linux and macOS count bytes; Windows counts 255
+// UTF-16 units, and a string never has more UTF-16 units than UTF-8 bytes), so a name always fits a folder named after
+// it, the examples' layout (dir: './notes' for 'notes'). The name rides every HELLO and every directory register and
+// lookup, is stored in the boot record, and a peer's name is journaled when it differs (nameReject): the bound keeps
+// all of those small. A HELLO with a longer `n` is malformed, refused before the name compare can journal it.
+export const NAME_MAX = 255
 //! utf8Len — a string's UTF-8 byte count without encoding it (a lone surrogate counts 3, as TextEncoder writes it)
 export const utf8Len = (s        )         => {
   let n = 0
@@ -59,6 +78,10 @@ export const utf8Len = (s        )         => {
   }
   return n
 }
+//! overBytes — is `s` more than `max` UTF-8 bytes? The length alone decides most strings without a scan: a UTF-16 unit
+// takes at least 1 byte and at most 3, so more than `max` units is over, and at most `max / 3` units is not. A hostile
+// HELLO of 256 MiB is refused without reading it byte by byte.
+export const overBytes = (s        , max        )          => s.length > max || (s.length * 3 > max && utf8Len(s) > max)
 //! PROOF_LEN — HMAC-SHA256 as base64url (§2): the one place the proof's length lives. A DOOR whose `p` is
 // not exactly this long is a malformed frame; a right-length wrong value is `bad-proof`.
 export const PROOF_LEN = 43
