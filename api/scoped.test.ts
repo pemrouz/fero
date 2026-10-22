@@ -771,6 +771,12 @@ test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s pa
     //! a member of an older version ignores the argument and sends its whole share: the fold sees the row alone
     h2 = { whole: { c: { [AY]: { v: 2, st: [1, 10, 'h2'] }, [B]: { v: 7, st: [1, 11, 'h2'] } }, att: ['a', 'b'] }, a: 'ignores' }
     assert.deepStrictEqual(await g.keyed('a'), { x: 5, y: 2 })
+    //! …and the whole share is cut BEFORE the fold (the round-3 review: the answer for the row is the same uncut). A row
+    // nobody has, read now, keeps no state: uncut, h2's other rows would land in it, and the state of a row nobody has
+    // is never swept (its owner never holds it), so every absent key read during a rolling upgrade would keep a copy
+    assert.equal(g.keyedRows, 1, '`a` alone')
+    assert.equal(await g.keyed('zz'), undefined)
+    assert.equal(g.keyedRows, 1, 'no state for `zz`: h2\'s whole share was cut to the row, which holds nothing')
     //! PARKING: h1 answers in the skew window (no claim, no attestation for `a`) and nobody else claims the row — not
     // covered, so the last value the row showed stands: the last keyed read's, which the live union never saw (KEYED
     // PARKING, below, has the live union's side)
