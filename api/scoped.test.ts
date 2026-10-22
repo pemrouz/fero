@@ -853,3 +853,46 @@ test('the system rows call with a partition answers that row alone over a real l
     await Promise.all(nodes.map((n) => n.destroy()))
   }
 })
+
+//! the coordinator's side of V4-NN, through the real composer (the round-2 review: the tests above drive a fake call or
+// call `rows` straight from a client, so a gather callback that dropped the partition stayed green, and the whole share
+// travelled again). A keyed read of a row this node owns but does not hold goes through the gather — an absent row is
+// never held. The test records every member `rows` call and the answer that came back BEFORE the coordinator cuts it to
+// the row (fold.ts only), because the cut hides a whole share from the read's own answer.
+test('a keyed read through the real composer asks the other member for that row only: the partition rides the call, and the answer holds that row alone', async () => {
+  const { Caller, SYSTEM } = await import('./methods.ts')
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) =>
+    fero('scoped', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })))
+  const real = Caller.prototype.call
+  const seen: { a: unknown; to: string | undefined; cells: string[]; att: string[] | null }[] = []
+  Caller.prototype.call = function (this: InstanceType<typeof Caller>, m: string, a: unknown, opts?: { timeout?: number; retry?: boolean; to?: string }, pre?: never) {
+    const p = real.call(this, m, a, opts, pre)
+    if (m !== SYSTEM + 'rows') return p
+    return p.then((r) => {
+      const rows = r as { c: Record<string, unknown>; att: string[] | null }
+      seen.push({ a, to: opts?.to, cells: Object.keys(rows.c), att: rows.att })
+      return r
+    })
+  }
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    //! replicas 1: four rows whose one holder is n02, so its whole share is not empty, and a row n01 owns that nobody wrote
+    const ring = new Ring()
+    ring.build(1, [['n01', addrs[0]], ['n02', addrs[1]]])
+    const theirs: string[] = []
+    for (let i = 0; theirs.length < 4; i++) if (ring.holders('w' + i, 1)[0] === 'n02') theirs.push('w' + i)
+    let k = ''
+    for (let i = 0; k === ''; i++) if (ring.holders('gone' + i, 1)[0] === 'n01') k = 'gone' + i
+    for (const w of theirs) await nodes[0].methods.update({ key: w, value: { w } }, { timeout: 3000 })
+    const held = (f: Fero) => (diag(f)!.capture().held ?? []) as string[]
+    assert.ok(await until(() => theirs.every((w) => held(nodes[1]).includes(w)), 8000), 'n02 holds its four rows')
+    seen.length = 0
+    assert.equal(await nodes[0].methods.read(k), undefined, 'the absent row reads absent')
+    assert.deepStrictEqual(seen, [{ a: k, to: 'n02', cells: [], att: [] }], 'one call, for the row alone: no cell of n02\'s four rows came back')
+  } finally {
+    Caller.prototype.call = real
+    await Promise.all(nodes.map((n) => n.destroy()))
+  }
+})
