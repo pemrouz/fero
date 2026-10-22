@@ -2190,7 +2190,7 @@ test('wave 6a — the same write relayed while px RE-ENTERS from an orphan at th
   assert.equal(S.node.writes.stranded, false)
 })
 
-//! ── wave 6b: a client leaves a feeder whose gate is shut (DECISIONS V4-NN) ──
+//! ── wave 6b: a client leaves a feeder whose gate is shut (DECISIONS V4-58) ──
 test('wave 6b — a client leaves a feeder whose gate is SHUT for a linked server whose gate is OPEN: the words come on digests and PONGs, the feeder link is closed on purpose (journal refeed), its linkDown elects the open one and reparks the in-flight attempt; with no open server known it stays; the shut feeder comes back as a spare and is moved to when the roles flip', () => {
   const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:bb', 'sim:cc'] })
   h.node.step({ kind: 'start' })
@@ -2304,7 +2304,7 @@ test('wave 6b — a relay forgets what it held for a client whose link died: a w
   assert.equal(h.node.writes.pending.size, 1, "the member's linkDown left the client's attempt in place")
 })
 
-//! ── wave 6c: the spoke edge cases the M12 oracle found (DECISIONS V4-NN) ──
+//! ── wave 6c: the spoke edge cases the M12 oracle found (DECISIONS V4-62) ──
 
 //! the shed's word (STATUS "a spoke keeps showing the rows of a partition that moved off its feeder"): a join moved px
 // off aa — the install's rescope froze aa's copy into an orphan, and once every current holder attested its frozen

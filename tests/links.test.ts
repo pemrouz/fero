@@ -1,4 +1,4 @@
-//! ── tests/links — the link sockets' own rules, on real sockets (V4-NN) ──────────────────────────────
+//! ── tests/links — the link sockets' own rules, on real sockets (V4-63) ──────────────────────────────
 // Two rules of shell/runtime.ts:
 // - Nagle's algorithm is off on every link socket: #wire calls setNoDelay(true) before any byte can leave
 //   (tests/latency.perf.ts pins what it buys: a writing method call and a forwarded update in about 1 ms, not 43);

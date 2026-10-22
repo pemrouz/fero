@@ -1,4 +1,4 @@
-//! Tier-3 real-WAL: the dir lock (wave 6b, DECISIONS V4-NN). One process at a time holds a `dir`. Before this a second
+//! Tier-3 real-WAL: the dir lock (wave 6b, DECISIONS V4-59). One process at a time holds a `dir`. Before this a second
 // process started on a dir the first still held restored it, ran as the same uuid, and both appended rows to one log
 // (the platform spikes, 2026-10-12). Now the composer takes `lock` (pid, host, boot id, process start time; one atomic
 // link) before it reads the boot record; a second open is refused at fero() time with a typed error naming the holder;
