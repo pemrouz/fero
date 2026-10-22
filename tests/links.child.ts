@@ -1,8 +1,11 @@
-//! tests/links.child — a role file for the run batch's exit case (tests/links.test.ts): `node links.child.ts <host:port>
-// [count]` dials the given address with a bare Runtime (heartbeats off, so it sends nothing of its own after its HELLO),
-// prints `up`, and waits for one line on stdin. Then, in ONE run, it ships `count` PINGs (1 by default) on its link and
-// calls process.exit(0): the last batch of PINGs is still in the socket when the process exits, and only the shell's
-// 'exit' hook can flush it.
+//! tests/links.child — a role file for the run batch's exit cases (tests/links.test.ts): `node links.child.ts <host:port>
+// [count] [run|listener]` dials the given address with a bare Runtime (heartbeats off, so it sends nothing of its own
+// after its HELLO), prints `up`, and waits for one line on stdin. Then, in ONE run:
+// - run (the default): it ships `count` PINGs (1 by default) on its link and calls process.exit(0). The last batch of
+//   PINGs is still in the socket when the process exits, and only the shell's 'exit' hook can flush it.
+// - listener: it ships nothing, registers a process 'exit' listener of its own that ships the `count` PINGs, and calls
+//   process.exit(0). That listener runs after the shell's exit hook (the shell registers it when it loads), so a cork
+//   made in it would never open: its PINGs must go out uncorked.
 // Not a test file (the battery's glob is tests/*.test.ts).
 
 import '../utils/battery.ts'
@@ -19,7 +22,9 @@ const wait = setInterval(() => {
   process.stdin.once('data', () => {
     const [link] = rt.node.links.keys()
     const ping = encodeControl(VERB.PING)
-    for (let i = 0; i < Number(process.argv[3] ?? 1); i++) rt.node.env.sink.send(link, ping)
+    const ship = () => { for (let i = 0; i < Number(process.argv[3] ?? 1); i++) rt.node.env.sink.send(link, ping) }
+    if (process.argv[4] === 'listener') process.on('exit', ship)
+    else ship()
     process.exit(0)
   })
 }, 5)

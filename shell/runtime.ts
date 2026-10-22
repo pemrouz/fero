@@ -832,15 +832,27 @@ export class Runtime {
 // takes at once when it has room, so a frame the kernel shipped reaches the OS as it did uncorked. Without the frame
 // limit, the frames that waited behind a bigger batch were still in Node's buffer when the destroy or the exit came,
 // and neither waits: 952 of 3,000 tiny frames were lost (with a limit of 1025, 1,975 of them).
+//! Once the exit hook has run, nothing corks again (`exiting`): the process ends when the 'exit' listeners return,
+// and a nextTick never runs, so a cork made then would never open. A frame shipped after the hook (by a user's own
+// 'exit' listener that runs after it, say a last write made by plain assignment) goes out uncorked, as it did before
+// the run batch. Without the flag such frames were batched again and the last batch never left: 0 of 20 rows written
+// in an 'exit' listener reached the peer (the wave 7 review), and 2,050 of 3,000 tiny frames (tests/links.test.ts).
+// The hook is registered when this module loads, not at the first cork, so every exit runs it: a frame an 'exit'
+// listener ships before the hook runs is batched and the hook flushes it, and a frame shipped after it goes out
+// uncorked.
 const BATCH_FRAMES = 1024
 const batches = new Map<net.Socket, number>()
-let corkHooked = false
+let exiting = false
+process.on('exit', () => {
+  exiting = true
+  for (const s of batches.keys()) { try { s.uncork() } catch { /* a socket already gone */ } }
+  batches.clear()
+})
 const uncork = (sock: net.Socket) => { batches.delete(sock); sock.uncork() }
 const runBatch = (sock: net.Socket, len: number) => {
   const n = batches.get(sock)
   if (n === undefined) {
-    if (len >= sock.writableHighWaterMark) return
-    if (!corkHooked) { corkHooked = true; process.on('exit', () => { for (const s of batches.keys()) { try { s.uncork() } catch { /* a socket already gone */ } } }) }
+    if (exiting || len >= sock.writableHighWaterMark) return
     batches.set(sock, 1)
     process.nextTick(uncork, sock)
     sock.cork()
