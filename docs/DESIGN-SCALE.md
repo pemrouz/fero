@@ -1944,10 +1944,13 @@ the same breath, lowers the answer's start on every lane to just under
 the LOWEST entry there of EVERY partition the word names (read off the
 per-partition index, as `#forwardWhole` lowers a cover for a re-entry),
 and the ship walks each lane from there to its end, so every entry of p
-the feeder feeds leaves behind the word. Both halves matter: lowered
-under the highest entry, or for the first named partition only, the
-answer loses a row for good (the sixth review's R6-7 and R6-3, measured
-below). The rule is one place, checked at the
+the feeder feeds leaves behind the word. Both halves matter, and EVERY
+means every, whatever state the partition is in: lowered under the
+highest entry, for the first named partition only, only for a partition
+HELD at the word (a repair latch open at the heal leaves p fed but not
+held), or stopping after the first named partition that has entries,
+the answer loses a row for good (the sixth review's R6-7 and R6-3, the
+seventh's R7-1 and R7-2, measured below). The rule is one place, checked at the
 word: whatever of p the feeder holds when the word is said, on
 whichever lane, by whichever path it came (tapped behind the word,
 appended since the clear, spliced by a fold, re-entered whole), sits
@@ -2228,8 +2231,8 @@ the wire (the drained survivors, the drain digest, the word ahead of
 the first record, the leapfrogged rows sent again). On the two mutants
 they are red at "the exchange's end, before any beat: the spoke shows
 what its feeder feeds": [px.a, px.b, px.d, qx.w, qx.z] against the same
-with px.c (both queues), and [qx.w, qx.z, rx.a, rx.b] against the same
-with rx.c. The both-back shape kills no mutant of the lowering (px's
+with px.c (at a queue of three both lists also hold qx.y7), and [qx.w,
+qx.z, rx.a, rx.b] against the same with rx.c. The both-back shape kills no mutant of the lowering (px's
 fold on the torn link lowers the cover under px's rows anyway); it pins
 the one word for two partitions and the two owed ends in fold order,
 and thirteen mutants turn it red (the word's place, the {x} half, the
@@ -2246,12 +2249,67 @@ eighteen; the five filters put back: fourteen, seventeen, twelve,
 fifteen and sixteen; the guard off and the debt taken out up front: one
 each; the {x} never consumed: fifteen; the {e} half off: fifteen; a
 non-held end kept owed: three) and the earlier rounds' sixteen (one to
-twenty each). The seeded runs never reach the owed {x}: with a counter
-in a scratch copy, the scoped sweep (sim/scoped-sweep.test.ts, A1 to
-A13 and its mutation pins: 4,934 answers) and the scale probes (10,452
-answers) owe it and pay it 0 times, against 18
-times in kernel/client.test.ts (638 answers; the start lowered on 8 of
-them). A sweep family that pauses a spoke's feeder link with a small
+twenty each). The seventh review (2026-10-22, R7-1 and R7-2) found two
+more slips of the same line that kept all 100 tests green and lost a
+row for good. One lowers only a partition HELD at the word, the
+held-for-feeds slip wave 6a once made in `#answer`'s head: a repair
+latch open on px at the heal leaves px fed but not held, the word drops
+the leapfrogged cc#2, and the repair's forward carries only its delta
+(the spoke's lane cc [4] against the feeder's [2, 4]). The other stops
+after the first named partition that has entries: with the word [px,
+rx], px's one row on bb lowers bb and the loop never reaches rx, whose
+leapfrogged row sits on cc (rx.c lost, the same lane cc). Two more
+families pin them, next to the two-partition loop (104 tests): the
+leapfrog with a repair latch opened on px before the heal, at queues of
+two and three, three beats while the repair is open (at about the
+eighth the latch times out and px becomes an assigned orphan, in flight
+by the rule), then the repair's fold and twenty beats; and px and rx
+shed in one pause with rx, the SECOND named, back first across bb and
+cc and leapfrogged, and px back second on the torn link with one row on
+bb, at queues of three and four. Each asserts what the sixth's do, plus
+the owed ends (none for px while it is acquiring; rx's, then px's, in
+fold order). On the two mutants they are red at "the exchange's end,
+before any beat: the spoke shows what its feeder feeds": [px.a, px.b,
+qx.w, qx.z] against the same with px.c, and [px.o, qx.w, qx.z, rx.a,
+rx.b] against the same with rx.c (at the larger queue both lists also
+hold qx.y7). Forty-one one-line mutants each turn tests red, on
+kernel/client.test.ts alone (104 tests): the lowering's own (the start
+not lowered, lowered on one lane only, on the wrong lane, by one entry
+too few, a beat late: twelve each; the word said after the ship:
+nineteen; under the highest entry: two; for the first named partition
+only: three; only on a lane the start names, and never by one: two;
+only for a held partition: two; stopping after the first named
+partition with entries: two), the order rule's (the {x} after the
+reply, after the end, after the ship: nineteen each; the {x} half off:
+twenty-two; the five filters put back: eighteen, twenty-one, fourteen,
+nineteen and twenty; the guard off and the debt taken out up front: one
+each; the {x} never consumed: seventeen; the {e} half off: seventeen; a
+non-held end kept owed: five) and the earlier rounds' sixteen (one to
+twenty-four each). The seventh review's nine other mutants of the line
+ran too. Five are red (the last named partition only: one; under the
+second-lowest entry: two; no compare: two; the compare reversed:
+fourteen; the lowered start dropped when the ask is capped:
+twenty-two). Four stay green and are harmless. Lowering only a
+partition the feeder feeds, lowering in place, or lowering to the
+record's pp only skips a partition the ship filters out anyway, or
+lowers further. Comparing against the answer's own start instead of
+the start as lowered so far could only matter when two named partitions
+each have a row at or under the start on one lane, and no reachable
+state gives that. The rows at or under the start are the survivors of
+the one flush that cleared the queue (after a clear nothing more is
+tapped to the link until the heal), and every flush on a client link
+holds one lane or one partition: a tap is flushed once per inbound
+frame (`#ingest`), an owner's own commit once per run (`commit`), and a
+fold's forward carries one partition. A probe confirmed it: one member
+chunk with bb#9, then cc#5 of px and cc#6 of rx, is tapped and flushed
+frame by frame, so the bb frame's clear leaves the link unsynced and
+the cc rows are never tapped to it. The seeded runs never reach the
+owed {x}: with a counter in a scratch copy, the scoped sweep
+(sim/scoped-sweep.test.ts, A1 to A13 and its mutation pins: 4,934
+answers) and the scale probes (10,452 answers) owe it and pay it 0
+times, against 22 times in kernel/client.test.ts (740 answers on its
+104 tests, the start lowered on 12 of them; 18, 638 and 8 on its 100).
+A sweep family that pauses a spoke's feeder link with a small
 queue across a shed, a re-latch of the same partition and the heal
 would let M12 judge clause 3 on random schedules (A11 already pauses
 the link); not built here.
