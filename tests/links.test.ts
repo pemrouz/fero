@@ -189,13 +189,15 @@ test('the run batch: 3,000 frames under 64 bytes made in one run leave in batche
     for (let i = 0; i < N; i++) a.write([{ type: REC.update, key: [`k${i}`], value: i }])
     const toB = [...s.written].find((x) => x.remotePort === pb)
     assert.ok(toB, 'the spy saw a\'s socket to b')
-    const handed = s.handed.get(toB) ?? 0
-    console.log(`  ${N} tiny frames in one run reached the OS in ${handed} writes`)
-    assert.ok(handed >= 3 && handed <= 100, `${N} frames reached the OS in ${handed} writes (at least 3: batches of at most 1024; at most 100: still batched)`)
     assert.deepEqual(s.refused, [], 'every write() answered true, as it did uncorked')
     assert.deepEqual(steps.filter((k) => k === 'pause'), [], 'the shell never paused the link')
     assert.deepEqual(s.wide, [], 'no batch handed the OS more than 1024 frames')
     assert.deepEqual(s.over, [], 'no batch reached the high-water mark')
+    //! counted before the run's last uncork (a tick that has not run yet): two batches of 1024, each with the frame
+    // that flushed it, so 4 here
+    const handed = s.handed.get(toB) ?? 0
+    console.log(`  ${N} tiny frames in one run reached the OS in ${handed} writes before the run's last uncork`)
+    assert.ok(handed >= 3 && handed <= 100, `${N} frames reached the OS in ${handed} writes (at least 3: batches of at most 1024; at most 100: still batched)`)
     assert.ok(await until(() => applied - applied0 >= N && a.node.stateHash === b.node.stateHash, 10_000), 'b applied every record')
   } finally {
     s.off()
