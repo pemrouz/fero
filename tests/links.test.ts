@@ -3,8 +3,9 @@
 // - Nagle's algorithm is off on every link socket: #wire calls setNoDelay(true) before any byte can leave
 //   (tests/latency.perf.ts pins what it buys: a writing method call and a forwarded update in about 1 ms, not 43);
 // - the run batch (runBatch): the small frames one run of the event loop makes on a link leave together when the run
-//   ends, a batch never reaches the socket's high-water mark, and no cork outlives its run; every socket the shell
-//   destroys, and every socket of a process that exits, is flushed first.
+//   ends, a batch never reaches the socket's high-water mark nor holds more than 1024 frames (libuv's IOV_MAX), and
+//   no cork outlives its run; every socket the shell destroys, and every socket of a process that exits, is flushed
+//   first, however many frames its batch holds.
 //! How the checks see the sockets: a PASSIVE spy on net.Socket's prototype (setNoDelay and write, the public methods
 // the shell calls; _write and _writev, the stream methods Node calls to hand bytes to the OS), installed for one test
 // and taken off after. It records and calls straight through, so nothing behaves differently. (If #wire ever turns
@@ -33,6 +34,8 @@ type Spy = {
   noDelay: WeakSet<net.Socket>
   over: string[] // a write made while corked that took the batch to the high-water mark
   handed: Map<net.Socket, number> // how many times Node handed bytes to the OS (_write or _writev), per socket
+  wide: string[] // a hand-off of more than 1024 frames in one _writev (libuv's IOV_MAX: the rest would wait a loop turn)
+  refused: string[] // a write() that answered false (the shell then pauses the link)
 }
 const SPIED = ['write', 'setNoDelay', '_write', '_writev'] as const
 //! spy — install the passive spy; `off` restores the prototype exactly as it was (own property or inherited)
@@ -40,7 +43,7 @@ const spy = (): Spy => {
   const proto = net.Socket.prototype as unknown as Record<string, (...a: unknown[]) => unknown>
   const own = SPIED.map((k) => Object.getOwnPropertyDescriptor(proto, k))
   const orig = Object.fromEntries(SPIED.map((k) => [k, proto[k]])) as Record<(typeof SPIED)[number], (...a: unknown[]) => unknown>
-  const s: Spy = { off: () => {}, written: new Set(), early: [], noDelay: new WeakSet(), over: [], handed: new Map() }
+  const s: Spy = { off: () => {}, written: new Set(), early: [], noDelay: new WeakSet(), over: [], handed: new Map(), wide: [], refused: [] }
   //! TCP only: the test runner's own stdout is a pipe, a net.Socket with no remote port
   const tcp = (x: net.Socket) => typeof x.remotePort === 'number'
   proto.setNoDelay = function (this: net.Socket, ...a: unknown[]) {
@@ -54,12 +57,18 @@ const spy = (): Spy => {
       const len = (a[0] as Uint8Array).length
       if (this.writableCorked > 0 && this.writableLength + len >= this.writableHighWaterMark)
         s.over.push(`${this.localPort} -> ${this.remotePort}: ${this.writableLength} batched + ${len} >= ${this.writableHighWaterMark}`)
+      const ok = orig.write.apply(this, a)
+      if (!ok) s.refused.push(`${this.localPort} -> ${this.remotePort}: writableLength ${this.writableLength}`)
+      return ok
     }
     return orig.write.apply(this, a)
   }
   for (const k of ['_write', '_writev'] as const)
     proto[k] = function (this: net.Socket, ...a: unknown[]) {
-      if (tcp(this)) s.handed.set(this, (s.handed.get(this) ?? 0) + 1)
+      if (tcp(this)) {
+        s.handed.set(this, (s.handed.get(this) ?? 0) + 1)
+        if (k === '_writev' && (a[0] as unknown[]).length > 1024) s.wide.push(`${this.localPort} -> ${this.remotePort}: ${(a[0] as unknown[]).length} frames`)
+      }
       return orig[k].apply(this, a)
     }
   s.off = () => SPIED.forEach((k, i) => { const d = own[i]; if (d) Object.defineProperty(proto, k, d); else delete proto[k] })
@@ -98,6 +107,7 @@ test('every link socket turns Nagle off before its first byte: member links both
     assert.ok(socks.some((x) => x.localPort === pm) && socks.some((x) => x.remotePort === pm), 'the method link wrote both ways')
     assert.deepEqual(s.early, [], 'no link socket was written to before setNoDelay(true)')
     assert.deepEqual(s.over, [], 'no batch reached the high-water mark')
+    assert.deepEqual(s.wide, [], 'no batch handed the OS more than 1024 frames')
   } finally {
     s.off()
     for (const f of live.reverse()) await f.destroy()
@@ -135,6 +145,7 @@ test('the run batch: 2,000 small frames made in one run reach the OS in a few wr
     const corkedAfter = await new Promise<number[]>((r) => process.nextTick(() => r([...s.written].filter((x) => !x.destroyed).map((x) => x.writableCorked))))
     assert.deepEqual(corkedAfter.filter((c) => c !== 0), [], 'no socket is still corked once the run that corked it ends')
     assert.deepEqual(s.over, [], 'no batch reached the high-water mark, and the big frame was never batched')
+    assert.deepEqual(s.wide, [], 'no batch handed the OS more than 1024 frames')
     const handed = (s.handed.get(toB) ?? 0) - handed0
     console.log(`  ${N + big} frames in one run reached the OS in ${handed} writes`)
     assert.ok(handed > 0 && handed <= 200, `${N + big} frames reached the OS in ${handed} writes (at most 200; one write per frame is ${N + big})`)
@@ -143,6 +154,52 @@ test('the run batch: 2,000 small frames made in one run reach the OS in a few wr
     s.off()
     await a.destroy()
     await b.destroy()
+  }
+})
+
+//! two bare Runtimes linked a -> b, heartbeats off (so nothing is sent but what the test makes); a's redial is slow, so
+// a link the test drops stays down while the test reads b (b listens first, so a's first dial lands)
+const pair = async (onApply: () => void = () => {}) => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 0, redialMs: 2_000 })
+  const b = new Runtime({ uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [], heartbeatMs: 0, redialMs: 2_000 }, onApply)
+  await b.start()
+  await a.start()
+  assert.ok(await until(() => a.node.admitted().length === 1 && b.node.admitted().length === 1), 'a and b linked')
+  await new Promise((r) => setTimeout(r, 50)) // the link's opening exchange is over
+  //! the steps a's shell makes on its own (a 'pause' is the one this file watches)
+  const steps: string[] = []
+  const step = a.node.step.bind(a.node)
+  a.node.step = (e) => { steps.push(e.kind); step(e) }
+  return { a, b, pb, steps, stop: async () => { await a.destroy(); await b.destroy() } }
+}
+
+//! frames under 64 bytes reach the 64 KiB mark only past 1024 frames, and libuv hands the OS at most 1024 buffers
+// (IOV_MAX) in the first try at a writev. Before the frame limit, one batch here held about 1,900 frames, the rest of
+// its writev waited a loop turn, and the next write() answered false: the kernel paused the link, cleared its paused
+// queue and healed the rest by anti-entropy (the wave 7 review: write 1909 of 3,000 answered false). Uncorked, every
+// one of these writes answered true.
+test('the run batch: 3,000 frames under 64 bytes made in one run leave in batches of at most 1024 frames, every write() answers true, and the link is never paused', async () => {
+  let applied = 0
+  const { a, b, pb, steps, stop } = await pair(() => { applied++ })
+  const s = spy()
+  try {
+    const N = 3000
+    const applied0 = applied
+    for (let i = 0; i < N; i++) a.write([{ type: REC.update, key: [`k${i}`], value: i }])
+    const toB = [...s.written].find((x) => x.remotePort === pb)
+    assert.ok(toB, 'the spy saw a\'s socket to b')
+    const handed = s.handed.get(toB) ?? 0
+    console.log(`  ${N} tiny frames in one run reached the OS in ${handed} writes`)
+    assert.ok(handed >= 3 && handed <= 100, `${N} frames reached the OS in ${handed} writes (at least 3: batches of at most 1024; at most 100: still batched)`)
+    assert.deepEqual(s.refused, [], 'every write() answered true, as it did uncorked')
+    assert.deepEqual(steps.filter((k) => k === 'pause'), [], 'the shell never paused the link')
+    assert.deepEqual(s.wide, [], 'no batch handed the OS more than 1024 frames')
+    assert.deepEqual(s.over, [], 'no batch reached the high-water mark')
+    assert.ok(await until(() => applied - applied0 >= N && a.node.stateHash === b.node.stateHash, 10_000), 'b applied every record')
+  } finally {
+    s.off()
+    await stop()
   }
 })
 
@@ -157,7 +214,12 @@ const rawPeer = async () => {
   return { addr: `127.0.0.1:${port}`, verbs, closed: () => closed, stop: () => new Promise<void>((r) => server.close(() => r())) }
 }
 
-test('a frame shipped in the same run as its socket is closed, or as the runtime is destroyed, still reaches the peer (the batch is flushed first)', async () => {
+//! 3,000 PINGs of 12 bytes: more than 2048 frames in the run. Before the frame limit, the flush was one writev of
+// every batched frame; libuv took 2 x 1024 of them and left the rest for a loop turn the destroy never gave it, so
+// 952 PINGs were lost. With batches of at most 1024 frames, the flush leaves in one try.
+const PINGS = 3000
+
+test('every frame shipped in the same run as its socket is closed, or as the runtime is destroyed, still reaches the peer (the batch is flushed first, 3,000 tiny frames)', async () => {
   for (const how of ['close', 'destroy'] as const) {
     const peer = await rawPeer()
     const rt = new Runtime({ uuid: 'aa', hosts: [peer.addr], heartbeatMs: 0, redialMs: 50 })
@@ -165,12 +227,16 @@ test('a frame shipped in the same run as its socket is closed, or as the runtime
       await rt.start()
       assert.ok(await until(() => peer.verbs().includes(VERB.HELLO)), `${how}: the HELLO arrived`)
       const [link] = rt.node.links.keys()
-      //! one run: the frame is batched, then the socket goes
-      rt.node.env.sink.send(link, encodeControl(VERB.PING))
+      //! one run: the frames are batched, then the socket goes
+      const ping = encodeControl(VERB.PING)
+      for (let i = 0; i < PINGS; i++) rt.node.env.sink.send(link, ping)
       if (how === 'close') rt.node.env.sink.close(link)
       else void rt.destroy()
       assert.ok(await until(() => peer.closed()), `${how}: the peer saw the socket close`)
-      assert.deepEqual(peer.verbs(), [VERB.HELLO, VERB.PING], `${how}: the PING shipped before the ${how} reached the peer`)
+      const verbs = peer.verbs()
+      assert.equal(verbs[0], VERB.HELLO, `${how}: the HELLO came first`)
+      assert.equal(verbs.filter((v) => v === VERB.PING).length, PINGS, `${how}: every PING shipped before the ${how} reached the peer`)
+      assert.equal(verbs.length, PINGS + 1, `${how}: nothing else arrived`)
     } finally {
       await rt.destroy()
       await peer.stop()
@@ -178,15 +244,18 @@ test('a frame shipped in the same run as its socket is closed, or as the runtime
   }
 })
 
-test('a frame shipped in the same run as process.exit() still reaches the peer (the shell\'s exit hook flushes every batch)', async () => {
+test('every frame shipped in the same run as process.exit() still reaches the peer (the shell\'s exit hook flushes every batch, 3,000 tiny frames)', async () => {
   const peer = await rawPeer()
-  const child = fero.spawn(path.join(import.meta.dirname, 'links.child.ts'), [peer.addr], { stdin: 'pipe' })
+  const child = fero.spawn(path.join(import.meta.dirname, 'links.child.ts'), [peer.addr, String(PINGS)], { stdin: 'pipe' })
   try {
     assert.ok(await until(() => child.out.includes('up') && peer.verbs().includes(VERB.HELLO), 10_000), 'the child linked and sent its HELLO')
     child.write('go')
     assert.equal(await child.exited, 0, 'the child exited 0')
     assert.ok(await until(() => peer.closed()), 'the peer saw the socket close')
-    assert.deepEqual(peer.verbs(), [VERB.HELLO, VERB.PING], 'the PING shipped in the exiting run reached the peer')
+    const verbs = peer.verbs()
+    assert.equal(verbs[0], VERB.HELLO, 'the HELLO came first')
+    assert.equal(verbs.filter((v) => v === VERB.PING).length, PINGS, 'every PING shipped in the exiting run reached the peer')
+    assert.equal(verbs.length, PINGS + 1, 'nothing else arrived')
   } finally {
     if (child.child.exitCode === null) child.child.kill('SIGKILL')
     await peer.stop()
