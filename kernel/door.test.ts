@@ -240,6 +240,22 @@ test('a HELLO whose listen is over LISTEN_MAX (253 + \':\' + 5 digits = 259 UTF-
     assert.deepEqual(rows(JK.redial), l === '' ? [] : [[10, l, null]], `${utf8Len(l)} bytes: redialed at its listen`)
     assert.equal(effects.filter((e) => e[0] === 'timer' && e[2] === TAG.redial).length, l === '' ? 0 : 1)
   }
+  //! every HELLO, not only the first: an OPEN node re-runs the admit tail on a second HELLO of an admitted link, and the
+  // tail sets link.listen = v.l (node.ts #admit). A check made only while the link is in LS.hello would take the long
+  // listen onto the link, and its drop would redial it (the third review's probe, mutant MZ3)
+  {
+    const long = 'h'.repeat(254) + ':65535'
+    const { node, closes, rows, up } = harness('aa')
+    up(1)
+    helloWith(1, node, {})
+    assert.deepEqual(node.admitted(), ['bb'], 'the first HELLO admits')
+    helloWith(1, node, { l: long })
+    assert.deepEqual(closes(), [[1, 'malformed-hello']], 'the second HELLO is malformed too')
+    assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: listen over 259 bytes', null]])
+    assert.equal(node.links.get(1)?.listen, 'sim:bb', 'the long listen is never taken onto the link')
+    node.step({ kind: 'linkDown', link: 1, reason: 'malformed-hello' })
+    assert.deepEqual(rows(JK.redial), [[10, 'sim:bb', null]], 'the drop redials the listen the first HELLO carried, never the long one')
+  }
 })
 
 test('a HELLO whose name is over NAME_MAX (255 UTF-8 bytes) is malformed before the name compare: no nameReject row carries it; 255 bytes are compared as ever', () => {
@@ -264,6 +280,18 @@ test('a HELLO whose name is over NAME_MAX (255 UTF-8 bytes) is malformed before 
     other.up(1)
     helloWith(1, other.node, { n })
     assert.deepEqual(other.closes(), [[1, 'name-mismatch']], `${utf8Len(n)} bytes, another name`)
+  }
+  //! every HELLO, not only the first (the listen test says why): a second HELLO on an admitted link with a long name is
+  // malformed before the compare, so no nameReject row carries it (the third review's probe, mutant MZ5)
+  {
+    const { node, closes, rows, up } = harness('aa', { name: 'shop' })
+    up(1)
+    helloWith(1, node, { n: 'shop' })
+    assert.deepEqual(node.admitted(), ['bb'], 'the first HELLO admits')
+    helloWith(1, node, { n: 's'.repeat(NAME_MAX + 1) })
+    assert.deepEqual(closes(), [[1, 'malformed-hello']], 'the second HELLO is malformed too')
+    assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: name over 255 bytes', null]])
+    assert.deepEqual(rows(JK.nameReject), [], 'the long name is never journaled')
   }
   //! overBytes is utf8Len's verdict, with or without the scan
   for (const [t, max] of [['', 0], ['a', 0], ['abc', 3], ['abcd', 3], ['é', 1], ['é', 2], ['€€', 5], ['€€', 6], ['😀', 3], ['😀', 4], ['\ud800', 2], ['x'.repeat(300), 299]] as const)
