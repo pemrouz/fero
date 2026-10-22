@@ -812,11 +812,17 @@ export class Runtime {
 // reaches the peer after 300 ms, where with Nagle on its first small frame left at once (the wave 7 review). Such a
 // run also holds every read, timer and reply of the process, so its frames wait with everything else.
 // Corking around one kernel step instead was measured and does not help: in that burst every step makes one frame.
-//! Three rules keep write()'s answers what they were uncorked, so the kernel pauses a link exactly when it did:
+//! Three rules keep write()'s answers what they were uncorked whenever the OS has room for a batch, so the kernel
+// pauses a link when it did:
 // - a batch never reaches the socket's high-water mark: a frame that would take it there flushes the batch first
 //   and goes out on its own;
 // - a batch never holds more than BATCH_FRAMES (1024) frames: the next one flushes it and goes out on its own;
 // - a frame at or over the mark is never corked.
+// On a congested link (the OS takes only part of a batch), Node counts the whole batch in writableLength until its
+// writev is done, where uncorked it counted only the frame the OS was part way through. So write() answers false, and
+// the kernel pauses the link, up to one batch (under 64 KiB) earlier than uncorked (the wave 7 review: 60-byte frames
+// to a peer that never reads, the first false answer after 2.71 MB, against 2.74 to 2.76 MB). By then the link is
+// full, so the pause is due anyway.
 // Why the frame limit: libuv hands the OS at most IOV_MAX = 1024 buffers in its first try at a writev (Linux and
 // macOS). A batch of at most 1024 frames leaves in that one try whenever the OS has room for its bytes, as the same
 // frames did one by one, and Node counts them out of writableLength at once. A bigger batch's writev finished only on
