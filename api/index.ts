@@ -755,7 +755,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let gather: Gather | null = null
   const gatherOf = (): Gather =>
     (gather ??= new Gather(rt, (uuid, t, p) => memberCaller!.call(SYSTEM + 'rows', p, { timeout: t, to: uuid }) as Promise<Rows>, fault,
-      (r) => { if (gather !== null) host?.endLive(gather.proxy, r) }))
+      (r) => { if (gather !== null) host?.endLive(gather.proxy, r) }, (k) => gathers(k)))
 
   //! ── the scoped data facade (M6, DESIGN-M6 C6): §9's promise — an expression means the same at
   // R=2 and R=∞, TYPED ERRORS, never a silent partial. Operators would fold the held SHARD as if it
@@ -770,6 +770,21 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const scopedThrow = (op: string, reason: 'holistic' | 'shortfall', hint: string, partition?: string): never => {
     throw { scoped: true, op, reason, replicas: node.replicas, ...(partition !== undefined ? { partition } : {}), hint } satisfies import('./types.ts').ScopedError
   }
+  //! ownerOf — k's owner on the ring of the committed epoch. The ring must be BUILT for that epoch before ownerOf
+  // answers (the fix-round pin caught a stale ring answering self-owns-everything here — the hop never left the node
+  // and the non-held read fell through to a silent local undefined, §9's banned answer)
+  const ownerOf = (k: string): string => {
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    return ring.ownerOf(k)
+  }
+  //! gathers — keyedRead's test for its gather branch, kept beside it: this node owns k and does not hold it. The
+  // gather's keyed side drops the state of a row that fails it (fold.ts #sweep, V4-NN).
+  const gathers = (k: string): boolean => {
+    if (!scoped || !node.armed || node.scope!.held(k)) return false
+    const owner = ownerOf(k)
+    return !owner || owner === node.uuid
+  }
   //! keyedRead — the ONE keyed-read routing every internal path shares (the remote-key handle, the
   // built-in read's non-held leg, the SYSTEM-plane hop). M6-review finding 5: the hop dispatches
   // SYSTEM + 'read', never the user-claimable 'read' name — a user-supplied `read` method can no
@@ -781,12 +796,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // guard site covers the local first-hop and the remote answer alike.
   const keyedRead = async (k: string): Promise<unknown> => {
     if (scoped && node.armed && !node.scope!.held(k)) {
-      //! the ring must be BUILT for the committed epoch before ownerOf answers (the fix-round pin
-      // caught a stale ring answering self-owns-everything here — the hop never left the node and
-      // the non-held read fell through to a silent local undefined, §9's banned answer)
-      const ring = node.writes.ring
-      if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
-      const owner = ring.ownerOf(k)
+      const owner = ownerOf(k)
       if (owner && owner !== node.uuid)
         return memberCaller!.call(SYSTEM + 'read', k, { timeout: 8000, to: owner })
       //! THIS node is the owner but does not hold k — the handover windows (finding 15 and its
@@ -797,8 +807,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // THE GATHER — parked claims include every unshed orphan's, absence is attested by the full
       // holder set, and an unreachable member is a typed error, never a silent partial. A truly
       // absent key answers fast (one fan-out round-trip); a local-shard undefined never leaks.
-      //! One row's gather (V4-NN): every member is asked for k's partition only, folded beside the live union
-      // (fold.ts keyed), so a member whose whole share passes one frame no longer refuses the read.
+      //! One row's gather (V4-NN): every member is asked for k's partition only, folded beside the live union onto
+      // the row's own keyed state (fold.ts keyed), so a member whose whole share passes one frame no longer refuses
+      // the read, and parking holds across keyed reads.
       return await gatherOf().keyed(k)
     }
     return bind.data.get(k)
