@@ -61,7 +61,11 @@ export interface Rows { c: Claims; att: string[] | null }
 // held ∪ orphan scope, plus the attestation set for the coverage sweep. Tombstones ride from the
 // versions map (a removed cell's stamp without a live value); acquiring partitions contribute
 // nothing (their base is not yet this node's to attest) and are NOT attested.
-export const rowsPartial = (rt: Runtime): Rows => {
+//! `p` — one partition only (V4-NN: a keyed read during a handover, Gather.keyed): the same answer cut to that row's
+// cells, its attestation cut to `p`. One string test per cell and no parse: a cell is JSON.stringify(key), so a cell
+// of `p` starts with `["p"` and goes on with `]` or `,` (inside, below). Still one walk of every version this node
+// holds — a cold path (a handover), and the walk is what makes the cut answer exactly the whole answer's part.
+export const rowsPartial = (rt: Runtime, p?: string): Rows => {
   const node = rt.node
   const out: Claims = {}
   const scope = node.scope
@@ -74,7 +78,9 @@ export const rowsPartial = (rt: Runtime): Rows => {
     const p = (JSON.parse(cell) as string[])[0] ?? ''
     return att.has(p)
   }
+  const pre = p === undefined ? null : prefixOf(p)
   for (const [cell, st] of node.versions) {
+    if (pre !== null && !inside(cell, pre)) continue
     if (!mine(cell)) continue
     const v = node.state.get(cell)
     //! EXPLICIT-undefined cells ship as tombstone-equivalent: the wire codec drops undefined values
@@ -84,7 +90,24 @@ export const rowsPartial = (rt: Runtime): Rows => {
     if (node.state.has(cell) && v !== undefined) out[cell] = { v, st: [st.epoch, st.seq, st.origin] }
     else out[cell] = { st: [st.epoch, st.seq, st.origin], t: 1 }
   }
-  return { c: out, att: att === null ? null : [...att] }
+  return { c: out, att: att === null ? null : p === undefined ? [...att] : att.has(p) ? [p] : [] }
+}
+
+//! prefixOf / inside — is this cell one of partition p's? `pre` is `["p"` (the key's first part, quoted as JSON
+// quotes it), and the next character closes the key (`]`, the row) or goes on to a field (`,`)
+const prefixOf = (p: string): string => JSON.stringify([p]).slice(0, -1)
+const inside = (cell: string, pre: string): boolean => {
+  if (!cell.startsWith(pre)) return false
+  const c = cell.charCodeAt(pre.length)
+  return c === 93 || c === 44 // ']' or ','
+}
+//! only — a member's answer cut to partition p: a member of an older version, which does not read the argument,
+// sends its whole share (it fit one frame, or it would have refused); the fold must still see the row alone
+const only = (rows: Rows, p: string): Rows => {
+  const pre = prefixOf(p)
+  const c: Claims = {}
+  for (const cell of Object.keys(rows.c)) if (inside(cell, pre)) c[cell] = rows.c[cell]
+  return { c, att: rows.att === null ? null : rows.att.includes(p) ? [p] : [] }
 }
 
 //! newer — the kernel's LWW total order (epoch, seq, origin), verbatim.
@@ -95,7 +118,8 @@ const newer = (a: [number, number, string], b: [number, number, string]): boolea
 // the composer — v2's M3 leak); one-shot and live consumption share the registry and the refresh.
 export class Gather {
   #rt: Runtime
-  #call: (uuid: string, timeoutMs: number) => Promise<Rows>
+  //! the member call: `rows` on that member — its whole share, or with `p` the share of one partition (keyed)
+  #call: (uuid: string, timeoutMs: number, p?: string) => Promise<Rows>
   //! cell → member uuid → claim (the registry: claims survive across refreshes — parking's substrate)
   #registry = new Map<string, Map<string, Claim>>()
   proxy: any = proxy({})
@@ -111,7 +135,7 @@ export class Gather {
   // at once (api/index.ts read); onRefused ends the live reads already open (Host.endLive): never a silent partial.
   refused: ScopedError | null = null
   #onRefused: ((r: ScopedError) => void) | undefined
-  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>, fault?: Fault, onRefused?: (r: ScopedError) => void) {
+  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number, p?: string) => Promise<Rows>, fault?: Fault, onRefused?: (r: ScopedError) => void) {
     this.#rt = rt
     this.#call = call
     this.#fault = fault
@@ -123,22 +147,64 @@ export class Gather {
   // registry's wholesale-replace or returning a mid-projection snapshot (the flake the Tier-3 suite
   // caught: `await data` racing a shed re-gather answered with a partial union).
   #chain: Promise<unknown> = Promise.resolve()
-  //! `key` — one row of the union, for keyedRead's handover branch (api/index.ts): its answer is that row's copy, never
-  // the whole union's, so a one-key read is not refused because the union would not fit one frame. It still gathers
-  // every member's WHOLE share, so a member whose share passes one frame refuses it until the handover ends (STATUS).
   //! `want: false` — the caller drops the answer (a live tick, a heal, a view install): it is not built. Copying the
-  // whole union for nobody cost a live tick about 5x past the charge (the V4-51/52 review).
-  refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string; want?: boolean }): Promise<unknown> {
+  // whole union for nobody cost a live tick about 5x past the charge (the V4-51/52 review). One row is `keyed`, below.
+  refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; want?: boolean }): Promise<unknown> {
     const next = this.#chain.then(() => this.#refresh(rt, opts), () => this.#refresh(rt, opts))
     this.#chain = next.catch(() => {}) // the chain never rejects; each caller sees its own outcome
     return next
+  }
+
+  //! keyed — ONE row, for keyedRead's handover branch (api/index.ts: this node owns the row but is still taking it
+  // over), in a fold of its own beside the live union (V4-NN). Every member is asked for that row's partition only
+  // (`rows` with the partition, rowsPartial), so a member whose whole share passes one frame still answers; before,
+  // the read gathered every member's whole share and such a member refused it 'too-large' until the handover ended.
+  // The fold starts from a COPY of what the live union holds for this row — its claims, so a claim parked there across
+  // generations still parks here (the Q3a rule), and its last value — and folds this generation's answers onto the
+  // copy with the union's own code (#fold): the same answer the next live generation would give for the row, had
+  // every share fit. The live union is never written: a one-partition answer replacing a member's claims wholesale
+  // there would drop its claims for every other row. Not on the refresh chain, for the same reason: it touches only
+  // its own copy, taken in one synchronous run after the last answer.
+  //! This node's own answer is taken LAST, after every other answer is in. Within one view, a previous holder of the
+  // row (an orphan) claims it until its shed, and it sheds only once every holder of the row attests it — this node
+  // among them, as its owner — so an orphan's answer can lack the row only if this node already held it when that
+  // answer left, and this node's own answer, taken after, has it (unless a second handover moved the row again inside
+  // the read). The whole read takes its own answer first; parking across its generations covers that window.
+  async keyed(key: string, timeoutMs = 8000): Promise<unknown> {
+    const node = this.#rt.node
+    const members = node.membership.view.members.map((m) => m[0])
+    const answered = new Map<string, Rows>()
+    const missing: string[] = [], tooBig: string[] = []
+    await Promise.all(members.filter((u) => u !== node.uuid).map(async (u) => {
+      try { answered.set(u, only(await this.#call(u, timeoutMs, key), key)) }
+      catch (e) { (isTooLarge(e) ? tooBig : missing).push(u) }
+    }))
+    answered.set(node.uuid, rowsPartial(this.#rt, key))
+    //! a member whose claims for THIS row pass one frame: the row itself cannot travel, and retrying cannot help
+    if (tooBig.length)
+      throw {
+        scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, partition: key, missing: tooBig,
+        hint: `what ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds' : 'hold'} for this row is bigger than one frame (${sizeOf(node.tune.frame)}), so fero cannot send it: read a smaller part of the row with a method that returns it`,
+      } satisfies ScopedError
+    if (missing.length)
+      throw {
+        scoped: true, op: 'gather', reason: 'unreachable', replicas: node.replicas, partition: key, missing,
+        hint: 'this key is changing owner and some members are unreachable — the read would be a silent partial; retry when the view heals',
+      } satisfies ScopedError
+    const reg = new Map<string, Map<string, Claim>>()
+    const pre = prefixOf(key)
+    for (const [cell, per] of this.#registry) if (inside(cell, pre)) reg.set(cell, new Map(per))
+    const last = pick(this.proxy, key)
+    const px = proxy(last === undefined ? {} : { [key]: last })
+    this.#fold(reg, px, answered, members)
+    return answer(pick(px, key), node, true)
   }
 
   //! #refresh — one generation: fan out to every view member (self in-process), replace each
   // answerer's claim set wholesale, then fold. An unreachable member fails the ONE-SHOT caller typed
   // (never a silent partial — plan §5/§9); the LIVE path keeps the last-good claims (parking) and
   // retries on its cadence, which is the availability-honest reading of the same rule.
-  async #refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string; want?: boolean }): Promise<unknown> {
+  async #refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; want?: boolean }): Promise<unknown> {
     const node = this.#rt.node
     const gen = ++this.#gen
     const members = node.membership.view.members.map((m) => m[0])
@@ -158,10 +224,9 @@ export class Gather {
         scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, missing: tooBig,
         hint: `${rows}, so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`,
       }
-      //! the stored refusal is the whole read's, whoever asked: the next live read hears it (api/index.ts), and was
-      // told a key is changing owner when a keyed read had asked last (the last check). A keyed caller hears its own.
+      //! the stored refusal is the whole read's: the next live read hears it (api/index.ts)
       this.refused = r
-      if (opts.throwOnPartial) throw opts.key === undefined ? r : { ...r, hint: `${rows}, and this key is changing owner: retry in a moment` }
+      if (opts.throwOnPartial) throw r
       this.#onRefused?.(r)
     } else this.refused = null
     if (missing.length && opts.throwOnPartial)
@@ -171,20 +236,34 @@ export class Gather {
       } satisfies ScopedError
     //! superseded mid-flight by a newer refresh — answer a COPY, never the live union root
     // (M6-review finding 8: the one-shot paths hand this value to user code)
-    if (gen !== this.#gen) return opts.want === false ? undefined : answer(this.#pick(opts.key), node, opts.key !== undefined)
+    if (gen !== this.#gen) return opts.want === false ? undefined : answer(snapshot(this.proxy), node)
+    this.#fold(this.#registry, this.proxy, answered, members)
+    //! the one-shot answer is a COPY (M6-review finding 8): snapshot() is the proxy's live internal
+    // root — `await data` and local methods.read() hand this value straight to user code, and a
+    // mutation there must never write through into the union every live subscriber shares. The wire
+    // path copies into frame bytes anyway; local must match (V4-52: the very value a client's read
+    // decodes — see answer). (The live SUB path hands out `proxy` itself — a read-only projection by
+    // contract — and stays as-is.)
+    return opts.want === false ? undefined : answer(snapshot(this.proxy), this.#rt.node)
+  }
+
+  //! #fold — one generation's answers folded into a union: the registry `reg` (cell → member → claim) and its
+  // projection `px`. The live union passes its own (#refresh); a keyed read passes a copy of one row's (keyed).
+  #fold(reg: Map<string, Map<string, Claim>>, px: any, answered: Map<string, Rows>, members: string[]) {
+    const node = this.#rt.node
     //! per-generation attestations: uuid → the partitions that member attests (null = ALL). Built
     // from the answers of THIS generation only — attestation never survives a refresh (findings 0/28/53)
     const att = new Map<string, Set<string> | null>()
     for (const [uuid, rows] of answered) att.set(uuid, rows.att === null ? null : new Set(rows.att))
     //! merge: replace each answerer's claims wholesale, keep everyone else's (parking substrate)
-    const touched = new Set<string>([...this.#registry.keys()])
+    const touched = new Set<string>([...reg.keys()])
     for (const [uuid, rows] of answered) {
       const claims = rows.c
       for (const cell of Object.keys(claims)) touched.add(cell)
-      for (const [cell, per] of this.#registry) { per.delete(uuid); if (!per.size) void cell } // wholesale replace below
+      for (const [cell, per] of reg) { per.delete(uuid); if (!per.size) void cell } // wholesale replace below
       for (const [cell, claim] of Object.entries(claims)) {
-        let per = this.#registry.get(cell)
-        if (!per) { per = new Map(); this.#registry.set(cell, per) }
+        let per = reg.get(cell)
+        if (!per) { per = new Map(); reg.set(cell, per) }
         per.set(uuid, claim)
       }
     }
@@ -194,7 +273,7 @@ export class Gather {
     // registry entry per dead uuid for the node's lifetime. Members merely MISSING this generation
     // keep their claims — that is lawful parking, not departure.
     const alive = new Set(members)
-    for (const [, per] of this.#registry)
+    for (const [, per] of reg)
       for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid)
     //! fold the touched cells — the winner per cell by the kernel's stamp order — then ACROSS DEPTH
     // (V4-18, overlapping cells): a field cell whose winning stamp is at or below an ancestor's winning
@@ -211,7 +290,7 @@ export class Gather {
     if (node.epoch > 0 && ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     const wins = new Map<string, Claim | null>()
     for (const cell of touched) {
-      const per = this.#registry.get(cell)
+      const per = reg.get(cell)
       let win: Claim | null = null
       if (per) for (const c of per.values()) if (win === null || newer(c.st, win.st)) win = c
       wins.set(cell, win)
@@ -235,7 +314,7 @@ export class Gather {
           return a !== undefined && (a === null || a.has(p)) // undefined = did not answer this generation
         })
         if (covered) {
-          this.#registry.delete(cell)
+          reg.delete(cell)
           dropped.push(key)
         }
         continue
@@ -266,17 +345,17 @@ export class Gather {
     // went stale as collateral). A cell that cannot materialize is skipped — its top-level key
     // still shows through whatever of its siblings/parent projected (the kernel's own flat fold
     // holds both cells; nesting-under-null is the documented §5 materialization ambiguity).
-    let root = snapshot(this.proxy) as Record<string, unknown>
+    let root = snapshot(px) as Record<string, unknown>
     const emptied: string[][] = [] // the deep cells deleted this generation — their parent levels may be made-up ones
     for (const key of dropped)
-      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true, this.#fault); if (key.length > 1) emptied.push(key) } catch { /* absent subtree */ } }
+      if (key.length === 1 || present(root, key)) { try { applyCell(px, key, undefined, true, this.#fault); if (key.length > 1) emptied.push(key) } catch { /* absent subtree */ } }
     stamped.sort((a, b) => a.key.length - b.key.length)
     let depth = 1
     for (const s of stamped) {
-      if (!s.t) { try { applyCell(this.proxy, s.key, s.v, false, this.#fault) } catch { /* blocked intermediate */ } continue }
+      if (!s.t) { try { applyCell(px, s.key, s.v, false, this.#fault) } catch { /* blocked intermediate */ } continue }
       //! a deep tombstone looks at the object as the shallower cells left it (one fresh read per depth)
-      if (s.key.length > depth) { root = snapshot(this.proxy) as Record<string, unknown>; depth = s.key.length }
-      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true, this.#fault); if (s.key.length > 1) emptied.push(s.key) } catch { /* absent subtree */ } }
+      if (s.key.length > depth) { root = snapshot(px) as Record<string, unknown>; depth = s.key.length }
+      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(px, s.key, undefined, true, this.#fault); if (s.key.length > 1) emptied.push(s.key) } catch { /* absent subtree */ } }
     }
     //! UN-VIVIFY (V4-18, the kernel's #unvivify for the gather): the projection makes `{}` up for the
     // levels a field lands in (applyStreamRec's orphan-cell vivify), so after a field's tombstone (or
@@ -288,30 +367,17 @@ export class Gather {
     // with anything in it stays (the fields keep it, on every node); an empty object held by the
     // nearest projected ancestor's own value was never made up; any other empty object was — it goes,
     // and the level above is asked the same question.
-    for (const key of emptied) this.#unvivify(key, shown, wins)
-    //! the one-shot answer is a COPY (M6-review finding 8): snapshot() is the proxy's live internal
-    // root — `await data` and local methods.read() hand this value straight to user code, and a
-    // mutation there must never write through into the union every live subscriber shares. The wire
-    // path copies into frame bytes anyway; local must match (V4-52: the very value a client's read
-    // decodes — see answer). (The live SUB path hands out `proxy` itself — a read-only projection by
-    // contract — and stays as-is.)
-    return opts.want === false ? undefined : answer(this.#pick(opts.key), this.#rt.node, opts.key !== undefined)
-  }
-  //! #pick — the union's value, or one row of it: its OWN row only (an absent 'constructor' row is absent, never
-  // Object.prototype's function)
-  #pick(key: string | undefined): unknown {
-    const all = snapshot(this.proxy) as Record<string, unknown>
-    return key === undefined ? all : Object.hasOwn(all, key) ? all[key] : undefined
+    for (const key of emptied) this.#unvivify(key, shown, wins, reg, px)
   }
 
   //! #unvivify — take back the levels a deleted field cell alone had made up (see the projection above).
-  #unvivify(key: string[], shown: Map<string, unknown>, wins: Map<string, Claim | null>) {
+  #unvivify(key: string[], shown: Map<string, unknown>, wins: Map<string, Claim | null>, reg: Map<string, Map<string, Claim>>, px: any) {
     for (let j = key.length - 1; j >= 1; j--) {
       const level = key.slice(0, j)
       const lk = JSON.stringify(level)
       if (shown.has(lk)) return // its own stamped value projected whole, `{}` included
-      if (wins.get(lk) === null && this.#registry.has(lk)) return // parked: the last value stands
-      let cur: unknown = snapshot(this.proxy)
+      if (wins.get(lk) === null && reg.has(lk)) return // parked: the last value stands
+      let cur: unknown = snapshot(px)
       for (const k of level) cur = cur !== null && typeof cur === 'object' ? (cur as Record<string, unknown>)[k] : undefined
       if (cur === null || typeof cur !== 'object' || Array.isArray(cur) || Object.keys(cur as object).length > 0) return
       //! an empty object nobody claims: the nearest projected ancestor's own value says whether it was made up
@@ -325,11 +391,11 @@ export class Gather {
           break
         }
         const aw = wins.get(ak)
-        if (aw === null && this.#registry.has(ak)) { held = true; break } // a parked ancestor: its last value stands
+        if (aw === null && reg.has(ak)) { held = true; break } // a parked ancestor: its last value stands
         if (aw != null && aw.t === 1) break // a row remove at this level: whatever is under it was re-made by a field
       }
       if (held) return
-      try { applyCell(this.proxy, level, undefined, true, this.#fault) } catch { return }
+      try { applyCell(px, level, undefined, true, this.#fault) } catch { return }
     }
   }
 
@@ -355,6 +421,12 @@ const answer = (v: unknown, node: Runtime['node'], keyed = false): unknown => {
     if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, keyed ? 'the answer' : 'the whole resource', keyed)
     throw new Error(`the result could not be sent: ${(e as Error).message}`)
   }
+}
+
+//! pick — one row of a union: its OWN row only (an absent 'constructor' row is absent, never Object.prototype's function)
+const pick = (px: any, key: string): unknown => {
+  const all = snapshot(px) as Record<string, unknown>
+  return Object.hasOwn(all, key) ? all[key] : undefined
 }
 
 //! applyCell — project one folded cell into the result proxy through the ONE substrate seam.
