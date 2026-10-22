@@ -480,6 +480,17 @@ test('a paused link shows what its parked frames weigh beside their count: the l
   dragTo(el, tPause)
   g(`expanded.add('g/nodes/n01'); expanded.add('g/nodes/n01/g/links'); render(); navTo('${lk}')`)
   assert.match(el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'unknown at t, never a guess')
+  //! a capture from before the field: its rows carry no queuedBytes, so the replay may not claim one either, even where
+  // its fold would say 0 (a link not yet paused): unknown at t, as the end table shows it
+  const older = JSON.parse(JSON.stringify(cap)) as typeof cap
+  for (const n of older.nodes) for (const l of n.links) delete (l as { queuedBytes?: number }).queuedBytes
+  const o = await bootViewer('parked-older', older, { search: '' })
+  o.g(`navTo('${lk}')`)
+  assert.match(o.el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'the end table: absent is unknown')
+  dragTo(o.el, tPause - 1)
+  o.g(`expanded.add('g/nodes/n01'); expanded.add('g/nodes/n01/g/links'); render(); navTo('${lk}')`)
+  assert.match(o.el('tree').innerHTML, /data-tip="links@t"/, 'the topology replays')
+  assert.match(o.el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'before the pause the fold would say 0, and the page still says unknown')
 })
 
 test('an even split has no modal side: every node is pilled and the header says split — the first-listed node is not "converged" by accident (ISSUES I-7)', async () => {
