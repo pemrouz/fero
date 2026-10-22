@@ -361,3 +361,24 @@ replay chain-rebuild advances from (a stale seed is honest-low; the panel's comp
 the truing would overclaim — only the epoch-0-born arming may true); per-record receiver-side
 "first-ever" detection (locally impossible — the exact reason the sender stamps pp); attesting
 tails on the wire instead of floors (a tail proves nothing about interiors).
+
+## Note (2026-10-22, wave 7, DECISIONS V4-NN) — a keyed read during a handover gathers one partition
+
+The keyed read's handover branch (api/index.ts keyedRead: this node owns the row
+but is still taking it over) used the whole-resource gather and picked the row:
+every member sent its WHOLE share, so a member whose share passed one frame
+refused its answer `too-large` (V4-51), and the read of one small row was refused
+until the handover ended. It now asks each member for that row's partition only
+(the system `rows` call takes the partition; `rowsPartial(rt, p)` cuts its
+answer to the row's cells and attests `p` alone), and folds the answers in a fold
+of its own (`Gather.keyed`) beside the live union: a COPY of the union's claims
+and last value for the row, with this generation's answers folded on top by the
+union's own code (`#fold`, moved out of `#refresh` unchanged). Parking (C5)
+therefore holds for the row exactly as in the union, and the union is never
+written by a keyed read (a one-partition answer replacing a member's claims
+wholesale there would drop its claims for every other row). This node's own
+answer is taken last, after the others: within one view an orphan sheds only
+once every holder attests, this node among them, so an orphan's answer can lack
+the row only if this node already held it. What is still refused: a member whose
+claims for this one row pass one frame (the row cannot travel), and an
+unreachable member (typed, as before).

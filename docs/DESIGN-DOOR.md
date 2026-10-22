@@ -1520,3 +1520,18 @@ secret and that a process without it cannot read or write — reworded, with
 the two member lines that said the same. The version mix on client links
 (a V4-30 build against this one) is stated in "The rule" and pinned by a
 kernel test. Nothing in kernel/door.ts, kernel/node.ts or sim/ changed.*
+
+*Note (2026-10-22, wave 7, DECISIONS V4-NN): deviation (1) above said the
+post-step cursor "sees every row the step wrote". It does not when
+`journal.cap` is below one step's burst: the ring overwrites a refusal row
+inside the very step that wrote it, and the line was lost. The shape that
+does it: a member that evicts a client squatting on a member's uuid goes on
+to admit that member in the same step (identified, the digest, the join).
+The refusal rows are now kept beside the ring — `Journal.keep()` is `emit()`
+plus one push of the row it wrote onto a list of at most 64 — at the eight
+`doorReject` and `contractReject` sites, and the composer takes them from
+there after every step (inside the branch it already runs when the journal
+moved). The ring and its rows are unchanged; no hot-path emit site changed. A
+guard test fails if a refusal row is ever written with `emit()`, since its
+line would then never print. Pinned in api/index.test.ts with `journal.cap`
+1 (red: no line).*
