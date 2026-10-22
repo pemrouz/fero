@@ -725,8 +725,9 @@ test('a keyed gather reads only its own row, a refresh nobody reads builds no an
 // frame"): a keyed read on the row's owner while it is still taking the row over gathered EVERY member's whole share,
 // so one member whose share passed one frame refused its answer 'too-large' and the read was refused until the
 // handover ended. It asks each member for that row's partition only now, and folds the answers in a fold of its own,
-// beside the live union: a copy of the union's claims and last value for the row, never the union itself.
-test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s partition only: a member whose whole share passes one frame answers it; the fold is a copy beside the live union, parking included', async () => {
+// beside the live union: the row's own keyed state, first a copy of the union's claims and last value for the row,
+// never the union itself.
+test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s partition only: a member whose whole share passes one frame answers it; the fold is beside the live union, parking included', async () => {
   const { Gather } = await import('./fold.ts')
   //! self owns `a` and is still taking it over (it holds nothing, attests nothing); h1 is the row's old holder, h2 a member
   const fake = {
@@ -770,11 +771,12 @@ test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s pa
     //! a member of an older version ignores the argument and sends its whole share: the fold sees the row alone
     h2 = { whole: { c: { [AY]: { v: 2, st: [1, 10, 'h2'] }, [B]: { v: 7, st: [1, 11, 'h2'] } }, att: ['a', 'b'] }, a: 'ignores' }
     assert.deepStrictEqual(await g.keyed('a'), { x: 5, y: 2 })
-    //! PARKING, copied from the live union: h1 answers in the skew window (no claim, no attestation for `a`) and
-    // nobody else claims the row — not covered, so the live union's last value stands, exactly as there
+    //! PARKING: h1 answers in the skew window (no claim, no attestation for `a`) and nobody else claims the row — not
+    // covered, so the last value the row showed stands: the last keyed read's, which the live union never saw (KEYED
+    // PARKING, below, has the live union's side)
     h1 = { whole: null, a: { c: {}, att: [] } }
     h2 = { whole: { c: {}, att: ['b'] }, a: { c: {}, att: [] } }
-    assert.deepStrictEqual(await g.keyed('a'), { x: 1 }, 'the parked claim of the live union parks here too')
+    assert.deepStrictEqual(await g.keyed('a'), { x: 5, y: 2 }, 'the row parks at its last value')
     assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 1 }, b: 1 }, 'still untouched')
     //! attested absence by every holder (self is not one of them in this ring) drops it: a real delete
     fake.writes.ring.holders = () => ['h1', 'h2']
@@ -792,6 +794,145 @@ test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s pa
     h2 = { whole: { c: {}, att: ['b'] }, a: 'down' }
     await assert.rejects(g.keyed('a'), (e: ScopedError) => e.reason === 'unreachable' && e.partition === 'a' && e.missing!.join() === 'h2')
   } finally { g.destroy() }
+})
+
+//! V4-NN, the round-2 review: the keyed fold started from a fresh COPY of the live union on every read, so on a node
+// whose live union was never read, two keyed reads did not park across each other. The second, in the skew window (the
+// old holder has shed: no claim, no attestation; the holders still acquiring), read the row absent, where the one
+// registry of the whole-read gather, which a keyed read used to write, kept its last value. And a row a keyed read had
+// seen deleted came back from the live union's older copy. The row now has a keyed state of its own, beside the live
+// union, that takes every fold for the row (keyed reads and live generations) and is dropped once it cannot matter.
+test('KEYED PARKING [V4-NN] — keyed reads park across each other and follow the live generations, on a keyed state of the row that never writes the live union and is dropped once it cannot matter', async () => {
+  const { Gather } = await import('./fold.ts')
+  //! self owns `a` and `b` and is taking them over (it holds nothing, attests nothing); h1 is the old holder, h2 a co-holder
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: (): string[] => ['self', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const A = JSON.stringify(['a']), AY = JSON.stringify(['a', 'y']), B = JSON.stringify(['b'])
+  type Rows = { c: Record<string, unknown>; att: string[] }
+  const none: Rows = { c: {}, att: [] }
+  let h1: Rows = none, h2: Rows = none
+  let gathers = true
+  //! each member sends its whole share whatever it is asked (an older member): keyed() cuts it to the row
+  const g = new Gather({ node: fake } as never, async (u: string) => structuredClone(u === 'h1' ? h1 : h2) as never, undefined, undefined, () => gathers)
+  try {
+    //! the probe's shape: read 1, h1 claims the row; read 2, h1 has shed and nobody attests `a`
+    h1 = { c: { [A]: { v: { x: 1 }, st: [1, 1, 'h1'] } }, att: ['a'] }
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 })
+    h1 = none
+    assert.deepStrictEqual(await g.keyed('a'), { x: 1 }, 'read 2 parks: the row is not covered, so its last value stands')
+    assert.deepStrictEqual(snapshot(g.proxy), {}, 'the live union was never written')
+    //! a live generation between two keyed reads feeds the row's keyed state: a newer value that only it heard
+    h1 = { c: { [A]: { v: { x: 2 }, st: [1, 5, 'h1'] }, [B]: { v: 1, st: [1, 6, 'h1'] } }, att: ['a', 'b'] }
+    await g.refresh({ node: fake } as never, { throwOnPartial: true, want: false })
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 2 }, b: 1 })
+    h1 = none
+    assert.deepStrictEqual(await g.keyed('a'), { x: 2 }, 'the last value is the live generation\'s, not the last keyed read\'s')
+    //! a keyed read changes the keyed state alone: h2 claims a newer field, then sheds it too
+    h2 = { c: { [AY]: { v: 3, st: [1, 7, 'h2'] } }, att: [] }
+    assert.deepStrictEqual(await g.keyed('a'), { x: 2, y: 3 })
+    h2 = none
+    assert.deepStrictEqual(await g.keyed('a'), { x: 2, y: 3 }, 'the field parks across keyed reads too')
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 2 }, b: 1 }, 'still untouched')
+    //! a delete a keyed read saw stays deleted: both holders (self not one of them in this ring) attest `b`, none claims it
+    fake.writes.ring.holders = () => ['h1', 'h2']
+    h1 = { c: {}, att: ['b'] }
+    h2 = { c: {}, att: ['b'] }
+    assert.equal(await g.keyed('b'), undefined, 'covered: the row is gone')
+    h1 = none
+    h2 = none
+    assert.equal(await g.keyed('b'), undefined, 'and stays gone in the skew window: the live union\'s older copy does not bring it back')
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 2 }, b: 1 }, 'the live union keeps its own view until its own generation')
+    fake.writes.ring.holders = () => ['self', 'h2']
+    //! the bound: a row nobody has, which the live union does not hold either, leaves nothing behind…
+    assert.equal(g.keyedRows, 2, '`a`, and the empty state of `b` that stands for its delete')
+    assert.equal(await g.keyed('nope'), undefined)
+    assert.equal(g.keyedRows, 2, 'no state for `nope`')
+    //! …and the state of a row a keyed read would not gather any more (this node holds it, or another member owns it)
+    // is dropped at the next keyed read or live generation; the next keyed read of it starts from the live union again
+    gathers = false
+    assert.equal(await g.keyed('nope'), undefined)
+    assert.equal(g.keyedRows, 0, 'swept')
+    gathers = true
+    assert.deepStrictEqual(await g.keyed('a'), { x: 2 }, 'from the live union\'s copy: its parked value, without the field only a keyed read saw')
+  } finally { g.destroy() }
+})
+
+//! the exact claim of KEYED PARKING, as a differential: a row's keyed state answers what ONE registry would answer for
+// the row had it taken exactly the folds of that row — every live generation (some members down), and a whole
+// generation for every keyed read of the row. That is base's gather restricted to the row's own folds: base also
+// refreshed the row on a keyed read of ANOTHER row (a whole refresh), which a keyed read no longer is. Random claims (a
+// stamp names one value), random self scope, members of an older version (the whole share, cut by keyed). Red before
+// the keyed state (a fresh copy per read): seed 1, `keyed {} ref {"f":1}`.
+test('KEYED PARKING, differential [V4-NN] — the keyed state of a row is a one-registry gather fed only that row\'s folds, 150 seeds', async () => {
+  const { Gather } = await import('./fold.ts')
+  let seed = 1
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff }
+  const one = <T,>(xs: T[]): T => xs[Math.floor(rnd() * xs.length)]
+  const MEMBERS = ['self', 'h1', 'h2', 'h3'], PARTS = ['a', 'b', 'ab', 'a"b']
+  const CELLS = [['a'], ['a', 'f'], ['a', 'f', 'g'], ['a', 'h'], ['b'], ['b', 'f'], ['ab'], ['ab', 'f'], ['a"b'], ['a"b', 'x']].map((k) => JSON.stringify(k))
+  const HOLD: Record<string, string[]> = { a: ['self', 'h1'], b: ['h1', 'h2'], ab: ['h2', 'h3'], 'a"b': ['self', 'h3'] }
+  const VALS: unknown[] = [1, 2, 'x', null, { f: 1 }, { f: { g: 2 } }, { h: 3, f: 0 }, {}, [1, 2]]
+  const hash = (str: string) => { let x = 2166136261; for (let i = 0; i < str.length; i++) x = Math.imul(x ^ str.charCodeAt(i), 16777619) >>> 0; return x }
+  const val = (cell: string, st: unknown[]) => structuredClone(VALS[hash(cell + '|' + st.join('|')) % VALS.length])
+  const tomb = (cell: string, st: unknown[]) => (hash(cell + '|' + st.join('|')) >>> 8) % 5 === 0
+  const claims = () => {
+    const c: Record<string, unknown> = {}
+    for (const cell of CELLS) {
+      if (rnd() < 0.55) continue
+      const st = [1, 1 + Math.floor(rnd() * 30), one(MEMBERS)]
+      c[cell] = tomb(cell, st) ? { st, t: 1 } : { v: val(cell, st), st }
+    }
+    return { c, att: rnd() < 0.1 ? null : PARTS.filter(() => rnd() < 0.5) }
+  }
+  let checks = 0
+  for (let s = 1; s <= 150; s++) {
+    seed = s * 104729
+    const fake = {
+      uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 1 << 20 },
+      membership: { view: { epoch: 1, members: MEMBERS.map((u) => [u, '']) } },
+      writes: { ring: { epoch: 1, build: () => {}, holders: (p: string) => HOLD[p] ?? ['self'] } },
+      scope: { entries: new Map<string, { state: number }>() }, versions: new Map<string, unknown>(), state: new Map<string, unknown>(),
+    }
+    const setSelf = () => {
+      fake.versions = new Map(); fake.state = new Map(); fake.scope = { entries: new Map() }
+      for (const p of PARTS) { const r = rnd(); if (r < 0.5) fake.scope.entries.set(p, { state: r < 0.3 ? 1 : r < 0.4 ? 3 : 2 }) }
+      for (const cell of CELLS) {
+        if (rnd() < 0.5) continue
+        const st = { epoch: 1, seq: 1 + Math.floor(rnd() * 30), origin: one(MEMBERS) }
+        fake.versions.set(cell, st)
+        if (!tomb(cell, [1, st.seq, st.origin])) fake.state.set(cell, val(cell, [1, st.seq, st.origin]))
+      }
+    }
+    let gen: Record<string, unknown> = {}
+    const down = new Set<string>()
+    const call = async (u: string) => { if (down.has(u)) throw new Error('timeout'); return structuredClone(gen[u]) as never }
+    const g = new Gather({ node: fake } as never, call)
+    const ref = Object.fromEntries(PARTS.map((p) => [p, new Gather({ node: fake } as never, call)]))
+    try {
+      for (let o = 0, ops = 4 + Math.floor(rnd() * 10); o < ops; o++) {
+        gen = Object.fromEntries(MEMBERS.map((u) => [u, rnd() < 0.3 ? { c: {}, att: [] } : claims()]))
+        setSelf()
+        down.clear()
+        if (rnd() < 0.4) {
+          for (const u of MEMBERS.slice(1)) if (rnd() < 0.25) down.add(u)
+          await g.refresh({ node: fake } as never, { throwOnPartial: false, want: false })
+          for (const p of PARTS) await ref[p].refresh({ node: fake } as never, { throwOnPartial: false, want: false })
+        } else {
+          const k = one(PARTS)
+          const got = await g.keyed(k)
+          const whole = await ref[k].refresh({ node: fake } as never, { throwOnPartial: true }) as Record<string, unknown>
+          assert.deepStrictEqual(got, Object.hasOwn(whole, k) ? whole[k] : undefined, `seed ${s} op ${o} row ${k}`)
+          checks++
+        }
+      }
+    } finally { g.destroy(); for (const p of PARTS) ref[p].destroy() }
+  }
+  assert.ok(checks > 700, `${checks} keyed reads compared`)
 })
 
 //! the member side of V4-NN: `rows` with a partition answers exactly the part of its whole answer for that row — the
