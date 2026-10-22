@@ -307,7 +307,9 @@ export class Gather {
     // otherwise assert a value forever (win never null ⇒ the sweep can never even run) and leak one
     // registry entry per dead uuid for the node's lifetime. Members merely MISSING this generation
     // keep their claims — that is lawful parking, not departure. With `row`, the row's cells alone (old and new: every
-    // touched cell is in the registry now); the next whole generation reaps the rest, before any fold reads them.
+    // touched cell is in the registry now). A departed member's claims in another row wait for that row's next fold,
+    // which reaps them before it reads them; if the member is back in the view by then they stay, as they would
+    // between two whole generations (KEYED ROW ONLY).
     const alive = new Set(members)
     if (cells === null) {
       for (const [, per] of reg)
