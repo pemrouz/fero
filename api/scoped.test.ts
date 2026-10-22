@@ -968,6 +968,56 @@ test('KEYED MID-READ [V4-NN] — a handover that ends while a keyed read is in f
   } finally { g.destroy() }
 })
 
+//! V4-NN, the round-3 review: keyed reads ran OFF the refresh chain, so a read whose answers came back after a newer
+// read's (or a newer live generation's) folded its older answers last, over the newer ones. A later read in the skew
+// window (h1 has shed: no claim, no attestation) then parked the OLDER value, after a read had already returned the
+// newer one. Base ran a keyed read as a refresh, on the chain. Here each h1 answer is h1's state when it is ASKED (x=1,
+// then a newer write x=2, then shed), and the answers held in flight come back newest first. On a real link a member
+// answers in order, so this needs two fan-outs to different member sets (a view install between them); the chain makes
+// the order hold whatever the links do. Red off the chain: `{ x: 1 }` for `{ x: 2 }`, and for the live generation's
+// newer value too.
+test('KEYED ORDER [V4-NN] — keyed reads and live generations fold in the order they began, so answers that come back late never fold over newer ones', async () => {
+  const { Gather } = await import('./fold.ts')
+  const A = JSON.stringify(['a'])
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['self', 'h2'] } },
+    scope: { entries: new Map() }, versions: new Map(), state: new Map(),
+  }
+  const none = { c: {}, att: [] as string[] }
+  const at = (x: number, seq: number) => ({ c: { [A]: { v: { x }, st: [1, seq, 'h1'] } }, att: ['a'] })
+  //! h1's answers, one per time it is asked, in that order; then nothing (it shed). h2 says nothing of `a`.
+  let script: unknown[] = []
+  const held: { answer: unknown; resolve: (v: unknown) => void }[] = []
+  const g = new Gather({ node: fake } as never, (u: string) => {
+    const answer = structuredClone(u === 'h1' ? (script.shift() ?? none) : none)
+    return new Promise((resolve) => held.push({ answer, resolve })) as never
+  })
+  //! hand back the answers in flight newest first, one per turn, until `p` settles
+  const lifo = async <T,>(p: Promise<T>): Promise<T> => {
+    let done = false
+    p.then(() => { done = true }, () => { done = true })
+    while (!done) {
+      await new Promise((r) => setImmediate(r))
+      const h = held.pop()
+      if (h !== undefined) h.resolve(h.answer)
+    }
+    return p
+  }
+  try {
+    //! two keyed reads of `a`, begun one after the other: the first asks h1 at x=1, the second at x=2
+    script = [at(1, 1), at(2, 5)]
+    assert.deepStrictEqual(await lifo(Promise.all([g.keyed('a'), g.keyed('a')])), [{ x: 1 }, { x: 2 }])
+    assert.deepStrictEqual(await lifo(g.keyed('a')), { x: 2 }, 'the skew window parks the newest value a read returned')
+    //! a keyed read, then a live generation begun after it (a view install's): the generation's newer value stands
+    script = [at(3, 7), at(4, 9)]
+    await lifo(Promise.all([g.keyed('a'), g.refresh({ node: fake } as never, { throwOnPartial: false, want: false })]))
+    assert.deepStrictEqual(snapshot(g.proxy), { a: { x: 4 } })
+    assert.deepStrictEqual(await lifo(g.keyed('a')), { x: 4 }, 'the skew window parks the live generation\'s newer value')
+  } finally { g.destroy() }
+})
+
 //! the member side of V4-NN: `rows` with a partition answers exactly the part of its whole answer for that row — the
 // row cell, its fields and their tombstones, a quoted key too — and attests that partition alone, or nothing
 test('rowsPartial with a partition is the whole answer\'s part for that row: its cells by their first key, its attestation cut to it', async () => {

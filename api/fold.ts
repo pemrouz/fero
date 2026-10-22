@@ -186,14 +186,27 @@ export class Gather {
   // union holds for the row (its claims and its last value). So a claim parked across generations parks across keyed
   // reads too (the Q3a rule): this is what the one registry of the whole-read gather held for the row, before a keyed
   // read stopped writing it. The live union is never written: a one-partition answer replacing a member's claims
-  // wholesale there would drop its claims for every other row. Not on the refresh chain, for the same reason: it
-  // touches only its own row's state, in one synchronous run after the last answer.
+  // wholesale there would drop its claims for every other row.
+  //! ON the refresh chain, as base's keyed read (a whole refresh) was: the row's keyed state takes folds from keyed
+  // reads and from live generations alike, so they must land in the order their fan-outs began. Off the chain (the
+  // round-3 review), a read whose answers came back after a newer read's or a newer generation's folded its OLDER
+  // answers last, and a later read in the skew window parked the older value, after a read had already returned the
+  // newer one. On a real link a member answers in order, so that took two fan-outs to different member sets (a view
+  // install between them); the chain makes the order hold whatever the links do.
+  keyed(key: string, timeoutMs = 8000): Promise<unknown> {
+    const next = this.#chain.then(() => this.#keyed(key, timeoutMs), () => this.#keyed(key, timeoutMs))
+    this.#chain = next.catch(() => {}) // the chain never rejects; each caller sees its own outcome
+    return next
+  }
   //! This node's own answer is taken LAST, after every other answer is in. Within one view, a previous holder of the
   // row (an orphan) claims it until its shed, and it sheds only once every holder of the row attests it — this node
   // among them, as its owner — so an orphan's answer can lack the row only if this node already held it when that
   // answer left, and this node's own answer, taken after, has it (unless a second handover moved the row again inside
-  // the read). Across views, parking (the keyed state) covers that window, as it does for the whole read.
-  async keyed(key: string, timeoutMs = 8000): Promise<unknown> {
+  // the read). Across views, parking (the keyed state) covers that window, as it does for the whole read. The order is
+  // right here because this node is the row's OWNER: within the view it is never the row's old holder. The whole read
+  // cannot take it: there this node can be one row's old holder and another's new one in the same gather, and each
+  // side wants its own answer taken at the other end (#refresh still takes it first; a STATUS line).
+  async #keyed(key: string, timeoutMs: number): Promise<unknown> {
     const node = this.#rt.node
     const members = node.membership.view.members.map((m) => m[0])
     const answered = new Map<string, Rows>()
