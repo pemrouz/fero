@@ -3220,6 +3220,113 @@ for (const back of [['px'], ['rx'], ['rx', 'px']])
     assert.deepEqual(laneAt(S, 'cc'), laneAt(F, 'cc'), 'lane cc at the spoke equals the feeder\'s')
   })
 
+//! the seventh review's R7-1 and R7-2: two more slips of the one lowering line. Lowered only for a partition HELD at
+// the word (the held-for-feeds slip wave 6a once made in #answer's head), a repair latch open on px at the heal skips
+// it: px is fed but not held, the leapfrogged cc#2 is dropped by the word and never re-sent, and the repair's forward
+// carries only its delta (px.c lost for good; the spoke's lane cc [4] against the feeder's [2, 4]). Stopped after the
+// first named partition that has entries, the word [px, rx] lowers bb for px's one row and never reaches rx, whose
+// leapfrogged row sits on cc, a lane px has no entry on (rx.c lost for good, the same lane cc). Every other test in
+// this file stayed green on both mutants. Red on them at "the exchange's end, before any beat: the spoke shows what
+// its feeder feeds": [px.a, px.b, qx.w, qx.z] against the same with px.c (at a queue of 3 both with qx.y7), and
+// [px.o, qx.w, qx.z, rx.a, rx.b] against the same with rx.c (at a queue of 4 both with qx.y7).
+for (const queued of [2, 3])
+  test(`wave 6c — the leapfrog, then a REPAIR latch opens on the shed partition before the heal (a queue of ${queued}): px is fed but not held at the word, and the start is still lowered under its entries, so the same answer brings it back whole (lowered for held partitions only, px.c was lost for good: the repair's forward is delta-only)`, () => {
+    const L = latching({ tune: { queued } })
+    const { F, S, p, link, connect, beat, laneAt } = L
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: one('cc', QX('w', 4), 4, 0, VERB.RECORDS) })
+    connect()
+    assert.deepEqual(kernelCells(S), kernelCells(F))
+    F.node.step({ kind: 'pause', link: 7 })
+    shedPx(F, 5)
+    if (queued === 3) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y7', 7), 7, 6, VERB.RECORDS) })
+    //! px back to aa from zero across bb and cc; the fold's flush clears the queue on bb#3, bb#5 and cc#2 leapfrog it
+    F.node.writes.ring.place('px', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 5, cc: 2 } } }) })
+    teachLanes(F, 2, [{ origin: 'bb', seq: 3, rec: PX('a', 1), pp: 0 }, { origin: 'bb', seq: 5, rec: PX('b', 2), pp: 3 }, { origin: 'cc', seq: 2, rec: PX('c', 3), pp: 0 }], { bb: 5, cc: 2 })
+    assert.equal(F.node.scope!.held('px'), true)
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'the fold\'s flush cleared the queue on its first frame: the word went')
+    assert.deepEqual(link.queued.map(frameName), ['bb#5', 'cc#2'], 'the leapfrog: bb#5 and cc#2 survived the clear')
+    //! cc announces px at bb#9: a repair latch on the held base, open at the heal
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 9, cc: 2 } } }) })
+    const st = F.node.scope!.entries.get('px')!
+    assert.equal(st.state, SCOPE.acquiring); assert.equal(st.preState, SCOPE.held, 'a repair of the held base')
+    assert.equal(F.node.scope!.held('px'), false, 'px is not held at the word')
+    assert.equal(F.node.scope!.feeds('px'), true, 'but this feeder feeds it')
+    const m = F.of('send').filter((e) => e[1] === 7).length
+    F.node.step({ kind: 'drain', link: 7 })
+    p.settle()
+    assert.deepEqual(screenCells(S), fedCells(F), 'the exchange\'s end, before any beat: the spoke shows what its feeder feeds (px.c, the leapfrogged cc#2, was dropped by the word and never re-sent)')
+    assert.deepEqual(kernelCells(S), fedCells(F), 'the exchange\'s end, before any beat: and holds it')
+    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }], 'the word before the ship; no owed end (px is acquiring, and that fold says its own)')
+    assert.deepEqual(S.jk(JK.unfed).map((e) => [e.a, e.b]), [['px', 3]], 'the word dropped px.a, px.b and the leapfrogged px.c')
+    const sent = namesOn(F, 7, m)
+    assert.deepEqual(sent.slice(0, 4), ['bb#5', 'cc#2', 'DIGEST', 'FEED'], 'the drained survivors, the drain digest, the word ahead of the first record')
+    assert.ok(sent.slice(4).includes('cc#2'), 'the answer re-sends cc#2 under the spoke\'s tail on that lane (the lowered start)')
+    //! three beats only: the repair latch times out at about the eighth (px is then an assigned orphan, in flight)
+    beat(3)
+    assert.deepEqual(kernelCells(S), fedCells(F), 'after three beats, the repair still open: the spoke holds what its feeder feeds')
+    assert.deepEqual(laneAt(S, 'cc'), laneAt(F, 'cc'), 'lane cc at the spoke equals the feeder\'s (it kept [4] for good on the mutant)')
+    //! the repair folds: the delta bb#9 alone
+    teachLanes(F, 2, [{ origin: 'bb', seq: 9, rec: PX('e', 5), pp: 5 }], { bb: 9, cc: 2 })
+    assert.equal(F.node.scope!.held('px'), true, 'the repair folded')
+    p.settle()
+    beat(20)
+    assert.deepEqual(kernelCells(F), queued === 3 ? ['px.a', 'px.b', 'px.c', 'px.e', 'qx.w', 'qx.y7', 'qx.z'] : ['px.a', 'px.b', 'px.c', 'px.e', 'qx.w', 'qx.z'])
+    assert.deepEqual(kernelCells(S), kernelCells(F), 'after the repair and twenty beats: the spoke holds what its feeder holds')
+    assert.deepEqual(screenCells(S), kernelCells(F))
+    assert.deepEqual(laneAt(S, 'cc'), laneAt(F, 'cc'), 'lane cc equal at the end')
+    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px'] }, { b: 'px' }, { e: 'px' }], 'then the repair\'s own group; no stray word')
+  })
+
+for (const queued of [3, 4])
+  test(`wave 6c — two partitions in one owed word, the SECOND named back first and leapfrogged on a lane the first has no entry on (a queue of ${queued}): the lowering goes on past the first named partition with entries, so rx comes back whole with the same answer (stopped after it, rx.c was lost for good)`, () => {
+    const L = latching({ tune: { queued } })
+    const { F, S, p, link, connect, beat, laneAt } = L
+    F.node.writes.ring.place('rx', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', RX('a', 1), 3, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('o', 7), 4, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', RX('b', 2), 5, 3, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: one('cc', QX('w', 4), 4, 0, VERB.RECORDS) })
+    connect()
+    assert.deepEqual(kernelCells(S), kernelCells(F))
+    F.node.step({ kind: 'pause', link: 7 })
+    shedPx(F, 5, 'px')
+    shedPx(F, 5, 'rx')
+    assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px', 'rx'], 'aa shed px, then rx')
+    if (queued === 4) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('y7', 7), 7, 6, VERB.RECORDS) })
+    //! rx back first, across bb and cc: its fold's flush clears the queue (both words go), its cc#2 leapfrogs the clear
+    F.node.writes.ring.place('rx', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { rx: { bb: 5, cc: 2 } } }) })
+    teachLanes(F, 2, [{ origin: 'bb', seq: 3, rec: RX('a', 1), pp: 0 }, { origin: 'bb', seq: 5, rec: RX('b', 2), pp: 3 }, { origin: 'cc', seq: 2, rec: RX('c', 3), pp: 0 }], { bb: 5, cc: 2 }, 'rx')
+    assert.equal(F.node.scope!.held('rx'), true)
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'rx\'s fold cleared the queue')
+    const drained = link.queued.flatMap((b) => new Framer().push(b.slice())[0].records().map((rv) => rv.origin + '#' + rv.seq))
+    assert.ok(drained.includes('cc#2'), 'rx\'s cc#2 leapfrogged the clear: ' + drained.join(','))
+    //! px back second, on the torn link: one row, on bb only (px has no entry on cc)
+    F.node.writes.ring.place('px', 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 4 } } }) })
+    teachLanes(F, 2, [{ origin: 'bb', seq: 4, rec: PX('o', 7), pp: 0 }], { bb: 4 }, 'px')
+    assert.equal(F.node.scope!.held('px'), true)
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'still one clear')
+    const m = F.of('send').filter((e) => e[1] === 7).length
+    F.node.step({ kind: 'drain', link: 7 })
+    p.settle()
+    assert.deepEqual(screenCells(S), fedCells(F), 'the exchange\'s end, before any beat: the spoke shows what its feeder feeds (rx.c, the leapfrogged cc#2, was dropped by the word and never re-sent)')
+    assert.deepEqual(kernelCells(S), fedCells(F), 'the exchange\'s end, before any beat: and holds it')
+    assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px', 'rx'] }, { e: 'rx' }, { e: 'px' }], 'one word names both, px first, before the ship; the owed ends after the reply, in fold order')
+    const sent = namesOn(F, 7, m)
+    assert.deepEqual(sent.slice(0, drained.length + 2), [...drained, 'DIGEST', 'FEED'], 'the drained survivors, the drain digest, the word ahead of the first record')
+    assert.ok(sent.slice(drained.length + 2).includes('cc#2'), 'the answer re-sends rx\'s cc#2 on a lane px has no entry on')
+    beat(20)
+    assert.deepEqual(kernelCells(S), fedCells(F), 'after twenty beats: the spoke holds what its feeder feeds')
+    assert.deepEqual(screenCells(S), fedCells(F))
+    assert.deepEqual(laneAt(S, 'cc'), laneAt(F, 'cc'), 'lane cc at the spoke equals the feeder\'s (it kept [4] for good on the mutant)')
+  })
+
 //! the spoke's link to aa blips: both ends see the close, the spoke re-dials aa (its only host) on link 4, aa admits it on
 // link 8; the pump is re-made on the new pair
 const reAdmit = (L: ReturnType<typeof latching>) => {
