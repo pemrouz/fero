@@ -111,19 +111,6 @@ const only = (rows: Rows, p: string): Rows => {
   for (const cell of Object.keys(rows.c)) if (inside(cell, pre)) c[cell] = rows.c[cell]
   return { c, att: rows.att === null ? null : rows.att.includes(p) ? [p] : [] }
 }
-//! headOf — a cell's first key as JSON wrote it (`["p"`, what prefixOf(p) gives): the keyed side cuts a whole live
-// answer to all its rows in one pass (Gather #feed), one short scan and one map lookup per cell. '' for a cell with no
-// key. A backslash escapes the next character, so an escaped quote inside the key does not end it.
-const headOf = (cell: string): string => {
-  if (cell.charCodeAt(0) !== 91 || cell.charCodeAt(1) !== 34) return '' // not `["`
-  for (let i = 2; i < cell.length; i++) {
-    const c = cell.charCodeAt(i)
-    if (c === 92) i++
-    else if (c === 34) return cell.slice(0, i + 1)
-  }
-  return ''
-}
-
 //! newer — the kernel's LWW total order (epoch, seq, origin), verbatim.
 const newer = (a: [number, number, string], b: [number, number, string]): boolean =>
   a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] > b[2]
@@ -149,21 +136,11 @@ export class Gather {
   // at once (api/index.ts read); onRefused ends the live reads already open (Host.endLive): never a silent partial.
   refused: ScopedError | null = null
   #onRefused: ((r: ScopedError) => void) | undefined
-  //! the keyed side (V4-NN, keyed below): row → that row's own registry (cell → member → claim) and projection, beside
-  // the live union and never sharing a map with it. It takes every fold for its row, keyed or live, so parking holds
-  // across keyed reads. `gathers` is the composer's own test for a keyed read that goes through the gather (this node
-  // owns the row and does not hold it, api/index.ts keyedRead): a row it fails is dropped (#sweep). Absent (a unit
-  // test's fake), no row is dropped that way.
-  #rows = new Map<string, { reg: Map<string, Map<string, Claim>>; px: any }>()
-  #gathers: ((key: string) => boolean) | undefined
-  //! keyedRows — how many rows the keyed side holds (read only: how a test sees its bound)
-  get keyedRows(): number { return this.#rows.size }
-  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number, p?: string) => Promise<Rows>, fault?: Fault, onRefused?: (r: ScopedError) => void, gathers?: (key: string) => boolean) {
+  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number, p?: string) => Promise<Rows>, fault?: Fault, onRefused?: (r: ScopedError) => void) {
     this.#rt = rt
     this.#call = call
     this.#fault = fault
     this.#onRefused = onRefused
-    this.#gathers = gathers
   }
 
   //! refresh — one gather generation, SERIALIZED: concurrent callers (a one-shot read racing the
@@ -179,22 +156,24 @@ export class Gather {
     return next
   }
 
-  //! keyed — ONE row, for keyedRead's handover branch (api/index.ts: this node owns the row but is still taking it
-  // over), in a fold of its own beside the live union (V4-NN). Every member is asked for that row's partition only
-  // (`rows` with the partition, rowsPartial), so a member whose whole share passes one frame still answers; before,
+  //! keyed — ONE row, for keyedRead's gather branch (api/index.ts: this node owns the row but does not hold it — a
+  // handover, or a read of an absent row, which no node holds), V4-NN. Every member is asked for that row's partition
+  // only (`rows` with the partition, rowsPartial), so a member whose whole share passes one frame still answers; before,
   // the read gathered every member's whole share and such a member refused it 'too-large' until the handover ended.
-  // The answers fold, with the union's own code (#fold), onto the row's KEYED STATE (#rows): the state the last fold
-  // for this row left, whether a keyed read or a live generation (#feed), and the first time a copy of what the live
-  // union holds for the row (its claims and its last value). So a claim parked across generations parks across keyed
-  // reads too (the Q3a rule): this is what the one registry of the whole-read gather held for the row, before a keyed
-  // read stopped writing it. The live union is never written: a one-partition answer replacing a member's claims
-  // wholesale there would drop its claims for every other row.
-  //! ON the refresh chain, as base's keyed read (a whole refresh) was: the row's keyed state takes folds from keyed
-  // reads and from live generations alike, so they must land in the order their fan-outs began. Off the chain (the
-  // round-3 review), a read whose answers came back after a newer read's or a newer generation's folded its OLDER
-  // answers last, and a later read in the skew window parked the older value, after a read had already returned the
-  // newer one. On a real link a member answers in order, so that took two fan-outs to different member sets (a view
-  // install between them); the chain makes the order hold whatever the links do.
+  // The answers fold into the LIVE union, limited to the row (#fold with `row`): each answering member's claims are
+  // replaced for the row's cells alone, and only the row's cells are folded, swept and reaped. So the row ends as a
+  // whole generation of the same answers would leave it, and every other row keeps its claims and its value (#fold
+  // says why). One registry, as in base, where a keyed read was a whole refresh: parking holds across keyed reads and
+  // live generations alike, a delete a keyed read saw stays deleted, and a whole read after a keyed read never goes
+  // back past what it returned. What base had more: a keyed read of ANOTHER row refreshed this row too (a STATUS line).
+  // (Rounds 2 to 4 of this lane kept a keyed state of the row beside the live union instead; then a whole read on the
+  // owner could go back past a keyed read, the round-4 review.)
+  //! ON the refresh chain, as base's keyed read (a whole refresh) was: keyed reads and live generations write the one
+  // registry, so they must land in the order their fan-outs began. Off the chain (the round-3 review), a read whose
+  // answers came back after a newer read's or a newer generation's folded its OLDER answers last, and a later read in
+  // the skew window parked the older value, after a read had already returned the newer one. On a real link a member
+  // answers in order, so that took two fan-outs to different member sets (a view install between them); the chain
+  // makes the order hold whatever the links do.
   keyed(key: string, timeoutMs = 8000): Promise<unknown> {
     const next = this.#chain.then(() => this.#keyed(key, timeoutMs), () => this.#keyed(key, timeoutMs))
     this.#chain = next.catch(() => {}) // the chain never rejects; each caller sees its own outcome
@@ -204,12 +183,13 @@ export class Gather {
   // row (an orphan) claims it until its shed, and it sheds only once every holder of the row attests it — this node
   // among them, as its owner — so an orphan's answer can lack the row only if this node already held it when that
   // answer left, and this node's own answer, taken after, has it (unless a second handover moved the row again inside
-  // the read). Across views, parking (the keyed state) covers that window, as it does for the whole read. The order is
-  // right here because this node is the row's OWNER: within the view it is never the row's old holder. The whole read
-  // cannot take it: there this node can be one row's old holder and another's new one in the same gather, and each
-  // side wants its own answer taken at the other end (#refresh still takes it first; a STATUS line).
+  // the read). Across views, parking covers that window, as it does for the whole read. The order is right here
+  // because this node is the row's OWNER: within the view it is never the row's old holder. The whole read cannot take
+  // it: there this node can be one row's old holder and another's new one in the same gather, and each side wants its
+  // own answer taken at the other end (#refresh still takes it first; a STATUS line).
   async #keyed(key: string, timeoutMs: number): Promise<unknown> {
     const node = this.#rt.node
+    const gen = this.#gen
     const members = node.membership.view.members.map((m) => m[0])
     const answered = new Map<string, Rows>()
     const missing: string[] = [], tooBig: string[] = []
@@ -234,71 +214,9 @@ export class Gather {
         scoped: true, op: 'gather', reason: 'unreachable', replicas: node.replicas, partition: key, missing,
         hint: 'this key is changing owner and some members are unreachable — the read would be a silent partial; retry when the view heals',
       } satisfies ScopedError
-    let row = this.#rows.get(key)
-    let liveKnew: boolean | undefined // known only for a fresh copy: did the live union hold anything of the row?
-    if (row === undefined) {
-      const reg = new Map<string, Map<string, Claim>>()
-      const pre = prefixOf(key)
-      for (const [cell, per] of this.#registry) if (inside(cell, pre)) reg.set(cell, new Map(per))
-      const last = pick(this.proxy, key)
-      row = { reg, px: proxy(last === undefined ? {} : { [key]: last }) }
-      liveKnew = reg.size !== 0 || last !== undefined
-    }
-    this.#fold(row.reg, row.px, answered, members)
-    const v = pick(row.px, key)
-    //! kept, unless it knows nothing (no cell, no value) and neither does the live union: a fresh copy is then the same
-    // empty state, so dropping it changes no answer — and a read of a row nobody has leaves nothing behind. An empty
-    // state is kept while the live union still holds cells of the row: it stands for the fold that took them away. A
-    // live generation that takes them from the live union too does not drop it: only the row's next keyed read, or a
-    // sweep, does (one small empty state, inside the bound #sweep states).
-    if (row.reg.size !== 0 || v !== undefined || (liveKnew ?? this.#knows(key))) this.#rows.set(key, row)
-    else this.#rows.delete(key)
-    this.#sweep()
-    return answer(v, node, true)
-  }
-
-  //! #knows — does the live union hold anything of row `key`: a value, or a cell in its registry (parked ones too)
-  #knows(key: string): boolean {
-    if (pick(this.proxy, key) !== undefined) return true
-    const pre = prefixOf(key)
-    for (const cell of this.#registry.keys()) if (inside(cell, pre)) return true
-    return false
-  }
-
-  //! #sweep — drop the keyed state of every row a keyed read would no longer gather (`gathers`): this node holds it now
-  // (keyedRead answers from its own data) or another member owns it (keyedRead asks that member). So after a sweep the
-  // keyed side holds only rows this node owns and does not hold: the rows of its handovers that were read by key, and
-  // rows nobody has whose empty state stands for a delete a keyed read saw (keyed above: it stays until the row's next
-  // keyed read or a sweep, even once the live union has seen the delete too). It runs after every keyed read and every
-  // live generation that feeds it; between two sweeps it grows by at most one row per keyed read.
-  #sweep() {
-    const gathers = this.#gathers
-    if (gathers === undefined) return
-    for (const k of this.#rows.keys()) if (!gathers(k)) this.#rows.delete(k)
-  }
-
-  //! #feed — a live generation's answers, folded onto the keyed side too, each answer cut to each of its rows (one pass
-  // over the answer's cells, headOf): the keyed state then follows the live generations exactly as the one registry
-  // did. Nothing here runs while the keyed side is empty (no keyed read during a handover), which is nearly always.
-  #feed(answered: Map<string, Rows>, members: string[]) {
-    this.#sweep()
-    if (this.#rows.size === 0) return
-    const heads = new Map<string, string>() // `["k"` → k
-    const cut = new Map<string, Map<string, Rows>>() // k → member → its answer for row k
-    for (const k of this.#rows.keys()) { heads.set(prefixOf(k), k); cut.set(k, new Map()) }
-    for (const [uuid, rows] of answered) {
-      const per = new Map<string, Claims>()
-      for (const cell of Object.keys(rows.c)) {
-        const k = heads.get(headOf(cell))
-        if (k === undefined) continue
-        let c = per.get(k)
-        if (c === undefined) per.set(k, (c = {}))
-        c[cell] = rows.c[cell]
-      }
-      const att = rows.att === null ? null : new Set(rows.att)
-      for (const [k, by] of cut) by.set(uuid, { c: per.get(k) ?? {}, att: att === null ? null : att.has(k) ? [k] : [] })
-    }
-    for (const [k, by] of cut) { const row = this.#rows.get(k)!; this.#fold(row.reg, row.px, by, members) }
+    //! destroyed while the answers travelled: the union is not written any more (as #refresh's own check)
+    if (gen === this.#gen) this.#fold(answered, members, key)
+    return answer(pick(this.proxy, key), node, true)
   }
 
   //! #refresh — one generation: fan out to every view member (self in-process), replace each
@@ -338,9 +256,7 @@ export class Gather {
     //! superseded mid-flight by a newer refresh — answer a COPY, never the live union root
     // (M6-review finding 8: the one-shot paths hand this value to user code)
     if (gen !== this.#gen) return opts.want === false ? undefined : answer(snapshot(this.proxy), node)
-    this.#fold(this.#registry, this.proxy, answered, members)
-    //! the keyed side takes this generation too (keyed, #feed): one size check when it is empty
-    if (this.#rows.size !== 0) this.#feed(answered, members)
+    this.#fold(answered, members)
     //! the one-shot answer is a COPY (M6-review finding 8): snapshot() is the proxy's live internal
     // root — `await data` and local methods.read() hand this value straight to user code, and a
     // mutation there must never write through into the union every live subscriber shares. The wire
@@ -350,20 +266,36 @@ export class Gather {
     return opts.want === false ? undefined : answer(snapshot(this.proxy), this.#rt.node)
   }
 
-  //! #fold — one generation's answers folded into a union: the registry `reg` (cell → member → claim) and its
-  // projection `px`. The live union passes its own (#refresh); the keyed side passes one row's (keyed, #feed).
-  #fold(reg: Map<string, Map<string, Claim>>, px: any, answered: Map<string, Rows>, members: string[]) {
+  //! #fold — one generation's answers folded into the union: the registry and its projection. With `row` (a keyed
+  // read, keyed above), the fold is LIMITED to that row's cells: each answerer's claims are replaced for those cells
+  // alone (its answer was cut to the row), and only those cells are folded, swept and reaped. That is exact, because
+  // every step below reads, for one cell, only cells of the same row: the coverage sweep reads the holders of the cell's
+  // partition (key[0], the row), the across-depth check reads the cell's prefixes, and the projection and the un-vivify
+  // walk the cell's own path. (Every cell has a row: the kernel keys a cell by its record's key, or by `at` for a keyless
+  // insert, kernel/node.ts apply.) The one moment a whole fold shares across rows is when the projection takes a fresh
+  // copy of the union for a deep remove: a whole fold may take it earlier, at another row's remove, and then skips a
+  // remove under a level that a sibling field made up in this same fold, which the row-limited fold applies. The field
+  // it removes is not there in either, so the value is the same. So the row ends as a whole fold of the same answers
+  // would leave it, and every other row keeps its claims and its value. Finding the row's cells is one string test per
+  // registry cell: a keyed read that gathers is a cold path (a handover, or a read of an absent row on its owner).
+  #fold(answered: Map<string, Rows>, members: string[], row?: string) {
     const node = this.#rt.node
+    const reg = this.#registry, px = this.proxy
+    //! the cells this fold may change: every cell, or with `row` that row's own
+    const pre = row === undefined ? null : prefixOf(row)
+    const cells = pre === null ? null : [...reg.keys()].filter((c) => inside(c, pre))
     //! per-generation attestations: uuid → the partitions that member attests (null = ALL). Built
     // from the answers of THIS generation only — attestation never survives a refresh (findings 0/28/53)
     const att = new Map<string, Set<string> | null>()
     for (const [uuid, rows] of answered) att.set(uuid, rows.att === null ? null : new Set(rows.att))
-    //! merge: replace each answerer's claims wholesale, keep everyone else's (parking substrate)
-    const touched = new Set<string>([...reg.keys()])
+    //! merge: replace each answerer's claims wholesale (with `row`, its claims for the row's cells), keep everyone
+    // else's (parking substrate)
+    const touched = new Set<string>(cells ?? [...reg.keys()])
     for (const [uuid, rows] of answered) {
       const claims = rows.c
       for (const cell of Object.keys(claims)) touched.add(cell)
-      for (const [cell, per] of reg) { per.delete(uuid); if (!per.size) void cell } // wholesale replace below
+      if (cells === null) { for (const [cell, per] of reg) { per.delete(uuid); if (!per.size) void cell } } // wholesale replace below
+      else for (const cell of cells) reg.get(cell)!.delete(uuid) // the row's cells alone
       for (const [cell, claim] of Object.entries(claims)) {
         let per = reg.get(cell)
         if (!per) { per = new Map(); reg.set(cell, per) }
@@ -374,10 +306,13 @@ export class Gather {
     // 1/22/52): a departed/evicted member is never fanned out to again, so its ghost claims would
     // otherwise assert a value forever (win never null ⇒ the sweep can never even run) and leak one
     // registry entry per dead uuid for the node's lifetime. Members merely MISSING this generation
-    // keep their claims — that is lawful parking, not departure.
+    // keep their claims — that is lawful parking, not departure. With `row`, the row's cells alone (old and new: every
+    // touched cell is in the registry now); the next whole generation reaps the rest, before any fold reads them.
     const alive = new Set(members)
-    for (const [, per] of reg)
-      for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid)
+    if (cells === null) {
+      for (const [, per] of reg)
+        for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid)
+    } else for (const cell of touched) { const per = reg.get(cell)!; for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid) }
     //! fold the touched cells — the winner per cell by the kernel's stamp order — then ACROSS DEPTH
     // (V4-18, overlapping cells): a field cell whose winning stamp is at or below an ancestor's winning
     // stamp is the older fact that ancestor's whole-row write carried (or its remove erased) — it is
@@ -470,11 +405,12 @@ export class Gather {
     // with anything in it stays (the fields keep it, on every node); an empty object held by the
     // nearest projected ancestor's own value was never made up; any other empty object was — it goes,
     // and the level above is asked the same question.
-    for (const key of emptied) this.#unvivify(key, shown, wins, reg, px)
+    for (const key of emptied) this.#unvivify(key, shown, wins)
   }
 
   //! #unvivify — take back the levels a deleted field cell alone had made up (see the projection above).
-  #unvivify(key: string[], shown: Map<string, unknown>, wins: Map<string, Claim | null>, reg: Map<string, Map<string, Claim>>, px: any) {
+  #unvivify(key: string[], shown: Map<string, unknown>, wins: Map<string, Claim | null>) {
+    const reg = this.#registry, px = this.proxy
     for (let j = key.length - 1; j >= 1; j--) {
       const level = key.slice(0, j)
       const lk = JSON.stringify(level)
@@ -513,7 +449,6 @@ export class Gather {
   destroy() {
     if (this.#timer) { clearInterval(this.#timer); this.#timer = null }
     this.#gen++
-    this.#rows.clear()
   }
 }
 
