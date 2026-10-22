@@ -40,8 +40,9 @@
 // stranded lane (A1 seed 8), and A4 seed 6. The runner drops a remove's OWN entry (its stamp and its cell): until
 // 2026-10-21 it matched by stamp alone and, for a field a row write swept, dropped the parent row's winning entry,
 // which is what A7 seed 5 and A2 seed 14 caught (the pins below say how they moved).
-// Cost: about 50 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five
-// pinned mutation schedules, each run clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
+// Cost: about 65 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five pinned
+// mutation schedules, each run clean and mutated; measured 2026-10-22, A14 and its owed-word pin about 10 s of it).
+// More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
 // 70 s on 2026-10-09, before the pinned seeds were added). The known-unsafe seeds below run in every battery on top
 // of that range, each pinned to the monitor line it fails on, and the set is exact in both directions over the
 // seeds that were checked: 1-8 for every family, and 1-12 for A11. Above that, a new red is a finding to read,
@@ -179,7 +180,7 @@ for (const fam of FAMILIES) {
       lanePairs += o.eng.lanePairs
       if (fam.name === 'A14-spoke-owed') {
         //! every word owed is paid by the horizon, once (a word owed twice before one heal would make these differ: none
-        // on seeds 1-24), and the counter's own rule held (a {b} is never said inside a link's own event)
+        // on seeds 1-72), and the counter's own rule held (a {b} is never said inside a link's own event)
         assert.equal(o.eng.feedOdd, 0, `${o.shape}: the counter's pay rule held (a {b} said inside the link's own event)`)
         assert.deepEqual([o.eng.paidX, o.eng.paidE], [o.eng.owedX, o.eng.owedE], `${o.shape}: every owed word was paid at the heal ({x} owed ${o.eng.owedX}, {e} owed ${o.eng.owedE})`)
         for (const k of Object.keys(words) as (keyof typeof words)[]) words[k] += o.eng[k] ?? 0
