@@ -1,6 +1,7 @@
 //! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts (and, since
 // wave 6a, A12, the spoke across two hand-offs, and A13, the spoke whose feeder repairs and re-enters through the latch,
-// with M12 judging every spoke against its feeder's held subset), each run
+// with M12 judging every spoke against its feeder's held subset; since wave 8, A14, the spoke whose paused feeder link
+// owes it the shed's word across a re-latch of the same partitions, V4-62's clause 3), each run
 // on seeded scoped clusters (n from the family's list, R 1-3, memory or durable, 50-500 partitions, row and field
 // writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M10 armed, and the mutation
 // runner's pinned catches.
@@ -130,14 +131,22 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   // delta forward taken out, a row of a repaired one on both. The answer's filter (feeds vs held) is NOT what this family
   // exercises — its spoke is synced all along — sighting 3 and the kernel tests cover that.
   'A13-spoke-repair': (e) => e.repairFolds > 0 && e.reentryFolds > 0,
+  //! A14: the feeder owed the spoke a shed's word (a clear took it from the paused queue) and paid it at the heal
+  // (sim/monitors.ts feedWords). Seeds 1-24 (measured 2026-10-22): 23 owe and pay it (1 to 20 partition-words each; seed
+  // 9's feeder lost no partition to the joiner, so nothing was shed); the word is paid while the partition is away on
+  // seeds 1 and 15, coming back (a latch from zero open) on 18 and 21, back and held on the other 19; frames of a
+  // re-latched partition survived a clear and reached the spoke ahead of the word said again (the leapfrog) on 4, 7, 17
+  // and 23; the fold's end was owed and paid on 19 of them.
+  'A14-spoke-owed': (e) => e.owedX > 0 && e.paidX > 0,
 }
 //! SPOKED — the families with a spoke: M12 (spokeMirror) must have compared something on every one of them
-const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff', 'A13-spoke-repair'])
+const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff', 'A13-spoke-repair', 'A14-spoke-owed'])
 
 for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live (lanes bounded), M8's tombstone half red today on every seed, compaction engaged, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
     let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0, lanePairs = 0, compactions = 0
+    const words = { owedX: 0, paidX: 0, owedE: 0, paidE: 0, healEnds: 0 }
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -159,6 +168,13 @@ for (const fam of FAMILIES) {
       floorLanes += o.eng.floorLanes; markPairs += o.eng.markPairs; if (o.R >= 2) rge2++
       spokeCells += o.eng.spokeCells; feederAcquires += o.eng.feederAcquires ?? 0; spokeStale += o.eng.spokeStale ?? 0
       lanePairs += o.eng.lanePairs
+      if (fam.name === 'A14-spoke-owed') {
+        //! every word owed is paid by the horizon, once (a word owed twice before one heal would make these differ: none
+        // on seeds 1-24), and the counter's own rule held (a {b} is never said inside a link's own event)
+        assert.equal(o.eng.feedOdd, 0, `${o.shape}: the counter's pay rule held (a {b} said inside the link's own event)`)
+        assert.deepEqual([o.eng.paidX, o.eng.paidE], [o.eng.owedX, o.eng.owedE], `${o.shape}: every owed word was paid at the heal ({x} owed ${o.eng.owedX}, {e} owed ${o.eng.owedE})`)
+        for (const k of Object.keys(words) as (keyof typeof words)[]) words[k] += o.eng[k] ?? 0
+      }
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
@@ -180,6 +196,14 @@ for (const fam of FAMILIES) {
       // partition with its feeder, and the count is 0 on every seed of 1-12. With the spoke's #unfeed off, seed 3 reads
       // 6 again (mutation-checked).
       assert.equal(spokeStale, 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (a shed tells its spokes since wave 6c)`)
+    }
+    //! A14 (wave 8): the owed words were owed and paid on these seeds, both kinds, and the heal-end check judged the spoke
+    // (non-vacuity: on seeds 1 and 2, 14 shed words owed and paid, 7 ends owed and paid, 2 heal ends judged); the spoke
+    // keeps no row of a partition that left its feeder at the horizon, as on A12
+    if (fam.name === 'A14-spoke-owed') {
+      assert.ok(words.owedX > 0 && words.paidX > 0 && words.owedE > 0 && words.paidE > 0, `non-vacuity: owed and paid words over the seeds (${JSON.stringify(words)})`)
+      assert.ok(words.healEnds > 0, `non-vacuity: the heal-end check judged ${words.healEnds} heal exchanges`)
+      assert.equal(spokeStale, 0, `the spoke kept ${spokeStale} rows of partitions that left its feeder`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
     //! stage 3: compaction fired on this family (compactAt 16), so M2 frontier-sound judged real passes. This count is
