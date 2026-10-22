@@ -5,7 +5,7 @@
 // - the run batch (runBatch): the small frames one run of the event loop makes on a link leave together when the run
 //   ends, a batch never reaches the socket's high-water mark nor holds more than 1024 frames (libuv's IOV_MAX), and
 //   no cork outlives its run; every socket the shell destroys (close, destroy, drop), and every socket of a process
-//   that exits, is flushed first, however many frames its batch holds.
+//   that exits, is flushed first, however many frames its batch holds; once the exit hook has run, nothing corks again.
 //! How the checks see the sockets: a PASSIVE spy on net.Socket's prototype (setNoDelay and write, the public methods
 // the shell calls; _write and _writev, the stream methods Node calls to hand bytes to the OS), installed for one test
 // and taken off after. It records and calls straight through, so nothing behaves differently. (If #wire ever turns
@@ -277,6 +277,30 @@ test('every frame shipped in the same run as process.exit() still reaches the pe
     const verbs = peer.verbs()
     assert.equal(verbs[0], VERB.HELLO, 'the HELLO came first')
     assert.equal(verbs.filter((v) => v === VERB.PING).length, PINGS, 'every PING shipped in the exiting run reached the peer')
+    assert.equal(verbs.length, PINGS + 1, 'nothing else arrived')
+  } finally {
+    if (child.child.exitCode === null) child.child.kill('SIGKILL')
+    await peer.stop()
+  }
+})
+
+//! a frame shipped by a user's own 'exit' listener, one that runs after the shell's exit hook, in a run that shipped
+// nothing before process.exit(): the hook has already flushed, and the process ends when the listeners return, so a
+// cork made then would never open. Before the `exiting` flag, the listener's frames were batched again: each full
+// batch of 1024 was flushed by the frame after it, and the last batch never left (2,050 of 3,000 arrived; a smaller
+// last write, 20 rows by plain assignment in the review's probe, lost every frame). With Nagle on, and with
+// setNoDelay alone, they all arrived. Now they go out uncorked.
+test('every frame shipped by a process \'exit\' listener that runs after the shell\'s exit hook still reaches the peer (it goes out uncorked, 3,000 tiny frames)', async () => {
+  const peer = await rawPeer()
+  const child = fero.spawn(path.join(import.meta.dirname, 'links.child.ts'), [peer.addr, String(PINGS), 'listener'], { stdin: 'pipe' })
+  try {
+    assert.ok(await until(() => child.out.includes('up') && peer.verbs().includes(VERB.HELLO), 10_000), 'the child linked and sent its HELLO')
+    child.write('go')
+    assert.equal(await child.exited, 0, 'the child exited 0')
+    assert.ok(await until(() => peer.closed()), 'the peer saw the socket close')
+    const verbs = peer.verbs()
+    assert.equal(verbs[0], VERB.HELLO, 'the HELLO came first')
+    assert.equal(verbs.filter((v) => v === VERB.PING).length, PINGS, 'every PING shipped by the exit listener reached the peer')
     assert.equal(verbs.length, PINGS + 1, 'nothing else arrived')
   } finally {
     if (child.child.exitCode === null) child.child.kill('SIGKILL')
