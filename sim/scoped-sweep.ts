@@ -9,8 +9,9 @@
 //   - mesh / plan: a scoped cluster built like harness.cluster() but with a tune table (compactAt and snapshotAt
 //     low enough that passes really fire), and a workload over 50 to 500 partitions with row writes, field
 //     writes, removes and re-writes of removed cells (harness.writesPlan draws from 20 keys only).
-//   - the adversaries A1-A11 of DESIGN-SCALE §6, A12 (wave 6a: a spoke across two hand-offs) and A13 (its review: a
-//     spoke whose feeder repairs and re-enters through the latch), one schedule builder each, run by one family runner.
+//   - the adversaries A1-A11 of DESIGN-SCALE §6, A12 (wave 6a: a spoke across two hand-offs), A13 (its review: a
+//     spoke whose feeder repairs and re-enters through the latch) and A14 (wave 8: a spoke whose paused feeder link
+//     owes it the shed's word across a re-latch, V4-62's clause 3), one schedule builder each, run by one family runner.
 //   - the mutation runner: a switch that weakens one rule of today's injected-drop class (a release the kernel
 //     does not do) and the monitors that must go red.
 //
@@ -21,12 +22,12 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLanes, boundedTombs, screenMatches, spokeMirror, spokeStale, laneUniqueCounts } from './monitors.ts'
-import { VERB } from '../kernel/codec.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLanes, boundedTombs, screenMatches, spokeMirror, spokeStale, spokeQuiet, laneUniqueCounts, feedWords, feedWordsOf } from './monitors.ts'
+import { VERB, Frame } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
-import type { Node, NodeOpts, LogEntry } from '../kernel/node.ts'
+import { stable, type Node, type NodeOpts, type LogEntry } from '../kernel/node.ts'
 import type { Tune } from '../kernel/tune.ts'
 
 const mul = (seed: number) => { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -214,7 +215,9 @@ interface Ctx {
   //! every 5 ms of virtual time, these run (the leave sweep's slice loop): reactive chaos
   polls: (() => void)[]
 }
-interface Family { name: string; ns: readonly number[]; Rs: readonly number[]; durable?: boolean | 'mix'; mutateAt: number; chaos: (c: Ctx) => void }
+//! `tune`, when a family has one, draws extra tune rows for its mesh after the shared draws (A14: a small paused queue);
+// a family without it draws nothing more, so its runs are exactly what they were
+interface Family { name: string; ns: readonly number[]; Rs: readonly number[]; durable?: boolean | 'mix'; mutateAt: number; tune?: (r: () => number) => Partial<Tune>; chaos: (c: Ctx) => void }
 
 const jcount = (sim: Sim, kind: number) => { let s = 0; for (const n of sim.nodes.values()) for (const e of n.journal.read()) if (e.kind === kind) s++; return s }
 const ownerOf = (c: Ctx, p: string): string | null => {
@@ -614,6 +617,149 @@ export const FAMILIES: readonly Family[] = [
       })
     },
   },
+  {
+    //! A14 the owed word (wave 8, 2026-10-22; STATUS's Sim and scale line, V4-62's clause 3, which no seeded schedule
+    // reached before: with a counter, the sweep and the scale probes owed and paid a shed word 0 times). A client of
+    // every member. Once the workload is in, its feeder F's link to it pauses, with a small queue (the tune rows queued
+    // and queuedBytes, drawn per seed), and a joiner n90 takes some of F's partitions: F's copies freeze and shed, and
+    // the shed's FEED {x} waits in the paused queue. While they are away, a burst of writes and removes lands on them
+    // at their new holders (so they come back on more than one run, with rows the spoke never saw and rows it must lose).
+    // Then either a second burst onto partitions F still holds taps the paused link until a clear takes the word
+    // (`taps`), or nothing does until the re-latch's own forward overflows the queue (`quiet`: its first frames go with
+    // the word, and the ones behind the clear survive and reach the spoke at the drain ahead of the word said again —
+    // the leapfrog of kernel/client.test.ts, counted in eng.survivors). Then n90 leaves cleanly and F latches its
+    // partitions back from zero; a fold that runs on the unsynced link owes its end too. The heal (the link's drain)
+    // comes a seeded delay after the re-latch folds (`after`), or, in `taps`, while a latch is open (`mid`: F's member
+    // links are slowed from the leave on, so the latches stay open past the heal) or before the leave (`before`): the
+    // word is paid while the partition is back, coming back, or away (eng.healHeld, healAcquiring, healGone; counted per
+    // shed partition at the drain). The
+    // engagement key: words owed and paid (sim/monitors.ts feedWords: eng.owedX, paidX, owedE, paidE). Judged at the
+    // horizon by M12 and the screen check like every spoked family, and at the heal exchange's end by this family's
+    // own check (`a14-heal-end`): the first quiet point after the drain (sim/monitors.ts spokeQuiet: everything the
+    // feeder sent has landed, its link synced and flowing), where the design says the spoke holds exactly what its
+    // feeder feeds — M12 over the partitions F holds, F's cells of every partition it feeds, nothing of a partition F
+    // has no entry for, the screen equal to the kernel. kernel/client.test.ts asserts the same there, on its hand-built
+    // shapes. The heal comes a seeded delay after the FIRST re-latched fold (`after`) or the first re-latch (`mid`).
+    name: 'A14-spoke-owed', ns: [3, 4], Rs: [1, 2, 3], mutateAt: 250,
+    tune: (r) => ({ queued: pick(r, [2, 3, 4]), queuedBytes: pick(r, [512, 4096, 1 << 20]) }),
+    chaos: (c) => {
+      const spoke = c.sim.add({ uuid: 's1', listen: 'sim:s1', hosts: c.nodes.map((x) => `sim:${x.uuid}`), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+      c.sim.post('s1', { kind: 'start' }, 0)
+      feedWords(c.sim) // the counter of owed and paid words (eng.owedX, paidX, owedE, paidE at the verdict)
+      //! the shape and its timings, drawn up front
+      const taps = c.r() < 0.5
+      //! in `quiet` nothing clears the queue before the re-latch's forward, so only a heal after the folds finds a word owed
+      const heal = taps ? pick(c.r, ['after', 'after', 'mid', 'before'] as const) : 'after'
+      const tp = 650 + Math.floor(c.r() * 150) // the pause, once the workload is in (its writes span 0-600 ms)
+      const tj = 10 + Math.floor(c.r() * 90) // the join, after the pause
+      const away = 4 + Math.floor(c.r() * 12) // the writes onto the shed partitions while they are away, 2 ms apart
+      const tb = Math.floor(c.r() * 40), burst = 4 + Math.floor(c.r() * 12) // taps: the burst onto F's own, after the first shed
+      const tl = 2 * away + 30 + Math.floor(c.r() * 400) // the leave, after the first shed (after the heal, for `before`)
+      const th = Math.floor(c.r() * (heal === 'mid' ? 15 : 300)) // the heal, after its trigger
+      c.eng.taps = taps ? 1 : 0
+      c.eng.heal = heal === 'before' ? 1 : heal === 'mid' ? 2 : 3
+      c.sim.at(tp, () => {
+        const pl = spoke.primary !== null ? spoke.links.get(spoke.primary) : undefined
+        const F = pl !== undefined ? c.sim.nodes.get(pl.uuid) : undefined
+        const l = F !== undefined ? [...F.links.values()].find((x) => x.uuid === 's1') : undefined
+        if (F === undefined || l === undefined) return
+        c.sim.post(F.uuid, { kind: 'pause', link: l.id }, 0)
+        c.eng.paused = 1
+        c.sim.at(tj, () => join(c.sim, 'n90', c.o))
+        const shed = new Set<string>()
+        const members = () => [...c.sim.nodes.keys()].filter((u) => u !== F.uuid && u !== 's1')
+        //! at the heal, what the shed partitions are at F, and how many frames of them leave the queue ahead of the
+        // owed word (the re-latch's frames a clear left behind it: the leapfrog); `mid` takes the slow links off after it
+        let healed = false, left = false, due = false
+        const drain = (ms: number) => {
+          if (healed) return
+          healed = true
+          c.sim.at(ms, () => {
+            for (const p of shed) {
+              const st = F.scope!.entries.get(p)?.state
+              const k = st === SCOPE.held ? 'healHeld' : st === SCOPE.acquiring ? 'healAcquiring' : st === undefined ? 'healGone' : 'healOrphan'
+              c.eng[k] = (c.eng[k] ?? 0) + 1
+            }
+            for (const b of l.queued) {
+              const f = new Frame(b)
+              if (f.verb === VERB.RECORDS && f.records().some((rv) => shed.has(partitionOf(rv.rec())))) c.eng.survivors = (c.eng.survivors ?? 0) + 1
+            }
+            c.sim.post(F.uuid, { kind: 'drain', link: l.id }, 0)
+            due = true
+            if (heal === 'mid') c.sim.at(100, () => { for (const u of members()) c.sim.fault(F.uuid, u, { delay: [1, 5] }) })
+          })
+        }
+        const leave = (ms: number) => {
+          if (left) return
+          left = true
+          leaveAndGo(c, 'n90', ms)
+          if (heal === 'mid') c.sim.at(ms, () => { for (const u of members()) c.sim.fault(F.uuid, u, { delay: [25, 40] }) })
+        }
+        c.sim.at(5000, () => drain(0)) // the backstop: the link heals whatever the schedule did
+        //! F's sheds, latches and folds, read by cursor every 5 ms slice: the first shed starts the rest
+        let jn = F.journal.n
+        c.polls.push(() => {
+          if (!c.sim.nodes.has(F.uuid)) return
+          const first = shed.size === 0
+          for (const row of F.journal.read(jn)) {
+            const p = row.a as string
+            if (row.kind === JK.shed) { shed.add(p); c.eng.fedSheds = (c.eng.fedSheds ?? 0) + 1 }
+            else if (row.kind === JK.acquireStart && shed.has(p)) { c.eng.relatches = (c.eng.relatches ?? 0) + 1; if (heal === 'mid') drain(th) }
+            else if (row.kind === JK.acquire && shed.has(p)) { c.eng.refolds = (c.eng.refolds ?? 0) + 1; if (heal === 'after') drain(th) }
+          }
+          jn = F.journal.n
+          if (!first || !shed.size) return
+          //! the first shed: rows onto the shed partitions while they are away (writes, field writes, removes), posted at
+          // another member (routed to their owner: nothing of them reaches F, nor its paused link)
+          const gone = [...shed], at = members().filter((u) => u !== 'n90')
+          if (at.length) for (let i = 0; i < away; i++) {
+            const q = pick(c.r, gone), roll = c.r()
+            const rec: Rec = roll < 0.45 ? { type: REC.update, key: [q], value: { away: i } } : roll < 0.75 ? { type: REC.update, key: [q, 'f' + (i % 3)], value: i } : { type: REC.remove, key: roll < 0.9 ? [q] : [q, 'f0'] }
+            c.sim.post(pick(c.r, at), { kind: 'write', recs: [rec] }, 2 * i)
+          }
+          //! taps: a burst onto partitions F still holds, tapped onto the paused link until a clear takes the word
+          if (taps) {
+            const mine = [...F.scope!.entries].filter(([, e]) => e.state === SCOPE.held).map(([q]) => q)
+            if (mine.length) for (let i = 0; i < burst; i++) c.sim.post(F.uuid, { kind: 'write', recs: [{ type: REC.update, key: [pick(c.r, mine), 'tap'], value: i }] }, tb + 2 * i)
+          }
+          if (heal === 'before') { drain(2 * Math.max(away, burst) + tb + 20 + th); leave(2 * Math.max(away, burst) + tb + 20 + th + tl) }
+          else leave(tl)
+        })
+        //! the heal exchange's end: the first quiet point after the drain (spokeQuiet: everything F sent has landed, its
+        // link synced and flowing again, the spoke not in resync, no fold group open) judges the spoke against F, as
+        // kernel/client.test.ts does right after the heal's settle: M12 over the partitions F holds; for every partition F
+        // FEEDS (held, or a latch from a held base or from nothing) the spoke holds exactly F's cells, and nothing of a
+        // partition F has no entry for (an orphan's frozen rows are left alone: its shed says the word); and the screen
+        // equals the kernel. Armed by the drain, not by a pay, so a word never said is judged too.
+        c.sim.monitors.push({
+          name: 'a14-heal-end',
+          check: (sim) => {
+            if (!due) return null
+            const s = sim.nodes.get('s1')
+            if (s === undefined || !sim.nodes.has(F.uuid) || spokeQuiet(sim, s) !== F) return null
+            due = false
+            c.eng.healEnds = (c.eng.healEnds ?? 0) + 1
+            const m = spokeMirror(sim, 's1')
+            if (m !== null) return `at the heal exchange's end: ${m}`
+            const sc = F.scope!
+            for (const [k, v] of s.state) {
+              const p = (JSON.parse(k) as string[])[0]
+              if (!sc.entries.has(p)) return `at the heal exchange's end: s1 shows ${k} of '${p}', a partition its feeder ${F.uuid} has no entry for (the owed {x} drops it)`
+              if (!sc.feeds(p)) continue
+              if (!F.state.has(k)) return `at the heal exchange's end: s1 shows ${k} of '${p}', which its feeder ${F.uuid} feeds without that cell`
+              if (stable(F.state.get(k)) !== stable(v)) return `at the heal exchange's end: s1 shows ${k} = ${stable(v)}; its feeder ${F.uuid} feeds ${stable(F.state.get(k))}`
+            }
+            for (const k of F.state.keys()) {
+              const p = (JSON.parse(k) as string[])[0]
+              if (sc.feeds(p) && !s.state.has(k)) return `at the heal exchange's end: s1 lacks ${k}, which its feeder ${F.uuid} feeds for '${p}'`
+            }
+            const scr = screenMatches(sim, 's1')
+            return scr === null ? null : `at the heal exchange's end: screen: ${scr}`
+          },
+        })
+      })
+    },
+  },
 ]
 
 //! runFamily — one seed of one family to its horizon, with an optional mutation. Never throws on a red run.
@@ -624,13 +770,14 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   const durable = fam.durable === true || (fam.durable === 'mix' && r() < 0.5)
   const parts = pick(r, [50, 120, 500])
   const count = pick(r, [60, 120])
+  const ft = fam.tune !== undefined ? fam.tune(r) : {}
   //! the stage-2 mutations switch the sweep off through the tune row (drop-dirty: so the sweep cannot heal what the
   // dirty leg should have); the injected-drop class leaves the tune alone
   const stage2 = mut === 'no-sweep' || mut === 'drop-dirty'
-  const o: MeshOpts = { replicas: R, durable, hb: 50, tune: { compactAt: 16, snapshotAt: 16, ...(stage2 ? { aeFan: 0 } : {}) }, fault: { delay: [1, 5] } }
+  const o: MeshOpts = { replicas: R, durable, hb: 50, tune: { compactAt: 16, snapshotAt: 16, ...ft, ...(stage2 ? { aeFan: 0 } : {}) }, fault: { delay: [1, 5] } }
   const sim = new Sim(seed)
   const eng: Record<string, number> = {}
-  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${mut !== 'none' ? ' mut=' + mut : ''}`, R, unsafe: [], notLive: [], redToday: [], red: new Set(), eng, sim }
+  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${Object.entries(ft).map(([k, v]) => ` ${k}=${v}`).join('')}${mut !== 'none' ? ' mut=' + mut : ''}`, R, unsafe: [], notLive: [], redToday: [], red: new Set(), eng, sim }
   const nodes = mesh(sim, n, o)
   if (mut === 'no-sweep') eng.mutated = 1
   //! drop-dirty: after every event, every stepped armed node's dirty set is emptied — the stamp site's one mark never
@@ -691,6 +838,9 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
     if (f !== undefined) for (const e of f.journal.read()) if (e.kind === JK.acquire) eng.feederAcquires = (eng.feederAcquires ?? 0) + 1
   }
   eng.spokeParts = m12.parts; eng.spokeCells = m12.cells
+  //! the FEED words (A14 installs the counter; no other family does, so their engagement rows are what they were)
+  const fw = feedWordsOf(sim)
+  if (fw !== undefined) Object.assign(eng, { owedX: fw.owedX, owedE: fw.owedE, paidX: fw.paidX, paidE: fw.paidE, saidX: fw.saidX, saidB: fw.saidB, saidE: fw.saidE, feedOdd: fw.odd })
   //! M8 in two halves (DESIGN-SCALE stage 3, 2026-10-12): the LANE half is a law now — scoped compaction keeps every lane
   // at or under winners + compactAt at the horizon, so a lane over it is a liveness problem (compaction did not keep up);
   // the TOMBSTONE half stays red today (no pin surface until stage 4)
