@@ -35,7 +35,7 @@ import { diagHello, onDiagQ } from './diag.js'
 import { maybeCompact } from './log.js'
 import { tuneOf,           } from './tune.js'
 import { RING } from './ring.js'
-import { NONCE_MIN, NONCE_MAX, PROOF_LEN, UUID_MAX, ISSUER_MAX, addressOk, contractDiff, prove, utf8Len, verify,                           } from './door.js'
+import { NONCE_MIN, NONCE_MAX, PROOF_LEN, UUID_MAX, ISSUER_MAX, LISTEN_MAX, NAME_MAX, addressOk, contractDiff, overBytes, prove, utf8Len, verify,                           } from './door.js'
 import { REC, TAG, partitionOf,                                } from './env.js'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -1910,8 +1910,15 @@ export class Node {
         //! the uuid's size (door.ts UUID_MAX): it becomes the origin of every record this peer stamps and the issuer of
         // every attempt it forwards, so a longer one could make its records unsendable once stamped. Malformed, with
         // the bound in the journal row.
-        if (utf8Len(v.u) > UUID_MAX) {
+        if (overBytes(v.u, UUID_MAX)) {
           j.armed && j.emit(JK.frameDrop, link.id, `malformed hello: uuid over ${UUID_MAX} bytes`)
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-hello')
+        }
+        //! the listen's size (door.ts LISTEN_MAX): the longest address there is. The listen goes into every view a
+        // member stores and ships, and becomes a redial target when an accepted link drops, so a longer one is malformed.
+        if (overBytes(v.l, LISTEN_MAX)) {
+          j.armed && j.emit(JK.frameDrop, link.id, `malformed hello: listen over ${LISTEN_MAX} bytes`)
           link.dead = true
           return this.env.sink.close(link.id, 'malformed-hello')
         }
@@ -1947,6 +1954,13 @@ export class Node {
           || (k !== undefined && (typeof k !== 'string' || k.length < NONCE_MIN || k.length > NONCE_MAX))
           || (vs !== undefined && !holdsOk(vs))) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-hello')
+        }
+        //! the name's size (door.ts NAME_MAX), checked before the compare below: a name that differs is journaled
+        // (nameReject carries it), and a malformed HELLO's row carries only the bound
+        if (typeof n === 'string' && overBytes(n, NAME_MAX)) {
+          j.armed && j.emit(JK.frameDrop, link.id, `malformed hello: name over ${NAME_MAX} bytes`)
           link.dead = true
           return this.env.sink.close(link.id, 'malformed-hello')
         }

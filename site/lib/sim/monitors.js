@@ -104,6 +104,11 @@ export const perEvent = () => [
     // fails to release the queue, or a ship that queues while flowing, violates this immediately. (The raw
     // queued bound (the node's tune row) is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
     // bound-only check is a tautology — an adversarial-review finding.)
+    //! The byte bound rides beside the count, as Link.full reads it (frames OR bytes, BEFORE the push): a frame goes onto
+    // the queue only while it holds fewer than the tune row `queuedBytes`, so the queue less its LAST frame holds fewer
+    // (one frame may pass the bound). And the byte count the link keeps (the diag row shows it, full() reads it) is the
+    // queue's own: a count that drifts from the frames would clear too early or never. The sum runs only on a non-empty
+    // queue, and a queue is non-empty only while its link is paused.
     name: 'queued-implies-paused',
     check: (() => {
       const due = new Due()
@@ -111,6 +116,14 @@ export const perEvent = () => [
         for (const l of n.links.values()) {
           if (l.queued.length > 0 && !l.paused) return `${id} link ${l.id} has ${l.queued.length} queued frames while FLOWING`
           if (l.queued.length > n.tune.queued) return `${id} link ${l.id} queued ${l.queued.length} > ${n.tune.queued}`
+          if (l.queued.length === 0) {
+            if (l.queuedBytes !== 0) return `${id} link ${l.id} counts ${l.queuedBytes} queued bytes on an empty queue`
+            continue
+          }
+          let bytes = 0
+          for (const b of l.queued) bytes += b.length
+          if (bytes !== l.queuedBytes) return `${id} link ${l.id} counts ${l.queuedBytes} queued bytes, holds ${bytes}`
+          if (bytes - l.queued[l.queued.length - 1].length >= n.tune.queuedBytes) return `${id} link ${l.id} queued ${bytes} bytes, ${bytes - l.queued[l.queued.length - 1].length} before its last frame >= ${n.tune.queuedBytes}`
         }
         return null
       })

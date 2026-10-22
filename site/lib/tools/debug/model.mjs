@@ -275,7 +275,7 @@ export const verifyReplay = (capture) => {
 //            seq, a splice fills BELOW the fence and never lowers them) · gateDrop(a=origin) names a lane
 //            without advancing it (streams.for runs before the gate) · acquire(a=partition) merges each lane
 //            up to the hand-off's cut (scope.ts onAcqDone), read off the entries it folded (handoffs()).
-// NOT derivable — carried as null, never guessed: `queued` while paused (ship() parks frames silently),
+// NOT derivable — carried as null, never guessed: `queued` and `queuedBytes` while paused (ship() parks frames silently),
 // `durable` once anything was ever persisted (persist/persisted carry batch ids, never origins; a node with
 // no persisted/replayed row anywhere in its journal provably never reached disk, so its durable IS 0), and
 // whether the PEER is a client (no emit). `n` on a stream is the count of records folded so far.
@@ -322,7 +322,7 @@ export const topologyAt = (capture, uuid, t) => {
     if (e.t > t) break
     const k = e.kind
     if (k === K.linkUp) {
-      links.set(e.a, { id: e.a, uuid: '', dialed: e.b === 1, admitted: false, synced: false, paused: false, queued: 0, client: null, diag: false, closing: false })
+      links.set(e.a, { id: e.a, uuid: '', dialed: e.b === 1, admitted: false, synced: false, paused: false, queued: 0, queuedBytes: 0, client: null, diag: false, closing: false })
     } else if (k === K.identified) {
       const l = links.get(e.a)
       if (l) { l.uuid = e.b; l.admitted = true; if (isClient && primary === null) primary = l.id }
@@ -334,10 +334,10 @@ export const topologyAt = (capture, uuid, t) => {
       if (isClient && primary === e.a) electPrimary()
     } else if (k === K.pause) {
       const l = links.get(e.a)
-      if (l) { l.paused = true; l.queued = null }
+      if (l) { l.paused = true; l.queued = null; l.queuedBytes = null }
     } else if (k === K.drain) {
       const l = links.get(e.a)
-      if (l) { l.paused = false; l.queued = 0 }
+      if (l) { l.paused = false; l.queued = 0; l.queuedBytes = 0 }
     } else if (k === K.dropOldest) {
       const l = links.get(e.a)
       if (l) l.synced = false
@@ -377,7 +377,7 @@ export const topologyAt = (capture, uuid, t) => {
 // END tables in the viewer, labelled with this reason — the fold layer proves what may be replayed
 // instead of the page assuming it.
 export const verifyTopology = (capture) => {
-  const LINK_FIELDS = ['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag']
+  const LINK_FIELDS = ['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'queuedBytes', 'diag']
   return capture.nodes.map((node) => {
     if (node.dropped > 0) return { uuid: node.uuid, ok: false, truncated: true, reason: `journal truncated (${node.dropped} dropped)` }
     const bad = (reason) => ({ uuid: node.uuid, ok: false, reason })
