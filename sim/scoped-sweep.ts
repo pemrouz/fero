@@ -143,9 +143,10 @@ const post = (sim: Sim, xs: Planned[], t0: number) => { for (const w of xs) sim.
 //! The OWED-WORD mutation (wave 8, for A14; V4-62's clause 3):
 //   owed-x-dropped — a feeder never owes a shed's word a clear took: every server's `owe` drops the kind 'x', so the
 //                    word is never said again at the heal and the answer's start is never lowered for it (the kernel
-//                    mutant "the {x} half off", made from outside: owe is a public method). The spoke keeps the rows
-//                    of a partition that left its feeder. Caught by A14's heal-end check (and M12 or spokeStale where
-//                    the partition stays away).
+//                    mutant "the {x} half off", made from outside: owe is a public method; on A14 seeds 1-24 the
+//                    kernel mutant and this one are red on the same four seeds at the same lines). The spoke keeps
+//                    the rows of a partition that left its feeder: A14's heal-end check names them where the word is
+//                    paid while the partition is away or its latch from zero is open.
 export type Mutation = 'none' | 'drop-one' | 'release-all' | 'version-only' | 'no-sweep' | 'drop-dirty' | 'owed-x-dropped'
 export const MUTATIONS: readonly Mutation[] = ['drop-one', 'release-all', 'version-only']
 export const STAGE2_MUTATIONS: readonly Mutation[] = ['no-sweep', 'drop-dirty']
