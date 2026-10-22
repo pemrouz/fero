@@ -761,6 +761,27 @@ test("a failed lookup is opened again with backoff: a successful register does n
   }
 })
 
+test("this box's own lookup rows pass isAddr, as another box's do: an older build's directory may hand out a host over 253 bytes, and it never enters the dial set", async () => {
+  //! this box's #directory runs in whichever process took the port, and an older build's register took a host of any
+  // size. A stand-in host (user name, the real Directory through the compose seam) hands out such a row.
+  const name = `dirl${process.pid}`
+  const addr = `127.0.0.1:${await ports.free()}`
+  const row = proxy({ u6: 'h'.repeat(254) + ':7', u7: 'x'.repeat(1 << 16) + ':7', u8: '127.0.0.1:7', u9: 'h'.repeat(253) + ':7' })
+  const host = await fero(name, { listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, methods: { lookup: () => row, register: () => true } })
+  let hosts: string[] = []
+  const d = new Directory({
+    compose: (_n, o) => fero(name, o), addr, name: 'r', uuid: 'u1', listen: () => undefined, serve: false,
+    heartbeatMs: 50, redialMs: 30, onHosts: (hs) => { hosts = hs }, onState: () => {},
+  })
+  try {
+    await d.start()
+    assert.ok(await until(() => hosts.length > 0, 8000), 'the lookup answered')
+    assert.deepEqual(hosts, ['127.0.0.1:7', 'h'.repeat(253) + ':7'], 'a host over the longest DNS name is dropped; 253 bytes are kept')
+  } finally {
+    await d.destroy(); await host.destroy()
+  }
+})
+
 test("an asked box whose directory goes away and comes back: the failed lookup is opened again on the new directory, `error` stays while it is dead and clears when it answers, and the box's servers are found", async () => {
   const name = `dirb${process.pid}`
   const own = `127.0.0.1:${await ports.free()}` // nothing listens there: this box's directory is down, which is fine
