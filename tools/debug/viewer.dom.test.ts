@@ -443,6 +443,45 @@ test("the debugger's own DIAG session is an OBSERVER, not a stuck pre-admit peer
   assert.match(el('statusRight').innerHTML, /1\/1 links/, 'the status bar at t counts peers only')
 })
 
+//! a two-node cluster whose n01 → n02 link is PAUSED with records parked on it (the socket's buffer is full; the
+// model.test recipe): the capture's link row carries the frame count and their weight (kernel/diag.ts queuedBytes)
+const parked = () => {
+  const sim = new Sim(3)
+  const nodes = cluster(sim, 2)
+  sim.run()
+  const link = nodes[0].links.values().next().value!
+  sim.post('n01', { kind: 'pause', link: link.id })
+  sim.run()
+  for (let i = 0; i < 3; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['k' + i], value: 'v'.repeat(700) }] }, i)
+  sim.run()
+  const cap = captureLive([...sim.nodes.values()])
+  const row = cap.nodes.find((n) => n.uuid === 'n01')!.links.find((l) => l.id === link.id) as unknown as { paused: boolean; queued: number; queuedBytes: number }
+  assert.ok(row.paused && row.queued === link.queued.length && row.queued > 0, 'the fixture is what it claims: a paused link with frames parked')
+  assert.equal(row.queuedBytes, link.queued.reduce((n, b) => n + b.length, 0))
+  assert.ok(row.queuedBytes > 2100 && row.queuedBytes < 1048576, `${row.queuedBytes} bytes: past 2 KiB, short of a MiB`)
+  return { cap, id: link.id, bytes: row.queuedBytes }
+}
+
+test('a paused link shows what its parked frames weigh beside their count: the link inspector, the node\'s link table, the status bar; under scrub the weight is unknown, never a guess', async () => {
+  const { cap, id, bytes } = parked()
+  const { el, g } = await bootViewer('parked', cap, { search: '' })
+  const w = (bytes / 1024).toFixed(1) + ' KiB'
+  const lk = `g/nodes/n01/g/links/${id}`
+  g(`navTo('${lk}')`)
+  assert.match(el('insp').innerHTML, new RegExp(`<dt data-tip="queued-bytes">queued bytes</dt><dd class="warn">${w}</dd>`), 'the link inspector: the weight, warn while anything waits')
+  assert.match(el('statusRight').innerHTML, new RegExp(`<span data-tip="queued-bytes">${w}</span>`), 'the status bar')
+  g(`navTo('g/nodes/n01')`)
+  assert.match(el('insp').innerHTML, /<th data-tip="queued-bytes">bytes<\/th>/, 'the node\'s link table has the column')
+  assert.match(el('insp').innerHTML, new RegExp(`<td data-tip="queued-bytes">${w}</td>`), 'and the row its weight')
+  //! under scrub the replay holds a paused link's weight as unknown (topologyAt: null from the pause row on)
+  const n01 = cap.nodes.find((n) => n.uuid === 'n01')!
+  const tPause = n01.journal.find((e) => e.kind === cap.vocab.pause)!.t
+  assert.ok(tPause < Number(el('trange').max), 'the writes after the pause leave the pause row scrubbable')
+  dragTo(el, tPause)
+  g(`expanded.add('g/nodes/n01'); expanded.add('g/nodes/n01/g/links'); render(); navTo('${lk}')`)
+  assert.match(el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'unknown at t, never a guess')
+})
+
 test('an even split has no modal side: every node is pilled and the header says split — the first-listed node is not "converged" by accident (ISSUES I-7)', async () => {
   //! two members cut from each other, each with its own writes, run to quiescence: one against one
   const sim = new Sim(5); const pair = cluster(sim, 2); sim.run()

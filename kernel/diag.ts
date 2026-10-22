@@ -162,7 +162,11 @@ export const diagNode = (node: Node) => ({
   ),
   links: [...node.links.values()].map((l) => ({
     id: l.id, uuid: l.uuid, dialed: l.dialed, admitted: l.state === LS.admitted, synced: l.synced,
-    paused: l.paused, queued: l.queued.length, client: l.client, diag: l.state === LS.diag,
+    paused: l.paused, queued: l.queued.length,
+    //! queuedBytes: what the parked frames weigh (Link.full clears the queue at the tune row `queued` frames OR
+    // `queuedBytes` bytes), so a pause holding a few big frames reads as heavy, not as a short queue
+    queuedBytes: l.queuedBytes,
+    client: l.client, diag: l.state === LS.diag,
   })),
 })
 

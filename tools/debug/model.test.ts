@@ -123,7 +123,7 @@ test('summarize reports capture health honestly (convergence from hashes, trunca
 })
 
 //! ── topology replay (links + streams under time travel) ──
-type L = { id: number; uuid: string; dialed: boolean; admitted: boolean; synced: boolean | null; paused: boolean; queued: number | null; closing: boolean }
+type L = { id: number; uuid: string; dialed: boolean; admitted: boolean; synced: boolean | null; paused: boolean; queued: number | null; queuedBytes: number | null; closing: boolean }
 type W = { a: number; s: number; d: number | null; n: number }
 type Topo = { links: Map<number, L>; streams: Map<string, W> }
 
@@ -139,8 +139,8 @@ test('topologyAt is genuine time travel for links and streams: nothing at t0, th
     for (const l of n.links) {
       const r = end.links.get(l.id)!
       assert.deepEqual(
-        { uuid: r.uuid, dialed: r.dialed, admitted: r.admitted, synced: r.synced, paused: r.paused, queued: r.queued, closing: r.closing },
-        { uuid: l.uuid, dialed: l.dialed, admitted: l.admitted, synced: l.synced, paused: l.paused, queued: l.queued, closing: false },
+        { uuid: r.uuid, dialed: r.dialed, admitted: r.admitted, synced: r.synced, paused: r.paused, queued: r.queued, queuedBytes: r.queuedBytes, closing: r.closing },
+        { uuid: l.uuid, dialed: l.dialed, admitted: l.admitted, synced: l.synced, paused: l.paused, queued: l.queued, queuedBytes: l.queuedBytes, closing: false },
         `link #${l.id} replays field for field`)
     }
     assert.deepEqual([...end.streams.keys()].sort(), Object.keys(n.streams).sort(), 'the captured origins, exactly')
@@ -169,7 +169,7 @@ test('topologyAt is genuine time travel for links and streams: nothing at t0, th
   assert.ok(samples.some((c) => c > 0 && c < n0.links.length), `an intermediate step is mid-formation (${samples.join(',')})`)
 })
 
-test('paused links: queued is an UNKNOWN (null) the replay never claims — verifyTopology skips it; drain restores the fact', () => {
+test('paused links: queued and queuedBytes are UNKNOWNS (null) the replay never claims — verifyTopology skips them; the capture carries both, the bytes the kernel holds; drain restores the facts', () => {
   const sim = new Sim(3)
   const nodes = cluster(sim, 2)
   sim.run()
@@ -184,12 +184,18 @@ test('paused links: queued is an UNKNOWN (null) the replay never claims — veri
   const rp = (topologyAt(paused, 'n01', Infinity) as Topo).links.get(link.id)!
   assert.equal(rp.paused, true)
   assert.equal(rp.queued, null, 'the parked depth is not a diary fact — null, never a guess')
+  assert.equal(rp.queuedBytes, null, 'nor is its weight')
+  //! the captured row (kernel/diag.ts) carries the weight beside the count: the bytes the kernel's queue holds now
+  const row = paused.nodes.find((n) => n.uuid === 'n01')!.links.find((l) => l.id === link.id)! as unknown as { queued: number; queuedBytes: number }
+  assert.equal(row.queued, link.queued.length)
+  assert.equal(row.queuedBytes, link.queued.reduce((n, b) => n + b.length, 0), 'the bytes parked, frame by frame')
+  assert.ok(row.queuedBytes > 0)
   assert.ok((verifyTopology(paused) as { ok: boolean; reason?: string }[]).every((r) => r.ok), 'an unknown is never compared — the guard still passes')
   sim.post('n01', { kind: 'drain', link: link.id })
   sim.run()
   const drained = captureSim(sim)
   const rd = (topologyAt(drained, 'n01', Infinity) as Topo).links.get(link.id)!
-  assert.deepEqual({ paused: rd.paused, queued: rd.queued, synced: rd.synced }, { paused: false, queued: 0, synced: true })
+  assert.deepEqual({ paused: rd.paused, queued: rd.queued, queuedBytes: rd.queuedBytes, synced: rd.synced }, { paused: false, queued: 0, queuedBytes: 0, synced: true })
   assert.ok((verifyTopology(drained) as { ok: boolean }[]).every((r) => r.ok))
 })
 
@@ -283,7 +289,7 @@ test('a digest on a PAUSED link never syncs it (kernel marks debt and returns be
   assert.ok(j.slice(iDrop).some((e) => e.kind === K.digestIn && e.a === link.id), 'a digest ARRIVED on the paused link after the overflow')
   assert.equal(link.synced, false, 'the kernel left it unsynced (paused: debt marked, no sync)')
   const r = (topologyAt(cap, 'n02', Infinity) as Topo).links.get(link.id)!
-  assert.deepEqual({ paused: r.paused, synced: r.synced, queued: r.queued }, { paused: true, synced: false, queued: null })
+  assert.deepEqual({ paused: r.paused, synced: r.synced, queued: r.queued, queuedBytes: r.queuedBytes }, { paused: true, synced: false, queued: null, queuedBytes: null })
   assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((x) => x.ok), JSON.stringify(verifyTopology(cap)))
 })
 

@@ -282,6 +282,8 @@ import { mountTips } from './eli5.mjs';
 // through here before touching innerHTML; capture content is arbitrary user data.
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const klog = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n;
+// a byte count as people read one: B below 1 KiB, else KiB or MiB to one decimal (a paused link's queuedBytes)
+const kib = n => n < 1024 ? n + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KiB' : (n/1048576).toFixed(1) + ' MiB';
 // isSystem — a node of a SYSTEM resource: its name starts with `#` (fero's own `#directory`; the public fero()
 // refuses such names, so a user resource never wears the badge). A capture without names (the sim) has none.
 const isSystem = n => typeof n.name === 'string' && n.name.startsWith('#');
@@ -525,7 +527,8 @@ const buildForest = (capture, T) => {
     // a field the capture could not vouch for (absent from its end table — an older capture) renders as
     // unknown under replay, exactly as it does at present: the verdict's `unverified` list says which
     const unvSynced = !!(tp && tv.unverified && tv.unverified.includes('synced'));
-    const lks = tp ? [...tp.links.values()].map(l => unvSynced ? { ...l, synced: null } : l) : n.links;
+    const unvBytes = !!(tp && tv.unverified && tv.unverified.includes('queuedBytes'));   // a capture from before the byte count
+    const lks = tp ? [...tp.links.values()].map(l => unvSynced || unvBytes ? { ...l, ...(unvSynced ? { synced: null } : {}), ...(unvBytes ? { queuedBytes: null } : {}) } : l) : n.links;
     //! the admitted/total stat counts PEERS: the debugger's own DIAG session (diag: true, kernel/diag.ts) is a
     // read-only observer that is never admitted — counting it read as a stuck 2/3 on a healthy pair (ISSUES I-6)
     const peers = lks.filter(l => !l.diag);
@@ -1020,7 +1023,7 @@ function renderStatus(){
   } else if (node.type === 'cell'){
     sb.innerHTML = `${fact('cell', 'cell')} · ${sst(node.sev, node.pill ? node.pill.lab : 'settled', node.pill ? node.pill.key : 'cell:settled')} · ${fact('winner ' + (e.cell.winner ? esc(e.cell.winner.origin + '#' + e.cell.winner.seq) : '—'), 'cell-winner')}`;
   } else if (node.type === 'link'){
-    sb.innerHTML = refusedMark(e.node) + `${fact('link', 'link')} · ${sst(node.sev, node.pill ? node.pill.lab : 'up', node.pill ? node.pill.key : 'link:up')} · ${e.link.queued == null ? fact('queued —', 'unknown@t') : fact('queued ' + e.link.queued, 'queued')}`;
+    sb.innerHTML = refusedMark(e.node) + `${fact('link', 'link')} · ${sst(node.sev, node.pill ? node.pill.lab : 'up', node.pill ? node.pill.key : 'link:up')} · ${e.link.queued == null ? fact('queued —', 'unknown@t') : fact('queued ' + e.link.queued, 'queued')} · ${e.link.queuedBytes == null ? fact('bytes —', 'unknown@t') : fact(kib(e.link.queuedBytes), 'queued-bytes')}`;
   } else if (node.type === 'stream'){
     sb.innerHTML = refusedMark(e.node) + `${fact('stream ' + esc(e.origin), 'stream')} · ${fact('applied ' + esc(String(e.w.a)), 'wm:applied')} · ${fact('shippable ' + esc(String(e.w.s)), 'wm:shippable')} · ${e.w.d == null ? fact('durable —', 'unknown@t') : fact('durable ' + esc(String(e.w.d)), 'wm:durable')}`;
   } else if (node.type === 'violation'){
@@ -1121,10 +1124,11 @@ function inspNode(nd){
     const cls = l.closing ? 'min' : l.diag || !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
     return `<tr><td class="node">${l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '—'} <span style="color:var(--soft)" data-tip="link-id">#${esc(String(l.id))}</span></td>` +
       `<td data-tip="${l.dialed ? 'side:dialed' : 'side:accepted'}">${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}"><span${skey ? ` data-tip="${skey}"` : ''}>${state}</span>${l.paused ? ' <span class="min" data-tip="link:paused">· paused</span>' : ''}</td>` +
-      (l.queued == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="queued">${esc(String(l.queued))}</td>`) + `</tr>`;
+      (l.queued == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="queued">${esc(String(l.queued))}</td>`) +
+      (l.queuedBytes == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="queued-bytes">${esc(kib(l.queuedBytes))}</td>`) + `</tr>`;
   }).join('');
   const links = lks.length
-    ? `<table class="vt"><thead><tr><th data-tip="peer">peer</th><th data-tip="side">side</th><th data-tip="link-state">state</th><th data-tip="queued">queued</th></tr></thead><tbody>${lrows}</tbody></table>`
+    ? `<table class="vt"><thead><tr><th data-tip="peer">peer</th><th data-tip="side">side</th><th data-tip="link-state">state</th><th data-tip="queued">queued</th><th data-tip="queued-bytes">bytes</th></tr></thead><tbody>${lrows}</tbody></table>`
     : `<div class="reason">No links${tp ? ' yet at this point' : ''}.</div>`;
   const sts = nd.entity.sts;
   const srows = sts.map(([o, v]) => { const w = wm(v); return (
@@ -1267,6 +1271,7 @@ function inspLink(nd){
       ['synced', l.synced === true ? 'yes' : l.synced === false && !l.diag ? 'no' : '—', l.synced === false && !l.diag ? 'warn' : '', 'synced'],   // '—' = field absent from this capture, or meaningless on an observer
       ['paused', l.paused ? 'yes' : 'no', l.paused ? 'warn' : '', 'paused'],
       l.queued == null ? ['queued', '—', '', 'unknown@t'] : ['queued', String(l.queued), l.queued ? 'warn' : '', 'queued'],
+      l.queuedBytes == null ? ['queued bytes', '—', '', 'unknown@t'] : ['queued bytes', kib(l.queuedBytes), l.queuedBytes ? 'warn' : '', 'queued-bytes'],
     ]), atEnd, 'facts');
 }
 function inspStream(nd){
