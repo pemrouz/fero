@@ -14,9 +14,9 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21, 1185 on 2026-10-22 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12, 1085 on 2026-10-20, 1108 then 1129 then 1142 on 2026-10-21, 1185 then 1192 on 2026-10-22 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
-`npm run perf` (62 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
+`npm run perf` (64 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
 
 ## Migration ledger (D-phases, per DESIGN-DATA3 §5)
@@ -807,6 +807,14 @@ working as designed.
   whole). Fable built it and five fix rounds, Opus the last two and all eight reviews; at the merge the
   owed word's queue guard became link.full() and the eighth review's relayed-write case became a test.
   1185/1185 + 18/18, perf 62/62, 1000/1000 seeds, sim:scale green.
+
+- 2026-10-22 — wave 7 part 1 (on Opus): the Nagle fix as V4-63 — `setNoDelay(true)` first in `#wire`, every
+  link socket and the #directory's included; the run batch (a cork at a run's first small frame, the uncork
+  on the next tick; under the high-water mark, at most 1024 frames for IOV_MAX, a big frame never corked;
+  every destroy and the exit hook flush, and nothing corks once the hook has run). A writing method call
+  and a forwarded update about 1 ms, not 43; 20,000 small writes 259 ms (Nagle on 290, off with no batch
+  677). Opus built it, reviewed it three times and fixed it twice (IOV_MAX; an exit listener's lost batch).
+  1192/1192 + 18/18, perf 64/64, 1000/1000 seeds.
 
 ## The debug tool
 
