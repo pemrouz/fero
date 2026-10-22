@@ -220,17 +220,25 @@ test('a HELLO whose listen is over LISTEN_MAX (253 + \':\' + 5 digits = 259 UTF-
     assert.deepEqual(closes(), [[1, 'malformed-hello']], `${l.length} characters`)
     assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: listen over 259 bytes', null]])
     assert.deepEqual(node.admitted(), [])
-    //! the accepted link drops: its listen was never taken, so nothing dials it
+    //! the accepted link drops: its listen was never taken, so nothing redials it. A redial is a TIMER first (node.ts
+    // #redial; the dial comes when it fires), so the check reads the redial timers and rows, not only the dials
     node.step({ kind: 'linkDown', link: 1, reason: 'malformed-hello' })
-    assert.deepEqual(effects.filter((e) => e[0] === 'connect'), [], 'no redial toward the refused listen')
+    assert.deepEqual(effects.filter((e) => e[0] === 'timer' && e[2] === TAG.redial), [], 'no redial timer toward the refused listen')
+    assert.deepEqual(rows(JK.redial), [], 'no redial row')
+    assert.deepEqual(effects.filter((e) => e[0] === 'connect'), [], 'no dial')
   }
   //! the bound itself: the longest DNS host with a 5-digit port, a bracketed IPv6 with a zone, and '' (a client)
   for (const l of ['h'.repeat(253) + ':65535', 'é'.repeat(126) + 'h:12345', '[fe80::1%eth0]:4000', '']) {
-    const { node, closes, up } = harness('aa')
+    const { node, closes, rows, up, effects } = harness('aa')
     up(1)
     helloWith(1, node, { l, ...(l === '' ? { r: 1 } : {}) })
     assert.deepEqual(closes(), [], `${utf8Len(l)} bytes`)
     assert.deepEqual(node.admitted(), ['bb'], `${utf8Len(l)} bytes admitted`)
+    //! the control for the check above: an admitted link that drops IS redialed, at the listen its HELLO carried (a
+    // client's '' names nothing), so a redial toward a refused listen would show there
+    node.step({ kind: 'linkDown', link: 1, reason: 'gone' })
+    assert.deepEqual(rows(JK.redial), l === '' ? [] : [[10, l, null]], `${utf8Len(l)} bytes: redialed at its listen`)
+    assert.equal(effects.filter((e) => e[0] === 'timer' && e[2] === TAG.redial).length, l === '' ? 0 : 1)
   }
 })
 
