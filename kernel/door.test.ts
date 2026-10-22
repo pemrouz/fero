@@ -17,7 +17,7 @@ import { Node, type NodeOpts } from './node.ts'
 import { VERB, Framer, encodeControl, encodeFrame, encodeRuns } from './codec.ts'
 import { JK } from './journal.ts'
 import { LS } from './link.ts'
-import { ISSUER_MAX, PROOF_LEN, UUID_MAX, proofMsg, utf8Len } from './door.ts'
+import { HOST_MAX, ISSUER_MAX, LISTEN_MAX, NAME_MAX, PROOF_LEN, UUID_MAX, overBytes, proofMsg, utf8Len } from './door.ts'
 import { REC, TAG, type EffectSink, type Env } from './env.ts'
 import { toyDoor, toyClientDoor, toyClientKey } from '../sim/door.ts'
 import { mulberry32 } from '../sim/exec.ts'
@@ -208,6 +208,58 @@ test('a HELLO whose uuid is over UUID_MAX (64 UTF-8 bytes) is malformed: frameDr
   }
   //! utf8Len is TextEncoder's count, a lone surrogate included
   for (const t of ['', 'abc', 'é', '€', '😀', '\ud800', '\udc00x', 'a😀é€']) assert.equal(utf8Len(t), new TextEncoder().encode(t).length, JSON.stringify(t))
+})
+
+test('a HELLO whose listen is over LISTEN_MAX (253 + \':\' + 5 digits = 259 UTF-8 bytes) is malformed: frameDrop names the bound, the link closes malformed-hello, never admitted, nothing redials it; 259 bytes are admitted', () => {
+  assert.equal(HOST_MAX, 253)
+  assert.equal(LISTEN_MAX, HOST_MAX + 6)
+  for (const l of ['h'.repeat(254) + ':65535', 'é'.repeat(127) + ':12345', '€'.repeat(85) + ':1234', 'x'.repeat(1 << 20)]) {
+    const { node, closes, rows, up, effects } = harness('aa')
+    up(1)
+    helloWith(1, node, { l })
+    assert.deepEqual(closes(), [[1, 'malformed-hello']], `${l.length} characters`)
+    assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: listen over 259 bytes', null]])
+    assert.deepEqual(node.admitted(), [])
+    //! the accepted link drops: its listen was never taken, so nothing dials it
+    node.step({ kind: 'linkDown', link: 1, reason: 'malformed-hello' })
+    assert.deepEqual(effects.filter((e) => e[0] === 'connect'), [], 'no redial toward the refused listen')
+  }
+  //! the bound itself: the longest DNS host with a 5-digit port, a bracketed IPv6 with a zone, and '' (a client)
+  for (const l of ['h'.repeat(253) + ':65535', 'é'.repeat(126) + 'h:12345', '[fe80::1%eth0]:4000', '']) {
+    const { node, closes, up } = harness('aa')
+    up(1)
+    helloWith(1, node, { l, ...(l === '' ? { r: 1 } : {}) })
+    assert.deepEqual(closes(), [], `${utf8Len(l)} bytes`)
+    assert.deepEqual(node.admitted(), ['bb'], `${utf8Len(l)} bytes admitted`)
+  }
+})
+
+test('a HELLO whose name is over NAME_MAX (255 UTF-8 bytes) is malformed before the name compare: no nameReject row carries it; 255 bytes are compared as ever', () => {
+  assert.equal(NAME_MAX, 255)
+  for (const [mine, n] of [[undefined, 's'.repeat(256)], ['shop', 's'.repeat(256)], ['shop', 'é'.repeat(128)], [undefined, '€'.repeat(86)], ['shop', 'x'.repeat(1 << 20)]] as const) {
+    const { node, closes, rows, up } = harness('aa', mine !== undefined ? { name: mine } : {})
+    up(1)
+    helloWith(1, node, { n })
+    assert.deepEqual(closes(), [[1, 'malformed-hello']], `${mine ?? 'no name'}: ${n.length} characters`)
+    assert.deepEqual(rows(JK.frameDrop), [[1, 'malformed hello: name over 255 bytes', null]])
+    assert.deepEqual(rows(JK.nameReject), [], 'refused before the compare: the peer\'s long name is never journaled')
+    assert.deepEqual(node.admitted(), [])
+  }
+  //! 255 bytes: admitted where the names agree (or this node has none), refused as another resource where they differ
+  for (const n of ['s'.repeat(255), 'é'.repeat(127) + 's', '😀'.repeat(63) + 'sss']) {
+    const same = harness('aa', { name: n })
+    same.up(1)
+    helloWith(1, same.node, { n })
+    assert.deepEqual(same.closes(), [], `${utf8Len(n)} bytes, the same name`)
+    assert.deepEqual(same.node.admitted(), ['bb'])
+    const other = harness('aa', { name: 'shop' })
+    other.up(1)
+    helloWith(1, other.node, { n })
+    assert.deepEqual(other.closes(), [[1, 'name-mismatch']], `${utf8Len(n)} bytes, another name`)
+  }
+  //! overBytes is utf8Len's verdict, with or without the scan
+  for (const [t, max] of [['', 0], ['a', 0], ['abc', 3], ['abcd', 3], ['é', 1], ['é', 2], ['€€', 5], ['€€', 6], ['😀', 3], ['😀', 4], ['\ud800', 2], ['x'.repeat(300), 299]] as const)
+    assert.equal(overBytes(t, max), utf8Len(t) > max, `${JSON.stringify(t)} over ${max}`)
 })
 
 test('a WRITE whose issuer is over ISSUER_MAX (uuid + \'~\' + 16 digits = 81 bytes) is malformed: the relay never stamps it, on a client link or a member link; 81 bytes commit', () => {
