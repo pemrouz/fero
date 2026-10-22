@@ -713,7 +713,7 @@ const rawHello = (addr: string, hello: Record<string, unknown>, ms = 1500): Prom
   setTimeout(finish, ms).unref()
 })
 
-//! V4-NN (STATUS: "The refusal lines can skip a line on a journal ring overflow"): the lines were fed from the
+//! V4-66 (STATUS: "The refusal lines can skip a line on a journal ring overflow"): the lines were fed from the
 // composer's post-step journal cursor, so a refusal row the ring overwrote inside its own step never printed. The
 // shape: a member that evicts a client squatting on a member's uuid goes on to admit that member IN THE SAME STEP
 // (identified, the digest, the join…), so below a few rows of journal.cap the eviction's row is gone by the fold.

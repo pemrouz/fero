@@ -362,7 +362,7 @@ the truing would overclaim — only the epoch-0-born arming may true); per-recor
 "first-ever" detection (locally impossible — the exact reason the sender stamps pp); attesting
 tails on the wire instead of floors (a tail proves nothing about interiors).
 
-## Note (2026-10-22, wave 7, DECISIONS V4-NN) — a keyed read during a handover gathers one partition
+## Note (2026-10-22, wave 7, DECISIONS V4-65) — a keyed read during a handover gathers one partition
 
 The keyed read's gather branch (api/index.ts keyedRead: this node owns the row
 but does not hold it, which is a handover, or a read of an absent row) used the

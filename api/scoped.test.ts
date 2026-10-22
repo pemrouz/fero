@@ -690,7 +690,7 @@ test('DRAIN, the verdict rides destroy(): an UNSCOPED pair resolves true on both
 
 //! the fix check: a keyed refresh read the union with `all[key]`, so an absent 'constructor' row answered (or was
 // refused as) Object.prototype's function; a live tick built a whole-union answer nobody reads. Own rows only, no
-// answer for `want: false`. (A keyed read refused for a member's WHOLE share was told to retry here; since V4-NN it
+// answer for `want: false`. (A keyed read refused for a member's WHOLE share was told to retry here; since V4-65 it
 // asks for the row's partition only — the KEYED HANDOVER test below.)
 test('a keyed gather reads only its own row, a refresh nobody reads builds no answer, and a keyed read is not refused for a member\'s whole share', async () => {
   const { Gather } = await import('./fold.ts')
@@ -721,12 +721,12 @@ test('a keyed gather reads only its own row, a refresh nobody reads builds no an
   } finally { g.destroy() }
 })
 
-//! V4-NN (STATUS: "A keyed read during a handover can be refused while a member's whole share is bigger than one
+//! V4-65 (STATUS: "A keyed read during a handover can be refused while a member's whole share is bigger than one
 // frame"): a keyed read on the row's owner while it is still taking the row over gathered EVERY member's whole share,
 // so one member whose share passed one frame refused its answer 'too-large' and the read was refused until the
 // handover ended. It asks each member for that row's partition only now, and folds the answers into the live union
 // for that row alone: the row changes there as a whole generation would change it, and every other row stays as it was.
-test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s partition only: a member whose whole share passes one frame answers it; the answers fold into the live union for that row alone, parking included', async () => {
+test('KEYED HANDOVER [V4-65] — a keyed read asks each member for its row\'s partition only: a member whose whole share passes one frame answers it; the answers fold into the live union for that row alone, parking included', async () => {
   const { Gather } = await import('./fold.ts')
   //! self owns `a` and is still taking it over (it holds nothing, attests nothing); h1 is the row's old holder, h2 a member
   const fake = {
@@ -807,13 +807,13 @@ test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s pa
   } finally { g.destroy() }
 })
 
-//! V4-NN, the round-2 review: the keyed fold started from a fresh COPY of the live union on every read, so on a node
+//! V4-65, the round-2 review: the keyed fold started from a fresh COPY of the live union on every read, so on a node
 // whose live union was never read, two keyed reads did not park across each other. The second, in the skew window (the
 // old holder has shed: no claim, no attestation; the holders still acquiring), read the row absent, where the one
 // registry of the whole-read gather, which base's keyed read wrote as a whole refresh, kept its last value. And a row a
 // keyed read had seen deleted came back from the live union's older copy. A keyed read folds into that one registry
 // again now (the round-4 review), for its row alone, so the row parks across keyed reads and live generations alike.
-test('KEYED PARKING [V4-NN] — keyed reads park across each other and across the live generations, in the one registry', async () => {
+test('KEYED PARKING [V4-65] — keyed reads park across each other and across the live generations, in the one registry', async () => {
   const { Gather } = await import('./fold.ts')
   //! self owns `a` and `b` and is taking them over (it holds nothing, attests nothing); h1 is the old holder, h2 a co-holder
   const fake = {
@@ -864,14 +864,14 @@ test('KEYED PARKING [V4-NN] — keyed reads park across each other and across th
   } finally { g.destroy() }
 })
 
-//! V4-NN, the round-4 review: rounds 2 to 4 of this lane folded a keyed read onto a keyed state of the row, beside the
+//! V4-65, the round-4 review: rounds 2 to 4 of this lane folded a keyed read onto a keyed state of the row, beside the
 // live union, so a WHOLE read on the same node could go back past a keyed read. In the skew window it showed the row
 // older than a keyed read had just returned, or showed again a row a keyed read had just read as removed. Base did
 // neither on the owner: its keyed read was a whole refresh of the one registry. A keyed read folds into that registry
 // again, for its row alone. Self owns `a` and is taking it over (no claim, no attestation); h1 is the old holder, h2 a
 // co-holder, also acquiring. Red on the keyed-state fold: `{ a: { x: 1 }, b: 1 }` for `{ a: { x: 5 }, b: 1 }`, and
 // `{ a: { x: 1 } }` for `{}`.
-test('KEYED THEN WHOLE [V4-NN] — on the owner, a whole read after a keyed read never shows the row older than the keyed read returned, nor a row it saw removed', async () => {
+test('KEYED THEN WHOLE [V4-65] — on the owner, a whole read after a keyed read never shows the row older than the keyed read returned, nor a row it saw removed', async () => {
   const { Gather } = await import('./fold.ts')
   const mk = () => ({
     uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
@@ -918,7 +918,7 @@ test('KEYED THEN WHOLE [V4-NN] — on the owner, a whole read after a keyed read
 // Gather. Each answer is taken at a random sim instant (the whole read's up to 400 sim ms apart). 60 seeds, both shapes,
 // about 3 s. On the keyed-state fold: 5 of 62 whole reads older than the keyed read (seeds 25, 33, 45, 50, 54) and 4 of
 // 62 that showed `gx` after the keyed read read it removed (seeds 16, 25, 38, 50); base 0 of each.
-test('KEYED THEN WHOLE, through a real kernel handover [V4-NN] — 60 seeds: the whole read never goes back past the keyed read', async () => {
+test('KEYED THEN WHOLE, through a real kernel handover [V4-65] — 60 seeds: the whole read never goes back past the keyed read', async () => {
   const { Sim } = await import('../sim/exec.ts')
   const { cluster, formed: simFormed } = await import('../sim/harness.ts')
   const { Gather, rowsPartial } = await import('./fold.ts')
@@ -994,13 +994,13 @@ test('KEYED THEN WHOLE, through a real kernel handover [V4-NN] — 60 seeds: the
   }
 })
 
-//! V4-NN: a keyed fold is LIMITED to its row (fold.ts #fold with `row`): it replaces each answering member's claims for
+//! V4-65: a keyed fold is LIMITED to its row (fold.ts #fold with `row`): it replaces each answering member's claims for
 // the row's cells alone, and reaps only the row's cells. The registry is private, so each claim it must keep is shown by
 // what it does next. Row `b`: h1's claim (seq 2) wins over h2's (seq 1). Row `c`: h3's (seq 4) over h1's (seq 3). A
 // keyed read of `a` hears h1 say nothing of `b` or `c` (its whole share is cut to `a`), while h3 is out of the view. Then
 // h3 is back, and a live generation hears h2 alone (h1 and h3 down): if the keyed fold had dropped h1's claim for `b`,
 // `b` would show h2's older value; if it had reaped h3's claim for `c`, `c` would show h1's older value.
-test('KEYED ROW ONLY [V4-NN] — a keyed read of one row leaves every other row\'s claims and value as they were', async () => {
+test('KEYED ROW ONLY [V4-65] — a keyed read of one row leaves every other row\'s claims and value as they were', async () => {
   const { Gather } = await import('./fold.ts')
   const all = [['self', ''], ['h1', ''], ['h2', ''], ['h3', '']]
   const fake = {
@@ -1033,7 +1033,7 @@ test('KEYED ROW ONLY [V4-NN] — a keyed read of one row leaves every other row\
   } finally { g.destroy() }
 })
 
-//! the exact claim of the one registry (V4-NN), as a differential: the live union answers every row as ONE registry
+//! the exact claim of the one registry (V4-65), as a differential: the live union answers every row as ONE registry
 // would that took every fold, each keyed fold limited to its row. The oracle is one whole-fold gather per row, fed every
 // live generation and a whole generation at every keyed read of THAT row: a fold limited to a row gives the row what a
 // whole fold of the same answers gives it (fold.ts #fold), and a keyed read of another row leaves it alone. So after
@@ -1044,7 +1044,7 @@ test('KEYED ROW ONLY [V4-NN] — a keyed read of one row leaves every other row\
 // one value), random self scope. Red on the keyed-state fold of rounds 2 to 4 (a keyed read never wrote the live
 // union): seed 1. Red when a keyed fold replaces a member's claims in every row: seed 1; when it reaps every row: seed
 // 27; when it reaps no row: seed 1; when it is a whole fold: seed 1.
-test('KEYED PARKING, differential [V4-NN] — the live union is one registry: every row as if it took every fold, each keyed fold limited to its row, 150 seeds', async () => {
+test('KEYED PARKING, differential [V4-65] — the live union is one registry: every row as if it took every fold, each keyed fold limited to its row, 150 seeds', async () => {
   const { Gather } = await import('./fold.ts')
   let seed = 1
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff }
@@ -1135,13 +1135,13 @@ test('KEYED PARKING, differential [V4-NN] — the live union is one registry: ev
   assert.ok(rowChecks > 4000, `${rowChecks} rows compared`)
 })
 
-//! V4-NN, the round-3 review: a keyed read takes this node's OWN answer last, after every other member's is in. The
+//! V4-65, the round-3 review: a keyed read takes this node's OWN answer last, after every other member's is in. The
 // shape it is for: a handover that ENDS while the read is in flight. This node owns `a` and is still taking it over
 // when the read starts; while the answers travel it finishes (it holds `a` now), and the old holder h1 sheds before it
 // answers (no claim, no attestation). Taken first, as base's keyed read (a whole refresh) took it, this node's answer
 // says nothing of the row and h1's says nothing either: the read answers undefined for a row that exists, the silent
 // wrong answer plan §9 bans. Red on base, and red with the own answer moved back to before the fan-out.
-test('KEYED MID-READ [V4-NN] — a handover that ends while a keyed read is in flight: this node\'s own answer is taken last, so the read sees the row', async () => {
+test('KEYED MID-READ [V4-65] — a handover that ends while a keyed read is in flight: this node\'s own answer is taken last, so the read sees the row', async () => {
   const { Gather } = await import('./fold.ts')
   const A = JSON.stringify(['a'])
   const fake = {
@@ -1162,7 +1162,7 @@ test('KEYED MID-READ [V4-NN] — a handover that ends while a keyed read is in f
   } finally { g.destroy() }
 })
 
-//! V4-NN, the round-3 review: keyed reads ran OFF the refresh chain, so a read whose answers came back after a newer
+//! V4-65, the round-3 review: keyed reads ran OFF the refresh chain, so a read whose answers came back after a newer
 // read's (or a newer live generation's) folded its older answers last, over the newer ones. A later read in the skew
 // window (h1 has shed: no claim, no attestation) then parked the OLDER value, after a read had already returned the
 // newer one. Base ran a keyed read as a refresh, on the chain. Here each h1 answer is h1's state when it is ASKED (x=1,
@@ -1170,7 +1170,7 @@ test('KEYED MID-READ [V4-NN] — a handover that ends while a keyed read is in f
 // answers in order, so this needs two fan-outs to different member sets (a view install between them); the chain makes
 // the order hold whatever the links do. Red off the chain: `{ x: 1 }` for `{ x: 2 }`, and for the live generation's
 // newer value too.
-test('KEYED ORDER [V4-NN] — keyed reads and live generations fold in the order they began, so answers that come back late never fold over newer ones', async () => {
+test('KEYED ORDER [V4-65] — keyed reads and live generations fold in the order they began, so answers that come back late never fold over newer ones', async () => {
   const { Gather } = await import('./fold.ts')
   const A = JSON.stringify(['a'])
   const fake = {
@@ -1219,7 +1219,7 @@ test('KEYED ORDER [V4-NN] — keyed reads and live generations fold in the order
   } finally { g.destroy() }
 })
 
-//! the member side of V4-NN: `rows` with a partition answers exactly the part of its whole answer for that row — the
+//! the member side of V4-65: `rows` with a partition answers exactly the part of its whole answer for that row — the
 // row cell, its fields and their tombstones, a quoted key too — and attests that partition alone, or nothing
 test('rowsPartial with a partition is the whole answer\'s part for that row: its cells by their first key, its attestation cut to it', async () => {
   const { rowsPartial } = await import('./fold.ts')
@@ -1248,7 +1248,7 @@ test('rowsPartial with a partition is the whole answer\'s part for that row: its
   assert.deepStrictEqual(flat, { c: { [cell('c')]: { v: 5, st: [1, 7, 'n1'] } }, att: null })
 })
 
-//! the wire of V4-NN: the system `rows` call carries the partition, and a real scoped server answers that row alone
+//! the wire of V4-65: the system `rows` call carries the partition, and a real scoped server answers that row alone
 test('the system rows call with a partition answers that row alone over a real link', async () => {
   const nodes = await spawn(2, 1)
   let c: Fero | null = null
@@ -1279,7 +1279,7 @@ test('the system rows call with a partition answers that row alone over a real l
   }
 })
 
-//! the coordinator's side of V4-NN, through the real composer (the round-2 review: the tests above drive a fake call or
+//! the coordinator's side of V4-65, through the real composer (the round-2 review: the tests above drive a fake call or
 // call `rows` straight from a client, so a gather callback that dropped the partition stayed green, and the whole share
 // travelled again). A keyed read of a row this node owns but does not hold goes through the gather — an absent row is
 // never held. The test records every member `rows` call and the answer that came back BEFORE the coordinator cuts it to
@@ -1322,7 +1322,7 @@ test('a keyed read through the real composer asks the other member for that row 
   }
 })
 
-//! the one registry through the real composer (V4-NN, the round-4 review): the keyed read that gathers and the whole read
+//! the one registry through the real composer (V4-65, the round-4 review): the keyed read that gathers and the whole read
 // must fold into the SAME Gather, or a whole read on the owner goes back past a keyed read (KEYED THEN WHOLE). The test
 // records the Gather each one used: a keyed read of a row this node owns that nobody wrote (it gathers), then
 // `methods.read()` and `await data` (the whole read). Red if the composer gave keyed reads a Gather of their own.

@@ -1521,7 +1521,7 @@ the two member lines that said the same. The version mix on client links
 (a V4-30 build against this one) is stated in "The rule" and pinned by a
 kernel test. Nothing in kernel/door.ts, kernel/node.ts or sim/ changed.*
 
-*Note (2026-10-22, wave 7, DECISIONS V4-NN): deviation (1) above said the
+*Note (2026-10-22, wave 7, DECISIONS V4-66): deviation (1) above said the
 post-step cursor "sees every row the step wrote". It does not when
 `journal.cap` is below one step's burst: the ring overwrites a refusal row
 inside the very step that wrote it, and the line was lost. The shape that

@@ -24,7 +24,7 @@ test('read(from) is a cursor: consumers resume where they left off, clamped to r
   assert.deepEqual(j.read(100), []) // a future cursor reads nothing, not garbage
 })
 
-//! V4-NN: the refusal rows are kept beside the ring until a reader takes them — a burst past the cap inside one step
+//! V4-66: the refusal rows are kept beside the ring until a reader takes them — a burst past the cap inside one step
 // overwrites the row in the ring, never in the kept list; emit() leaves the list alone; a list nobody takes stays bounded
 test('keep() is emit() plus the same row kept beside the ring: it outlives a burst past the cap, emit() never adds to it, and it holds at most KEPT_MAX', async () => {
   const { KEPT_MAX } = await import('./journal.ts')
@@ -44,7 +44,7 @@ test('keep() is emit() plus the same row kept beside the ring: it outlives a bur
   assert.deepEqual([j.kept[0].a, j.kept[KEPT_MAX - 1].a], [5, KEPT_MAX + 4], 'oldest out')
 })
 
-//! the guard on the composer's side of V4-NN: the refusal lines read the kept rows only, so a doorReject or a
+//! the guard on the composer's side of V4-66: the refusal lines read the kept rows only, so a doorReject or a
 // contractReject written with emit() would never print. Every one in the kernel goes through keep().
 test('every door and contract refusal row in the kernel is written through keep(), the one source of the refusal lines', async () => {
   const fs = await import('node:fs')
