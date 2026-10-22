@@ -2352,6 +2352,69 @@ on a client's awaiting entry yet (write.ts `#awaiting`, `p` is '' there)
 and the known-cost pin in sim/feeder-death.test.ts would flip. Not built
 in this wave.
 
+**Note, 2026-10-22 (wave 8: the owed word on random schedules).** The
+wave-6c note above ends with clause 3 reached by no seeded schedule. A
+new scoped-sweep family, A14 (sim/scoped-sweep.ts), reaches it. A spoke
+dials every member. Once the workload is in, its feeder's link to it
+pauses with a small queue (the tune rows `queued` 2 to 4 and
+`queuedBytes` 512 B to 1 MiB, drawn per seed). A joiner takes some of
+the feeder's partitions, their copies freeze and shed, and the shed's
+FEED {x} waits in the paused queue. While they are away, writes and
+removes land on them at their new holders. Then either taps onto the
+feeder's own partitions clear the queue, or nothing does until the
+re-latch's own forward overflows it (the leapfrog: frames behind the
+clear reach the spoke ahead of the word said again). The joiner leaves,
+the feeder latches the partitions back from zero, and the link heals
+after the first re-latched fold, while a latch is open, or before the
+leave, by seed.
+
+*What judges it.* M12 and the screen check at the horizon, as on every
+spoked family, and a new check at the heal exchange's end: the first
+quiet point after the drain (M1's `spokeQuiet`: everything the feeder
+sent has landed, its link synced and flowing). There the spoke must
+hold the feeder's cells of every partition the feeder feeds, and
+nothing of a partition the feeder has no entry for, with the screen
+equal to the kernel. That is the claim kernel/client.test.ts makes on
+its hand-built shapes. A counter (sim/monitors.ts `feedWords`) counts
+the words owed (every call of the public `owe`) and paid (a FEED frame
+shipped on a client link while its server steps an event of that link,
+where #answer is the only sender). It needs no kernel change.
+
+*Measured.* Seeds 1-72, all safe and live at the horizon and at the heal
+exchange's end. 71 owe and pay the shed word (576 partition-words; seed
+9's feeder lost nothing to the joiner). 57 also owe and pay the fold's
+end (488). Every owed word is paid, once. The word is paid while its
+partition is away on 7 seeds, while its latch from zero is open on 7,
+and once it is back and held on 57. The leapfrog's survivors reach the
+spoke on 11. At the battery's seeds, A1 to A13 owe and pay 0 words (A12
+and A13 say 285 {x} and 197 folds directly). The battery runs A14 seeds
+1 and 2 and always 18 and 32 (about 5 s), and the mutation pin on seeds
+1 and 18, each run clean and mutated (about 5 s).
+
+*Mutants (by hand on scratch copies, and one through the runner).* The
+answer's start not lowered: red on seed 32 alone of 1-72, the leapfrog
+on a lane the clear took nothing from (n90#34, a row of p10 written
+while it was away, survives the clear and is lost for good: "M12: s1
+lacks ["p10"]"). The owed {x} said after the ship: red on 18 of seeds
+1-24, every seed where the partition is held again at the heal but
+seed 22 (the word drops rows the answer just re-sent; seed 2: "s1 lacks
+["p8","f2"]"). The owed {x} dropped ("the {x} half
+off", and the runner's `owed-x-dropped`, which drops it at `owe`): red
+on seeds 1, 15, 18 and 21 of 1-24, where the word is paid while the
+partition is away or coming back. Where it is back and held, the answer
+re-sends it whole from the cover (the fold's splices lowered it) and
+the fold carries every remove, so nothing can tell today. Once stage 4
+releases tombstones a fold may carry no remove, and that mutant would
+show there too.
+
+*Not reached.* The heal never found a shed partition an orphan at the
+feeder (0 of 72 seeds), and each shed partition came back through one
+latch from zero, with no write to it while that latch was open. So the
+shapes that need an orphan, a base or an own commit at the heal (an
+orphan the ring assigns or not, a repair latch open, the owner's own
+mid-latch commit, one minted first record) and the stage-4 fold with no
+remove stay pinned by kernel/client.test.ts alone.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
