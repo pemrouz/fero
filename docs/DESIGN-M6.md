@@ -371,14 +371,41 @@ refused its answer `too-large` (V4-51), and the read of one small row was refuse
 until the handover ended. It now asks each member for that row's partition only
 (the system `rows` call takes the partition; `rowsPartial(rt, p)` cuts its
 answer to the row's cells and attests `p` alone), and folds the answers in a fold
-of its own (`Gather.keyed`) beside the live union: a COPY of the union's claims
-and last value for the row, with this generation's answers folded on top by the
-union's own code (`#fold`, moved out of `#refresh` unchanged). Parking (C5)
-therefore holds for the row exactly as in the union, and the union is never
-written by a keyed read (a one-partition answer replacing a member's claims
-wholesale there would drop its claims for every other row). This node's own
-answer is taken last, after the others: within one view an orphan sheds only
-once every holder attests, this node among them, so an orphan's answer can lack
-the row only if this node already held it. What is still refused: a member whose
-claims for this one row pass one frame (the row cannot travel), and an
-unreachable member (typed, as before).
+of its own (`Gather.keyed`) beside the live union, with the union's own code
+(`#fold`, moved out of `#refresh` unchanged). The union is never written by a
+keyed read: a one-partition answer replacing a member's claims wholesale there
+would drop its claims for every other row.
+
+Parking (C5) holds across keyed reads (corrected by the round-2 review; the first
+version folded onto a fresh copy of the live union on every read, so on a node
+whose live union was never read, a second keyed read in the skew window read the
+row absent). The fold runs on the row's KEYED STATE: a registry and a projection
+of its own, the first time a copy of the live union's row. Every keyed read of
+the row folds onto it, and so does every live generation (its answers cut to the
+row in one pass). So the keyed state answers what one registry would answer
+for the row had it taken exactly the folds of that row: a claim that
+empties with no tombstone and no coverage keeps its last value, and a delete a
+keyed read saw stays deleted (pinned by a differential, api/scoped.test.ts). Two
+limits, stated exactly. A keyed read of ANOTHER row no longer refreshes this row:
+before, a keyed read was a whole refresh, so every row of the one registry heard
+every member. So the first keyed read of a row parks only what the live union
+holds of it, which is what the first generation of a whole read does too.
+
+The keyed state is dropped when a keyed read would no longer gather the row (this
+node holds it now, or another member owns it: the composer's own test, shared
+with keyedRead), checked after every keyed read and every live generation that
+feeds the keyed side. A state that knows nothing (no cell, no value) is dropped
+too when the live union knows nothing of the row, because a fresh copy is then
+the same empty state; so a read of a row nobody has leaves nothing behind. After
+a check the keyed side holds only rows this node owns and does not hold: the rows
+of its handovers that were read by key, and rows nobody has whose empty state
+still stands for a delete the live union has not seen. Between two checks it
+grows by at most one row per keyed read. Each state holds that row's claims (one
+per member per cell) and one copy of its value. While the keyed side is empty,
+which is nearly always, a live generation pays one size check.
+
+This node's own answer is taken last, after the others: within one view an
+orphan sheds only once every holder attests, this node among them, so an
+orphan's answer can lack the row only if this node already held it. What is
+still refused: a member whose claims for this one row pass one frame (the row
+cannot travel), and an unreachable member (typed, as before).
