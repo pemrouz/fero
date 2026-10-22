@@ -830,6 +830,11 @@ working as designed.
   write-loop item waits for Fable; five Opus fix rounds and five reviews (round 5 took the integrator's
   direction: one registry, not a keyed state per row). 1214/1214 + 18/18, perf 64/64.
 
+- 2026-10-22 — wave 7 part 4 (on Opus): the kept refusal rows as V4-66 — Journal.keep() puts each door and
+  contract refusal row on a list of at most 64 beside the ring; the composer says them after every step and
+  empties the list; a guard test refuses an emit() at a refusal site. From the same lane as V4-65.
+  1214/1214 + 18/18, perf 64/64.
+
 ## The debug tool
 
 One journal, one model, replay for free (plan §8) — every piece exists because the
