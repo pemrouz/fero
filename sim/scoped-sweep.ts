@@ -140,7 +140,13 @@ const post = (sim: Sim, xs: Planned[], t0: number) => { for (const w of xs) sim.
 //                   dirty set, so the tick finds nothing to announce), measured with the sweep off so the sweep
 //                   cannot heal what the dirty leg should have. Red on an R=2 shape where `no-sweep` alone is green:
 //                   that difference is the dirty leg.
-export type Mutation = 'none' | 'drop-one' | 'release-all' | 'version-only' | 'no-sweep' | 'drop-dirty'
+//! The OWED-WORD mutation (wave 8, for A14; V4-62's clause 3):
+//   owed-x-dropped — a feeder never owes a shed's word a clear took: every server's `owe` drops the kind 'x', so the
+//                    word is never said again at the heal and the answer's start is never lowered for it (the kernel
+//                    mutant "the {x} half off", made from outside: owe is a public method). The spoke keeps the rows
+//                    of a partition that left its feeder. Caught by A14's heal-end check (and M12 or spokeStale where
+//                    the partition stays away).
+export type Mutation = 'none' | 'drop-one' | 'release-all' | 'version-only' | 'no-sweep' | 'drop-dirty' | 'owed-x-dropped'
 export const MUTATIONS: readonly Mutation[] = ['drop-one', 'release-all', 'version-only']
 export const STAGE2_MUTATIONS: readonly Mutation[] = ['no-sweep', 'drop-dirty']
 //! the monitors a mutation must turn red (any one of them counts as caught)
@@ -789,6 +795,24 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
       return null
     },
   })
+  //! owed-x-dropped: each server's `owe` drops the kind 'x' from the first pass that sees the server step (a word is
+  // owed many events later); this monitor sits before any counter a family installs, so a counter still sees the call
+  if (mut === 'owed-x-dropped') {
+    const seen = new WeakSet<Node>()
+    sim.monitors.push({
+      name: 'mutation-owed-x-dropped',
+      check: (s) => {
+        for (const id of s.full || s.allDirty ? s.nodes.keys() : s.stepped) {
+          const x = s.nodes.get(id)
+          if (x === undefined || x.client || seen.has(x)) continue
+          seen.add(x)
+          const owe = x.owe.bind(x)
+          x.owe = (link, kind, p) => { if (kind === 'x') { eng.mutated = 1; return } owe(link, kind, p) }
+        }
+        return null
+      },
+    })
+  }
   sim.run({ until: 1500 })
   if (!nodes.every((x) => x.armed)) { out.notLive.push('never formed'); return out }
   const t0 = sim.now
@@ -798,7 +822,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   //! the mutation fires at the first 5 ms slice at or past c.mutAt; its draws come from a separate stream so the
   // schedule itself is the same with and without it
   const mr = mul(seed * 31 + 7)
-  let mutated = mut === 'none' || stage2
+  let mutated = mut === 'none' || stage2 || mut === 'owed-x-dropped'
   for (let t = sim.now; t <= t0 + horizon; t += 5) {
     sim.run({ until: t })
     for (const f of c.polls) f()

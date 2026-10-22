@@ -234,7 +234,9 @@ for (const p of PLANTS)
 // violation of today's kernel). A6 seed 3 and A7 seed 4 (drop-one) were here until 2026-10-21, no longer pins since
 // stage 3: A7 seed 4 carried no violation since then, and A6 seed 3's only one was the mutation runner's own drop of a
 // swept field's parent row (M2 "still the WINNER"), which the runner no longer makes. A4 seed 6 (drop-one) and A7
-// seed 16 (release-all), today's pins, replace them.
+// seed 16 (release-all), today's pins, replace them. A14 seed 1 with `owed-x-dropped` (wave 8) is the owed-word pin: its
+// wrappers (the mutation's on `owe`, the FEED word counter's on `owe`, `step` and each client link's `ship`) go on at the
+// first pass that sees a server step, which the two walks reach at the same event.
 const FAMILY_RUNS: [string, number, Mutation][] = [
   ['A4-restarts', 6, 'drop-one'],
   ['A7-down-to-one', 16, 'release-all'],
@@ -245,6 +247,7 @@ const FAMILY_RUNS: [string, number, Mutation][] = [
   ['A11-spoke', 2, 'none'],
   ['A4-restarts', 1, 'none'], // sim.restart(): a node replaced inside an at() task
   ['A10-linger', 1, 'none'], // a node destroyed and dropped from sim.nodes
+  ['A14-spoke-owed', 1, 'owed-x-dropped'], // the owed-word mutation (wave 8): the counter's and the mutation's wrappers go on per walk, A14's heal-end check fires
 ]
 
 test('scoped walk = full walk on the scoped-sweep families: mutated, clean and a real violation — the same violation rows, the same engagement counts, the same trajectory', () => {
