@@ -197,6 +197,15 @@ test('paused links: queued and queuedBytes are UNKNOWNS (null) the replay never 
   const rd = (topologyAt(drained, 'n01', Infinity) as Topo).links.get(link.id)!
   assert.deepEqual({ paused: rd.paused, queued: rd.queued, queuedBytes: rd.queuedBytes, synced: rd.synced }, { paused: false, queued: 0, queuedBytes: 0, synced: true })
   assert.ok((verifyTopology(drained) as { ok: boolean }[]).every((r) => r.ok))
+  //! the drift guard compares the weight once it is a fact again: an end row that disagrees with the replay is refused,
+  // and a capture from before the field (no queuedBytes on its rows) says so in `unverified`, never a silent pass
+  const tampered = JSON.parse(JSON.stringify(drained)) as typeof drained
+  ;(tampered.nodes.find((n) => n.uuid === 'n01')!.links.find((l) => l.id === link.id) as unknown as { queuedBytes: number }).queuedBytes = 5
+  const vt = (verifyTopology(tampered) as { uuid: string; ok: boolean; reason?: string }[]).find((r) => r.uuid === 'n01')!
+  assert.deepEqual([vt.ok, vt.reason], [false, `link #${link.id} queuedBytes: 0 vs 5`])
+  const older = JSON.parse(JSON.stringify(drained)) as typeof drained
+  for (const n of older.nodes) for (const l of n.links) delete (l as { queuedBytes?: number }).queuedBytes
+  for (const r of verifyTopology(older) as { ok: boolean; unverified?: string[] }[]) assert.ok(r.ok && r.unverified?.includes('queuedBytes'), JSON.stringify(r))
 })
 
 test('durable nodes: the durable mark is claimed only where provable — persisted ⇒ unknown (null), skipped by the guard; the replay still verifies', () => {
