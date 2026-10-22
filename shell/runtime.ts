@@ -780,6 +780,9 @@ export class Runtime {
     const closed = this.#server ? new Promise<void>((resolve) => this.#server!.close(() => resolve())) : null
     for (const t of this.#timers.values()) clearTimeout(t)
     this.#timers.clear()
+    //! a safety net: node.destroy() above already closed (and so flushed, kill) every socket the kernel holds, and a
+    // socket it does not hold (a dial still in flight) has carried no frame. tests/links.test.ts's destroy case is
+    // held by that close, not by this loop.
     for (const s of this.#sockets.values()) kill(s)
     this.#sockets.clear()
     this.#paused.clear()

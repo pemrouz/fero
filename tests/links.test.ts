@@ -4,8 +4,8 @@
 //   (tests/latency.perf.ts pins what it buys: a writing method call and a forwarded update in about 1 ms, not 43);
 // - the run batch (runBatch): the small frames one run of the event loop makes on a link leave together when the run
 //   ends, a batch never reaches the socket's high-water mark nor holds more than 1024 frames (libuv's IOV_MAX), and
-//   no cork outlives its run; every socket the shell destroys, and every socket of a process that exits, is flushed
-//   first, however many frames its batch holds.
+//   no cork outlives its run; every socket the shell destroys (close, destroy, drop), and every socket of a process
+//   that exits, is flushed first, however many frames its batch holds.
 //! How the checks see the sockets: a PASSIVE spy on net.Socket's prototype (setNoDelay and write, the public methods
 // the shell calls; _write and _writev, the stream methods Node calls to hand bytes to the OS), installed for one test
 // and taken off after. It records and calls straight through, so nothing behaves differently. (If #wire ever turns
@@ -241,6 +241,26 @@ test('every frame shipped in the same run as its socket is closed, or as the run
       await rt.destroy()
       await peer.stop()
     }
+  }
+})
+
+//! drop (the diagnostics door's abrupt disconnect) flushes too: b applies every record a shipped in the dropping run
+// before b hears the link go down. a's redial is 2 s away, so no record can come back to b by a new link first.
+test('every frame shipped in the same run as a drop() of its link still reaches the peer (3,000 tiny records)', async () => {
+  let applied = 0
+  let atDown = -1
+  const { a, b, stop } = await pair(() => { applied++ })
+  try {
+    const step = b.node.step.bind(b.node)
+    b.node.step = (e) => { if (e.kind === 'linkDown' && atDown < 0) atDown = applied; step(e) }
+    const applied0 = applied
+    //! one run: the records are batched, then the link is dropped
+    for (let i = 0; i < PINGS; i++) a.write([{ type: REC.update, key: [`k${i}`], value: i }])
+    assert.equal(a.drop('bb'), true, 'a dropped its link to b')
+    assert.ok(await until(() => atDown >= 0), 'b saw the link go down')
+    assert.equal(atDown - applied0, PINGS, 'b applied every record shipped in the dropping run before the link went down')
+  } finally {
+    await stop()
   }
 })
 
