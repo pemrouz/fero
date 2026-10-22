@@ -1,13 +1,13 @@
 {
- "recordedAt": "2026-10-22T07:29:54.761Z",
+ "recordedAt": "2026-10-22T14:50:51.162Z",
  "node": "v26.1.0",
  "fero": {
   "version": "4.0.0",
-  "head": "9265e8a"
+  "head": "acddc76"
  },
  "commands": {
-  "cafe": "FERO_RENDEZVOUS=127.0.0.1:42915 FERO_CONFIG=off nice -n 15 node cafe.ts",
-  "visitor": "FERO_RENDEZVOUS=127.0.0.1:42915 FERO_CONFIG=off nice -n 15 node visitor.ts"
+  "cafe": "FERO_RENDEZVOUS=127.0.0.1:33019 FERO_CONFIG=off nice -n 15 node cafe.ts",
+  "visitor": "FERO_RENDEZVOUS=127.0.0.1:33019 FERO_CONFIG=off nice -n 15 node visitor.ts"
  },
  "shown": {
   "cafe": "node cafe.ts",
@@ -51,31 +51,31 @@
  ],
  "at": {
   "cafe": [
-   2557,
-   2557,
-   2557,
-   2557,
-   2557,
-   4387,
-   4387,
-   4387,
-   4387,
-   4387
+   1360,
+   1360,
+   1360,
+   1360,
+   1360,
+   2548,
+   2548,
+   2548,
+   2548,
+   2548
   ],
   "visitor": [
-   4352,
-   4393,
-   4393,
-   4394,
-   4394,
-   4394,
-   4394,
-   4394,
-   4395,
-   4395,
-   4395,
-   4395,
-   4395
+   2527,
+   2551,
+   2551,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552,
+   2552
   ]
  }
 }
