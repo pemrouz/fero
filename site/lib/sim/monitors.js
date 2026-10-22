@@ -9,8 +9,8 @@
 
 import { Node, stable, newer } from '../kernel/node.js'
 import { SCOPE } from '../kernel/scope.js'
-import { LS } from '../kernel/link.js'
-import { partitionOf, REC } from '../kernel/env.js'
+import { LS,           } from '../kernel/link.js'
+import { partitionOf, REC,            } from '../kernel/env.js'
 import { foldInto,             } from './fold.js'
                                     
 
@@ -785,7 +785,7 @@ const covers = (sim     , n      , origin        , p        )         =>
     : n.feederScoped ? spokeCovers(sim, n, origin, p)
     : (n.streams.get(origin)?.applied ?? 0)
 //! spokeQuiet — the feeder of a scoped spoke when everything the feeder sent has landed (the conditions above), else null
-const spokeQuiet = (sim     , n      )              => {
+export const spokeQuiet = (sim     , n      )              => {
   if (!sim.watch || n.primary === null || n.group !== null || n.resync !== null) return null
   const pl = n.links.get(n.primary)
   const F = pl !== undefined ? sim.nodes.get(pl.uuid) : undefined
@@ -1570,6 +1570,72 @@ export const spokeStale = (sim     , id        )                                
   return out
 }
 const partOfKey = (k        )         => (JSON.parse(k)            )[0] ?? ''
+
+//! feedWords — the FEED words scoped feeders say to their spokes, counted by kind (wave 8, for the owed-word family
+// A14 of sim/scoped-sweep.ts; V4-62's clause 3). Each count is in partition-words: an {x} frame names one partition
+// or more, a {b} or an {e} names one.
+//   owedX, owedE   a word OWED (node.ts owe): an {x} or an {e} a clear took from a paused client link the spoke had
+//                  been answered on (#clearCover), or the end of a fold that ran while that link was unsynced (scope.ts
+//                  onAcqDone). A word owed again later counts again.
+//   paidX, paidE   an owed word said again at the answer that heals the link (node.ts #payOwed, called by #answer).
+//   saidX, saidB, saidE   the words said where they happen: a shed's or a clean abort's {x}, a fold's {b} and {e}.
+//   odd            a {b} said inside a link's own event, where only an answer runs: always 0 (the self-check of the
+//                  rule below; a test asserts it).
+// No kernel change and no cost in a run that does not ask. `owe` is a public method and every owe goes through it
+// (#clearCover calls this.owe, onAcqDone node.owe), so a wrapper set on each server object sees every one. A FEED
+// frame shipped on a client link while its server steps an event OF THAT LINK (bytes in from the spoke, or the
+// link's drain) is a pay: #answer, the only caller of #payOwed, runs on exactly those two (the DIGEST handler and
+// the drain's resume), and none of the places that say a word directly does (evaluateSheds, #abort and onAcqDone
+// run on members' frames, timers and installs). The wrappers (owe and step on a server, ship on each of its client
+// links) go on at the first monitor pass that sees the server step or the link appear: a word is owed and paid many
+// events after a link's admit. They only count: no draw, no state, nothing moves (the trace stays the same).
+                                                                                                                                                   
+const feedCounts = new WeakMap                ()
+//! feedWordsOf — the counts if this run installed the counter, else undefined (a reader that must not install it)
+export const feedWordsOf = (sim     )                        => feedCounts.get(sim)
+export const feedWords = (sim     )            => {
+  const had = feedCounts.get(sim)
+  if (had !== undefined) return had
+  const w            = { owedX: 0, owedE: 0, paidX: 0, paidE: 0, saidX: 0, saidB: 0, saidE: 0, odd: 0 }
+  feedCounts.set(sim, w)
+  const stepping = new Map             () // the event each server is stepping right now
+  const seen = new WeakSet        ()
+  const said = (n      , l      , b            ) => {
+    if (b[2] !== VERB.FEED) return
+    const v = new Frame(b).value                                                         
+    const ev = stepping.get(n)
+    const own = ev !== undefined && (ev.kind === 'bytesIn' || ev.kind === 'drain') && ev.link === l.id
+    const nx = Array.isArray(v?.x) ? v.x.length : 0
+    if (own) { w.paidX += nx; if (typeof v?.e === 'string') w.paidE++; if (typeof v?.b === 'string') w.odd++ }
+    else { w.saidX += nx; if (typeof v?.b === 'string') w.saidB++; if (typeof v?.e === 'string') w.saidE++ }
+  }
+  const instrument = (n      ) => {
+    const owe = n.owe.bind(n), step = n.step.bind(n)
+    n.owe = (link, kind, p) => { if (kind === 'x') w.owedX++; else w.owedE++; owe(link, kind, p) }
+    n.step = (ev) => {
+      const was = stepping.get(n)
+      stepping.set(n, ev)
+      try { step(ev) } finally { if (was === undefined) stepping.delete(n); else stepping.set(n, was) }
+    }
+  }
+  const watchLink = (n      , l      ) => {
+    const ship = l.ship.bind(l)
+    l.ship = (bytes, sink, j) => { said(n, l, bytes); return ship(bytes, sink, j) }
+  }
+  sim.monitors.push({
+    name: 'feed-words',
+    check: (s) => {
+      for (const id of s.full || s.allDirty ? s.nodes.keys() : s.stepped) {
+        const n = s.nodes.get(id)
+        if (n === undefined || n.client) continue
+        if (!seen.has(n)) { seen.add(n); instrument(n) }
+        for (const l of n.clientLinks) if (!seen.has(l)) { seen.add(l); watchLink(n, l) }
+      }
+      return null
+    },
+  })
+  return w
+}
 
 //! boundedLogs — M8's horizon form (I12), in two halves: boundedLanes — at every armed node every lane holds at
 // most winners + compactAt entries (GREEN since DESIGN-SCALE stage 3, 2026-10-12: scoped compaction drops the
