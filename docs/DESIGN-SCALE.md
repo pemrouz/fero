@@ -1941,10 +1941,13 @@ lane, scope.ts `#shed`; a clean abort held none), so what the spoke
 holds of p is from before the word. And the answer that follows
 re-sends the named partitions WHOLE: `#payOwed` says the word and, in
 the same breath, lowers the answer's start on every lane to just under
-its lowest entry of a named partition (read off the per-partition
-index, as `#forwardWhole` lowers a cover for a re-entry), and the ship
-walks each lane from there to its end, so every entry of p the feeder
-feeds leaves behind the word. The rule is one place, checked at the
+the LOWEST entry there of EVERY partition the word names (read off the
+per-partition index, as `#forwardWhole` lowers a cover for a re-entry),
+and the ship walks each lane from there to its end, so every entry of p
+the feeder feeds leaves behind the word. Both halves matter: lowered
+under the highest entry, or for the first named partition only, the
+answer loses a row for good (the sixth review's R6-7 and R6-3, measured
+below). The rule is one place, checked at the
 word: whatever of p the feeder holds when the word is said, on
 whichever lane, by whichever path it came (tapped behind the word,
 appended since the clear, spliced by a fold, re-entered whole), sits
@@ -2095,6 +2098,10 @@ lost twice, its frame to the feeder lost, the spoke's first feeder had
 it, the repair not yet folded at the end) is judged gone at the end and
 comes back when it lands or when the repair folds. Bounded and visible
 (M12 reads it); reached by no seeded schedule; named here, not pinned.
+Clause 3's owed {x} is reached by no seeded schedule either: the scoped
+sweep and the scale probes never owe one (measured below), so the
+hand-built shapes in kernel/client.test.ts are its only cover, and A11
+to A13 being green says nothing about it.
 
 *Measured.* The 56-run probe on this tree, before and after the rework:
 swept 0 on 56, kept on the same 12 runs the base sweeps on (7 to 20 of
@@ -2204,7 +2211,50 @@ after send one to four), R5-4 and R5-4b (an owed {e} and an owed {x}
 for one partition in one debt) and R5-5 (kept cells under an owed {x})
 are green on the tree; the 56-run probe reads line for line as before
 (swept 0, judged 0, kept on 12, M11 0, bad 0); the scoped sweep stands
-at 16/16 with A11 to A13 engaged.
+at 16/16 with A11 to A13 engaged. The sixth review (2026-10-21, R6-1 to
+R6-7) found the lowering only half pinned. Lowered under the HIGHEST
+entry of the partition on a lane, or for the FIRST named partition
+only, the start kept all 95 tests green and lost a row for good (R6-7:
+px.c, the spoke's lane cc [3, 4] against the feeder's [2, 3, 4]; R6-3:
+rx.c, [4] against [2, 4]). Two test families pin the two halves, next
+to the leapfrog (kernel/client.test.ts, 95 to 100 tests): the leapfrog
+with two entries of px on the surviving lane (cc#2 and cc#3 in one
+frame), at queues of two and three; and px and rx shed in one pause,
+one owed word naming both, with px taken back, rx (the SECOND named)
+taken back, or both, across two lanes, at a queue of three. Each
+asserts the spoke equal to what its feeder feeds, on kernel and screen,
+at the exchange's end (before any beat) and after twenty beats, plus
+the wire (the drained survivors, the drain digest, the word ahead of
+the first record, the leapfrogged rows sent again). On the two mutants
+they are red at "the exchange's end, before any beat: the spoke shows
+what its feeder feeds": [px.a, px.b, px.d, qx.w, qx.z] against the same
+with px.c (both queues), and [qx.w, qx.z, rx.a, rx.b] against the same
+with rx.c. The both-back shape kills no mutant of the lowering (px's
+fold on the torn link lowers the cover under px's rows anyway); it pins
+the one word for two partitions and the two owed ends in fold order,
+and thirteen mutants turn it red (the word's place, the {x} half, the
+five filters, the {e} half, the owe at the fold and the owe in
+`#clearCover`). Thirty-nine one-line
+mutants each turn tests red, on kernel/client.test.ts alone (100
+tests): the lowering's own (the start not lowered, lowered on one lane
+only, on the wrong lane, by one entry too few, a beat late: eight
+each; the word said after the ship: fifteen; under the highest entry:
+two; for the first named partition only: one; only on a lane the start
+names, and never by one: two), the order rule's (the {x} after the
+reply, after the end, after the ship: fifteen each; the {x} half off:
+eighteen; the five filters put back: fourteen, seventeen, twelve,
+fifteen and sixteen; the guard off and the debt taken out up front: one
+each; the {x} never consumed: fifteen; the {e} half off: fifteen; a
+non-held end kept owed: three) and the earlier rounds' sixteen (one to
+twenty each). The seeded runs never reach the owed {x}: with a counter
+in a scratch copy, the scoped sweep (sim/scoped-sweep.test.ts, A1 to
+A13 and its mutation pins: 4,934 answers) and the scale probes (10,452
+answers) owe it and pay it 0 times, against 18
+times in kernel/client.test.ts (638 answers; the start lowered on 8 of
+them). A sweep family that pauses a spoke's feeder link with a small
+queue across a shed, a re-latch of the same partition and the heal
+would let M12 judge clause 3 on random schedules (A11 already pauses
+the link); not built here.
 
 *What moves.* Scoped trajectories with a spoke: a FEED {x} per shed and
 per clean latch abort, two FEED frames per fold forwarded, the owed
