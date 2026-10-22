@@ -577,6 +577,8 @@ test('the paused queue\'s byte bound under the M0 monitor (queued-implies-paused
     return sim.violations.slice(v0).filter((v) => v.monitor === 'queued-implies-paused').map((v) => v.detail)
   }
   assert.deepEqual(plant([4000, 90_000], 94_000), [], 'lawful: 4000 bytes before the last frame, under 4096')
+  assert.deepEqual(plant([4095, 10], 4105), [], 'lawful at the edge: 4095 before the last frame (full() is false at 4095)')
+  assert.deepEqual(plant([4096, 10], 4106), [`n01 link ${link.id} queued 4106 bytes, 4096 before its last frame >= 4096`], 'full() is true at 4096: that frame would have cleared the queue')
   assert.deepEqual(plant([3000, 2000, 10], 5010), [`n01 link ${link.id} queued 5010 bytes, 5000 before its last frame >= 4096`])
   assert.deepEqual(plant([100], 101), [`n01 link ${link.id} counts 101 queued bytes, holds 100`])
   assert.deepEqual(plant([], 7), [`n01 link ${link.id} counts 7 queued bytes on an empty queue`])
