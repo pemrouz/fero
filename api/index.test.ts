@@ -713,18 +713,23 @@ const rawHello = (addr: string, hello: Record<string, unknown>, ms = 1500): Prom
   setTimeout(finish, ms).unref()
 })
 
-test('the refusal lines print nothing a peer chose unfiltered: a connecting socket\'s claimed listen with a newline, an escape and 100k characters gives ONE line, cut and clean; another socket with another claim prints nothing new (inbound refusals print once per reason); an open server\'s forged contract value is cut and clean too', async () => {
+test('the refusal lines print nothing a peer chose unfiltered: a connecting socket\'s claimed listen with a newline and an escape gives ONE line, cut and clean (100k characters is a malformed HELLO and prints nothing); another socket with another claim prints nothing new (inbound refusals print once per reason); an open server\'s forged contract value is cut and clean too', async () => {
   const S = 'index-test-secret-KILO-11'
   const p = await ports.free(), p2 = await ports.free()
   const s = await fero('doorsafe', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
   const o = await fero('doorsafe2', { uuid: 'ab', listen: `127.0.0.1:${p2}`, heartbeat: { ms: 50 }, redial: { ms: 30 } })
-  const evil = `x\nfero('doorsafe'): a fake line\u001b[2J` + 'y'.repeat(100_000)
+  //! 235 bytes: inside LISTEN_MAX (259, kernel/door.ts), far past the line's cut of 64
+  const evil = `x\nfero('doorsafe'): a fake line\u001b[2J` + 'y'.repeat(200)
   const lines = await stderrOf(async () => {
     try {
+      //! a claim past LISTEN_MAX never reaches the door: a malformed HELLO, with no row a line could print
+      await rawHello(`127.0.0.1:${p}`, { u: 'zw', i: 1, l: evil + 'y'.repeat(100_000), n: 'doorsafe' })
+      assert.ok(await until(() => diag(s)!.journal().events.some((e) => e.kind === JK.frameDrop && e.b === 'malformed hello: listen over 259 bytes'), 5000), 'malformed')
+      assert.equal(doorRows(s).length, 0, 'no door row for the long claim')
       await rawHello(`127.0.0.1:${p}`, { u: 'zz', i: 1, l: evil, n: 'doorsafe' })
       assert.ok(await until(() => doorRows(s).length >= 1, 5000), 'refused no-secret')
       assert.equal(doorRows(s)[0][1].length, evil.length, 'the row carries the claim as made — the row is the record, the line is the print')
-      await rawHello(`127.0.0.1:${p}`, { u: 'zy', i: 1, l: 'z\rother' + 'q'.repeat(500), n: 'doorsafe' })
+      await rawHello(`127.0.0.1:${p}`, { u: 'zy', i: 1, l: 'z\rother' + 'q'.repeat(200), n: 'doorsafe' })
       assert.ok(await until(() => doorRows(s).length >= 2, 5000), 'refused again')
       await rawHello(`127.0.0.1:${p2}`, { u: 'zx', i: 1, l: '127.0.0.1:1', n: 'doorsafe2', c: 'v1;heartbeat.ms=\nanything\u001b[2J' })
       assert.ok(await until(() => diag(o)!.journal().events.some((e) => e.kind === JK.contractReject), 5000), 'contractReject')
