@@ -364,32 +364,49 @@ tails on the wire instead of floors (a tail proves nothing about interiors).
 
 ## Note (2026-10-22, wave 7, DECISIONS V4-NN) — a keyed read during a handover gathers one partition
 
-The keyed read's handover branch (api/index.ts keyedRead: this node owns the row
-but is still taking it over) used the whole-resource gather and picked the row:
-every member sent its WHOLE share, so a member whose share passed one frame
-refused its answer `too-large` (V4-51), and the read of one small row was refused
-until the handover ended. It now asks each member for that row's partition only
-(the system `rows` call takes the partition; `rowsPartial(rt, p)` cuts its
-answer to the row's cells and attests `p` alone), and folds the answers in a fold
-of its own (`Gather.keyed`) beside the live union, with the union's own code
-(`#fold`, moved out of `#refresh` unchanged). The union is never written by a
-keyed read: a one-partition answer replacing a member's claims wholesale there
-would drop its claims for every other row.
+The keyed read's gather branch (api/index.ts keyedRead: this node owns the row
+but does not hold it, which is a handover, or a read of an absent row) used the
+whole-resource gather and picked the row: every member sent its WHOLE share, so
+a member whose share passed one frame refused its answer `too-large` (V4-51),
+and the read of one small row was refused until the handover ended. It now asks
+each member for that row's partition only (the system `rows` call takes the
+partition; `rowsPartial(rt, p)` cuts its answer to the row's cells and attests
+`p` alone). `Gather.keyed` folds the answers into the live union with the
+union's own code (`#fold`, moved out of `#refresh`), limited to the row.
 
-Parking (C5) holds across keyed reads (corrected by the round-2 review; the first
-version folded onto a fresh copy of the live union on every read, so on a node
-whose live union was never read, a second keyed read in the skew window read the
-row absent). The fold runs on the row's KEYED STATE: a registry and a projection
-of its own, the first time a copy of the live union's row. Every keyed read of
-the row folds onto it, and so does every live generation (its answers cut to the
-row in one pass). So the keyed state answers what one registry would answer
-for the row had it taken exactly the folds of that row: a claim that
-empties with no tombstone and no coverage keeps its last value, and a delete a
-keyed read saw stays deleted (pinned by a differential, api/scoped.test.ts). One
-limit, stated exactly. A keyed read of ANOTHER row no longer refreshes this row:
-before, a keyed read was a whole refresh, so every row of the one registry heard
-every member. So the first keyed read of a row parks only what the live union
-holds of it, which is what the first generation of a whole read does too.
+The fold limited to one row (since the round-4 review). Each answering member's
+claims are replaced for the row's cells alone, and only the row's cells are
+folded: the touched set, the coverage sweep and the reap are the row's. This is
+exact, because every step of the fold for one cell reads only cells of the same
+row. The coverage sweep reads the holders of the cell's partition (`key[0]`, the
+row), the across-depth check reads the cell's prefixes, and the projection and
+the un-vivify walk the cell's own path. Every cell has a row: the kernel keys a
+cell by its record's key, or by `at` for a keyless insert. One moment is shared
+across rows in a whole fold: the projection takes a fresh copy of the union at
+the first deep remove of each depth, and in a whole fold that can be another
+row's, a little earlier. Then a deep remove under a level that a sibling field
+made up in the same fold is skipped there and applied in the row's fold. The
+field it removes is not there in either, so the value is the same. So the row
+ends as a whole fold of the same answers would leave it, and every other row
+keeps its claims and its value (pinned: KEYED ROW ONLY, and a 150-seed
+differential against a one-registry oracle, api/scoped.test.ts).
+
+So there is one registry again, as in base, where a keyed read was a whole
+refresh. Parking (C5) holds across keyed reads and live generations alike: a
+claim that empties with no tombstone and no coverage keeps its last value, and a
+delete a keyed read saw stays deleted. A whole read after a keyed read on the
+same node never shows the row older than the keyed read returned, nor a row it
+read as removed (pinned: KEYED THEN WHOLE, on fake nodes and over 60 seeds of a
+real kernel handover). Rounds 2 to 4 of this lane kept a keyed state of the row
+beside the live union instead. The round-4 review showed what that cost on the
+real kernel: a whole read older than the keyed read in 11 of 204 pairs, and a
+removed row back in 10 of 203 (base 0 of each). So the keyed state went.
+
+One limit, stated exactly. A read of a row parks only what that row's own folds
+heard: its keyed reads and the live generations. It does not park what keyed
+reads of OTHER rows heard of it, because a keyed read of another row is no
+longer a whole refresh. That holds for every keyed read of the row, not only the
+first, and for a whole read of the row too (corrected by the round-4 review).
 
 The folds land in the order their fan-outs began (corrected by the round-3
 review): a keyed read queues on the refresh chain, as base's keyed refresh did.
@@ -398,26 +415,9 @@ live generation's folded its OLDER answers last, and a later read in the skew
 window parked the older value after a read had already returned the newer one.
 On a real link each member answers in order, so that needed two fan-outs to
 different member sets (a view install between them); the chain makes the order
-hold whatever the links do (pinned: KEYED ORDER).
-
-The keyed state is dropped when a keyed read would no longer gather the row (this
-node holds it now, or another member owns it: the composer's own test, shared
-with keyedRead), checked after every keyed read and every live generation that
-feeds the keyed side. A state that knows nothing (no cell, no value) is dropped
-too when the live union knows nothing of the row, because a fresh copy is then
-the same empty state; so a read of a row nobody has leaves nothing behind. After
-a check the keyed side holds only rows this node owns and does not hold: the rows
-of its handovers that were read by key, and rows nobody has whose empty state
-stands for a delete a keyed read saw. Such an empty state stays until the row's
-next keyed read (which drops it once the live union knows nothing of the row) or
-until a check finds the row held or owned elsewhere, so it can outlive the live
-union learning of the delete too (corrected by the round-4 review; one empty map
-per such row, inside the bound). Between two checks the keyed side grows by at
-most one row per keyed read. Each state holds that row's claims (one per member
-per cell) and one copy of its value. While the keyed side is empty, which is
-nearly always, a live generation pays one size check; the check at the start of
-each live generation that feeds the keyed side is what empties it once the
-handovers end (pinned: KEYED PARKING's last step, since the round-4 review).
+hold whatever the links do (pinned: KEYED ORDER). A keyed read still in flight
+when the gather is destroyed does not write the union, as a whole refresh does
+not.
 
 This node's own answer is taken last, after the others: within one view an
 orphan sheds only once every holder attests, this node among them, so an
@@ -429,11 +429,16 @@ row's old holder and another row's new one in the same gather, and each side
 wants this node's answer at the other end. So a first whole-read generation can
 still miss a row whose handover ends mid-gather (a STATUS line).
 
-This path is not only a handover's: a keyed read of an ABSENT row on its owner
-takes it too, since no node holds a row nobody has. Each such read asks every
-member, and each member walks all the versions it holds with one string test
-per cell and sends the row's cells alone; base sent and parsed every member's
-whole share. A read of a row nobody has leaves no keyed state.
+What it costs. Nothing on the live path: a live generation is the whole fold it
+was. A keyed read that gathers walks the registry's cell keys once on the
+coordinator, one string test per cell, to find the row's cells. Each member
+walks all the versions it holds, one string test per cell, and sends the row's
+cells alone; base sent and parsed every member's whole share. It is a cold path:
+a handover, or a keyed read of an ABSENT row on its owner (no node holds a row
+nobody has). Memory: nothing beside the live union. The registry holds no more
+than a whole read that gathered every share would hold. Once the gather exists,
+every view install runs a whole refresh (on base too), so it fills with the
+whole resource either way.
 
 What is still refused: a member whose claims for this one row pass one frame
 (the row cannot travel), and an unreachable member (typed, as before). In a
@@ -443,4 +448,5 @@ older version ignores the partition and sends its whole share, and refuses it
 to the row before the fold; one that does not fit says nothing of the row, and
 retrying helps once the handover ends. So the too-large hint names both: read a
 smaller part of the row, or, if that member runs an older fero, retry once the
-key has finished changing owner (since the round-4 review).
+key has finished changing owner (since the round-4 review; one member and two
+are pinned).
