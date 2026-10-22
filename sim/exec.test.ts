@@ -546,3 +546,45 @@ test('backpressure overflow heals: the queue clears to a tail hole, the drain-ti
   assert.equal(nodes[1].state.size, 300)
   assert.equal(link.synced, true)
 })
+
+test('the paused queue\'s byte bound under the M0 monitor (queued-implies-paused): big frames clear the queue by weight long before 256 frames, the frame that passes the bound is lawful, and a queue that broke the bound, a byte count that drifted and a count left on an empty queue are each named', () => {
+  const tune = { queuedBytes: 4096 }
+  const sim = new Sim(9)
+  const nodes = cluster(sim, 2, { tune })
+  sim.run()
+  assert.ok(formed(nodes))
+  const link = [...nodes[0].links.values()].find((l) => l.uuid === 'n02')!
+  sim.post('n01', { kind: 'pause', link: link.id })
+  sim.run()
+  //! about 1 KiB a frame: four frames pass 4 KiB, so the fifth clears the queue (the byte bound, never the count)
+  let most = 0, passed = 0
+  sim.monitors.push({ name: 'probe', check: () => { most = Math.max(most, link.queued.length); if (link.queuedBytes > tune.queuedBytes) passed++; return null } })
+  for (let i = 0; i < 40; i++) sim.post('n01', { kind: 'write', recs: [{ type: 0, key: [`k${i}`], value: 'v'.repeat(1000) }] }, i * 0.1)
+  sim.run()
+  assert.deepEqual(sim.violations, [], 'the kernel keeps the bound: the monitor is quiet')
+  assert.ok(passed > 0, 'a queue passed queuedBytes by its last frame, and the monitor let it: one frame may pass the bound')
+  assert.ok(most >= 2 && most <= 5, `the queue never held more than a few frames (${most}): the weight cleared it`)
+  assert.ok(nodes[0].journal.read().some((e) => e.kind === JK.dropOldest), 'cleared by weight')
+  //! each plant lands on the paused link, and n01's next step (a second pause, which changes nothing) shows it to the monitor
+  const plant = (queued: number[], bytes: number): string[] => {
+    const v0 = sim.violations.length
+    link.queued = queued.map((n) => new Uint8Array(n))
+    link.queuedBytes = bytes
+    sim.post('n01', { kind: 'pause', link: link.id })
+    sim.run()
+    link.queued = []
+    link.queuedBytes = 0
+    return sim.violations.slice(v0).filter((v) => v.monitor === 'queued-implies-paused').map((v) => v.detail)
+  }
+  assert.deepEqual(plant([4000, 90_000], 94_000), [], 'lawful: 4000 bytes before the last frame, under 4096')
+  assert.deepEqual(plant([3000, 2000, 10], 5010), [`n01 link ${link.id} queued 5010 bytes, 5000 before its last frame >= 4096`])
+  assert.deepEqual(plant([100], 101), [`n01 link ${link.id} counts 101 queued bytes, holds 100`])
+  assert.deepEqual(plant([], 7), [`n01 link ${link.id} counts 7 queued bytes on an empty queue`])
+  //! the plants are gone; the drain heals the cleared tail as ever
+  const v0 = sim.violations.length
+  sim.post('n01', { kind: 'drain', link: link.id })
+  sim.run()
+  assert.equal(sim.violations.length, v0, 'nothing after the plants')
+  assert.equal(converged(sim), null)
+  assert.equal(nodes[1].state.size, 40)
+})
