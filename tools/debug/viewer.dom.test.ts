@@ -499,6 +499,9 @@ test('a paused link shows what its parked frames weigh beside their count: the l
   o.g(`expanded.add('g/nodes/n01'); expanded.add('g/nodes/n01/g/links'); render(); navTo('${lk}')`)
   assert.match(o.el('tree').innerHTML, /data-tip="links@t"/, 'the topology replays')
   assert.match(o.el('insp').innerHTML, /<dt data-tip="unknown@t">queued bytes<\/dt><dd class="">—<\/dd>/, 'before the pause the fold would say 0, and the page still says unknown')
+  //! only the weight is unknown there: synced is a replayed fact the older capture vouches for, so it still reads yes
+  // (the third review's probe, mutant MZ1: a spread that nulls synced whenever the weight is unverified)
+  assert.equal((o.el('insp').innerHTML as string).match(/<dt[^>]*>synced<\/dt><dd[^>]*>([^<]*)<\/dd>/)?.[1], 'yes', 'synced stays a fact on an older capture')
 })
 
 test('an even split has no modal side: every node is pilled and the header says split — the first-listed node is not "converged" by accident (ISSUES I-7)', async () => {
