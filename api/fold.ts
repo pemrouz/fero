@@ -218,12 +218,17 @@ export class Gather {
       catch (e) { (isTooLarge(e) ? tooBig : missing).push(u) }
     }))
     answered.set(node.uuid, rowsPartial(this.#rt, key))
-    //! a member whose claims for THIS row pass one frame: the row itself cannot travel, and retrying cannot help
-    if (tooBig.length)
+    //! a member whose claims for THIS row pass one frame: the row itself cannot travel, and retrying cannot help. Or a
+    // member of an older version, which ignores the partition and sends its whole share: that one passing one frame says
+    // nothing of the row, and retrying helps once the handover ends (base's words). The refusal looks the same from
+    // here, so the hint names both (the round-4 review).
+    if (tooBig.length) {
+      const one = tooBig.length === 1, who = tooBig.join(', ')
       throw {
         scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, partition: key, missing: tooBig,
-        hint: `what ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds' : 'hold'} for this row is bigger than one frame (${sizeOf(node.tune.frame)}), so fero cannot send it: read a smaller part of the row with a method that returns it`,
+        hint: `what ${who} ${one ? 'holds' : 'hold'} for this row is bigger than one frame (${sizeOf(node.tune.frame)}), so fero cannot send it: read a smaller part of the row with a method that returns it (if ${who} ${one ? 'runs an older fero, it sends all its rows' : 'run an older fero, they send all their rows'}, not this row alone: then retry once this key has finished changing owner)`,
       } satisfies ScopedError
+    }
     if (missing.length)
       throw {
         scoped: true, op: 'gather', reason: 'unreachable', replicas: node.replicas, partition: key, missing,

@@ -793,7 +793,7 @@ test('KEYED HANDOVER [V4-NN] — a keyed read asks each member for its row\'s pa
     h1 = { whole: null, a: 'big' }
     await assert.rejects(g.keyed('a'), (e: ScopedError) => {
       assert.deepEqual({ ...e, hint: '' }, { scoped: true, op: 'gather', reason: 'too-large', replicas: 2, partition: 'a', missing: ['h1'], hint: '' })
-      assert.equal(e.hint, 'what h1 holds for this row is bigger than one frame (8 KiB), so fero cannot send it: read a smaller part of the row with a method that returns it')
+      assert.equal(e.hint, 'what h1 holds for this row is bigger than one frame (8 KiB), so fero cannot send it: read a smaller part of the row with a method that returns it (if h1 runs an older fero, it sends all its rows, not this row alone: then retry once this key has finished changing owner)')
       return true
     })
     h1 = { whole: null, a: { c: {}, att: ['a'] } }
