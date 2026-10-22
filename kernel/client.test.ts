@@ -3327,6 +3327,74 @@ for (const queued of [3, 4])
     assert.deepEqual(laneAt(S, 'cc'), laneAt(F, 'cc'), 'lane cc at the spoke equals the feeder\'s (it kept [4] for good on the mutant)')
   })
 
+//! the eighth review's R8-1, added at the merge: the lowering compares each lane with the start AS LOWERED SO FAR, not
+// with the answer's own start `d`. The note once called the second form harmless, on the claim that every flush on a
+// client link holds one lane or one partition, so one clear leaves at most one named partition at or under the start on
+// a lane. A relayed write breaks that claim: the WACK hops of a spoke's own relayed attempts are shipped STRAIGHT to the
+// spoke's link inside the tap (write.ts #ack), after the tap's add and before the RECORDS handler's per-frame flush. With
+// the paused queue full, the third hop clears it; the clear takes no record of lane bb, so the cover stays at bb's tail,
+// and the flush then ships the whole tap frame [bb#10 px, bb#11 qx, bb#12 rx] into the emptied queue. Two named
+// partitions now sit at or under the start on ONE lane. Compared with `d`, bb is lowered under rx's entry, not under
+// px's lower one, and the spoke loses its own settled write px.n for good: red on that mutant at "the exchange's end,
+// before any beat" ([px.c, qx.w, qx.y, qx.z, rx.c, rx.k] against the same with px.n; lane bb [6, 11, 12] against
+// [6, 10, 11, 12]). Every other test in this file stays green on it.
+const shedPart = (F: H, part: string, t: Record<string, number>) => {
+  F.node.writes.ring.place(part, 'bb', 'cc')
+  F.node.scope!.rescope(F.node)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [part]: t } }) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [part]: t } }) })
+}
+test('wave 6c — a relayed write\'s third WACK clears the paused queue in the middle of the tap: px and rx both survive on lane bb, and the start is lowered under px, the lower of the two (a queue of 10)', () => {
+  const L = latching({ tune: { queued: 10 } })
+  const { F, S, p, link, connect, beat, laneAt } = L
+  F.node.writes.ring.place('rx', 'bb', 'aa')
+  //! px and rx hold one row each, on cc only; qx holds bb#6 and cc#4
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: one('cc', PX('c', 3), 2, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: one('cc', RX('c', 8), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: one('cc', QX('w', 4), 4, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+  assert.equal(F.node.scope!.held('px') && F.node.scope!.held('rx'), true)
+  connect()
+  assert.deepEqual(kernelCells(S), kernelCells(F))
+  F.node.step({ kind: 'pause', link: 7 })
+  shedPart(F, 'px', { cc: 2 })
+  shedPart(F, 'rx', { cc: 3 })
+  assert.deepEqual(F.jk(JK.shed).map((e) => e.a), ['px', 'rx'], 'aa shed px, then rx')
+  //! both back from zero, each through a fold that teaches its cc row (synced and paused: {b}, the row, {e} queue up)
+  for (const [part, rec, seq] of [['px', PX('c', 3), 2], ['rx', RX('c', 8), 3]] as [string, Rec, number][]) {
+    F.node.writes.ring.place(part, 'bb', 'aa')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { [part]: { cc: seq } } }) })
+    teachLanes(F, 2, [{ origin: 'cc', seq, rec, pp: 0 }], { cc: seq }, part)
+    assert.equal(F.node.scope!.held(part), true)
+  }
+  assert.equal(F.jk(JK.dropOldest).length, 0, 'no clear yet')
+  const before = link.queued.map(frameName)
+  //! the spoke writes px.n, qx.y and rx.k in ONE write: aa relays three attempts to bb (keyed per record)
+  S.node.step({ kind: 'write', recs: [PX('n', 10), QX('y', 11), RX('k', 12)] })
+  p.toA()
+  const keys = [...F.node.writes.pending.keys()]
+  assert.equal(keys.length, 3, 'three relayed attempts: ' + keys.join(','))
+  const [iss] = keys[0].split('|')
+  const cids = keys.map((k) => Number(k.split('|')[1]))
+  //! bb commits them as ONE run bb#10..12 and its fan-out reaches aa before its WACK (replication IS an ack): aa's tap
+  // adds each record to the spoke's outbox and hops a WACK straight to the spoke's link per record
+  const recs = [{ rec: PX('n', 10), pp: 0 }, { rec: QX('y', 11), pp: 6 }, { rec: RX('k', 12), pp: 0 }]
+  const fr = encodeRuns(recs.map((r, i) => ({ rec: r.rec, origin: 'bb', seq: 10 + i, epoch: 1, pp: r.pp, iss, cid: cids[i] })), VERB.RECORDS, true)
+  assert.equal(fr.length, 1, 'one inbound frame')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: fr[0] })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a WACK hop cleared the queue: queue before the write ' + before.join(' '))
+  assert.deepEqual(link.queued.map(frameName), ['bb#10+bb#11+bb#12'], 'the whole tap frame left the outbox after the clear and survived')
+  F.node.step({ kind: 'drain', link: 7 })
+  p.settle()
+  assert.deepEqual(screenCells(S), fedCells(F), "the exchange's end, before any beat: the spoke shows what its feeder feeds (px.n, its own settled write, kept)")
+  assert.deepEqual(kernelCells(S), fedCells(F), "the exchange's end, before any beat: and holds it")
+  assert.deepEqual(F.sentOn(7, VERB.FEED).map((f) => f.value), [{ x: ['px', 'rx'] }, { e: 'px' }, { e: 'rx' }], 'one word for both, then the two ends')
+  beat(20)
+  assert.deepEqual(kernelCells(S), fedCells(F), 'after twenty beats: the spoke holds what its feeder feeds')
+  assert.deepEqual(screenCells(S), fedCells(F), 'after twenty beats: and shows it')
+  assert.deepEqual(laneAt(S, 'bb'), laneAt(F, 'bb'), "lane bb at the spoke equals the feeder's")
+})
+
 //! the spoke's link to aa blips: both ends see the close, the spoke re-dials aa (its only host) on link 4, aa admits it on
 // link 8; the pump is re-made on the new pair
 const reAdmit = (L: ReturnType<typeof latching>) => {
