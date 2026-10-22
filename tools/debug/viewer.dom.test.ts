@@ -473,6 +473,8 @@ test('a paused link shows what its parked frames weigh beside their count: the l
   g(`navTo('g/nodes/n01')`)
   assert.match(el('insp').innerHTML, /<th data-tip="queued-bytes">bytes<\/th>/, 'the node\'s link table has the column')
   assert.match(el('insp').innerHTML, new RegExp(`<td data-tip="queued-bytes">${w}</td>`), 'and the row its weight')
+  //! the unit is picked after rounding: a count just short of a MiB rounds to 1024.0 KiB, which reads as 1.0 MiB
+  assert.deepEqual([1023, 1024, 1048524, 1048525, 1048575, 1048576].map((n) => g(`kib(${n})`)), ['1023 B', '1.0 KiB', '1023.9 KiB', '1.0 MiB', '1.0 MiB', '1.0 MiB'])
   //! under scrub the replay holds a paused link's weight as unknown (topologyAt: null from the pause row on)
   const n01 = cap.nodes.find((n) => n.uuid === 'n01')!
   const tPause = n01.journal.find((e) => e.kind === cap.vocab.pause)!.t
