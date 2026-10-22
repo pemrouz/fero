@@ -39,7 +39,7 @@ Entries: `.` → [api/index.ts](api/index.ts), `./internals` → [internals.ts](
 
 | Command | What it does |
 |---|---|
-| `npm test` | 1192 unit/sim/scenario tests (the 28 example checks, the n=100 scale tier, the config tiers, the debugger's DOM and ELI5 gates), then `test:contract`: data's 18-clause SCHEDULE suite from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: directory OFF, config layer OFF. |
+| `npm test` | 1199 unit/sim/scenario tests (the 28 example checks, the n=100 scale tier, the config tiers, the debugger's DOM and ELI5 gates), then `test:contract`: data's 18-clause SCHEDULE suite from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: directory OFF, config layer OFF. |
 | `npm run perf` | The 64 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02). |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200 s each). Script-tier: run it on scale-relevant kernel changes, not per commit. |
