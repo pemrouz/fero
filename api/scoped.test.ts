@@ -1037,3 +1037,42 @@ test('a keyed read through the real composer asks the other member for that row 
     await Promise.all(nodes.map((n) => n.destroy()))
   }
 })
+
+//! the bound of KEYED PARKING through the real composer: the keyed side of the composer's own gather keeps no state for
+// a row nobody has, and sweeps the state of a row a keyed read would not gather — one this node holds, one another member
+// owns — with the composer's own test (api/index.ts gathers, the same test as keyedRead's). The gather is taken by
+// wrapping Gather.prototype.keyed for one read; the two later reads call it directly, past keyedRead's routing, so a
+// state is made for exactly the rows the sweep must drop. Without the composer's test, both states stay.
+test('KEYED PARKING, the bound through the real composer — no state for a row nobody has; the state of a held row and of a row another member owns is swept', async () => {
+  const { Gather } = await import('./fold.ts')
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) =>
+    fero('scoped', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })))
+  const real = Gather.prototype.keyed
+  let g: InstanceType<typeof Gather> | null = null
+  Gather.prototype.keyed = function (this: InstanceType<typeof Gather>, key: string, t?: number) { g = this; return real.call(this, key, t) }
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    const ring = new Ring()
+    ring.build(1, [['n01', addrs[0]], ['n02', addrs[1]]])
+    const ownedBy = (u: string, pre: string) => { for (let i = 0; ; i++) if (ring.holders(pre + i, 1)[0] === u) return pre + i }
+    const gone = ownedBy('n01', 'gone'), mine = ownedBy('n01', 'm'), theirs = ownedBy('n02', 't')
+    await nodes[0].methods.update({ key: mine, value: { mine } }, { timeout: 3000 })
+    await nodes[0].methods.update({ key: theirs, value: { theirs } }, { timeout: 3000 })
+    const held = (f: Fero) => (diag(f)!.capture().held ?? []) as string[]
+    assert.ok(await until(() => held(nodes[0]).includes(mine) && held(nodes[1]).includes(theirs), 8000), 'each row at its holder')
+    assert.equal(await nodes[0].methods.read(gone), undefined)
+    Gather.prototype.keyed = real
+    assert.ok(g !== null, 'the keyed read went through the composer\'s gather')
+    const gather = g as InstanceType<typeof Gather>
+    assert.equal(gather.keyedRows, 0, 'a row nobody has leaves no state')
+    assert.deepStrictEqual(await gather.keyed(theirs), { theirs })
+    assert.equal(gather.keyedRows, 0, 'n02 owns the row: swept')
+    assert.deepStrictEqual(await gather.keyed(mine), { mine })
+    assert.equal(gather.keyedRows, 0, 'n01 holds the row: swept')
+  } finally {
+    Gather.prototype.keyed = real
+    await Promise.all(nodes.map((n) => n.destroy()))
+  }
+})
