@@ -1792,7 +1792,17 @@ full queue the group's three frames can force a clear one frame earlier
 than before (the clear's cover heals it as ever; one client test runs
 with a queue of four where it ran with two, pinning the same clear). The
 scoped sweep, the spoked families on seeds 1-12 and sim/scale-probes did
-not move: the markers ride behind the fold's forward.
+not move: the markers ride behind the fold's forward. One hole is left,
+found by the eighth review at the merge (its R8-2; STATUS keeps a
+narrower line): a clear INSIDE the forward. On a paused client link one
+frame short of full, {b} fits, the forward's first frame overflows the
+queue, and the clear takes {b} with it. Link.flush ships on after a
+clear on a client link, so the forward's later frames survive with no
+group open at the spoke and land one event each at the drain: an older
+value of a row and its later remove can arrive as two events again, the
+row showing between them. The end state is right. A fix would ship a
+fresh FEED {b: p} into the emptied queue when a clear takes a {b} whose
+{e} it did not take; not built.
 
 *What M1 reads for a spoke of a scoped feeder.* From wave 6a to now it
 read nothing per event: the forward's flicker made the spoke's applied
@@ -2289,21 +2299,22 @@ twenty-four each). The seventh review's nine other mutants of the line
 ran too. Five are red (the last named partition only: one; under the
 second-lowest entry: two; no compare: two; the compare reversed:
 fourteen; the lowered start dropped when the ask is capped:
-twenty-two). Four stay green and are harmless. Lowering only a
+twenty-two). Three stay green and are harmless: lowering only a
 partition the feeder feeds, lowering in place, or lowering to the
 record's pp only skips a partition the ship filters out anyway, or
-lowers further. Comparing against the answer's own start instead of
-the start as lowered so far could only matter when two named partitions
-each have a row at or under the start on one lane, and no reachable
-state gives that. The rows at or under the start are the survivors of
-the one flush that cleared the queue (after a clear nothing more is
-tapped to the link until the heal), and every flush on a client link
-holds one lane or one partition: a tap is flushed once per inbound
-frame (`#ingest`), an owner's own commit once per run (`commit`), and a
-fold's forward carries one partition. A probe confirmed it: one member
-chunk with bb#9, then cc#5 of px and cc#6 of rx, is tapped and flushed
-frame by frame, so the bb frame's clear leaves the link unsynced and
-the cc rows are never tapped to it. The seeded runs never reach the
+lowers further. The fourth, comparing against the answer's own start
+instead of the start as lowered so far, was argued harmless here and
+is not (the eighth review, at the merge). It matters when two named
+partitions each have a row at or under the start on one lane, and a
+relayed write builds that: the WACK hops of a spoke's own relayed
+attempts go straight to the spoke's link inside the tap, between the
+tap's add and the per-frame flush, so the third hop clears a full paused
+queue and the whole tap frame (rows of px, qx and rx on lane bb)
+survives the clear. Compared with `d`, bb is lowered under rx's row,
+not px's lower one, and the spoke loses its own settled write px.n for
+good. kernel/client.test.ts pins it ('a relayed write's third WACK
+clears the paused queue in the middle of the tap'), red on that mutant
+and on no other test: forty-two mutants turn tests red. The seeded runs never reach the
 owed {x}: with a counter in a scratch copy, the scoped sweep
 (sim/scoped-sweep.test.ts, A1 to A13 and its mutation pins: 4,934
 answers) and the scale probes (10,452 answers) owe it and pay it 0
