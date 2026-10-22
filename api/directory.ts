@@ -487,8 +487,10 @@ export class Directory {
       else if (this.#o.serve && !this.hosting) this.#armRetry()
     }))
     //! the live lookup: one subscription, re-subscribed by the Caller on every primary change (a fresh
-    // host's snapshot root-replaces the mirror). Folds to the address set minus own listen.
-    this.#lookup(c, '', (row) => Object.values(row).filter((a) => typeof a === 'string'), (e) => this.#setError('lookup', e))
+    // host's snapshot root-replaces the mirror). Folds to the address set minus own listen. Each address
+    // passes isAddr, as another box's do (fromBox): this box's directory runs in whichever process took
+    // the port, which may be an older build whose register took a host of any size.
+    this.#lookup(c, '', (row) => Object.values(row).filter((a): a is string => isAddr(a)), (e) => this.#setError('lookup', e))
     //! the other boxes (§11): one ask-only client each, after this box's own
     for (const b of o.boxes ?? []) {
       if (this.#destroyed) return
