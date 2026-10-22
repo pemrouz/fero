@@ -70,7 +70,7 @@ Object.defineProperty(WriteRejectError.prototype, 'name', { value: 'WriteRejectE
 const VERB_NAMES = ['update', 'insert', 'remove'] as const
 
 //! ── the refusal lines (DESIGN-DOOR §3, §14 Q4): one stderr line per peer address and reason, per process ──
-// Fed from the refusal rows the kernel keeps beside its journal ring (kernel/journal.ts keep, V4-NN), which the
+// Fed from the refusal rows the kernel keeps beside its journal ring (kernel/journal.ts keep, V4-66), which the
 // composer takes after every step: every `doorReject` reason and `contractReject`; `nameReject` stays silent as
 // today. They used to come from the post-step journal cursor, and a ring that overflowed inside the step that wrote
 // the row (journal.cap below the step's burst) lost the line; the row in the ring is the same object. The rows
@@ -797,7 +797,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // THE GATHER — parked claims include every unshed orphan's, absence is attested by the full
       // holder set, and an unreachable member is a typed error, never a silent partial. A truly
       // absent key answers fast (one fan-out round-trip); a local-shard undefined never leaks.
-      //! One row's gather (V4-NN): every member is asked for k's partition only, and the answers fold into the live
+      //! One row's gather (V4-65): every member is asked for k's partition only, and the answers fold into the live
       // union limited to k's cells (fold.ts keyed), so a member whose whole share passes one frame no longer refuses
       // the read, and the one registry still parks the row across keyed reads and whole reads alike.
       return await gatherOf().keyed(k)
@@ -1098,7 +1098,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false, want: false }).catch(() => {})
       }
       //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process. Taken from
-      // the kept rows, never from `events`: the ring may have overwritten the row already (V4-NN). Inside this branch
+      // the kept rows, never from `events`: the ring may have overwritten the row already (V4-66). Inside this branch
       // because a kept row was emitted too, so `n` moved: a step that journals nothing pays nothing more.
       if (j.kept.length !== 0) {
         for (const e of j.kept) sayRefusal(name, node, e, clientOnly)

@@ -61,7 +61,7 @@ export interface Rows { c: Claims; att: string[] | null }
 // held ∪ orphan scope, plus the attestation set for the coverage sweep. Tombstones ride from the
 // versions map (a removed cell's stamp without a live value); acquiring partitions contribute
 // nothing (their base is not yet this node's to attest) and are NOT attested.
-//! `p` — one partition only (V4-NN: Gather.keyed, a keyed read on the row's owner while it does not hold the row — a
+//! `p` — one partition only (V4-65: Gather.keyed, a keyed read on the row's owner while it does not hold the row — a
 // handover, or a read of an absent row, which no node holds): the same answer cut to that row's cells, its attestation
 // cut to `p`. One string test per cell and no parse: a cell is JSON.stringify(key), so a cell of `p` starts with `["p"`
 // and goes on with `]` or `,` (inside, below). Still one walk of every version this node holds, which is what makes
@@ -157,7 +157,7 @@ export class Gather {
   }
 
   //! keyed — ONE row, for keyedRead's gather branch (api/index.ts: this node owns the row but does not hold it — a
-  // handover, or a read of an absent row, which no node holds), V4-NN. Every member is asked for that row's partition
+  // handover, or a read of an absent row, which no node holds), V4-65. Every member is asked for that row's partition
   // only (`rows` with the partition, rowsPartial), so a member whose whole share passes one frame still answers; before,
   // the read gathered every member's whole share and such a member refused it 'too-large' until the handover ended.
   // The answers fold into the LIVE union, limited to the row (#fold with `row`): each answering member's claims are

@@ -145,7 +145,7 @@ export class Journal {
     if (t >= this.#cap) this.dropped++
     this.#ring[t % this.#cap] = { t, kind, a, b, c }
   }
-  //! kept / keep — the rows a reader must not lose to the ring (DECISIONS V4-NN): the door's and the contract's
+  //! kept / keep — the rows a reader must not lose to the ring (DECISIONS V4-66): the door's and the contract's
   // refusals (doorReject, contractReject), written through keep() at their few cold sites in kernel/node.ts. The ring
   // can overwrite a row inside the very step that wrote it, when journal.cap is below that step's burst (a member that
   // evicts a client squatting on a member's uuid goes on to admit the member in the same step); this list holds the
