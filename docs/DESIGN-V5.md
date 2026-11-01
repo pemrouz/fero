@@ -130,7 +130,7 @@ A design, a plan and a backtest for the next fero kernel, against `main` at d7c9
 | cache with expiry | `0` | `{ ttl: '10m', max: 1e6 }` | | Redis with `maxmemory` |
 | session store | `0` | `{ ttl: '30m' }` | `touch` resets the ttl | Redis sessions |
 | stream | `'7d'` | `false` | | Kafka topic |
-| compacted stream | `'all'` | `true` | readers may start at a snapshot | Kafka compacted topic |
+| stream with a current picture | `'7d'` | `true` | a reader starts from a snapshot, then reads the log | Kafka compacted topic (a snapshot is the compacted form; 3.4) |
 | event store | `'all'` | as needed | | EventStoreDB |
 | pub/sub | `0` | `false` | `durability: 'none'` | NATS core, Redis pub/sub |
 | queue | `0`, or `'7d'` for audit | messages are rows; an ack removes one | the queue library (5.3) | SQS, JetStream work queue |
@@ -166,6 +166,35 @@ There are two rungs, not three.
   - The loaded row is written with `if: { version }` set to what the leader saw at the miss, so a remove or a write that lands while `load` runs wins, and the stale load is dropped.
   - With `rows: { ttl }` it is a Redis-style cache in front of Postgres, and every reader stays live.
 
+### 3.4 Retention, snapshots and recovery
+
+v4 has no separate copy of the state: its logs are the state, and compaction drops the entries a newer write has superseded. v5 keeps three things apart.
+
+| What | Holds | Kept by | Needed for |
+|---|---|---|---|
+| the state | the rows now: in memory, and in snapshots on disk | always | reads, conditions, recovery, new subscribers |
+| the tail | every record after the latest durable snapshot | always, whatever `history` says | crash recovery (snapshot plus tail) and followers catching up |
+| history | older records, before the tail | `history` | replay, tapes, cursors further back |
+
+**Retention never touches the state or the tail.**
+- Dropping history is always safe, because a durable snapshot already holds what those records built.
+- The tail is short because snapshots are frequent: a new snapshot is taken after N records or M bytes of tail. So a size limit on `history` can always be met. The oldest records it drops are already inside a snapshot.
+
+**Snapshots are incremental.**
+- A big object with small changes must not mean rewriting the whole object on every snapshot.
+- A snapshot writes only the rows that changed since the previous one, as a new layer.
+- A background merge folds layers together, as an LSM tree does, so the number of layers stays bounded.
+- So a snapshot costs about as much as the changes since the last one, not the size of the state.
+- The copy-on-write state (4.1) is what lets a layer be cut at exactly one offset.
+
+**Rebuilding a picture needs a starting point, and a window of deltas alone is not one.** So:
+- A `state` subscriber always starts from a snapshot, then gets deltas. One that falls behind the tail gets a fresh snapshot.
+- A `log` reader whose cursor is older than history is refused `expired`, with the earliest cursor still kept. If it wants the current picture, it asks for a snapshot and reads on from there.
+- A stream with `rows: false` has no picture to rebuild. Records past its history are gone, as in Kafka.
+- An app that must rebuild everything from deltas alone, as event sourcing does, sets `history: 'all'`.
+
+There is no separate per-key log compaction, as Kafka has. A snapshot is that compacted form, and it is kept beside the log rather than inside it.
+
 ## 4. The layers and their primitives
 
 ```
@@ -192,7 +221,8 @@ L0  io                       journal · segments · snapshots · group commit ·
   - This is how one fsync serves thousands of shards, and still lets each shard keep and drop its own segments.
 - **What `persisted` waits for.** The journal fsync that covers the record. A vote, a term and a metadata entry are never answered before theirs.
 - **Snapshots.**
-  - Each shard's state is snapshotted at an offset, every N records or M seconds, from a copy-on-write state, so a snapshot is the state at exactly one offset (N-10).
+  - Each shard's state is snapshotted at an offset after N records or M bytes of tail, from a copy-on-write state, so a snapshot is the state at exactly one offset (N-10).
+  - Snapshots are incremental: each writes only the rows changed since the previous one, as a layer, and a background merge bounds the number of layers (3.4).
   - A snapshot is written to a temporary file, fsynced, renamed, and the directory fsynced. Only then may anything it replaces be deleted.
   - Boot is the latest snapshot plus the log after it.
 - **When a segment is deleted.** All four must hold:
