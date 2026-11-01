@@ -985,10 +985,24 @@ Each phase ends on a test, not a date.
 Reply "defaults" to take every pick, or name a change ("3b").
 
 1. **Replace v4's kernel.** a) v5's kernel under v4's api and tools, with v4 frozen for features (my pick). b) Evolve v4 one mechanism at a time.
-2. **Shard replication.**
-   - a) Kafka's protocol under a Raft controller (my pick). One Raft group, and each shard costs only a little metadata. The price is the composition of controller, in-sync sets and eligible leaders: that is where most of v5's own hard cases (V5-BACKTEST part 2) live.
-   - b) Raft per shard (Redpanda, CockroachDB). No controller and no composition, but thousands of Raft groups with their heartbeats and elections; with a witness per group, two copies survive a crash too.
-   - c) **The ring decides, the logs follow** (Viewstamped Replication per shard, with views from the ring). Raft agrees only on the member list and its epoch. Every node and client computes each shard's replicas and leader from the ring over that list, as v4 does, so there are no per-shard elections and no per-shard controller state. A write commits when a majority of the shard's replicas hold it on disk. When the list changes, each affected shard's new leader first collects the latest records from a majority of the old replicas (VR's view change), and writes need majorities of both old and new replicas until the new ones catch up. Clients can send writes straight to the leader. The price: three copies to survive a crash (no two-copy mode), and leaders are placed by the ring, not by load. Under review: if chosen, section 4.2 is rewritten and re-checked against the backtest.
+2. **Shard replication.** A second, independent review compared these in depth; its full analysis is [V5-REPLICATION.md](V5-REPLICATION.md). Its pick, and now mine, is (b).
+   - a) Kafka's protocol under a Raft controller (in-sync sets; the shape section 4.2 describes today).
+     - One Raft group, and each shard costs only a little metadata.
+     - But its safety rests on the composition of controller, in-sync sets and eligible leaders, published only as seven years of fixes (KIP-101, 279, 320, 841, 903, 966).
+     - A commit waits for the slowest in-sync copy.
+     - Failover stalls during a controller election.
+   - b) **Raft per shard, with the same Raft code for the metadata log (my pick).**
+     - Each shard is a small Raft group whose voters are its copies.
+     - The controller only places copies (v4's ring can stay as that policy), paces moves, and nominates a new leader when a member's session lapses. Shard safety never depends on it.
+     - A commit waits for a majority, so its latency is the median copy's.
+     - Idle groups go quiet, and traffic between two members coalesces into one frame per tick (as CockroachDB and TiKV do).
+     - No novel safety mechanism.
+     - The price: two copies survive a crash only with a witness per shard (fero deploy refuses two copies anyway), and a member that led thousands of shards needs nominated, paced elections when it dies.
+   - c) The ring computes each shard's view, with Viewstamped Replication. Rejected by the review: a ring is computed, never acknowledged.
+     - A safe switch still needs a per-shard epoch that a majority has recorded, plus a hand-over of the log tail. That brings back v4's handover machinery.
+     - The ring would also keep choosing a slow leader, and move every affected shard at once.
+     - The ring stays useful as the placement policy in (b).
+   - If (b) is chosen, section 4.2 is rewritten from the review's outline, and the backtest rows it names are re-checked.
 3. **Language.** a) TypeScript first, then Rust behind the same interface in phase 5 (my pick). b) Rust from the start: faster sooner, slower to change while the semantics move.
 4. **Durability.**
    - a) Two rungs: `persisted` (the default) and `none` (my pick). Group commit makes `persisted` cost one fsync, and nothing a reader saw is ever undone.
