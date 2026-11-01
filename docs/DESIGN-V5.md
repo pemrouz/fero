@@ -2,7 +2,7 @@
 
 A design, a plan and a backtest for the next fero kernel, against `main` at d7c9efe (v4, 1,216 tests) and data at 63fea66. Nothing here is built.
 
-**How it was checked.** v4's DECISIONS, STATUS, design records and HISTORY were catalogued into 1,313 hard cases, plus 102 invariants, 36 monitors and 20 SCHEDULE clauses. Each case was judged against the first draft by the agent that catalogued it; the second draft (this one) answers what they found open or wrong. The mapping is in [V5-BACKTEST.md](V5-BACKTEST.md). An independent review is in section 13.
+**How it was checked.** v4's DECISIONS, STATUS, design records and HISTORY were catalogued into 1,313 hard cases, plus 102 invariants, 36 monitors and 20 SCHEDULE clauses. Each case was judged against the first draft by the agent that catalogued it, and re-judged against the second; this third draft answers what was still open, and an independent reviewer checked it twice (section 13). The mapping is in [V5-BACKTEST.md](V5-BACKTEST.md). An independent review is in section 13.
 
 **Contents.**
 1. The answers
@@ -148,6 +148,7 @@ There are two rungs, not three.
 - **`none`:** records are delivered at the leader's append, may be lost, and are never part of anyone's state. That is what transient pub/sub means.
   - Such a resource must have `rows: false`; with rows it is refused at creation.
   - Its offsets restart with each leader epoch, and its cursors carry the epoch. A subscriber whose epoch is gone resumes at `latest` and is told so.
+  - Only the leader fans `none` records out: to each member that serves a subscriber, best effort, never through followers' logs.
 
 ### 3.3 Caches, all from the same parts
 
@@ -196,8 +197,9 @@ L0  io                       journal · segments · snapshots · group commit ·
   - The resource's `history` allows it.
   - Every in-sync replica's fetch position is past it.
   - No snapshot install in progress still needs it.
+  - No catch-up pin (4.2) covers it: a moving replica's pin is the one bounded exception to the next line.
 
-  A replica outside the in-sync set never holds a segment back: it installs a snapshot instead.
+  A replica outside the in-sync set otherwise never holds a segment back: it installs a snapshot instead.
 - **Boot checks.**
   - Every record carries a crc32c and its predecessor's offset and epoch (v4's chain, V3-8).
   - A member truncates its log at the first record that fails either check, and fetches the rest from the leader.
@@ -206,8 +208,8 @@ L0  io                       journal · segments · snapshots · group commit ·
 - **One process per dir.**
   - v4's lock file and its lease thread stay (V4-59).
   - Each lease has an epoch, and every file a member writes (journal, segments, snapshots, boot record) carries that epoch in its name. A holder writes only files of its own epoch.
-  - A new holder reads the older epochs' files without writing them, and copies what it keeps into files of its own.
-  - So a process that was frozen past its lease, and wakes between a check and a write, can only append to files the new holder no longer trusts.
+  - A new holder first renames the old epoch's directory to `retired-<epoch>`, then reads it as its base, read-only, and writes only new files of its own epoch. It copies nothing.
+  - So a process that was frozen past its lease, and wakes between a check and a write, finds its paths gone. It cannot delete what the new holder reads, and anything it appends through a still-open descriptor lands past the point the new holder read, where it is ignored.
 - **State larger than memory** (phase 5, opt-in per resource): rows live in an on-disk keyed store, with the hot set in memory. Views and first pictures read through it.
 - **Transports.**
   - TCP, TLS, WebSocket (browsers, with no bridge) and in-process (worlds and the simulator).
@@ -237,7 +239,7 @@ Two logs, one protocol family, both published algorithms.
 
 | Record | Holds |
 |---|---|
-| member | id, life (a random number per process start), disk incarnation, addresses (listen and advertised, apart), role (voter, witness, learner), state (up, restarting, leaving), code hashes it can run, kernel version |
+| member | id, life (a random number per process start), session epoch, disk incarnation, addresses (listen and advertised, apart), role (voter, witness, learner), state (up, restarting, leaving), code hashes it can run, kernel version |
 | resource | name, config (4.5), allowed code hashes, seed applied, write gate (open, or read-only with a reason) |
 | shard | resource, number, replicas, leader, leader epoch, in-sync set and its epoch, eligible replicas, split lineage |
 | cluster | id, cluster version (the newest protocol every member speaks), current and next door secret |
@@ -257,7 +259,8 @@ Raft as published, plus the fixes later practice added:
 
 | Event | Detected after (default) | What the controller does |
 |---|---|---|
-| a member's session lapses (it crashed, or hangs with its sockets open) | `session.ms`: 2 s in TypeScript, 1 s native (KRaft's default is 9 s) | moves its leaderships to in-sync followers; removes it from every in-sync set; records its life as **fenced**, and every leader then refuses writes from that life (`fenced`), so a process that wakes up late cannot write |
+| a member's session lapses (it crashed, or hangs with its sockets open) | `session.ms`: 2 s in TypeScript, 1 s native (KRaft's default is 9 s) | moves its leaderships to in-sync followers; removes it from every in-sync set; marks that **session epoch** fenced, and every leader then refuses writes and forwards carrying it (`fenced`), so a process that wakes up late cannot write. The member re-registers, gets a new session epoch, catches up and rejoins the in-sync sets (KRaft's broker epoch) |
+| the controller changes | — | the new controller restarts every session timer, giving each member a full `session.ms` before it can fence anyone, so a controller failover never fences a healthy cluster |
 | a member comes back with a new life | at its first heartbeat | removes it from every in-sync set before it can acknowledge anything (KIP-903) |
 | a member stays down past `evict.after` (10 min) | that long | re-creates its replicas elsewhere; if it was a voter, replaces it by single-voter changes |
 
@@ -292,9 +295,14 @@ These give failover in about 2.2 s at the defaults (1.1 s native): well under v4
   - fero deploy never runs two copies (deploy decision: two copies are refused), so this shape is local only.
 - **A leave that cannot finish in `leave.ms`** (it could not hand off a leadership, or re-replicate a shard only it holds) does not remove itself. It stops as a restart instead, stays a voter and a replica, and `destroy()` resolves `false` with the reason. Data only it holds is never dropped.
 - **A member that left and starts again** knows it left: its own metadata log records its removal. It joins whatever cluster its hosts or directory lead to, as a learner. It never founds a cluster. If none is reachable, it waits and says so, and `fero recover --new-cluster` can make it one.
+- **The price of `replicas: 'all'`.**
+  - Every member is in every shard's in-sync set, so a commit waits for the slowest member's fsync.
+  - A member lagging past `lag.ms` simply drops out of the set while writes go on, as long as `minInSync` remain.
+  - `evict.after` then has nothing to re-create, and only replaces a long-gone voter.
+  - Past about five members, `replicas: N` is the better choice.
 - **Leaving below R.**
   - When members fall below a resource's `replicas` by leaving, its shards keep min(R, members) replicas, and they grow back as members join.
-  - A shard's effective `minInSync` is min(`minInSync`, its replica count).
+  - A shard's effective `minInSync` is min(`minInSync`, its replica count), and **1 when it has exactly two replicas**, so two members survive one crash (with a witness or a surviving voter).
   - Only a configuration change (a leave) lowers the replica count. A crash only shrinks the in-sync set, so a crash never lowers the bar a write must meet.
 
 **The shard logs** use Kafka's replication under the controller (the KRaft design):
@@ -333,7 +341,8 @@ These give failover in about 2.2 s at the defaults (1.1 s native): well under v4
 
   There is no orphan, shed, latch or teacher.
   - **The catch-up pin.** While a new replica installs a snapshot and catches up, the leader keeps the log from that snapshot's offset (a pin). So the replica never has to reinstall because the segments it needs were deleted.
-  - **The pin is bounded** (`move.pin`, 1 GB by default). Past it, the move fails, the pin is dropped, and the controller reports the move and retries it with backoff. It may throttle the shard's replication traffic, never its writes, so a move cannot loop forever.
+  - **The pin is bounded** (`move.pin`, 1 GB by default). Past it, the move fails, the pin is dropped, and the controller reports the move and retries it with backoff, so a move cannot loop forever.
+  - **A shard written faster than a new replica can copy cannot finish a move** without slowing its writes. v5 reports that plainly; with `move.throttle` set, it slows that shard's writes until the move completes.
   - **The old replica stays** until the new one has joined.
 - **Two members.**
   - With a witness voting in the metadata log, a member's crash heals when both were in sync at the moment of the crash: the controller shrinks the set to the survivor, and `minInSync: 1` keeps it writable.
@@ -375,17 +384,22 @@ Both refuse while a quorum or an eligible replica is up. Both are journalled and
 **At the leader, in this order:**
 1. **Dedup.**
    - **What it checks.** If the attempt id is in the leader's log, committed or in the uncommitted tail, the leader answers with the original offset, and nothing else runs.
-   - **No answer before commit.** A dedup answer, and every refusal (a `conflict`, a rule's refusal), is judged against the log-end state, so it is held until the high-water mark reaches the offset it was judged at. If the leader is deposed first, the answer is `unknown`, and the issuer retries at the new leader. So no client ever holds a confirmation, or a `conflict` naming a version, that a truncation later undoes.
-   - **What the leader keeps.** Per issuer and shard, the outcomes of that issuer's last 1,024 committed attempts (v4's `dedupKeep`). An issuer is forgotten only after it has been silent for the retry horizon (5 min). So memory is bounded by active issuers, not by records.
+   - **No answer before commit.** A dedup answer, and every refusal (a `conflict`, a rule's refusal), is judged against the log-end state, so it is held until the high-water mark reaches the version it was judged against. A refusal whose cause is already committed goes at once. If the leader is deposed first, the answer is `unknown`, and the issuer retries at the new leader. So no client ever holds a confirmation, or a `conflict` naming a version, that a truncation later undoes.
    - **What the issuer promises.**
-     - It has at most 1,024 attempts outstanding per shard, counted from its oldest unacknowledged one: a sliding window, as TCP's.
+     - Its call ids rise, and it has at most 1,024 attempts outstanding **in all**, across every shard, counted from its oldest unacknowledged one: a sliding window, as TCP's.
      - It stops retrying an attempt after half the horizon.
-     - So a retry always finds its first attempt among the outcomes the leader still holds, if that attempt committed.
-     - An attempt that never committed is judged fresh, whatever order the attempts arrive in. There is no high-water rule: call ids interleave across shards and reorder across leader changes, which is v3's CHECKPOINT deviation 1.
+   - **What the leader keeps.**
+     - Per issuer and shard, the highest call id it has seen, and the outcomes of that issuer's last 1,024 committed attempts there (v4's `dedupKeep`).
+     - An issuer is forgotten only after it has been silent for the retry horizon (5 min). So memory is bounded by active issuers, not by records.
+   - **The floor.**
+     - Because the window is global, an issuer that sent call id M had acknowledgements for every id at or below M − 1,024.
+     - So an attempt at or below (the highest id seen) − 1,024 that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`.
+     - Above the floor, an attempt not among the outcomes never committed: if it had, fewer than 1,024 newer attempts could have pushed it out. It is judged fresh, whatever order the attempts arrive in.
+     - The 1,024 margin is what makes reordering across shards and leader changes safe (v3's CHECKPOINT deviation 1).
    - **No late arrivals.**
      - An attempt carries a remaining budget, set by its issuer to half the horizon.
      - Every hop (client, relay, forwarding member) subtracts the time it held the attempt, measured on its own monotonic clock. A hop whose budget is spent answers `unknown` and does not forward.
-     - A member that forwards an attempt adds its own life, and leaders refuse forwards from a fenced life (4.2). So a member frozen past its session cannot deliver a parked attempt late.
+     - A member that forwards an attempt adds its session epoch, and leaders refuse forwards from a fenced epoch (4.2). So a member frozen past its session cannot deliver a parked attempt late.
      - The budget assumes a monotonic clock that keeps counting while a process is paused, which is true of `CLOCK_MONOTONIC` under a freeze or SIGSTOP. A virtual machine paused with its clock stopped is the residual case, named here, not hidden.
      - So however many hops there are, no attempt reaches a leader after its issuer could have been forgotten.
    - **Dedup survives snapshots.** The outcomes are part of the shard's state, so a snapshot carries them and a `history: 0` resource loses none.
@@ -425,7 +439,7 @@ A refusal is not appended. A retried refused write is judged afresh, since the r
 
 **Row retention** (3.1) runs on the leader's tick. Rows past their `ttl`, over `max`, or matching `where` are removed by records that carry a reason.
 
-**The fold** is data's: records apply through its hot lane in offset order. Followers, clients and replays run the same fold, with no LWW comparison anywhere. A write to a cell under an absent row follows data's deep-path law, as today.
+**The fold** is data's: records apply through its hot lane in offset order. Followers, clients and replays run the same fold, with no LWW comparison anywhere. A field write under an absent row never reaches the fold: the leader refuses it `absent-row` (step 2, decision 14).
 
 ### 4.4 L3: flow
 
@@ -497,9 +511,11 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
     - Its writes carry attempt ids derived from the call key, their order, and a hash of their content. So the leaders' dedup makes a re-run's identical writes no-ops.
     - A re-run that writes something different under the same position is refused `call-diverged`, and the call fails loudly instead of believing its new value landed. Handlers are re-runnable when their writes depend only on their input and committed state; anything else should write with a condition.
     - External effects take the call key as their idempotency key, as the "fero test" café already does.
-  - **The lease bound.**
-    - The runner's member renews a call's lease while the handler runs.
-    - The lease can lapse only when that member's session lapses, and then the controller fences the member's life: leaders refuse every write from a fenced life (`fenced`, 4.2). So a re-run never overlaps a first run that is slow but alive.
+  - **The lease and the fence.**
+    - The runner's member renews a call's lease with the `#calls` leader while the handler runs.
+    - **Every write a call makes carries `if: { fence: { lock: callKey, token } }`**, where the token is its claim's version. A re-run claims with a higher token, so wherever the re-run has written, the first run's later writes are refused.
+    - **A runner fences itself.** If its last successful renewal is older than the lease minus a margin (on its monotonic clock), it stops issuing the handler's writes and fails the call `lease-lost`. So a member cut from the `#calls` leader, but not from the controller, stops before a re-run can start.
+    - A member whose session lapses is fenced by the controller as well (4.2).
     - A call is re-run only within half the retry horizon of its claim, so the re-run lands while the leaders still hold its first run's outcomes.
     - A call whose runner died later than that is not re-run. It is marked `unknown`, with the offsets it wrote, for the app to reconcile.
 - **Rules.**
@@ -514,9 +530,10 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 - **Identity and security.**
   - A client presents a token signed by the cluster (claims: subject, roles, expiry), and `ctx.peer` carries the claims. The shared client key (`secret.client`) stays as the simplest token.
   - TLS uses a cluster certificate authority, so clients verify servers, closing v4's "a client-key holder can pose as a server" (S-123).
-    - **The CA key** is held by the controller, encrypted under the cluster secret in the metadata log. Hosted, fero deploy holds it.
+    - **The CA key** is in the metadata log only as envelopes encrypted to each voter's own key, so learners and clients never hold it, and a leaked join secret cannot sign certificates. Hosted, fero deploy holds it.
+    - **Joins use single-use join tokens** the controller mints (`fero join-token`; fero deploy mints one per new machine). The long-lived shared secret is a local convenience, and a leaked one is a member, as today.
     - **A client trusts what it was given.** Its token, or the client key bundle `fero key` prints, carries the CA root's fingerprint, so a client checks a server against that, never against what the server says.
-    - **A member gets its own certificate when it joins**, after proving the join secret. Removing a member revokes its certificate: the revocation list lives in the metadata log, and members refuse revoked certificates. So a removed member cannot rejoin on an old certificate, and the join secret is only needed at join.
+    - **A member gets its own certificate when it joins**, after proving a join token or the secret. Removing a member revokes its certificate: the revocation list lives in the metadata log, and members refuse revoked certificates. So a removed member cannot rejoin on an old certificate.
   - The secret rotates through the metadata log, which holds the current and the next secret during a window.
   - The box directory stays on loopback, as today.
 - **`cluster.writable`** is true when every shard of the resource has a leader and at least `minInSync` in-sync replicas. `cluster.shards` lists each shard's state for the rest.
@@ -532,7 +549,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 | cluster | the metadata log | voter count, witness, default `replicas`, `minInSync`, `session.ms`, `lag.ms`, `evict.after`, cluster version | online |
 | resource | the metadata log | `shards`, `replicas`, `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
 
-- **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. This is unchanged from the "fero test" design; v5 adds only that a solo node is the same L0 to L2 code, with one replica.
+- **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. This is unchanged from the "fero test" design; v5 adds only that a solo node is the same L0 to L3 code, with one replica.
 
 ### 4.6 L5: libraries and adapters
 
@@ -660,7 +677,7 @@ Restart-all is every copy restarting at once: the voters and shards are in each 
 
 | # | Piece | On v5 |
 |---|---|---|
-| 1 | the world in `fero()` | L4, unchanged; a solo node is L0 to L2 with one replica and the in-process transport |
+| 1 | the world in `fero()` | L4, unchanged; a solo node is L0 to L3 with one replica and the in-process transport |
 | 2 | the clock and ids | leader time `t` (4.3) under the world's clock; `fero.id()` from the world's seed |
 | 3 | input keys | call keys in `#calls`, with crash semantics (4.5) |
 | 4 | `fero test` as a verb | L5 |
@@ -670,7 +687,7 @@ Restart-all is every copy restarting at once: the voters and shards are in each 
 | 8 | the store: forks, versions, proposals | records in system resources, as designed. **A fork's rows are a copy-on-write snapshot** of each shard at an offset: segments and snapshots are immutable, so a fork costs a pointer |
 | 9 | the tape at the live edge | **a tape is a resource with `history: '14d'` and rows keyed by match key**: the edge appends each input and answer; a replay reads the inputs in order with `read({ from })` and looks each ask's answer up by its match key |
 | 10 | the ai component and `fero change` | unchanged |
-| 11 | app steps in the simulator; agents | methods run as sim steps against L0 to L2, under the same seeds |
+| 11 | app steps in the simulator; agents | methods run as sim steps against L0 to L3, under the same seeds and the world's virtual clock |
 
 ## 7. The backtest, summarised
 
@@ -780,14 +797,15 @@ Results go into `tools/perf/results`, as today's baseline does.
 ### 8.4 TypeScript first, native next
 
 - **Why native for the hot path.** The native column needs native code. JavaScript's per-object costs and its single event loop cap one process well below it.
-- **TypeScript first.** L0 to L2 are a deterministic machine behind one interface: events in, effects out. Build them in TypeScript under the simulator until the semantics stop moving.
+- **TypeScript first.** L0 to L3 are a deterministic machine behind one interface: events in, effects out. Build them in TypeScript under the simulator until the semantics stop moving.
 - **Then Rust.** Implement the same interface in Rust (N-API for Node, WASM for browsers, a C ABI for other languages). Run both under the same seeds and compare effects byte for byte. L3 fan-out and L0 io move with them.
 - **L4 stays JavaScript.** Views, methods and rules are user code.
 - **Who owns the rows.**
   - The kernel owns them: on its worker thread in TypeScript, in Rust natively, in a compact form. That is what conditions, snapshots and serving read.
   - The JavaScript side holds a projection: the rows this process reads, as immutable objects, built from the record stream it subscribes to.
   - So a sync `data[k]` of a held row is a property read (about 100 ns), and a row not held is an async hop (4.5).
-  - The cost is a second copy of the rows a process reads. A member that serves but never reads a resource keeps no projection of it.
+  - The cost is a second copy of the rows a process reads, or serves views over. A member that neither reads a resource nor serves views of it keeps no projection of it.
+- **Leader-side user code runs on the kernel thread.** `rules.write`, `where`, `partition` and `load` are loaded there, from the resource's code by hash, so they cannot close over main-thread state. Their time budget interrupts JavaScript only, not a native call or `Atomics.wait`.
 - **Two costs to say plainly.**
   - The journal plus per-shard segments write each record twice. If measurement shows that matters, phase 5 moves to journal files with per-shard indexes, deleted when every shard they hold has passed them.
   - Followers do not re-encode, but they do decode, to fold and to serve.
@@ -948,7 +966,8 @@ Reply "defaults" to take every pick, or name a change ("3b").
 7. **Defaults.**
    - a) My pick:
      - 16 shards;
-     - `replicas: 'all'` (every member holds every shard, as v4's unscoped default and fero deploy's v1), `minInSync` 2, capped at the replica count; `replicas: N` opt-in for large clusters;
+     - `replicas: 'all'` (every member holds every shard, as v4's unscoped default and fero deploy's v1), and `replicas: N` opt-in for large clusters;
+     - `minInSync` 2, capped at the replica count, and 1 at two replicas;
      - 3 voters;
      - a 100 ms tick, `lag.ms` 1 s, `evict.after` 10 min;
      - `history: 0`, `rows: true`.
