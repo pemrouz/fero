@@ -17,7 +17,7 @@ These are the cases a per-shard quorum log with a controller is known to get wro
 | N-05 | A fresh read served by a deposed leader | `read(key, { fresh: true })` uses the read-index: the leader confirms it is still leader with the in-sync set before answering (DESIGN-V5 §4.5). Local reads are stale by contract, but never older than the reader's own last-seen offsets (§4.4) |
 | N-06 | A retried write whose first attempt committed, under a new leader | The attempt id is in the log, so the new leader's dedup window has it and answers with the original offsets |
 | N-07 | A retried conditional write is judged again and refused by its own effect | Dedup comes before conditions (DESIGN-V5 §4.3), over the leader's whole log including its uncommitted tail. A refusal is never appended, so a refused attempt is judged afresh on retry; it had no effect |
-| N-08 | The dedup window evicts an attempt before the issuer stops retrying | The window is sized in time (default 5 min) and the issuer's retry horizon is bounded below it; both are pins |
+| N-08 | The dedup window evicts an attempt before the issuer stops retrying | Per issuer and shard, the leader keeps the last 1,024 outcomes, and the issuer keeps at most 1,024 attempts outstanding per shard from its oldest unacknowledged one; every attempt carries a time budget that each hop spends, ending well inside the 5-minute horizon after which a silent issuer is forgotten (DESIGN-V5 §4.3) |
 | N-09 | Leader time goes backwards on a leader change, or jumps forward with skew | `t = max(previous t, clock)` per shard, carried in the log; forward skew can expire a TTL early by the skew; leases are fenced (N-15), so skew costs availability, never safety |
 | N-10 | A snapshot taken while appends continue is not a state at one offset | Snapshots are taken from a persistent (copy-on-write) state at an offset; the snapshot names its offset and the fold resumes after it |
 | N-11 | A follower behind retention can never catch up | It installs a snapshot, then fetches; retention never waits on a replica outside the in-sync set |
@@ -28,7 +28,7 @@ These are the cases a per-shard quorum log with a controller is known to get wro
 | N-16 | A session lapses during a partition while its client is alive | Its `while: 'session'` rows go, by contract; the client re-creates them on reconnect and is told its session ended |
 | N-17 | Two members create the same resource with different options at once | Creation is a metadata record; the second creator's options must hash equal or it is refused with the difference |
 | N-18 | A roll runs two code versions; a rule tightened in v2 is bypassed by v1 writers until the roll ends | Stated, not prevented: both hashes are allowed during a roll. A deploy that tightens a rule can ask for a stop-the-world roll instead |
-| N-19 | A member returns with an empty or older disk under its old identity | Identity includes the disk's incarnation (v4's boot record); a member whose disk is not the one the controller knows rejoins as a new replica and catches up |
+| N-19 | A member returns with an empty or older disk under its old identity | Identity includes the disk's incarnation (v4's boot record). As a replica, it rejoins as a new one and catches up; as a voter, it joins as a learner and the controller replaces its old incarnation by two single-voter changes, so it never votes twice (DESIGN-V5 §4.2) |
 | N-20 | fsync fails or a disk lies | The member stops acknowledging (v4's fsyncgate latch) and leaves every in-sync set; the controller moves its shards |
 | N-21 | The metadata log grows without bound | Raft snapshots of the metadata state |
 | N-22 | Thousands of resources times shards overload the controller | Controller decisions are batched; each member holds a bounded number of replicas; the scale tier (n ≈ 100) pins it |
@@ -38,4 +38,13 @@ These are the cases a per-shard quorum log with a controller is known to get wro
 
 ## Part 1: v4's hard cases
 
-*Filled from the catalogs below.*
+Every hard case v4 recorded, with v4's mechanism and v5's answer, is in one file per source:
+
+| File | Source | Rows |
+|---|---|---|
+| [v5-backtest/decisions.md](v5-backtest/decisions.md) | docs/DECISIONS.md, plus its 102 invariants against v5 | 414 |
+| [v5-backtest/status-leave-door.md](v5-backtest/status-leave-door.md) | STATUS.md, docs/DESIGN-LEAVE.md, docs/DESIGN-DOOR.md | 306 |
+| [v5-backtest/scale-m6-m7.md](v5-backtest/scale-m6-m7.md) | docs/DESIGN-SCALE.md, DESIGN-M6.md, DESIGN-M7.md, CHECKPOINT.md, plus v4's measured scale numbers | 259 |
+| [v5-backtest/history-config-monitors.md](v5-backtest/history-config-monitors.md) | docs/HISTORY.md, DESIGN-DIRECTORY.md, DESIGN-CONFIG.md, sim/monitors.ts, data's SCHEDULE, plus the 36 monitors and 20 clauses against v5 | 334 |
+
+The summary, and the third draft's answers to the rows the second draft left open, are in DESIGN-V5 section 7.
