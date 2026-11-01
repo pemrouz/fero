@@ -2,7 +2,10 @@
 
 A design, a plan and a backtest for the next fero kernel, against `main` at d7c9efe (v4, 1,216 tests) and data at 63fea66. Nothing here is built.
 
-**How it was checked.** v4's DECISIONS, STATUS, design records and HISTORY were catalogued into 1,313 hard cases, plus 102 invariants, 36 monitors and 20 SCHEDULE clauses. Each case was judged against the first draft by the agent that catalogued it, and re-judged against the second; this third draft answers what was still open, and an independent reviewer checked it twice (section 13). The mapping is in [V5-BACKTEST.md](V5-BACKTEST.md). An independent review is in section 13.
+**How it was checked.**
+- v4's DECISIONS, STATUS, design records and HISTORY were catalogued into 1,313 hard cases, plus 102 invariants, 36 monitors and 20 SCHEDULE clauses.
+- Each case was judged against the first draft by the agent that catalogued it, and re-judged against the second. This draft answers what was still open (section 7).
+- An independent reviewer reviewed three rounds, and signed off on phase 1 starting from this document (section 13). The mapping is in [V5-BACKTEST.md](V5-BACKTEST.md). An independent review is in section 13.
 
 **Contents.**
 1. The answers
@@ -208,7 +211,8 @@ L0  io                       journal · segments · snapshots · group commit ·
 - **One process per dir.**
   - v4's lock file and its lease thread stay (V4-59).
   - Each lease has an epoch, and every file a member writes (journal, segments, snapshots, boot record) carries that epoch in its name. A holder writes only files of its own epoch.
-  - A new holder first renames the old epoch's directory to `retired-<epoch>`, then reads it as its base, read-only, and writes only new files of its own epoch. It copies nothing.
+  - A new holder first renames the old epoch's directory to `retired-<epoch>`. Then it writes and fsyncs its boot record, naming that directory and the end offset it will read to. Only then does it read the base, read-only and never past that offset, and from then on it writes only new files of its own epoch. It copies nothing, and after a crash it boots from the boot record's base, never from whatever the retired files have grown to.
+  - The journal and segments roll by creating new files and unlinking old ones by path. They are never truncated in place, so a frozen holder's descriptor cannot shorten what the new holder reads.
   - So a process that was frozen past its lease, and wakes between a check and a write, finds its paths gone. It cannot delete what the new holder reads, and anything it appends through a still-open descriptor lands past the point the new holder read, where it is ignored.
 - **State larger than memory** (phase 5, opt-in per resource): rows live in an on-disk keyed store, with the hot set in memory. Views and first pictures read through it.
 - **Transports.**
@@ -260,7 +264,7 @@ Raft as published, plus the fixes later practice added:
 | Event | Detected after (default) | What the controller does |
 |---|---|---|
 | a member's session lapses (it crashed, or hangs with its sockets open) | `session.ms`: 2 s in TypeScript, 1 s native (KRaft's default is 9 s) | moves its leaderships to in-sync followers; removes it from every in-sync set; marks that **session epoch** fenced, and every leader then refuses writes and forwards carrying it (`fenced`), so a process that wakes up late cannot write. The member re-registers, gets a new session epoch, catches up and rejoins the in-sync sets (KRaft's broker epoch) |
-| the controller changes | — | the new controller restarts every session timer, giving each member a full `session.ms` before it can fence anyone, so a controller failover never fences a healthy cluster |
+| the controller changes | — | the new controller restarts every session timer, giving each member a full `session.ms` before it can fence anyone, so a controller failover never fences a healthy cluster. The cost: a member that died just before the change is detected after up to twice `session.ms` |
 | a member comes back with a new life | at its first heartbeat | removes it from every in-sync set before it can acknowledge anything (KIP-903) |
 | a member stays down past `evict.after` (10 min) | that long | re-creates its replicas elsewhere; if it was a voter, replaces it by single-voter changes |
 
@@ -386,15 +390,15 @@ Both refuse while a quorum or an eligible replica is up. Both are journalled and
    - **What it checks.** If the attempt id is in the leader's log, committed or in the uncommitted tail, the leader answers with the original offset, and nothing else runs.
    - **No answer before commit.** A dedup answer, and every refusal (a `conflict`, a rule's refusal), is judged against the log-end state, so it is held until the high-water mark reaches the version it was judged against. A refusal whose cause is already committed goes at once. If the leader is deposed first, the answer is `unknown`, and the issuer retries at the new leader. So no client ever holds a confirmation, or a `conflict` naming a version, that a truncation later undoes.
    - **What the issuer promises.**
-     - Its call ids rise, and it has at most 1,024 attempts outstanding **in all**, across every shard, counted from its oldest unacknowledged one: a sliding window, as TCP's.
+     - Its call ids rise, and it has at most 1,024 attempts outstanding **in all**, across every shard, counted from its oldest unacknowledged one: a sliding window, as TCP's. The window is a node key (`issuer.window`); a busy member, which issues for its methods and loads, can raise it, and the floor below moves with it.
      - It stops retrying an attempt after half the horizon.
    - **What the leader keeps.**
-     - Per issuer and shard, the highest call id it has seen, and the outcomes of that issuer's last 1,024 committed attempts there (v4's `dedupKeep`).
+     - Per issuer and shard, the highest call id it has seen, and **every committed outcome whose id is above the floor** (below). By construction that is at most 1,024 entries per issuer per shard. It is kept by id, not by commit order, because a lower id can commit after a higher one.
      - An issuer is forgotten only after it has been silent for the retry horizon (5 min). So memory is bounded by active issuers, not by records.
    - **The floor.**
      - Because the window is global, an issuer that sent call id M had acknowledgements for every id at or below M − 1,024.
      - So an attempt at or below (the highest id seen) − 1,024 that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`.
-     - Above the floor, an attempt not among the outcomes never committed: if it had, fewer than 1,024 newer attempts could have pushed it out. It is judged fresh, whatever order the attempts arrive in.
+     - Above the floor, every committed attempt is among the outcomes, so an attempt above the floor that is not among them never committed. It is judged fresh, whatever order the attempts arrive in.
      - The 1,024 margin is what makes reordering across shards and leader changes safe (v3's CHECKPOINT deviation 1).
    - **No late arrivals.**
      - An attempt carries a remaining budget, set by its issuer to half the horizon.
@@ -514,7 +518,8 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - **The lease and the fence.**
     - The runner's member renews a call's lease with the `#calls` leader while the handler runs.
     - **Every write a call makes carries `if: { fence: { lock: callKey, token } }`**, where the token is its claim's version. A re-run claims with a higher token, so wherever the re-run has written, the first run's later writes are refused.
-    - **A runner fences itself.** If its last successful renewal is older than the lease minus a margin (on its monotonic clock), it stops issuing the handler's writes and fails the call `lease-lost`. So a member cut from the `#calls` leader, but not from the controller, stops before a re-run can start.
+    - **A runner fences itself.** If its last successful renewal is older than the lease minus a margin (on its monotonic clock), it stops issuing the handler's writes and fails the call `lease-lost`. The margin is at least a renewal round trip plus the clock-drift bound (`skew.max`). So a member cut from the `#calls` leader, but not from the controller, stops before a re-run can start.
+    - **The residual:** a write already in flight to a partition the re-run never touches still lands. That is why a re-runnable handler writes with conditions.
     - A member whose session lapses is fenced by the controller as well (4.2).
     - A call is re-run only within half the retry horizon of its claim, so the re-run lands while the leaders still hold its first run's outcomes.
     - A call whose runner died later than that is not re-run. It is marked `unknown`, with the offsets it wrote, for the app to reconcile.
@@ -530,7 +535,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 - **Identity and security.**
   - A client presents a token signed by the cluster (claims: subject, roles, expiry), and `ctx.peer` carries the claims. The shared client key (`secret.client`) stays as the simplest token.
   - TLS uses a cluster certificate authority, so clients verify servers, closing v4's "a client-key holder can pose as a server" (S-123).
-    - **The CA key** is in the metadata log only as envelopes encrypted to each voter's own key, so learners and clients never hold it, and a leaked join secret cannot sign certificates. Hosted, fero deploy holds it.
+    - **The CA key** is in the metadata log only as envelopes encrypted to each voter's own key, so learners and clients never hold it, and a leaked join secret cannot sign certificates. A witness is a voter and can decrypt it too. Hosted, fero deploy holds it.
     - **Joins use single-use join tokens** the controller mints (`fero join-token`; fero deploy mints one per new machine). The long-lived shared secret is a local convenience, and a leaked one is a member, as today.
     - **A client trusts what it was given.** Its token, or the client key bundle `fero key` prints, carries the CA root's fingerprint, so a client checks a server against that, never against what the server says.
     - **A member gets its own certificate when it joins**, after proving a join token or the secret. Removing a member revokes its certificate: the revocation list lives in the metadata log, and members refuse revoked certificates. So a removed member cannot rejoin on an old certificate.
@@ -991,4 +996,25 @@ Reply "defaults" to take every pick, or name a change ("3b").
 
 ## 13. The review
 
-*Filled in after the independent review.*
+Two kinds of review shaped this document.
+- **The four catalogue agents** judged every v4 case against each draft (section 7).
+- **An independent reviewer**, briefed as a distributed-systems and performance engineer, read the drafts, v4's tree, and the "fero deploy" and "fero test" docs, without being shown my conclusions. It reviewed three times.
+
+| Round | Verdict | What it found | What changed |
+|---|---|---|---|
+| 1 (second draft) | "Not as it stands. The L1 skeleton is sound and well chosen" | Dedup answers and refusals went out before commit, so a truncation could undo a confirmed write. Fence tokens from different `#locks` shards were compared. A call re-run could reuse an id with different content. The backtest claim was unsupported. Seven significant points: a follower could depose a leader; `committed` with eligible leaders; the queue, cache and pub/sub weaknesses; the deploy and test fit; who owns rows natively; the simplicity claim; the plan | Answers held until the high-water mark; fences per lock; content-hashed call ids; section 7 filled; sessions as the only deposer; no `committed` rung; the `claim` op and sampled LRU; `replicas: 'all'`; L0 to L3 deterministic; row ownership stated; "fewer novel mechanisms, about as many in all"; libraries prototyped in phase 3 |
+| 2 (third draft) | "Closer, and the L1/L3 skeleton now reads as sound", but not yet | Fenced lives never un-fenced, so a controller failover fenced the cluster. A per-shard dedup window double-committed after one slow forward. Two members were read-only under the defaults. Call re-runs needed a claim-token fence. `absent-row` contradicted the fold | Session epochs, with timers restarted on controller change; a global issuer window and a floor; `minInSync` 1 at two replicas; claim-token fences and self-fencing; the fold paragraph; retired-epoch renames; CA key envelopes and join tokens |
+| 3 (this draft) | "With those two edits I sign off on phase 1 starting from this document" | Outcomes were kept by commit order, not by id, which reopened a double commit. A new holder's read of a retired epoch was not pinned by its boot record | Both edits made as specified: outcomes kept by id above the floor; a boot record naming the base and its end offset, written before the read; files rolled, never truncated in place |
+
+**What the reviewer said to keep.**
+- One log per shard, with offsets as versions, removals as records, and history, rows and cache as separate knobs: "the right answer to the author's question".
+- Appending only results, so leader-side user code may be non-deterministic: "the decision that makes replay, forks and tapes cheap".
+- Cursors with a log identity, snapshot-replace and per-row conflation, as the L3 primitives.
+- TypeScript first, behind a deterministic interface, with differential Rust runs.
+
+**What phase 1 must carry as properties to check** (the reviewer's condition):
+- the dedup floor and the global window, and outcomes kept by id;
+- fenced session epochs, and re-registration;
+- the eligible-leader and fsync rules of the high-water mark.
+
+These are in the L2 reference model and the L1 TLA+ scope of section 10.2.
