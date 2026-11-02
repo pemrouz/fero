@@ -37,6 +37,17 @@ These are the cases a log-first design (a metadata Raft group, BookKeeper-style 
 | L-25 | Placement keeps choosing a slow server | Placement is a policy over load and latency, not a fixed hash; the controller hands a slow writer's shards over, one at a time |
 | L-26 | A server reading old offsets from the object store gets stale data | Segment and snapshot files are written once under unique names and never overwritten, so a read is either the file or nothing |
 | L-27 | A split or merge storm under load | The controller changes one shard at a time and paces splits and merges by a budget per minute |
+| L-28 | Recovery hears from one sealed node that has a batch, while another is silent | A silent node is unknown, never absent; the sealer waits or reaches more nodes before it closes, so a batch committed on the silent node is never cut off (DESIGN-V5 4.2) |
+| L-29 | A reader tails a sealed loglet that is not yet closed, and sees batches a losing recovery re-wrote | On a sealed, unclosed loglet a reader sees nothing beyond the committed point it already had; on a closed one, nothing past the chain's recorded end |
+| L-30 | The writer and the controller both reconfigure the same loglet after a log node fails | Only the writer changes its loglet's log nodes; the controller only changes writers |
+| L-31 | A planned close races a failover of the same shard | Every close is a compare-and-swap against the chain version read; the loser adopts the winner's end |
+| L-32 | The writer dies in the middle of a split | The server that takes over recovers the parent's end and opens the children after it in the same swap; children never start at an offset a seal could not guarantee |
+| L-33 | A loglet is deleted while only an incremental snapshot layer covers it | Deletion needs a merged snapshot base at or above its end, no merge reading it, no fork or child needing it, and `history` allowing it (4.1) |
+| L-34 | A disk lied about an fsync, and its copy is one of only Q | Recovery reads every reachable copy and waits up to `recovery.wait` for all E; the residual case is named in 4.2 |
+| L-35 | A loglet is re-opened on fewer log nodes than `copies` | Never below `copies.min` (2) while two log nodes exist; below it, writes are refused with the reason |
+| L-36 | A server's main thread hangs while its kernel thread keeps the session alive | The kernel's watchdog answers method calls `busy`, so clients move; its shards keep being written |
+| L-37 | A run folder's dirs were wiped but its `cluster-id` file stayed | With no metadata in any dir, the file is stale: it is renamed aside and a new cluster is founded, said on stderr |
+
 
 ## Part 1: v4's hard cases
 
