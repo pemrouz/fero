@@ -38,9 +38,11 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
   - One small Raft group keeps the cluster's facts. It is the only consensus in the system.
   - Section 4.
 - **Scaling, up and down.**
-  - Servers start and stop at will. Durability never depends on them, and they never copy rows from each other's disks: a server reads what it needs from storage.
+  - Servers start and stop at will, and never copy rows from each other's disks: a server reads what it needs from storage.
+  - When the log tier is separate (as in fero deploy), durability never depends on the servers.
+  - When servers are also the log nodes (the default when self-hosting), losing servers also loses copies, until they are re-copied.
   - Log nodes are added for space and throughput: new log stretches simply go to them.
-  - Shards split by themselves as load grows, without moving data.
+  - Shards split by themselves as load grows, without copying data between servers: a child reads the parent's snapshot and tail from storage.
   - Limits remain, said plainly in 4.2:
     - with every server holding every row, more servers add CPU and clients, not room for rows;
     - one partition is one writer.
@@ -330,7 +332,8 @@ A loglet has one writer, and E log nodes (its copies: 3 by default). A write com
    - The writer sends each batch to all E log nodes.
    - A batch is committed when it and every batch before it in the loglet have Q copies on disk.
    - The committed point is the end of that prefix, never a batch past a gap.
-   - The writer stamps the committed point on later batches, and once on a short idle ping after its last batch. Then it goes quiet. This is BookKeeper's last-add-confirmed.
+   - The writer stamps the committed point on later batches.
+   - When a commit lands with nothing else in flight, it sends the committed point at once, on a small ping, then goes quiet. This is BookKeeper's explicit last-add-confirmed. So a standby, and a client it serves, never waits for the next batch to see a write.
 2. **Seal.**
    - Only two actors ever seal a loglet:
      - its own writer, to stop at a known end (a handover, a split, a change of log nodes);
@@ -341,7 +344,8 @@ A loglet has one writer, and E log nodes (its copies: 3 by default). A write com
    - **The seal set.** The sealer needs seal acknowledgements from at least E − Q + 1 log nodes whose copy of the loglet is whole. A log node that found its copy damaged at boot (4.1) says so, and does not count.
    - **Reading forward.** It then reads from every log node of the loglet it can reach, starting at the highest committed point any of them reports.
    - **Absent versus unknown.**
-     - A batch is **absent** only when every node in a set of E − Q + 1 whole copies answers "I do not have it".
+     - A batch is **absent** only when every node in a set of E − Q + 1 whole copies **that have recorded the seal** answers "I do not have it".
+     - A "no" from a node that has not recorded the seal counts for nothing, since the old writer can still land the batch there.
      - A node that does not answer is **unknown**, never absent: the sealer waits for it, or reaches more nodes.
      - Treating silence as absence is the class of bug Vanlightly's TLA+ work found in BookKeeper's recovery.
    - **Recovery writes.**
@@ -359,7 +363,10 @@ A loglet has one writer, and E log nodes (its copies: 3 by default). A write com
 - **A sealed loglet not yet closed:** nothing beyond the last committed point the reader already had. Readers wait for the close.
 
 **One reconfigurer per thing.**
-- **The writer changes its loglet's log nodes.** If it cannot get Q acknowledgements within `ack.ms` (200 ms), it seals its own loglet at its committed end, and opens the next on other log nodes, by the same compare-and-swap.
+- **The writer changes its loglet's log nodes.**
+  - It does so when a log node's link closes, or when that node misses three acknowledgements in a row past `ack.ms` (1 s in TypeScript, 200 ms native).
+  - It then seals its own loglet at its committed end, and opens the next on other log nodes, by the same compare-and-swap.
+  - So one GC pause on a log node does not re-open every loglet it holds. BookKeeper likewise changes ensembles on a failed connection, not on one slow acknowledgement.
 - **The controller changes writers, and only that.**
 - So a log node's failure is repaired by the shard's writer within `ack.ms`, not by a session lapse.
 
@@ -412,7 +419,7 @@ Every server and log node keeps a session with the controller: a heartbeat each 
 | Event | Detected after (default) | What happens |
 |---|---|---|
 | a server's session lapses | `session.ms`: 2 s in TypeScript, 1 s native; tunable down to 500 ms | its session epoch is fenced: writers refuse forwards carrying it. Its shards go to new writers. It re-registers with a new epoch when it returns |
-| a log node stops answering a writer | `ack.ms`: 200 ms | that writer seals and re-opens its loglet on other log nodes (one reconfigurer) |
+| a log node's link to a writer closes, or it misses three acknowledgements past `ack.ms` | `ack.ms`: 1 s in TypeScript, 200 ms native | that writer seals and re-opens its loglet on other log nodes (one reconfigurer) |
 | a log node's session lapses | `session.ms` | no new loglets go to it; sealed loglets it held are re-copied from their other copies, or from the object store |
 | the controller changes | — | session timers restart, so a controller failover never fences a healthy cluster. A server that died just before is detected after up to twice `session.ms` |
 | a server's main thread (methods, views) stalls past 5 s while its kernel thread is fine | the kernel's watchdog | it answers method calls `busy`, so clients go to another server. Its shards keep being written on the kernel thread, and `cluster.health` says why |
@@ -444,7 +451,7 @@ Every server and log node keeps a session with the controller: a heartbeat each 
 - **If the writer dies mid-split,** the server that takes over recovers the parent's end X′, and opens the children at X′ + 1 in the same swap. A seal cannot choose its offset; the swap records whatever end recovery found.
 - **A child's cold start** is the parent's latest snapshot at or below X, plus the parent's tail up to X, filtered by the child's hash bit. The parent's loglets from that snapshot to X are kept until each child has written its own snapshot.
 - **Each child inherits** the parent's dedup outcomes and fence tokens, filtered to its partitions.
-- **When they land.** Splits land in phase 2 only after the 1,000-seed sweep is green without them.
+- **When they land.** Splits land in phase 4, where fero deploy first needs them, after phase 2's sweep is green without them.
 
 **Pacing.** The controller:
 - makes one change per shard at a time;
@@ -516,7 +523,7 @@ Every server and log node keeps a session with the controller: a heartbeat each 
    - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor, kept by id. An issuer silent for the retry horizon (5 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
    - **The floor.** An attempt at or below (highest id seen) − 1,024 that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
    - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server that forwards an attempt adds its session epoch, and writers refuse forwards from a fenced epoch.
-   - **Across writers.** The outcomes are part of the shard's state, so snapshots carry them, and a new writer has them once it has folded the recovered tail.
+   - **Across writers.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new writer takes the higher of the snapshot's and the recovered tail's highest id, so the floor never drops below where the old writer had moved it.
 2. **Shape checks that need the current row.**
    - Array holes (`sparse-hole`, V4-28/33).
    - An insert under an existing row.
@@ -633,7 +640,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 - **`cluster.writable`** is true when every shard of the resource has a writer whose open loglet reached Q acknowledgements within `ack.ms`. `cluster.shards` details each shard, including how many copies its loglets really have.
 - **Fewer log nodes than `copies`.** A loglet gets as many copies as there are log nodes, and `cluster.health` and one stderr line say so. So two processes on one box after one leaves is visibly one copy.
 - **A floor.**
-  - A writer never re-opens a loglet below `copies.min`: 2 by default, whenever there are at least two log nodes.
+  - A writer never re-opens a loglet below `copies.min`: 2 by default, whenever at least two log nodes have live sessions.
   - Below the floor, the shard refuses writes with the reason, rather than shrink silently.
   - With a single log node (one process, the free tier), one copy is the stated setup.
 - **Defining and changing a resource.**
@@ -967,7 +974,7 @@ Measured on `main` (d7c9efe) on this session's container (Node 22, a cloud VM). 
      - The loglet starts from Vanlightly's BookKeeper spec.
      - The chain and its compare-and-swap follow Delos.
      - Checked exhaustively at small sizes: 3 log nodes, 2 shards, 2 servers, crashes, partitions, restarts, power loss, a lying disk, a split during recovery, snapshot layers against loglet deletion, and an object store that is slow or down.
-   - **L3 in TLA+:** cursors, snapshots that replace, credits, failover.
+   - **L3 in TLA+:** cursors (including their resolution through split lineage), snapshots that replace, credits, failover.
    - **L2 against a reference model:** a 200-line sequential interpreter of records, conditions, ops and dedup, run against the code on random sequences.
    - **The simulator checks the code against the specs** by replaying each seeded run through them (trace validation).
 3. **Layer contracts.** Each layer has an interface, an invariant list, and a suite that runs in under 30 seconds. The full battery runs in CI. Golden trajectories are per layer.
@@ -990,9 +997,9 @@ Scaling is built in phase 2, with the kernel, not bolted on later. Each phase en
 |---|---|---|
 | 0. Decide | section 12; v4 frozen for features (deploy-blocking fixes only); CI and a pinned runner; data's commits pushed | decisions recorded; CI green on v4 |
 | 1. Specify | the L1 TLA+ specs (Raft composition, loglet, chain), the L3 spec, the L2 reference model; the L0 to L4 interfaces; every backtest case as a named test | the model checker is green; every case has a test name |
-| 2. The log | L0 (log node journal and entry store, the object-store interface with its local-folder version, snapshots on log nodes) and L1 (metadata Raft, loglets, chains, handover, failover, sessions, placement and pacing, the witness; then splits, once the sweep is green without them) in TypeScript under v4's simulator, with v5 monitors and trace validation | 1,000-seed sweeps green, scaling included (servers and log nodes joining and leaving, then splits under load); kill -9 of everything, and a simulated power loss, lose no persisted write; the follower read path measured; the L0 to L2 TS pins |
+| 2. The log | **The simulator first:** v4's executive gains node kinds (servers, log nodes, voters) and an object store whose calls complete as sim events. Then L0 (log node journal and entry store, the object-store interface with its local-folder version, snapshots on log nodes) and L1 (metadata Raft, loglets, chains, handover, failover, sessions, simple placement) in TypeScript, with v5 monitors and trace validation | 1,000-seed sweeps green with servers and log nodes joining, leaving and crashing; kill -9 of everything, and a simulated power loss, lose no persisted write; the follower read path measured; the L0 to L2 TS pins |
 | 3. Surface | L2, L3 and L4 (v4's api ported: data binding, methods, door, config, rules, identity); the carried v4 bugs fixed; prototypes of the queue, groups and locks libraries | examples 01 to 44 pass; every backtest case passes or is marked not applicable with its reason |
-| 4. Platform | the S3 object store; separate log nodes and the hosted log tier; sleep and wake; worlds, call keys, tapes, forks, caught-up, rolls; TLS and the CA; `fero migrate`; the npm build | the café from "fero test" runs on v5; fero deploy milestones 1 and 2 run against a local log tier with an S3-compatible store |
+| 4. Platform | the S3 object store; separate log nodes and the hosted log tier; **splits, load-aware placement and pacing; the witness**; sleep and wake; worlds, call keys, tapes, forks, caught-up, rolls; TLS and the CA; `fero migrate`; the npm build | the café from "fero test" runs on v5; fero deploy milestones 1 and 2 run against a local log tier with an S3-compatible store |
 | 5. Native and reach | the Rust L0 to L3 (and a native log node) behind the same interface; merges of shards that hold data; relays; `rules.read`; mergeable views across shards; the finished libraries; the RESP, Kafka and WebSocket gateways | every row of section 8 is a green pin in the native column, on the pinned runner |
 
 **The carried v4 bugs, fixed in phase 3.** These are in parts v5 keeps, each fixed with its failing test first:
@@ -1049,7 +1056,7 @@ Reply "defaults" to take every pick, or name a change ("3b").
      - `copies` 3 with a majority quorum, or as many log nodes as there are when fewer;
      - `standbys`: every server, up to 5;
      - one voter, or 3 once there are three members;
-     - a 100 ms tick, `session.ms` 2 s, `ack.ms` 200 ms, `evict.after` 10 min;
+     - a 100 ms tick, `session.ms` 2 s, `ack.ms` 1 s (200 ms native), `evict.after` 10 min;
      - `history: 0`, `rows: true`.
    - b) Name your own.
 8. **Where log nodes run when self-hosting.** a) In the same processes as the servers, by default, with separate log nodes as an option (my pick). b) Always separate.
@@ -1059,7 +1066,7 @@ Reply "defaults" to take every pick, or name a change ("3b").
      - S3 when configured;
      - across boxes without one, log nodes keep sealed loglets and snapshots.
    - b) Required everywhere: simpler code paths, but local dev needs an S3-compatible store.
-10. **The witness.** a) Supported from phase 2, run on a third failure domain, since two-machine self-hosting needs it (my pick). b) Later.
+10. **The witness.** a) Supported from phase 4, run on a third failure domain, since two-machine self-hosting needs it (my pick). b) Earlier, in phase 2.
 11. **When a frame leaves.** a) At the end of the event-loop turn that made it (my pick, as v4). b) Send a turn's first small frame at once.
 12. **Streaming method results.** a) Stream a method's returned view, `move` records carried (my pick). b) Snapshots only.
 13. **Where the TypeScript kernel runs.** a) On a worker thread, with user code on the main thread (my pick). b) On the main thread, as v4.
@@ -1104,4 +1111,15 @@ Its eight conditions for phase 1, and this draft's answers:
 | "no data moved" said truly | 4.2, "what moves, and from where", and the stated limits |
 | L-cases for the new sequences | V5-BACKTEST L-28 to L-37 |
 
-**Still to come:** a final review of this draft, the same way the third draft was signed off.
+**The sign-off review of the log-first draft.** The reviewer who signed off on the third draft reviewed this one fresh.
+- **Its verdict:** "No, by two edits", both one sentence:
+  - a "no" counts toward a batch's absence only from a copy that has recorded the seal;
+  - the per-issuer highest call id is shard state, carried in snapshots.
+- **Also asked for:** §1 qualified, so that durability never depending on servers is said only for a separate log tier.
+- **Then:** "With those two, and §1 qualified … I sign off on phase 1 starting from this document." All three are made.
+- **Its four further items,** due before phase 2, are made too:
+  - `copies.min` counts log nodes with live sessions;
+  - `ack.ms` is 1 s in TypeScript and needs three misses or a closed link;
+  - the committed point is sent the moment a commit lands;
+  - splits and the witness move to phase 4, with the simulator's new node kinds budgeted in phase 2.
+- **What it confirmed holds on this L1:** the dedup floor and global window; fences per lock; call re-runs; read-your-writes; cursors; and "no answer before commit" composed with recovery.
