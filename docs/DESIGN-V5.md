@@ -378,7 +378,7 @@ One published design, run once per shard, plus the engineering that published mu
 
 #### Who writes, and handover
 
-- **One writer per shard:** its Raft leader. For a moment, two replicas may each think they lead, in different terms. Only one can commit, because a commit needs a majority and any two majorities overlap. A deposed leader's in-flight writes were never answered as committed (4.3, "no answer before commit"). A `sent` write was told only that it was appended, and its client resends it (3.2).
+- **One writer per shard:** its Raft leader. For a moment, two replicas may each think they lead, in different terms. Only one can commit, because a commit needs a majority and any two majorities overlap. A deposed leader's in-flight writes were never answered as committed (4.3, "no answer before commit"). From phase 5, a `sent` write was told only that it was appended, and its client resends it (3.2).
 - **A planned handover** (a roll, a drain, a move).
   1. The leader stops taking new writes to the shard. Writes that arrive meanwhile wait, or get `moved` with the target.
   2. It brings the target up to its log end, then sends Raft's TimeoutNow, and the target stands at once.
@@ -484,7 +484,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 Every step acts only on **committed** entries: appending is not enough, since a leader can be deposed before its entry commits.
 1. **B's leader commits `importing(s, from A)`,** then copies s while A still takes writes: by subscribing to s at A in `state` mode, or from A's latest snapshot in the object store. From then until `open` commits, B answers writes to s `retry`, with a retry-after, never `moved(A)`.
 2. **A's leader commits `fenced(s, to B, N)`,** where N is s's last sequence number, only after B reports that its `importing` has committed. Only once `fenced` commits does A answer `moved(B)` for s, and send B what changed since its copy, then `END(N)`, then the carried state (below). A appends nothing to s after the fence, so that delta is complete.
-3. **B's leader commits `open(s, N)`,** and serves s only after it commits.
+3. **B's leader commits `open(s, N)`,** and serves s only after it commits. Before that, B writes everything it copied into its own log, as import entries or a snapshot layer named by one, and commits it: the rows, the sequence and epoch, and the carried state. So a new B leader has all of it, and no carried outcome is ever lost.
 
 - **The slot is unwritable for about one round trip:** between the fence and the open, since the bulk copy happened before the fence.
 - **Writes in flight at A when it fences** were appended before the fence, so they commit or fail at A as usual, and A answers them; their effects are in the delta.
@@ -494,7 +494,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 - **A lost B.** If B is permanently lost after the fence, s stays fenced at A until an operator acts: `fero recover` or the planner's `move(s, A)`, which re-imports s into A.
 - **The slot table** in `#meta` is a hint, refreshed after each move. The truth is the fence and open entries in the shards' own logs, and a stale route costs one `moved`.
 - **`state` readers** need nothing: positions are per slot (2). A subscriber of s at A gets `END` at the fence, with its position, and resubscribes at B.
-- **`log` readers** (a tape, a derived resource, `read({ from })`) at a position below N are answered by B `moved(A)`, or `expired` once `history` has lapsed. s's records before N stay in A's segments or the object store, and a replay across a move reads A's segments for s, then B's.
+- **`log` readers** (a tape, a derived resource, `read({ from })`) at a position below N are answered by B `moved(A)`, or `expired` once `history` has lapsed. s's records before N stay in A's segments or the object store, and a replay across a move reads A's segments for s, then B's. Once A is deleted, B serves s's records below N itself, from A's segments in the object store; without an object store, A is kept until `history` has lapsed for every slot it moved.
 - **A shard is deleted** only once its segments are uploaded or its `history` has lapsed, and once the slot table has shown none of its slots for a grace period (`settle.ms`). Meanwhile its former members answer `moved` from the table, so a client with a stale route is never left dialling nothing.
 - **The model:** at most one shard has a committed `open` for a slot with no later committed `fenced`; no slot sequence number is stamped by two shards; a slot's sequence never goes back; every committed write to s is at B when B opens.
 
@@ -547,7 +547,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
   - `fero recover --new-cluster`, the same for `#meta` (etcd's force-new-cluster is the whole-cluster precedent). It bumps `#meta`'s incarnation and keeps the cluster id, so cursors on healthy shards stay valid. Members compare `#meta`'s incarnation in HELLO: one with a lower incarnation stops its `#meta` replica, adopts the higher one, and comes back as a new replica of it. So an old voter returning with its dir never revives the old `#meta`. On the bump, every shard leader re-writes its shard record and every server re-registers its resources, so a `#meta` rebuilt from a copy that was behind learns every shard and resource made since.
   - **Both commands refuse** while any voter they would drop answers, and name it. A voter that cannot be reached is named too, so the operator sees what may still come back.
 - **Routing.**
-  - The partition-to-shard function is a fixed 64-bit hash with a full avalanche finaliser, versioned with the frame format.
+  - The partition-to-slot function is a fixed 64-bit hash with a full avalanche finaliser, versioned with the frame format.
   - A leader refuses a record whose partition is not in its shard (`wrong-shard`).
   - Clients send writes to their server, which maps each row key to its shard (a custom `partition` function runs only on servers) and forwards to the shard's leader. It finds the leader from its own replicas, or from `#meta`'s directory. A stale answer costs one `moved`, which names the current leader, or the shard a slot moved to.
 - **Who dials whom.** Members dial only members `#meta` names, plus their `hosts` and the box directory. Never an address a client claims.
@@ -626,7 +626,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 | cursor | the cluster id, the resource's incarnation, then per slot its epoch and the sequence last seen: one entry for each followed partition's slot, or up to 1,024 for a whole resource; or `'latest'`, `'earliest'` |
 
 - **Who serves.**
-  - Any full replica of the shard that is ready: its leader, a follower or a learner. A replica is ready once its snapshot has loaded and its fold has reached the commit offset it was told when it started; until then it answers `moved`, naming a ready one. Always up to the commit offset, and never before its fold has reached the subscriber's cursor.
+  - Any full replica of the shard that is ready: its leader, a follower or a learner. A replica is ready once its snapshot has loaded and its fold has reached the commit offset it was told when it started; until then it answers `moved`, naming a ready one. Readiness is also per slot: a shard serves a slot only while it holds it open, so B answers `retry` for s until its `open` commits and its fold has applied it, and A answers `moved(B)` once its fence commits. Always up to the commit offset, and never before its fold has reached the subscriber's cursor.
   - Older offsets come from segments, on replicas' disks or in the object store.
   - A follower that falls behind the tail and reloads a snapshot ends its `log` subscriptions on that shard with `expired`, and re-snapshots its `state` subscriptions.
   - A one-shot read at a server that neither folds nor relays the partition is refused `moved`, naming a full replica. A relay answers only after its upstream snapshot has landed, never from an empty fold.
@@ -675,7 +675,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - **Fences.**
     - Every write a call makes carries `if: { fence: { lock: callKey, token } }`.
     - The runner renews the lease while it runs, and stops writing if its last renewal is older than the lease minus a margin (a round trip plus `skew.max`).
-    - A call is re-run only within half the retry horizon. Past that it is marked `unknown`, with the offsets it wrote.
+    - A call is re-run only within half the retry horizon. Past that it is marked `unknown`, with the positions it wrote.
 - **Rules.**
   - `validation` runs where a write first enters. A retry skips it, and the writer runs it again after dedup.
   - `rules.write(peer, record, current)` runs at the writer, with the current row.
@@ -724,7 +724,7 @@ L5 is built only from L4 calls; each library is a file with its own tests, and n
 | flow | `SUB`, `SNAP`, `DELTA`, `END`, `CREDIT` | L3 |
 
 18 verbs in four families, each owned by one layer.
-- **`ASK` and `ANSWER`** carry everything that asks a member to do something: a write, a method call, a planner hint, a define or an alter, a recover. The payload is the standard library's to read, and the answer comes after commit (4.3).
+- **`ASK` and `ANSWER`** carry everything that asks a member to do something: a write, a method call, a planner hint, a define or an alter, a recover. The payload is the standard library's to read, and the answer comes after commit (4.3). An `ANSWER` is accepted only on the link its `ASK` went out on; any other is dropped, so a forged one cannot settle an attempt.
 - **A follow set is a `SUB`,** and a slot move's copy is a `SUB` of that slot.
 - PreVote is a `VOTE` with a flag. Every Raft verb carries its shard, and one frame carries many shards' messages.
 
@@ -778,7 +778,7 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
 - **Locks.**
   - A lock is a row in `#locks`, claimed with `if: { absent }` or `{ expired: 'lease' }`. Its token is the claim's version.
   - Protected writes carry `if: { fence: { lock, token } }`. Each shard keeps the highest token seen per lock, in its state, and a slot move carries it. A limit, said plainly: fence tables are per shard, so a stale holder writing to a shard that has never seen the lock is accepted there. Writes a lock protects should live in partitions the lock's holders always write, or check the lock's current token with `if: { equals }` on the lock row.
-  - A lock records the offsets its holder wrote at, so the next holder's reads can carry them as minimums.
+  - A lock records the positions its holder wrote at, so the next holder's reads can carry them as minimums.
 - **Transactions across partitions** (sagas: readers can see the intermediate states).
   1. Take the locks in key order.
   2. Write an intent row.
