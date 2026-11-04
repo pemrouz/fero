@@ -108,6 +108,10 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-96 | A client with a stale route dials a shard deleted by a shrink | A shard is deleted only after a grace period with no slots in the table, and its former members answer `moved` from the table meanwhile (4.2) |
 | R-97 | A client link carries a `recover` inside an `ASK` | Admin `ASK`s need the admin key, checked at the door before the payload reaches the library (4.1) |
 | R-98 | An issuer's oldest unacknowledged attempt sits exactly at the floor | The window is a span of ids: highest issued minus oldest unacknowledged is below `issuer.window`, so the oldest is always above the floor (4.3) |
+| R-99 | B's leader is replaced after copying a slot, before `open` | B commits the copied rows and carried state to its own log before `open`, so the new leader has them, outcomes included (4.2) |
+| R-100 | A `log` reader reaches below a move's fence after the old shard was deleted | B serves those records from the old shard's segments in the object store; without one, the old shard is kept until `history` lapses (4.2) |
+| R-101 | A forged `ANSWER` arrives on a client link | An `ANSWER` is accepted only on the link its `ASK` went out on (4.7) |
+| R-102 | A read reaches B while the slot is still importing, or A after its fence | Readiness is per slot: B answers `retry` until `open` commits and is applied; A answers `moved(B)` after the fence (4.4) |
 
 ## Part 1: v4's hard cases
 
