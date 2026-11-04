@@ -204,7 +204,7 @@ v4's logs are its state, and compaction trims them. v5 keeps three things apart.
 **Retention never touches the state or the tail.** A new snapshot is taken after N records or M bytes of tail, so a limit on `history` can always be met; anything it drops is inside a snapshot already.
 
 **Snapshots are incremental layers.**
-- Each snapshot writes only the rows changed since the previous one, plus a removal marker for each row removed since. A background merge folds layers together in order, as an LSM tree does, and drops the markers once no older layer remains below them.
+- Each snapshot writes only the rows changed since the previous one, plus a removal marker for each row removed since. Layers are laid out by slot, with a per-slot index, so a slot move or a one-slot reader reads only its slot's bytes. A background merge folds layers together in order, as an LSM tree does, and drops the markers once no older layer remains below them.
 - A cold start applies the base, then each layer in order, so a removed row stays removed.
 - So a big object with small changes means small snapshots.
 - A snapshot is cut from copy-on-write state, so it is the state at exactly one offset.
@@ -343,7 +343,7 @@ One published design, run once per shard, plus the engineering that published mu
   - A replica is its member id plus its disk incarnation (4.1).
   - Leadership transfer on a planned stop or move, so neither waits for an election timeout.
 - **Who stands for election.**
-  - Raft's randomized timeouts: each full voter stands after `election.ms` plus a random part, so one candidate usually stands alone.
+  - Raft's randomized timeouts: each full voter stands after a random time between `election.ms` and twice that, as the Raft paper does, so one candidate usually stands alone, even when many shards fail over at once.
   - Two kinds of candidate wait longer. A member whose clock is more than `skew.max` (1 s) from its peers' median waits twice as long, and `cluster.health` says so; it can still lead when it alone can win. A log replica stands only when no full voter has **won** an election for twice `election.ms`; a full voter that keeps standing and losing (its log is behind) does not hold it back (below).
   - Raft's vote rule decides who can win: a candidate's log must be at least as up to date as the voter's.
   - Leadership is spread afterwards, by the hand-back (healing, below), not by who stands first.
@@ -480,7 +480,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 | scale to zero (sleep) | needs log replicas: the servers stop, and the log replicas and the object store keep everything |
 | wake | a server starts. Each shard's leading log replica brings it up to date, or adds it, then hands it leadership (repair, above) |
 
-**Moving a slot.** The one way data changes shards, pull-style, as Redis Cluster's IMPORTING and Vitess's cut-over do. To move slot s from shard A to shard B:
+**Moving a slot.** The one way data changes shards, pull-style, as Redis Cluster's IMPORTING and Vitess's cut-over do. To move slot s from shard A to shard B (a move may carry a set of slots at once, with the same steps, so a grow is one move of many slots, not many moves):
 Every step acts only on **committed** entries: appending is not enough, since a leader can be deposed before its entry commits.
 1. **B's leader commits `importing(s, from A)`,** then copies s while A still takes writes: by subscribing to s at A in `state` mode, or from A's latest snapshot in the object store. From then until `open` commits, B answers writes to s `retry`, with a retry-after, never `moved(A)`.
 2. **A's leader commits `fenced(s, to B, N)`,** where N is s's last sequence number, only after B reports that its `importing` has committed. Only once `fenced` commits does A answer `moved(B)` for s, and send B what changed since its copy, then `END(N)`, then the carried state (below). A appends nothing to s after the fence, so that delta is complete.
@@ -492,6 +492,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 - **Why the `max` merge is safe.** A writer that saw id h knows the issuer issued h. By the issuer's window (4.3), every id at or below h − `issuer.window` already has a definitive answer, whichever shard gave it. So raising B's floor forgets only answered attempts. Without the merge, a late copy of a committed write could land at B as fresh.
 - **Crashes.** Each leader resumes from its own committed log. A new A leader with a committed `fenced` re-sends from B's position. A new B leader with a committed `importing` re-subscribes at A. A cancels a move only after B commits `abort(s)`, and B aborts only before `open`.
 - **A lost B.** If B is permanently lost after the fence, s stays fenced at A until an operator acts: `fero recover` or the planner's `move(s, A)`, which re-imports s into A.
+- **Views mid-move.** A server that replicates both A and B takes each slot from exactly one of them: A's copy until it has applied B's `open`, then B's. B's imported copy is invisible to views and reads until then, so a slot never counts twice or not at all.
 - **The slot table** in `#meta` is a hint, refreshed after each move. The truth is the fence and open entries in the shards' own logs, and a stale route costs one `moved`.
 - **`state` readers** need nothing: positions are per slot (2). A subscriber of s at A gets `END` at the fence, with its position, and resubscribes at B.
 - **`log` readers** (a tape, a derived resource, `read({ from })`) at a position below N are answered by B `moved(A)`, or `expired` once `history` has lapsed. s's records before N stay in A's segments or the object store, and a replay across a move reads A's segments for s, then B's. Once A is deleted, B serves s's records below N itself, from A's segments in the object store; without an object store, A is kept until `history` has lapsed for every slot it moved.
@@ -499,7 +500,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 - **The model:** at most one shard has a committed `open` for a slot with no later committed `fenced`; no slot sequence number is stamped by two shards; a slot's sequence never goes back; every committed write to s is at B when B opens.
 
 **The shard rule,** the only automatic policy for data, run by each shard's leader as healing is:
-- **Grow.** Over `shard.bytes` (4 GB) or `shard.rate` (half the leader's measured write capacity), the leader creates a shard (one `#meta` record; healing places it) and moves half its slots there.
+- **Grow.** Over `shard.bytes` (4 GB) or `shard.rate` (half the leader's measured write capacity), the leader creates a shard (one `#meta` record; healing places it) and moves the half of its slots that splits its measured load evenly, ties broken by slot number, as one move.
 - **Shrink.** Under a quarter of both for `shrink.after` (6 h), so a daily cycle does not move gigabytes each night and back each morning; not the resource's last shard; and only when its smallest sibling stays under half of both limits after taking its slots, so a shrink never sets off a grow. Then it moves its slots there and is deleted (above).
 - **One move at a time per resource,** by a lease row in `#meta`, paced like snapshot loads.
 - **A hot slot** can get a shard of its own. A hot partition is still one writer.
@@ -542,7 +543,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 - **Mixed versions.** Frames carry the protocol version. The cluster version lives in `#meta`, and is raised only when every member runs the new kernel, as Kafka's `metadata.version` is.
 - **Operator recovery.**
   - `fero recover --unclean <shard>`, when a shard's voters have permanently lost their majority. One surviving replica forces a configuration of itself, as TiKV's `unsafe-recover` and CockroachDB's `debug recover` do for one range. It reports what may be lost, and bumps the shard's incarnation in `#meta` and the epoch of each slot it holds, so stale cursors are refused instead of waiting.
-  - **Recovery and moves.** The surviving copy may be from before a move's fence. So a recovered shard re-fences every slot the slot table places elsewhere, never reopens one, and shows the operator the list first. For recovery, the table is the authority.
+  - **Recovery and moves.** The surviving copy may be from before a move's fence. So a recovered shard holds exactly the slots the slot table gives it: it re-fences every slot the table places elsewhere, never reopens one, re-opens those the table gives it, and shows the operator the list first. For recovery, the table is the authority.
   - **The residual case:** if the "lost" majority was only partitioned, it may still elect under the old incarnation. Its leader learns the bump from `#meta` when it can reach it, and stops; until then two writers exist under two incarnations, and the command says so before it runs.
   - `fero recover --new-cluster`, the same for `#meta` (etcd's force-new-cluster is the whole-cluster precedent). It bumps `#meta`'s incarnation and keeps the cluster id, so cursors on healthy shards stay valid. Members compare `#meta`'s incarnation in HELLO: one with a lower incarnation stops its `#meta` replica, adopts the higher one, and comes back as a new replica of it. So an old voter returning with its dir never revives the old `#meta`. On the bump, every shard leader re-writes its shard record and every server re-registers its resources, so a `#meta` rebuilt from a copy that was behind learns every shard and resource made since.
   - **Both commands refuse** while any voter they would drop answers, and name it. A voter that cannot be reached is named too, so the operator sees what may still come back.
@@ -577,7 +578,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 2. **Shape checks that need the current row.**
    - Array holes (`sparse-hole`, V4-28/33).
    - An insert under an existing row.
-   - A field write to a row that does not exist is refused `absent-row` (decision 14).
+   - A field write to a row that does not exist is refused `absent-row` (decision 14), and one whose parent field does not exist is refused `absent-path`, so a write under a removed field never recreates it silently.
 3. **`validation` and `rules.write`**, with the current row.
 4. **Conditions**, against the writer's state at this point in its log.
 5. **Ops**, which compute the value to append.
@@ -632,7 +633,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - A one-shot read at a server that neither folds nor relays the partition is refused `moved`, naming a full replica. A relay answers only after its upstream snapshot has landed, never from an empty fold.
   - A server that stops folding or relaying a partition ends that part of each subscription with `END` and the cursor, so the subscriber resubscribes elsewhere and never waits on a silent server.
   - A server asked for a partition it does not fold subscribes upstream itself, and becomes a relay for it.
-- **Cursors know their log.** A cursor whose cluster id, resource incarnation or slot epoch does not match is refused `unknown-log`. Past retention, `expired` with the earliest available.
+- **Cursors know their log.** A cursor whose cluster id or resource incarnation does not match, or whose slot epoch is older than the slot's, is refused `unknown-log`. A cursor whose epoch is newer than the server's means the server is behind: it answers `retry`, and a reader never drops back to an older epoch. Past retention, `expired` with the earliest available.
 - **A snapshot replaces.** It replaces the subscriber's whole view of the selected partitions, applied as one diff between begin and end markers, so ghost rows cannot survive and nothing flickers.
 - **Deltas carry their slot sequences**, so a filtered subscriber's cursor is exact, and stays exact across a slot move.
 - **Credits.**
@@ -671,7 +672,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - **Call keys.** A call with a key claims a row in `#calls` (with a lease) before its handler runs, and stores the result, so a finished call never runs twice within the key's TTL.
   - **Re-runs.**
     - A handler whose server dies mid-call is re-run when its lease lapses.
-    - Its writes carry attempt ids derived from the call key, their order and a hash of their content, marked as resent. So a re-run's identical writes dedupe, and a re-run that writes something different is refused `call-diverged`.
+    - Its writes carry attempt ids derived from the call key, their order and a hash of their content, marked as resent. So a re-run's identical writes dedupe, and a re-run that writes something different to the same slot is refused `call-diverged`. Detection is per slot, said plainly: a re-run whose k-th write goes to another slot is not caught. So handlers must be deterministic given their input and `ctx`, as fero test already asks: `ctx.now()` is the call claim's writer time, and `ctx.id()` is derived from the call key and a counter, so a re-run sees the same values.
   - **Fences.**
     - Every write a call makes carries `if: { fence: { lock: callKey, token } }`.
     - The runner renews the lease while it runs, and stops writing if its last renewal is older than the lease minus a margin (a round trip plus `skew.max`).
@@ -861,6 +862,33 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 | HISTORY, DIRECTORY, CONFIG, monitors | 334 | 68 | 184 | 28 | 54 | 38 | 4 | 1 | 11 |
 | **Total** | **1,313** | **426** | **555** | **136** | **196** | **142** | **12** | **3** | **39** |
 
+**Fixed slots (decisions 20d and 21a).**
+- Two agents re-judged the 290 cases whose answers named splits, lineage, incarnations, offsets, ranks, merges, `none`, `sent` or the old wire verbs, against the draft with fixed slots folded in. The reviewer's slot edits (M1 to M3) landed while they worked, so some judged the text before them.
+
+| Source | Re-judged | Gone | Same | n/a | Open | Better than before | Worse than before |
+|---|---|---|---|---|---|---|---|
+| DECISIONS, STATUS, LEAVE, DOOR | 140 | 43 | 88 | 1 | 8 | 4 | 5 |
+| SCALE, M6, M7, CHECKPOINT, HISTORY, DIRECTORY, CONFIG, monitors | 150 | 45 | 93 | 2 | 10 | 13 | 9 |
+| **Total** | **290** | **88** | **181** | **3** | **18** | **17** | **14** |
+
+**The 18 open, and their answers.**
+
+| Rows | The case | Answer (section) |
+|---|---|---|
+| D-010, D-344, S-109, C-210 | a new leader at the receiving shard could lose a moved slot's rows or outcomes | the receiving shard commits everything it copied to its own log before `open` (4.2) |
+| D-260, S-161, H-062 | recovery could reuse numbers, reopen a moved slot, or drop a reader back an epoch | versions and tokens compare as (epoch, sequence); a recovered shard holds exactly the slots the table gives it; a newer cursor epoch gets `retry` (2, 4.2, 4.4) |
+| D-251, C-077 | a moved slot's history had no home, and a shrink deleted it | `log` readers below the fence go to the old shard's segments, then the object store; a shard is deleted only once its history is safe (4.2) |
+| C-010, H-074 | dedup answered with an offset that means nothing after a move | it answers with the position (slot, epoch, sequence) (4.3) |
+| D-063 | a forged `ANSWER` on a client link | accepted only on the link its `ASK` went out on (4.7) |
+| D-407 | a read reached a slot mid-move | readiness is per slot (4.4) |
+| C-125 | a grow was hundreds of moves, each reading a whole snapshot | one move carries a set of slots; snapshot layers have a per-slot index (3.4, 4.2) |
+| C-201 | a server holding both shards counted a slot twice or not at all | its views take each slot from exactly one shard (4.2) |
+| C-214 | the shard rule could flap with load cycles | `shrink.after` (6 h), and a shrink that cannot set off a grow (4.2) |
+| H-192 | a write under a removed field recreated it | refused `absent-path` (4.3) |
+| H-210 | a re-run whose k-th write went to another slot was not caught | named as a limit; handlers must be deterministic given input and `ctx`, whose `now` and `id` the call claim fixes (4.5) |
+
+**What got worse,** and stays so: a slot move copies data, where a split copied nothing; a grow can briefly make every whole-resource reader resubscribe once; divergent method re-runs are caught only per slot. **What got better:** no cursor lineage anywhere, per-resource `copies` kept, shrinking comes with growing, and the quiet-shard and leave rules now have answers in the text.
+
 **This draft (Raft per shard).**
 - The same four agents re-judged the same 876 cases against this draft, and compared each answer with the log-first one.
 - The review's edits landed while they worked, so some judged the reviewed text. Every case they found open is answered below.
@@ -911,7 +939,7 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 | H-172 | a live voter removed before its replacement holds every commit | removal waits for the commit offset, exactly (4.2) |
 | H-276 | cluster keys change unchecked | `fero.alter('#meta')`, with range and cross-key checks (4.5) |
 
-Each answer is also a case in V5-BACKTEST part 2 (R-59 to R-79).
+Each answer is also a case in V5-BACKTEST part 2 (R-59 to R-79). The fixed-slots answers are R-83 to R-108.
 
 **The log-first rewrite (the last draft).**
 - The same four agents re-judged every case whose answer touched L0 or L1 (876 of the 1,313) against the rewrite: membership, leave, eviction, handover, durability, client failover, discovery and scale. Answers in L2 to L5 carried over.
@@ -937,7 +965,7 @@ Each answer is also a case in V5-BACKTEST part 2 (R-59 to R-79).
 
 Its 23 open cases were answered in that draft (git history, commit 0ad07a8), and re-judged against this one above.
 
-The per-case files in [v5-backtest/](v5-backtest) carry each case's latest verdict: the Raft-per-shard one for the 876 cases that touch L0 or L1.
+The per-case files in [v5-backtest/](v5-backtest) carry each case's latest verdict: the fixed-slots one for the 290 cases that touch slots, positions or moves, else the Raft-per-shard one for the cases that touch L0 or L1.
 
 ## 8. Performance, layer by layer
 
