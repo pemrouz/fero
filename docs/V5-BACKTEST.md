@@ -112,6 +112,12 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-100 | A `log` reader reaches below a move's fence after the old shard was deleted | B serves those records from the old shard's segments in the object store; without one, the old shard is kept until `history` lapses (4.2) |
 | R-101 | A forged `ANSWER` arrives on a client link | An `ANSWER` is accepted only on the link its `ASK` went out on (4.7) |
 | R-102 | A read reaches B while the slot is still importing, or A after its fence | Readiness is per slot: B answers `retry` until `open` commits and is applied; A answers `moved(B)` after the fence (4.4) |
+| R-103 | A grow moves hundreds of slots, each reading a whole snapshot and making every whole-resource reader resubscribe | A move carries a set of slots in one move; snapshot layers have a per-slot index, so a move reads only its slots (3.4, 4.2) |
+| R-104 | A server replicates both shards of a move, and a view counts the slot twice or not at all | A server's views take each slot from exactly one shard: the old until it has applied the new one's `open` (4.2) |
+| R-105 | A reader's cursor has a newer slot epoch than the server it reaches | The server is behind: it answers `retry`; only an older epoch is refused `unknown-log` (4.4) |
+| R-106 | A write under a removed intermediate field recreates it | Refused `absent-path`, as a write to a missing row is `absent-row` (4.3) |
+| R-107 | A method re-run diverges, and its k-th write goes to a different slot | Not caught, said plainly; handlers must be deterministic given input and `ctx`, whose `now` and `id` are fixed by the call claim (4.5) |
+| R-108 | Many shards fail over at once, and votes split | Each voter stands after a random time between `election.ms` and twice that, as the Raft paper does (4.2) |
 
 ## Part 1: v4's hard cases
 
