@@ -86,7 +86,7 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
 | **partition** | the unit of order, atomicity and following. By default one row; a `partition` function can group rows | `room42/m1` and `room42/m2` in `room42` |
 | **shard** | a hash range of partitions with one log, one Raft group and one leader at a time. Invisible to users | `hash('room42')` falls in shard 7's range |
 | **log** | one shard's records in order, with offsets (Raft's indexes) that never go back | shard 7, offsets 0, 1, 2, … |
-| **replica** | one member's copy of one shard's log. A **voter** counts toward the shard's majority; a **learner** gets the log but does not vote | shard 7 on S1, S2, S3 |
+| **replica** | one member's copy of one shard's log. A **voter** counts toward the shard's majority; a **learner** gets the log and never stands, but answers vote requests (4.2) | shard 7 on S1, S2, S3 |
 | **full replica** | a replica on a server: it folds the rows, serves them, and can lead | S1's replica of shard 7 |
 | **log replica** | a replica that keeps the log only: it votes, never serves, and leads only to repair (4.2) | a witness's replica of shard 7 |
 | **leader** | the voter that writes the shard, chosen by Raft | shard 7's leader is S2 |
@@ -325,6 +325,7 @@ One published design, run once per shard, plus the engineering that published mu
   - Term, vote and entries are fsynced before any reply that depends on them.
   - Membership changes one voter at a time, and a new leader first commits an entry of its own term (Ongaro's 2015 fix).
   - A new voter joins as a learner and is promoted only once it has caught up (etcd's rule).
+  - **A learner answers vote requests** by the normal log rule, and never stands itself, as etcd's raft lets learners vote. A candidate counts only the votes of its own configuration's voters, so this is safe; and it matters when a learner was promoted by an entry it has not yet received. Otherwise a leader that dies mid-promotion, or a leave cut off halfway (example 01), leaves a shard needing a vote its new voter will not give.
   - PreVote and CheckQuorum, so a returning replica cannot unseat a working leader, and a cut-off leader steps down within `election.ms`.
   - A replica is its member id plus its disk incarnation (4.1).
   - Leadership transfer on a planned stop or move, so neither waits for an election timeout.
@@ -355,6 +356,7 @@ One published design, run once per shard, plus the engineering that published mu
   - fero deploy's smallest projects have three voters;
   - a project's servers can sleep, while its log replicas and the object store keep everything.
 - **When healing uses them.** Only when a shard has fewer server candidates than `copies` (below), or a planner places them.
+- **What they store.** A log replica stores the tail of every shard it votes in, up to the next snapshot, so its disk grows with write volume. v4's witness held no records; this one holds the log, since that is what lets it count toward a commit.
 - **Leading only to repair.** A log replica cannot judge conditions, ops or rules, so it never takes a client write. When it leads, it does only this:
   1. commit an entry of its own term;
   2. if a full voter is live, bring it up to date and hand it leadership;
@@ -486,12 +488,13 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 6. **Two voters cannot survive a crash.** So below three candidates a shard has one voter, and a crash of its machine stops that shard's writes until it returns, unless a witness makes three.
 7. **Many groups.** Each shard costs its Raft state in memory, and frames while it is busy. Quiet shards cost only their members' link pings. Phase 2 pins 10,000 idle shards per process.
 8. **Wake time.** A snapshot read: about a second when small, about a minute for 10 GB.
+9. **Member pairs.** Idle link pings grow with the pairs of members that share shards: about 20,000 frames/s at n = 100. Phase 2 pins that; larger clusters raise `ping.ms`, or bound how many peers each member shares shards with.
 
 #### Leaving, restarting and stopping
 
 | Stop | Used by | What happens |
 |---|---|---|
-| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **First** it marks itself `draining` in `#meta`, so no healing step, its own shards' included, targets it again. **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver, if the remaining live voters stay a majority of the new set. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters (links down past `evict.after`, never a mere GC pause) are removed first, when that is what lets the leave carry (as V4-60). A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
+| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **First** it marks itself `draining` in `#meta`, so no healing step, its own shards' included, targets it again. **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver, if the remaining live voters stay a majority of the new set. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters are removed first, when that is what lets the leave carry (as V4-60). For a leave, a voter is dead when its link has been down past `election.ms` and it still does not answer the leader's probes for the rest of `leave.ms` (4 s), longer than any GC pause the timeouts tolerate. A paused voter answers in time, and is kept. A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
 | `restart` | the same signals under a supervisor (`FERO_SUPERVISED`), rolls, restart-all | hands over every shard it leads, and stays a replica of all of them |
 
 - **A crash** is a restart that skipped the handover.
@@ -513,7 +516,8 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 - **Operator recovery.**
   - `fero recover --unclean <shard>`, when a shard's voters have permanently lost their majority. One surviving replica forces a configuration of itself, as TiKV's `unsafe-recover` and CockroachDB's `debug recover` do for one range. It reports what may be lost, and bumps the shard's incarnation in `#meta`, so stale cursors are refused instead of waiting.
   - **The residual case:** if the "lost" majority was only partitioned, it may still elect under the old incarnation. Its leader learns the bump from `#meta` when it can reach it, and stops; until then two writers exist under two incarnations, and the command says so before it runs.
-  - `fero recover --new-cluster`, the same for `#meta` (etcd's force-new-cluster is the whole-cluster precedent). It bumps `#meta`'s incarnation and keeps the cluster id, so cursors on healthy shards stay valid.
+  - `fero recover --new-cluster`, the same for `#meta` (etcd's force-new-cluster is the whole-cluster precedent). It bumps `#meta`'s incarnation and keeps the cluster id, so cursors on healthy shards stay valid. Members compare `#meta`'s incarnation in HELLO: one with a lower incarnation stops its `#meta` replica, adopts the higher one, and comes back as a new replica of it. So an old voter returning with its dir never revives the old `#meta`.
+  - **Both commands refuse** while any voter they would drop answers, and name it. A voter that cannot be reached is named too, so the operator sees what may still come back.
 - **Routing.**
   - The partition-to-shard function is a fixed 64-bit hash with a full avalanche finaliser, versioned with the frame format.
   - A leader refuses a record whose partition is not in its shard (`wrong-shard`).
@@ -827,7 +831,57 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 | HISTORY, DIRECTORY, CONFIG, monitors | 334 | 68 | 184 | 28 | 54 | 38 | 4 | 1 | 11 |
 | **Total** | **1,313** | **426** | **555** | **136** | **196** | **142** | **12** | **3** | **39** |
 
-**This draft (Raft per shard).** The same agents re-judge the same 876 cases against this draft; the results land here, above the log-first ones they replace.
+**This draft (Raft per shard).**
+- The same four agents re-judged the same 876 cases against this draft, and compared each answer with the log-first one.
+- The review's edits landed while they worked, so some judged the reviewed text. Every case they found open is answered below.
+
+| Source | Re-judged | Gone | Same | n/a | Open | Better than log-first | Worse than log-first |
+|---|---|---|---|---|---|---|---|
+| DECISIONS | 269 | 121 | 139 | 1 | 8 | 5 | 6 |
+| STATUS, LEAVE, DOOR | 208 | 90 | 110 | 0 | 8 | 8 | 12 |
+| SCALE, M6, M7, CHECKPOINT | 182 | 82 | 84 | 12 | 4 | 10 | 10 |
+| HISTORY, DIRECTORY, CONFIG, monitors | 217 | 62 | 145 | 0 | 10 | 12 | 4 |
+| **Total** | **876** | **355** | **478** | **13** | **30** | **35** | **32** |
+
+**What got better than log-first.**
+- One protocol: there is no seal, recovery read or chain swap to get wrong.
+- The cursor, snapshot-reload and `END` rules now hold in the draft's own text (C-015 to C-017, C-060, C-069, H-160).
+- A damaged replica cannot vote, and there is no quorum knob to set below a majority (C-142, C-220).
+- Example 01, the witness's failure domain and idle issuers are spelled out (D-075, D-195, D-036).
+
+**What got worse than log-first:** the price of servers holding the copies again.
+- Idle pings grow with member pairs: about 20,000 frames/s at n = 100, v4's level, against the log-first draft's 3,000 (section 8).
+- A new replica copies its shard. A returning disk's copy is reused, but each placement change moves data (C-183, C-214).
+- Two machines without a witness: a one-voter shard stops when its machine crashes, and an acknowledged write is on one disk until the learner has it (S-146, H-049). `copies: 2` and the witness are the stated alternatives.
+- A witness now stores the log of every shard it votes in (S-185).
+- Removal, catch-up and leave now rest on healing's rules, not on servers holding nothing durable (H-167, H-172, H-177, S-207). Each has its rule and its case.
+
+**The 30 open, and this draft's answers.**
+
+| Rows | The case | Answer (section) |
+|---|---|---|
+| D-050, H-057 | founders could each mint a cluster id, or disagree on `seeds` | the winner of `#meta`'s first election mints it; seeds compare list hashes; a `cluster-id` file wins (4.2) |
+| D-081, D-085 | healing could add back a member that is leaving | a leave marks it `draining` first (4.2) |
+| D-084, C-033 | a quiet shard leaves a lagging follower stale | quiet only when every live voter has the commit offset; a returning link reports log ends (4.2) |
+| D-119 | Raft verbs on a client link | member links only; plan verbs need the admin key (4.1) |
+| D-303 | no caps on batches or bundled frames | 1 MB batches and frames, 4 MB catch-up appends (4.1) |
+| D-343, H-110, H-128 | log dropped before its cover is fsynced | journal truncation, log drops and snapshot installs all wait for the fsync (4.1) |
+| D-407 | a learner still loading serves reads | a replica serves only once ready (4.4) |
+| S-037, S-196, S-201 | a learner promoted by an entry it has not received refuses its vote | learners answer vote requests by the log rule, as etcd's raft does (4.2) |
+| S-207, S-208 | a leave right after a crash leaves the stayer read-only | a voter silent past `election.ms` that ignores probes for the rest of `leave.ms` is removed first (V4-60) (4.2) |
+| S-049, S-222, S-183 | a recovered `#meta` and an old one share the cluster id | `#meta`'s incarnation rides HELLO, and the lower one stops and rejoins; `recover` refuses while a voter it would drop answers (4.2) |
+| C-129 | idle traffic above the stated target | section 8 states about 20,000 frames/s at n = 100; phase 2 pins it (4.2, 8) |
+| C-178 | a Raft log cut on disk | a cut record and a new segment, replayed at boot (4.1) |
+| C-192 | a replica removed while it was down | it learns from the leader or `#meta`, stops, and deletes its copy (4.2) |
+| H-052 | a stale `cluster-id` while a dir is still locked | a locked dir is not stale (4.2) |
+| H-076 | resend storms at elections | jittered backoff, and a retry-after on `no-writer` and `moved` (4.3) |
+| H-081 | `issuer.window` against a fixed floor | a cluster key, and the floor uses it (4.3) |
+| H-112 | the lying-disk residual | named in 4.1 |
+| H-116 | a process opens another project's dir | the boot record names cluster and project (4.1) |
+| H-172 | a live voter removed before its replacement holds every commit | removal waits for the commit offset, exactly (4.2) |
+| H-276 | cluster keys change unchecked | `fero.alter('#meta')`, with range and cross-key checks (4.5) |
+
+Each answer is also a case in V5-BACKTEST part 2 (R-59 to R-79).
 
 **The log-first rewrite (the last draft).**
 - The same four agents re-judged every case whose answer touched L0 or L1 (876 of the 1,313) against the rewrite: membership, leave, eviction, handover, durability, client failover, discovery and scale. Answers in L2 to L5 carried over.
@@ -848,34 +902,12 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 - Read-your-writes holds across failover.
 
 **What got worse.**
-- Failover went from about 0.6 s (draft 2) to 2.2 s. That is the GC-safe `session.ms` (4.2), still half of v4's.
-- The rest were the 23 open cases below, now answered.
+- Failover went from about 0.6 s (draft 2) to 2.2 s, the GC-safe timeout, still half of v4's. This draft keeps 2.2 s (`election.ms`).
+- The rest were its 23 open cases.
 
-**The 23 open after the rewrite, and this draft's answers.**
+Its 23 open cases were answered in that draft (git history, commit 0ad07a8), and re-judged against this one above.
 
-| Rows | The case | Answer (section) |
-|---|---|---|
-| S-059 | a log node's leave is bounded by `leave.ms` but must wait for its loglets to be covered | it stays as a draining log node until covered; a forced stop is a restart (4.2) |
-| S-065 | a server could redial an address a client claimed | servers dial only members the metadata names, `hosts` and the directory (4.2) |
-| S-095, H-024 | a hung main thread keeps its session, since heartbeats come from the kernel thread | the kernel's watchdog answers calls `busy`; shards keep being written (4.2) |
-| C-016, C-017 | resubscribing with a raised cursor skips records | the waiting writes' offsets go along as a minimum, not as the cursor (4.4) |
-| C-060 | a follower that reloads a snapshot leaves its subscribers stale | it ends `log` subscriptions `expired` and re-snapshots `state` ones (4.4) |
-| C-142, H-112 | a truncated copy, or a lying disk, counts toward recovery and loses a committed batch | damaged copies do not count; recovery reads every reachable copy and waits up to `recovery.wait`; the residual case is named (4.2) |
-| C-220 | `quorum` below a majority breaks the durability promise | Q is a majority of E or more, never less (4.2) |
-| D-036 | dedup state never forgets an issuer | an issuer silent for the horizon is forgotten, from memory and snapshots (4.3) |
-| D-075, H-064 | the last voter's leave, and example 01's crashes | the last voter hands its vote over first; example 01's four cases are spelled out (4.2) |
-| D-407 | a relay answers from an empty fold | a relay answers only after its upstream snapshot lands; otherwise `moved` (4.4) |
-| H-052 | a stale `cluster-id` file strands new processes | wiped dirs make the file stale, so a new cluster is founded and said; otherwise wait and say, or `recover` (4.2) |
-| H-055 | two cluster ids never merge | by design; both refusals name both ids and the fix (4.2) |
-| H-089 | merges do not inherit dedup outcomes or fences | merges of empty shards combine both; data merges are phase 5 (4.2) |
-| H-125 | a loglet re-opened with fewer log nodes shrinks to one copy silently | `copies.min` (2); below it the shard refuses writes with the reason (4.5) |
-| H-128 | a snapshot on a local folder in a multi-box cluster is a single copy | across boxes without an object store, snapshots go to E log nodes; a local folder is for one box only (4.1) |
-| H-134, H-138 | snapshot layers without removal markers resurrect removed rows | layers carry removal markers, applied and merged in order (3.4) |
-| H-160 | a server that stops serving a partition goes silent | it ends that part of each subscription with `END` and the cursor (4.4) |
-| H-236 | a parked dialer never retries | it retries at v4's slow heartbeat revival (11) |
-| H-254 | the directory refuses a restarted identity in the same process | keyed by life; accepted once the earlier link closes (11) |
-
-The per-case files in [v5-backtest/](v5-backtest) carry each case's latest verdict: the log-first one where it was re-judged.
+The per-case files in [v5-backtest/](v5-backtest) carry each case's latest verdict: the Raft-per-shard one for the 876 cases that touch L0 or L1.
 
 ## 8. Performance, layer by layer
 
@@ -1164,4 +1196,6 @@ Its eight conditions for phase 1, and that draft's answers:
 | E5 | a sleeping project with only log replicas could never let a new server join | log members fold `#meta` and can lead it (4.2) |
 
 Also made: a clamp on writer time; a log replica stands when no full voter has *won*; the read index is per shard, with quiet only when followers are caught up; random disk incarnations; a leave removes only voters dead past `evict.after`; paced hand-backs; honest idle-frame numbers; versions and terms across a split; `recover --new-cluster` keeps the cluster id; removed replicas, `gone` hints for live members, learner catch-up bounds, the unclean-recovery residual, and the corrected recovery precedents. The new cases are R-47 to R-58, and the model gains the properties the reviewer listed (10.2).
+
+**The backtest re-check of this draft** found 30 more cases open, all answered (section 7, cases R-59 to R-79). This round has not yet been re-read by the reviewer.
 
