@@ -47,7 +47,7 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-35 (L-36) | A member's main thread hangs while its kernel thread keeps pinging | The watchdog answers calls `busy`; its shards keep being written (4.2) |
 | R-36 (L-37) | A run folder's dirs were wiped but its `cluster-id` file stayed | The file is renamed aside and a new cluster is founded, said on stderr (4.2) |
 | R-37 (L-07) | `#meta` loses its majority | Writes and failovers carry on; joins, new resources and directory updates wait; a stale directory costs one `moved` (4.2) |
-| R-38 | A member leaves while another voter of the same shard is dead | Voters dead past `evict.after` are removed first when that lets the leave carry; a shard where neither is safe keeps the leaver as a voter, and `destroy()` names it (4.2) |
+| R-38 | A member leaves while another voter of the same shard is dead | A voter whose link is down past `election.ms` and that does not answer probes for the rest of `leave.ms` is removed first, when that lets the leave carry (V4-60); a shard where neither is safe keeps the leaver as a voter, and `destroy()` names it (4.2) |
 | R-39 | A replica whose fold lags far behind wins an election | Raft elects only complete logs; a replica whose fold lags past `lag.max` waits one more step; a new leader answers only once its fold reaches its log end (4.2) |
 | R-40 | A planner places a shard on a server without the resource's code | The leader refuses a target without the resource's code hashes (4.5) |
 | R-41 | A frozen server forwards an attempt late | Links and budgets bound how late a copy can arrive: a server forwards only over the link it had, which the leader closed after `election.ms` of missed pings. The log makes answers unique: a resent attempt's refusal is appended, so a late copy finds it (4.3) |
@@ -67,7 +67,7 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-55 | A leader quiets a shard while a follower lags | A leader quiets only when every live voter has its commit offset; a follower told "quiet at i" while below it asks to wake (4.2) |
 | R-56 | A `fresh` read at a quiet shard's deposed leader after links return | The read index is a per-shard message carrying the term; link pings never confirm leadership (4.2) |
 | R-57 | A member returns as rank 1 for thousands of shards | It takes back at most ten leaderships a second (4.2) |
-| R-58 | A member leaves while a peer is in a GC pause | Only voters dead past `evict.after` are removed for a leave; a shorter silence keeps the leaver as a voter, and `destroy()` says so (4.2) |
+| R-58 | A member leaves while a peer is in a GC pause | A paused peer answers the leader's probes within `leave.ms`, so it is kept, and the leave carries normally (4.2) |
 | R-59 | A follower restarts during a roll while its shards are quiet | When a link comes back, each side reports its log end per shared shard, and the leader wakes any shard whose follower is behind (4.2) |
 | R-60 | A new leader overwrites a follower's uncommitted tail, then the follower loses power | The follower journals a cut record before the new entries and starts a new segment; boot replays cuts in order (4.1) |
 | R-61 | A replica removed while it was down comes back | It learns of its removal from the leader or `#meta`, stops serving, and deletes its copy once `#meta` shows the configuration without it; if re-added first, its copy seeds the learner (4.2) |
@@ -85,6 +85,10 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-73 | Every election brings a resend storm | Resends back off with jitter from `election.step` to `election.ms`; `no-writer` and `moved` carry a retry-after (4.3) |
 | R-74 | Issuers and writers disagree on `issuer.window`, so a lost write looks committed | `issuer.window` is a cluster key, and the floor uses it (4.3, 4.5) |
 | R-75 | A cluster key changes online to a value that breaks another | `fero.alter('#meta', change)` checks ranges and cross-key rules, and refuses with the reason (4.5) |
+| R-76 | A leader dies mid-promotion, or example 01's leave is cut off halfway, and the shard needs a vote from a learner that has not heard of its promotion | Learners answer vote requests by the normal log rule and never stand; candidates count only their own configuration's voters (4.2) |
+| R-77 | One voter crashed seconds ago, then another member leaves a three-voter shard | A voter silent past `election.ms` that does not answer probes for the rest of `leave.ms` is removed first, so the stayer keeps writing (V4-60) (4.2) |
+| R-78 | `#meta` is recovered with `--new-cluster`, then an old voter returns with its dir | Members compare `#meta`'s incarnation in HELLO; the lower one stops its `#meta` replica and rejoins the new one (4.2) |
+| R-79 | `recover` is run while a voter it would drop is still alive | Both recover commands refuse while any voter they would drop answers, naming it (4.2) |
 
 ## Part 1: v4's hard cases
 
