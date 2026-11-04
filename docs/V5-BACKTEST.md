@@ -72,6 +72,12 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-60 | A new leader overwrites a follower's uncommitted tail, then the follower loses power | The follower journals a cut record before the new entries and starts a new segment; boot replays cuts in order (4.1) |
 | R-61 | A replica removed while it was down comes back | It learns of its removal from the leader or `#meta`, stops serving, and deletes its copy once `#meta` shows the configuration without it; if re-added first, its copy seeds the learner (4.2) |
 | R-62 | Two members leave a three-voter shard one after the other | Each leave promotes a caught-up learner first, so the voter count holds while learners remain (4.2) |
+| R-63 | Founding seeds each mint a cluster id, or a seed restarted without its dir founds a second cluster | A seed founds only with a majority of seeds and none holding an id; the winner of `#meta`'s first election mints it; a dir-less seed that finds an id joins (4.2) |
+| R-64 | Healing adds back a member that is leaving, or example 01 hands the vote back to the exiting process | A leave marks the member `draining` in `#meta` first, so no target includes it (4.2) |
+| R-65 | A Raft or plan verb arrives on a client link | Raft verbs only on member links past the door, plan verbs only with the admin key; otherwise the link closes (4.1) |
+| R-66 | A huge batch, catch-up or bundled frame stalls a link | Batches cap at 1 MB, catch-up appends at 4 MB, bundled frames at 1 MB; big records are cut between markers (4.1) |
+| R-67 | The journal or log is dropped before the segment or snapshot covering it is on disk | Journal truncation waits for the covering segments' fsync; log drops wait for the snapshot's fsync or confirmed put (4.1) |
+| R-68 | A new learner, still loading its snapshot, serves a read as if rows were absent | A replica serves only once ready: snapshot loaded and fold at the commit offset it started from; until then `moved` (4.4) |
 
 ## Part 1: v4's hard cases
 

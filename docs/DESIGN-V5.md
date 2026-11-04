@@ -246,7 +246,7 @@ L0  storage and io        one journal per process · group commit · segments ·
 
 **On every member** (a server or a log member).
 - **One journal per process.** Every Raft entry, term and vote, for every shard the process holds, goes into one journal file. One `fdatasync` covers a batch: at most every millisecond, or every megabyte. So a process with 1,000 shards pays one fsync per batch, not 1,000. This is group commit, as CockroachDB and TiKV share one log engine across their groups.
-- **Segments.** After the journal fsync, entries are written to segment files per shard, with an index from offset to position, and a per-partition index so a replay of one partition skips the rest. The journal is truncated once the segments cover it.
+- **Segments.** After the journal fsync, entries are written to segment files per shard, with an index from offset to position, and a per-partition index so a replay of one partition skips the rest. The journal is truncated only once the segments that cover it are fsynced.
 - **Cuts.** When a new leader overwrites a follower's uncommitted tail (Raft's log-matching repair), the follower writes a cut record (shard, last offset kept) to the journal before the new entries, and starts that shard's next segment file from there; files are never truncated in place. Boot replays cuts in order, and runs the predecessor check on the chain as cut.
 - **What `persisted` waits for.** The journal fsync that covers the entry, on a majority of the shard's voters. A term or vote is never used before its own fsync.
 - **Boot checks.** Every record carries a crc32c and its predecessor's offset (v4's chain, V3-8).
@@ -270,7 +270,7 @@ L0  storage and io        one journal per process · group commit · segments ·
   - Every full replica cuts its own snapshots, for its own restarts.
   - Only the leader uploads them: put-if-absent, under a name keyed by (shard incarnation, offset).
   - A snapshot is named in the shard's log, by an entry, only after its put is confirmed.
-- **When a replica may drop its log below offset i.** All of these must hold:
+- **When a replica may drop its log below offset i.** All of these must hold, and the covering snapshot is fsynced locally, or its put confirmed, first:
   - a snapshot covers i where the shard can still reach it: for a full replica, its own snapshot, or a merged base named in the object store (a single incremental layer covers nothing on its own); for a log replica, a merged base named in the object store, or else i is at or below the offset every full voter has snapshotted past, which the leader stamps on its appends;
   - the segment is uploaded, or the shard's `history` allows dropping it;
   - no split child still needs it;
@@ -286,6 +286,8 @@ L0  storage and io        one journal per process · group commit · segments ·
 - TCP, TLS, WebSocket (browsers, with no bridge), and in-process (worlds and the simulator).
 - Frames are v4's: encoded once, with a crc32c, and the same bytes are the journal row and the wire (V3-8).
 - A frame is sent at the end of the event-loop turn that made it (decision 9). One frame to a peer carries the messages of every shard the two share.
+- **Sizes are capped.** A Raft batch is at most 1 MB, a catch-up `APPEND` at most 4 MB, and a frame bundling many shards is cut at 1 MB. A record bigger than a batch is cut into frames between begin and end markers, as big rows are (4.4).
+- **Member verbs only on member links.** Raft verbs are accepted only on links from members that passed the door; on a client link they close it, as v4 drops VIEW and VOTE there. Plan verbs need the admin key.
 
 ### 4.2 L1: the log
 
@@ -303,7 +305,7 @@ One published design, run once per shard, plus the engineering that published mu
 - **One cluster per project.** Its resources are entries in its catalog. This replaces v4's one cluster per resource, with its own port, membership and heartbeats each.
 - **A cluster id**, minted at genesis, rides every HELLO. Different ids never link, and both sides say so, naming both ids and the fix.
 - **Exactly one genesis**, which creates `#meta`.
-  - Across boxes, the founding members start with the same `seeds` list, which becomes `#meta`'s first voters.
+  - Across boxes, the founding members start with the same `seeds` list, which becomes `#meta`'s first voters. A seed founds only when it reaches a majority of the seeds and none of them has a cluster id. They then hold `#meta`'s first election, and the winner's first entry carries the cluster id it mints; no seed takes client traffic before it has applied that entry. A seed restarted without its dir finds a cluster id at another seed, and joins as a new replica.
   - On one box, the first process of a project's run creates `cluster-id` in the run's folder under `.fero/` with an exclusive create, and is `#meta`'s only voter.
   - Everyone else joins: it writes its member record to `#meta`, through any member.
   - A process given cross-box `hosts` and no `seeds` never founds a cluster; it joins its hosts' cluster, or waits and says "no seeds configured".
@@ -486,7 +488,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 
 | Stop | Used by | What happens |
 |---|---|---|
-| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver, if the remaining live voters stay a majority of the new set. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters (links down past `evict.after`, never a mere GC pause) are removed first, when that is what lets the leave carry (as V4-60). A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
+| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **First** it marks itself `draining` in `#meta`, so no healing step, its own shards' included, targets it again. **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver, if the remaining live voters stay a majority of the new set. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters (links down past `evict.after`, never a mere GC pause) are removed first, when that is what lets the leave carry (as V4-60). A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
 | `restart` | the same signals under a supervisor (`FERO_SUPERVISED`), rolls, restart-all | hands over every shard it leads, and stays a replica of all of them |
 
 - **A crash** is a restart that skipped the handover.
@@ -586,7 +588,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 | cursor | the cluster id, the resource's incarnation, then per shard its incarnation, the offset last seen, and (for a `none` resource) the leader's term; or `'latest'`, `'earliest'` |
 
 - **Who serves.**
-  - Any full replica of the shard: its leader, a follower or a learner. Always up to the commit offset, and never before its fold has reached the subscriber's cursor.
+  - Any full replica of the shard that is ready: its leader, a follower or a learner. A replica is ready once its snapshot has loaded and its fold has reached the commit offset it was told when it started; until then it answers `moved`, naming a ready one. Always up to the commit offset, and never before its fold has reached the subscriber's cursor.
   - Older offsets come from segments, on replicas' disks or in the object store.
   - A follower that falls behind the tail and reloads a snapshot ends its `log` subscriptions on that shard with `expired`, and re-snapshots its `state` subscriptions.
   - A one-shot read at a server that neither folds nor relays the partition is refused `moved`, naming a full replica. A relay answers only after its upstream snapshot has landed, never from an empty fold.
