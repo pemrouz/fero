@@ -1,54 +1,61 @@
 # v5 backtest: every hard case v4 met, and v5's own
 
-Companion to [DESIGN-V5.md](DESIGN-V5.md). Part 1 maps every hard case recorded in v4's DECISIONS, STATUS, design records and HISTORY to v5. Part 2 lists the hard cases the log-first design brings that v4 never had. Every row becomes a named test in phase 1 (DESIGN-V5 §11).
+Companion to [DESIGN-V5.md](DESIGN-V5.md). Part 1 maps every hard case recorded in v4's DECISIONS, STATUS, design records and HISTORY to v5. Part 2 lists the hard cases Raft per shard brings that v4 never had. Every row becomes a named test in phase 1 (DESIGN-V5 §11).
 
 **Verdicts.** `gone`: the mechanism that caused it does not exist in v5, and the row says what replaces it. `same`: the need is real in any design; the row names v5's mechanism and layer. `open`: v5 needs a decision or a design not yet in DESIGN-V5. `n/a`: tooling, wording or process with no kernel consequence.
 
 ## Part 2: hard cases v5 brings
 
-These are the cases a log-first design (a metadata Raft group, BookKeeper-style loglets, and Delos-style chains, with disposable servers) is known to get wrong when built carelessly. Each is a property the TLA+ specs check (phase 1) and a monitor the simulator runs (phase 2). The earlier list, written for in-sync sets, is in git history (commit 9e6f7b8).
+These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, healing by each shard's leader, an optional planner, log replicas and splits) is known to get wrong when built carelessly. Each is a property the TLA+ spec checks (phase 1) and a monitor the simulator runs (phase 2). The log-first list (L-01 to L-38) is in git history (commit 0ad07a8); each L case that still applies is folded into a row below, with its number.
 
 | id | Case | v5's answer (DESIGN-V5) |
 |---|---|---|
-| L-01 | Two servers both try to take over shard 7 (a stale controller decision, or a partition) | Taking over is seal, recover, then a compare-and-swap of the chain in the metadata; exactly one swap succeeds, and the loser's loglet is sealed, so its appends fail (4.2) |
-| L-02 | An old writer, cut off, keeps appending | Once E − Q + 1 log nodes have sealed its loglet, no append can reach Q acknowledgements; its in-flight writes were never answered (4.2, 4.3 "no answer before commit") |
-| L-03 | A seal races an append in flight | Recovery reads the sealed nodes and re-writes to Q every batch any of them holds, so a committed batch is never lost; an uncommitted one may survive, and a retry finds it by dedup (4.2) |
-| L-04 | A batch reached one log node only, then the writer died | Recovery keeps it if a sealed node holds it (re-written to Q), or drops it if none does; either way its writer was never told it committed |
-| L-05 | A log node dies during recovery | Recovery needs E − Q + 1 sealed nodes and their reads; with fewer, the shard waits, and `fero recover --unclean` is the only way on, reporting what may be lost (4.2) |
-| L-06 | A reader sees a record that recovery later drops | Readers only see records up to the committed point, which only commits make move, and recovery never drops a committed batch |
-| L-07 | The metadata group is down | Writers keep appending to their open loglets; only changes (a new writer, a split, a join) wait (4.2 "What the metadata is not") |
-| L-08 | The controller fails over in the middle of reassigning shards | Each decision is a metadata entry, and each takeover is a compare-and-swap, so a repeated or stale decision costs one extra handover, never two writers |
-| L-09 | A slow but alive server's session lapses | Its loglets are sealed; its next append is refused, so it learns it lost the shard; its pending answers are `unknown`; it re-registers with a new session epoch (4.2) |
-| L-10 | A shard splits while writes, subscribers and consumers are in flight | The parent's loglet is sealed at X; writes to it are refused `moved` with the children; cursors resolve through the chain; children inherit the snapshot at X, dedup outcomes and fence tokens (4.2) |
-| L-11 | Two shards merge while readers hold cursors on both | Both are sealed; the merged shard continues both offset ranges in the chain; a cursor resolves to its range |
-| L-12 | The object store is down or slow | Uploads wait; log nodes keep sealed loglets longer; a log node near full refuses new loglets and they go elsewhere; an alarm says so |
-| L-13 | A snapshot is named before its upload finished, or a loglet is deleted before the snapshot covering it is safe | A snapshot is named in the metadata only after its put is confirmed; a loglet copy is deleted only after it is uploaded or covered by a named snapshot (4.1) |
-| L-14 | A cold server takes over a large shard | It loads the snapshot and reads the tail before it writes, so writes pause for that long; the controller prefers warm followers, and `standbys` keeps them warm (4.2) |
-| L-15 | A log node comes back without its disk | Its identity includes the disk incarnation, so it is a new log node; the loglets it held are re-copied from their other copies or the object store (4.2) |
-| L-16 | A fork points at a snapshot that retention later deletes | Forks hold references in the metadata; nothing referenced is deleted |
-| L-17 | Writer time jumps on a change of writer | `t = max(last t in the log, clock)`, and a server more than `skew.max` off the controller's clock is not given shards (4.2) |
-| L-18 | A retry reaches the new writer after a takeover | The outcomes are in the shard's state, so the new writer has them once it has folded the recovered tail; forwards from a fenced session epoch are refused (4.3) |
-| L-19 | Two machines, one crashes | Each loglet has E = 2, Q = 2; the survivor seals (it needs one sealed node: itself) and re-opens each loglet with one copy, which needs the metadata, so two machines need a witness voter (4.2) |
-| L-20 | A server that is also a log node crashes, taking both roles at once | Its loglets elsewhere lose one copy each and keep writing at Q; its own shards are sealed using the remaining copies (E − Q + 1 of them) and taken over |
-| L-21 | Restart-all of a cluster whose servers are its log nodes | The metadata group re-forms; each open loglet is sealed and recovered as its log nodes return, in any order, as long as a metadata majority and E − Q + 1 copies of each loglet come back |
-| L-22 | A noisy project on fero deploy's shared log tier | Per-project quotas on the log tier; each project has its own metadata group, so one project's trouble stays its own |
-| L-23 | A `none` resource's writer changes | Its records were never stored, so they are gone; its cursors carry the writer's epoch, and a subscriber whose epoch is gone resumes at `latest` and is told so (3.2) |
-| L-24 | A planned handover meets in-flight writes | The old writer stops taking writes, waits for its in-flight batches to commit, then seals at that end; writes that arrive meanwhile get `moved` with the new writer |
-| L-25 | Placement keeps choosing a slow server | Placement is a policy over load and latency, not a fixed hash; the controller hands a slow writer's shards over, one at a time |
-| L-26 | A server reading old offsets from the object store gets stale data | Segment and snapshot files are written once under unique names and never overwritten, so a read is either the file or nothing |
-| L-27 | A split or merge storm under load | The controller changes one shard at a time and paces splits and merges by a budget per minute |
-| L-28 | Recovery hears from one sealed node that has a batch, while another is silent, or answers "no" before it has recorded the seal | A silent node is unknown, never absent; a "no" counts only from a node that has recorded the seal, since the old writer could still land the batch on an unsealed one; so a batch that could commit is never cut off (DESIGN-V5 4.2) |
-| L-38 | The writer's dedup floor rose on refused attempts, then the writer changed | Each issuer's highest call id seen is shard state, carried in snapshots; a new writer takes the higher of the snapshot's and the tail's, so a late duplicate below the old floor is never judged fresh (4.3) |
-| L-29 | A reader tails a sealed loglet that is not yet closed, and sees batches a losing recovery re-wrote | On a sealed, unclosed loglet a reader sees nothing beyond the committed point it already had; on a closed one, nothing past the chain's recorded end |
-| L-30 | The writer and the controller both reconfigure the same loglet after a log node fails | Only the writer changes its loglet's log nodes; the controller only changes writers |
-| L-31 | A planned close races a failover of the same shard | Every close is a compare-and-swap against the chain version read; the loser adopts the winner's end |
-| L-32 | The writer dies in the middle of a split | The server that takes over recovers the parent's end and opens the children after it in the same swap; children never start at an offset a seal could not guarantee |
-| L-33 | A loglet is deleted while only an incremental snapshot layer covers it | Deletion needs a merged snapshot base at or above its end, no merge reading it, no fork or child needing it, and `history` allowing it (4.1) |
-| L-34 | A disk lied about an fsync, and its copy is one of only Q | Recovery reads every reachable copy and waits up to `recovery.wait` for all E; the residual case is named in 4.2 |
-| L-35 | A loglet is re-opened on fewer log nodes than `copies` | Never below `copies.min` (2) while two log nodes exist; below it, writes are refused with the reason |
-| L-36 | A server's main thread hangs while its kernel thread keeps the session alive | The kernel's watchdog answers method calls `busy`, so clients move; its shards keep being written |
-| L-37 | A run folder's dirs were wiped but its `cluster-id` file stayed | With no metadata in any dir, the file is stale: it is renamed aside and a new cluster is founded, said on stderr |
-
+| R-01 (L-01, L-08) | Two replicas both try to lead shard 7 (a partition, or a stale planner hint) | Each needs a majority of votes in its term, and majorities overlap, so there is one leader per term; a leader of an older term cannot commit (4.2) |
+| R-02 (L-02, L-09) | An old leader, cut off, keeps taking writes | It cannot reach a majority, so nothing commits; CheckQuorum steps it down within `election.ms`; its writes were never answered, and their issuers get `unknown` (4.2, 4.3) |
+| R-03 (L-03, L-04, L-06, L-28, L-29) | A leader dies with a batch on a minority of replicas | The new leader holds every committed entry (leader completeness). The batch may be kept, committed by the new leader's first entry of its own term, or dropped; its writer was never told it committed, and readers only ever see up to the commit offset (4.2) |
+| R-04 (L-05, L-21) | A shard loses its majority, or the whole cluster restarts | It refuses writes with the reason and keeps serving reads; it elects once a majority of its voters is back, in any order; without one, `fero recover --unclean` is the only way on (4.2) |
+| R-05 | The single-server membership change bug (Ongaro, 2015) | A new leader commits an entry of its own term before any membership change (4.2) |
+| R-06 | A partitioned replica returns with a high term and unseats a working leader | PreVote: it must first win a pre-vote, which voters that hear a live leader refuse (4.2) |
+| R-07 (L-15) | A member comes back without its disk, with damaged records, or after an unclean stop under `memory` | Its replicas cannot vouch for their logs, so they come back as new replicas under a new disk incarnation, and never vote as the old ones (4.1, 4.2) |
+| R-08 | A member that led a thousand shards dies | Its shards elect in parallel, ranked so one candidate usually stands, with their messages batched per peer (4.2) |
+| R-09 | A quiet shard's leader dies | Its followers see the member's link pings stop, wake the shard and elect (4.2) |
+| R-10 (L-30) | Healing and a planner hint change the same shard at once | Every change is a Raft entry in the shard's own log, one at a time; a hint names the config it read, and is refused `stale-plan` if the config moved (4.2) |
+| R-11 | Two planners at once, or a stale one | Hints are checked against each shard's config, so they waste moves and never break anything; the planner lease in `#meta` keeps two from fighting (4.2) |
+| R-12 | A slow but alive replica | The leader commits with the majority without it; it is replaced only after `evict.after` with its link down, or a planner's `gone` (4.2) |
+| R-13 (L-27) | A join or a loss moves many replicas at once | Rendezvous hashing moves about `copies`/n of them; each member loads two snapshots at a time and answers `busy` to more; each shard makes one change at a time (4.2) |
+| R-14 | A learner is promoted before it has caught up, and one more crash then stalls the shard | A learner is promoted only once caught up (etcd's rule) (4.2) |
+| R-15 | Leadership flaps between the rank-1 replica and the one that took over | Leadership returns only once the rank-1 replica has been live and caught up for `settle.ms` (4.2) |
+| R-16 (L-10, L-32) | A shard splits while writes, subscribers and consumers are in flight, or its leader dies mid-split | The split is one entry at offset X: committed, every replica applies it; not committed, it may be dropped like any entry. After it the parent refuses `moved`, naming the children; cursors resolve through the lineage; children inherit dedup outcomes, highest call ids and fence tokens (4.2) |
+| R-17 | A replica receives a child shard's messages before it has applied the split | It holds them until it applies the split (4.2) |
+| R-18 (L-11) | Two shards merge while readers hold cursors on both | Merges are phase 5 |
+| R-19 (L-12) | The object store is down or slow | Uploads wait; replicas keep log and snapshots longer; a member near full refuses new replicas; an alarm says so; new replicas stream snapshots from the leader meanwhile (4.1) |
+| R-20 (L-13, L-33) | A snapshot is named before its upload finished, or log is dropped while only an incremental layer covers it | A snapshot is named in the shard's log only after its put is confirmed; log is dropped only under a merged base, with no split child, fork or `history` still needing it (4.1) |
+| R-21 | A log replica drops log that the only remaining full replica's snapshot does not cover | A log replica drops log only under a merged base in the object store, or below the offset every full voter has snapshotted past, as stamped by the leader (4.1) |
+| R-22 (L-16) | A fork points at a snapshot that retention later deletes | Forks hold references in `#meta`; nothing referenced is deleted (4.1) |
+| R-23 (L-17) | Writer time jumps on a change of leader | `t = max(last t in the log, clock)`; a member more than `skew.max` off its peers' median does not stand for election (4.2) |
+| R-24 (L-18, L-38) | A retry reaches the new leader after a failover, or the dedup floor rose on refused attempts before it | Outcomes and each issuer's highest call id are shard state, in the log and in snapshots; a new leader folds its whole log before it answers (4.3) |
+| R-25 (L-19) | Two machines, one crashes | Below three candidates each shard has one voter, the first member; a crash of its machine stops writes until it returns. A witness on a third failure domain makes three voters, so either crash is survived (4.2) |
+| R-26 (L-14, L-20) | The full replicas crash and a log replica is the only up-to-date voter left | It leads only to repair: hands over to a returning full voter, or adds a server from the object store, promotes it and hands over. It never takes a client write; the shard says `no-writer` until then (4.2) |
+| R-27 | A log replica must repair, and there is no object store | It cannot build a full replica from its log alone, so it waits for a full voter to return with its disk, and says so (4.2) |
+| R-28 (L-22) | A noisy project on fero deploy's shared log tier | One log member per project, with a quota each; each project has its own cluster id and `#meta` (4.2) |
+| R-29 (L-23) | A `none` resource's leader changes | Its records were never stored; cursors carry the leader's term; a subscriber whose term is gone resumes at `latest` and is told so (3.2) |
+| R-30 (L-24, L-31) | A planned handover meets in-flight writes, or races a failover | The leader stops taking new writes, brings the target to its log end, then sends TimeoutNow; writes meanwhile wait or get `moved`; if a failover happens meanwhile, the higher term wins (4.2) |
+| R-31 (L-25) | A slow server keeps leading | A planner places by load; without one, a member past `skew.max`, or a replica whose fold lags past `lag.max`, does not stand, and hands over (4.2) |
+| R-32 (L-26) | A read from the object store gets stale data | Segments and snapshots are written once, under unique names, and never overwritten (4.1) |
+| R-33 (L-34) | A disk lied about an fsync, and its copy is part of the only majority | Boot checks catch damaged records, and such a replica comes back as a new one; an acknowledged write lost by a disk that lies cannot be detected on its own, the residual case, named (4.1) |
+| R-34 (L-35) | Healing shrinks a shard to fewer voters than `copies`, silently | Voters are the largest odd number the candidates allow, a live voter is removed only after its replacement is a caught-up voter, and `cluster.health` and stderr say how many voters each shard has (4.2, 4.5) |
+| R-35 (L-36) | A member's main thread hangs while its kernel thread keeps pinging | The watchdog answers calls `busy`; its shards keep being written (4.2) |
+| R-36 (L-37) | A run folder's dirs were wiped but its `cluster-id` file stayed | The file is renamed aside and a new cluster is founded, said on stderr (4.2) |
+| R-37 (L-07) | `#meta` loses its majority | Writes and failovers carry on; joins, new resources and directory updates wait; a stale directory costs one `moved` (4.2) |
+| R-38 | A member leaves while another voter of the same shard is dead | Dead voters are removed first when that lets the leave carry; a shard where neither is safe keeps the leaver as a voter, and `destroy()` names it (4.2) |
+| R-39 | A replica whose fold lags far behind wins an election | Raft elects only complete logs; a replica whose fold lags past `lag.max` waits one more step; a new leader answers only once its fold reaches its log end (4.2) |
+| R-40 | A planner places a shard on a server without the resource's code | The leader refuses a target without the resource's code hashes (4.5) |
+| R-41 | A frozen server forwards an attempt late | It forwards only over the link it had when it took the attempt; the leader closed that link after `election.ms` of missed pings, so the forward never lands, and the issuer retries (4.3) |
+| R-42 | A member holds thousands of shards, and each would fsync and ping alone | One journal per process, with one fsync per batch; one link ping per member pair; quiet shards send nothing (4.1, 4.2) |
+| R-43 | A `fresh` read reaches a deposed leader | Read index: it confirms that a majority still follows it before it answers (4.2, 4.5) |
+| R-44 | Example 01's voter leaves | It promotes the learner, hands over leadership, then removes itself, all while both are live (4.2) |
+| R-45 | A gone voter is replaced while one more voter is down | A gone voter is removed first (it was not answering anyway), then its replacement is added as a learner and promoted, so no step needs more live voters than before (4.2) |
+| R-46 | `confirm: 'sent'` on a write whose leader then dies | The promise said only "appended"; the write's outcome stays in `cluster.writes`, and a client's view shows it only if it commits; refused on conditions and ops (3.2) |
 
 ## Part 1: v4's hard cases
 

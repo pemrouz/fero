@@ -1,17 +1,20 @@
-# fero v5: the log first, servers on top
+# fero v5: one log per shard, Raft for each
 
 A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4, 1,216 tests) and data at 63fea66. Nothing here is built.
 
 **What this draft changes.**
-- Earlier drafts made servers hold the data and copy it to each other: first with Kafka's protocol, then with Raft per shard ([V5-REPLICATION.md](V5-REPLICATION.md) compares those).
-- This draft puts **the log first**. Each shard's log lives on log nodes, with object storage under them. Servers sit on top as disposable writers and caches.
+- The last draft put the log first: log nodes, loglets, chains and a metadata Raft group, with servers on top. That was three protocols, about twice the code ([V5-LOG-FIRST-REVIEW.md](V5-LOG-FIRST-REVIEW.md)).
+- This draft uses **one protocol, Raft, once per shard**, as CockroachDB, TiKV and Redpanda do. The cluster's own facts are one more shard. There is no separate metadata group and no outside store.
+- **Every resource starts as one shard**, which is one Raft group, and splits as it grows. So a small project runs as plain Raft, and a big one is many groups, with no second mechanism.
+- **The cluster heals itself.** Each shard's leader keeps its own replicas where a ring says they belong. An optional **planner** (the `fero` CLI, or fero deploy's platform) sends hints, and each shard checks them against its own log, so a stale planner cannot break anything.
+- **Two kinds of replica.** A full replica is a server: it folds rows and can lead. A log replica keeps the log only. Log replicas let two machines survive a crash with a witness, and let fero deploy keep its servers few and disposable.
 - Scaling up and down is designed in from the start, not added later.
 - Everything above the log carries over (sections 3, 4.3 to 4.6, 5): ops, subscriptions, methods, libraries. It only ever needed one writer per shard, with an ordered log.
 
 **How it was checked.**
 - v4's DECISIONS, STATUS, design records and HISTORY were catalogued into 1,313 hard cases, plus 102 invariants, 36 monitors and 20 SCHEDULE clauses ([V5-BACKTEST.md](V5-BACKTEST.md)).
-- Four agents judged the earlier drafts against every case, and an independent reviewer signed off on the third (section 13).
-- This draft's new L1 is being re-checked against the cases that touch it, and reviewed afresh (sections 7 and 13).
+- Four agents judged the earlier drafts against every case. An independent reviewer signed off on the third draft and on the log-first draft (section 13).
+- This draft's L1 is re-checked against the cases that touch it, and reviewed afresh (sections 7 and 13).
 
 **Contents.**
 1. The answers
@@ -31,22 +34,23 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
 ## 1. The answers
 
 - **The shape.**
-  - Every shard's log is written by one server at a time, and stored on log nodes (machines that keep the log on disk).
-  - A write counts once a quorum of log nodes has it on disk.
-  - Old log and snapshots move to object storage.
-  - Servers hold rows in memory only as a cache, so a server can stop at any time and another can take over from the log.
-  - One small Raft group keeps the cluster's facts. It is the only consensus in the system.
+  - Every shard is a small Raft group: three voting replicas by default. Its leader is the shard's only writer.
+  - A write counts once a majority of the shard's voters has it on disk.
+  - The cluster's facts (members, resources, where shards are) are one more shard, `#meta`.
+  - Snapshots and old log go to object storage when there is one.
   - Section 4.
-- **Scaling, up and down.**
-  - Servers start and stop at will, and never copy rows from each other's disks: a server reads what it needs from storage.
-  - When the log tier is separate (as in fero deploy), durability never depends on the servers.
-  - When servers are also the log nodes (the default when self-hosting), losing servers also loses copies, until they are re-copied.
-  - Log nodes are added for space and throughput: new log stretches simply go to them.
-  - Shards split by themselves as load grows, without copying data between servers: a child reads the parent's snapshot and tail from storage.
-  - Limits remain, said plainly in 4.2:
-    - with every server holding every row, more servers add CPU and clients, not room for rows;
-    - one partition is one writer.
+- **Who decides what.**
+  - **Safety** is each shard's Raft. Nothing outside it can make two writers commit.
+  - **Healing** is each shard's leader, by one rule: keep its replicas where the stored placement, or else the ring, says.
+  - **Plans** come from an optional planner, as hints each shard checks.
   - Section 4.2.
+- **Scaling, up and down.**
+  - Each resource starts as one shard. Shards split by size and load, and a split copies nothing: both children start on the parent's replicas.
+  - A new server gets about `copies`/n of all replicas from the ring. Each is a snapshot from the object store (or from the leader) plus a short tail.
+  - Durability depends on each shard's voters, not on how many servers run. Log replicas can be voters when servers are few.
+  - Limits remain, said plainly in 4.2:
+    - one partition is one writer;
+    - a server that becomes a replica copies that shard.
 - **Retention applies to two things, and they are separate knobs.**
   - `history` is how much of the log of deltas a resource keeps. `rows` is which rows its state keeps.
   - A stream keeps history and no rows; a map keeps rows and no history; a tape keeps both.
@@ -61,12 +65,13 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
   - Section 3.3.
 - **The layers.**
   - L0 storage and io; L1 the log; L2 fold and ops; L3 flow; L4 surface; L5 libraries.
-  - L1 is three published designs: Raft for the facts, BookKeeper's quorum log for each stretch of a shard's log, and Delos's chain of stretches for the whole log.
+  - L1 is one published design, Raft, run once per shard, with the engineering multi-Raft systems publish: one journal per process, batched messages, and quiet idle groups.
   - Everything a pattern needs above L2 is a library.
-- **Development speed.** v4's October went 15, then 40, then 34 open bugs over about 700 commits, because many novel mechanisms interact. v5 uses fewer novel mechanisms, each checked by a model checker before code. Section 10.
+- **Development speed.** v4's October went 15, then 40, then 34 open bugs over about 700 commits, because many novel mechanisms interact. v5 uses fewer novel mechanisms, each checked by a model checker before code, and L1 is one protocol with a public TLA+ spec. Section 10.
 - **fero test and fero deploy.** All 14 kernel needs from "fero deploy: the journey" and all 11 pieces from "fero test" have a home.
   - A tape is a log, a fork is a pointer to a snapshot, and sleep and wake are reading a snapshot back.
-  - The number of copies of the data no longer depends on the number of servers.
+  - The roll gets the two things the deploy doc asks for: a drain with no timeout (Raft's leadership transfer), and a caught-up signal that is a number.
+  - fero deploy's platform is the planner.
   - Section 6.
 
 ## 2. The model
@@ -79,36 +84,39 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
 | **cell** | a path inside a row; the unit of a write | `b42.status` |
 | **record** | one change to one cell or row (data's delta) plus the header of 4.3 | `{ set, ['b42','status'], 'booked' }` |
 | **partition** | the unit of order, atomicity and following. By default one row; a `partition` function can group rows | `room42/m1` and `room42/m2` in `room42` |
-| **shard** | a hash bucket of partitions with one log and one writer at a time. Invisible to users | `hash('room42') & 15` is shard 7 of 16 |
-| **log** | one shard's records in order, with offsets that never go back | shard 7, offsets 0, 1, 2, … |
-| **loglet** | one stretch of a shard's log, written by one server, stored on a few log nodes | shard 7, offsets 900 to 1,412, on log nodes A, C, E |
-| **chain** | a shard's loglets in order, kept in the metadata | shard 7: loglet 1, then 2, then 3 (open) |
+| **shard** | a hash range of partitions with one log, one Raft group and one leader at a time. Invisible to users | `hash('room42')` falls in shard 7's range |
+| **log** | one shard's records in order, with offsets (Raft's indexes) that never go back | shard 7, offsets 0, 1, 2, … |
+| **replica** | one member's copy of one shard's log. A **voter** counts toward the shard's majority; a **learner** gets the log but does not vote | shard 7 on S1, S2, S3 |
+| **full replica** | a replica on a server: it folds the rows, serves them, and can lead | S1's replica of shard 7 |
+| **log replica** | a replica that keeps the log only: it votes, never serves, and leads only to repair (4.2) | a witness's replica of shard 7 |
+| **leader** | the voter that writes the shard, chosen by Raft | shard 7's leader is S2 |
 | **version** | the shard's incarnation and the offset of a row's last write | `b42` at (7, 1, 902) |
 | **state** | the rows: the fold of the log | what `f.data` shows |
-| **server** | a process that runs resources: it writes the shards it leads, folds rows, serves reads, runs methods. Disposable | an app process; a copy in fero deploy |
-| **log node** | a process that stores loglets on disk and serves them. In small setups every server is also a log node | a disk in the cluster |
-| **voter** | a log node or server that votes in the metadata group: one, three or five per cluster | |
-| **object store** | where sealed loglets and snapshots go: S3 or a compatible store, or a local folder | |
+| **server** | a process that runs resources: it holds full replicas, leads some of them, serves reads and runs methods | an app process; a copy in fero deploy |
+| **log member** | a process with only the log role: it holds log replicas, and nothing else | a witness on a third machine; fero deploy's log tier |
+| **`#meta`** | the cluster's own shard: members, the catalog, and where shards are | |
+| **planner** | anything that sends placement hints: the `fero` CLI, fero deploy's platform, an operator. Optional | |
+| **object store** | where snapshots and old log segments go: S3 or a compatible store, or a local folder | |
 | **client** | a process that follows some partitions and writes through a server | a webserver |
 | **relay** | a client that also serves other clients | an edge tier |
 
 **Keys, partitions and shards.**
 - **A key** is a top-level key of the resource's object, as today.
 - **A partition** is one or more keys that stay ordered and atomic together. By default, exactly one key.
-- **A shard** groups many partitions so that a commit, an fsync, a write to the log nodes and a change of writer are paid per shard, not per partition.
+- **A shard** groups many partitions so that a commit, an fsync, a Raft round and a change of leader are paid per shard, not per partition.
 - **A shard never splits a partition.** A hot partition is bounded by one writer's core. The app splits it (`room42-0` … `room42-3`) if it must.
 - **Reading one partition does not mean reading its shard.**
   - Live updates are routed per partition.
   - The current rows come from a snapshot, by key.
-  - A replay of one partition's history uses a per-loglet index of where each partition's records are (4.1), so it skips the others.
+  - A replay of one partition's history uses a per-segment index of where each partition's records are (4.1), so it skips the others.
 
 **Shard count.**
-- Each resource starts with 16 shards (`shards` sets another power of two).
-- From then on, shards split and merge by themselves, by size and load (4.2). The count follows the data, with no fixed cap, and changing it moves no data.
+- Each resource starts as one shard (`shards` sets another power of two).
+- From then on, shards split by themselves, by size and load (4.2), and merges come in phase 5. The count follows the data, with no fixed cap, and a split copies nothing.
 
 **Order.**
 - One partition is totally ordered, whoever writes to it. Partitions are not ordered against each other.
-- A cell keeps the value of its last record in log order. There are no stamps and no elections.
+- A cell keeps the value of its last record in log order. There are no stamps and no per-cell elections; the only elections are Raft's, one per shard.
 
 ## 3. Retention: history, rows, caches
 
@@ -144,15 +152,17 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
 | tape (fero test) | `'14d'` | `{ ttl: '14d' }`, keyed by match key | replay reads the log in order; an ask finds its answer by match key | a recording |
 | presence | `0` | `{ while: 'session' }` | | ZooKeeper ephemeral node |
 
-**`durability`** has two rungs.
+**`durability`** has two rungs, per resource.
 
 | Rung | A write is confirmed when | It survives |
 |---|---|---|
-| `'persisted'` (default) | a quorum of the loglet's log nodes has it on disk | the loss of any minority of those log nodes, and a power loss of all of them |
-| `'none'` | the writer took it; no log nodes, no disk | nothing: transient pub/sub only |
+| `'persisted'` (default) | a majority of the shard's voters has it on disk | the loss of any minority of those voters, and a power loss of all of them |
+| `'none'` | the leader took it; no replicas, no disk | nothing: transient pub/sub only |
 
-- **`persisted`.** Group commit on the log nodes (4.1) makes it cost one fsync and one network round trip. Nothing a reader saw is ever undone.
-- **`none`.** Such a resource must have `rows: false`. Its records go straight from the writer to subscribers, best effort. Its cursors carry the writer's epoch; a subscriber whose epoch is gone resumes at `latest` and is told so.
+- **`persisted`.** Group commit on every member (4.1) makes it cost one fsync and one network round trip, with the leader's own fsync in parallel. Nothing a reader saw is ever undone.
+- **`none`.** Such a resource must have `rows: false`. Its records go straight from the leader to subscribers, best effort. Its cursors carry the leader's term; a subscriber whose term is gone resumes at `latest` and is told so.
+- **Per write, `confirm: 'sent'`** lets a plain write's promise resolve once its leader has appended it, before it commits. It may still be lost if that leader dies first; its outcome stays in `cluster.writes`, and a client's view shows it only once it commits (V4-7). It is refused on writes with conditions or ops, whose answers need the commit (4.3).
+- **A third rung, `'memory'`** (a majority holds it, disks written within a second, as Kafka's default), is decision 4b.
 
 ### 3.3 Caches, all from the same parts
 
@@ -171,9 +181,9 @@ v4's logs are its state, and compaction trims them. v5 keeps three things apart.
 
 | What | Holds | Kept by | Lives on | Needed for |
 |---|---|---|---|---|
-| the state | the rows now | always | snapshots in the object store (or on log nodes without one); in memory on servers that fold the shard | reads, conditions, starting a server, new subscribers |
-| the tail | every record after the latest snapshot | always, whatever `history` says | the open loglet and recent sealed ones, on log nodes | recovery (snapshot plus tail), live followers |
-| history | older records | `history` | sealed loglets, moved to the object store, or kept on log nodes without one | replay, tapes, cursors further back |
+| the state | the rows now | always | snapshots in the object store, or each full replica's own without one; in memory on full replicas | reads, conditions, starting a replica, new subscribers |
+| the tail | every record after the latest snapshot | always, whatever `history` says | every replica's log, on disk | recovery (snapshot plus tail), live followers |
+| history | older records | `history` | segments, moved to the object store, or kept in replicas' logs without one | replay, tapes, cursors further back |
 
 **Retention never touches the state or the tail.** A new snapshot is taken after N records or M bytes of tail, so a limit on `history` can always be met; anything it drops is inside a snapshot already.
 
@@ -191,12 +201,12 @@ v4's logs are its state, and compaction trims them. v5 keeps three things apart.
 ## 4. The layers and their primitives
 
 ```
-L5  libraries, adapters   queue · groups · locks · presence · rate limits · loaders · RESP / Kafka / WebSocket gateways · fero CLI
+L5  libraries, adapters   queue · groups · locks · presence · rate limits · loaders · RESP / Kafka / WebSocket gateways · fero CLI and planner
 L4  surface               fero(name) · views · methods · rules · identity · config · worlds (fero test)
 L3  flow                  subscriptions: selector + mode + cursor · credits · conflation · relays · near caches
 L2  fold and ops          records → rows · conditions · writer ops · writer time · dedup · row retention
-L1  the log               metadata (Raft) · chains of loglets · the loglet protocol · writers and handover · scaling
-L0  storage and io        log node storage · group commit · object store · snapshots · transports
+L1  the log               Raft per shard · #meta · healing · log replicas · splits · planner hints
+L0  storage and io        one journal per process · group commit · segments · object store · snapshots · transports
 ```
 
 - **Layer boundaries.** A layer talks only to the one below it, through an interface with its own test suite.
@@ -205,36 +215,38 @@ L0  storage and io        log node storage · group commit · object store · sn
 ### 4.0 The shape
 
 ```
-            clients, relays, browsers
-                     │  subscribe · write · call
-        ┌────────────┼────────────┐
-     server       server       server        disposable: write the shards they lead,
-        │            │            │          fold rows, serve, run methods
-        └──── append · read · seal ────┐
-     log node     log node     log node      durable: loglets on disk, a quorum per write
-        │            │            │
-        └──────── object store ─────────     sealed loglets and snapshots
-      metadata: one Raft group (1, 3 or 5 voters) holds members, the catalog and every shard's chain
+                 clients, relays, browsers
+                          │  subscribe · write · call
+        ┌─────────────────┼─────────────────┐
+     server S1         server S2         server S3     full replicas: fold rows, serve, run methods
+        │                 │                 │
+        │   shard 7:  S2 leads; S1 and S3 follow   ─┐
+        │   shard 9:  S1 leads; S2 and S3 follow    ├─ one Raft group per shard
+        │   #meta:    S3 leads; S1 and S2 follow   ─┘  (#meta is the cluster's own shard)
+        │                 │                 │
+        └──── log members (optional): log replicas that vote and keep the log, never serve
+        └──── object store (optional): snapshots and old log segments
+     planner (optional): the fero CLI or fero deploy's platform, sending hints each shard checks
 ```
 
 **Where each part runs.** The same code in every setup; only placement differs.
 
-| Setup | Servers | Log nodes | Metadata voters | Object store |
+| Setup | Servers | Voters per shard | Log members | Object store |
 |---|---|---|---|---|
-| one process: local dev, fero test, a single copy | 1 | the same process; each loglet has one copy | the same process | a local folder |
-| a few processes on one box (example 01) | each process | each process; up to three copies per loglet | the first process, then three once there are three; the rest follow | a local folder |
-| self-hosted cluster | each app process | each app process, or separate machines | three or five of them | optional: S3 or compatible. Without it, sealed loglets and snapshots stay on the log nodes, with E copies each |
-| fero deploy | each copy, disposable, may sleep | a shared tier the platform runs | on the log tier, one group per project | S3 |
+| one process: local dev, fero test, a single copy | 1 | 1: itself | none | a local folder |
+| a few processes on one box (example 01) | each process | 1 (the first member) while there are fewer than three, the others learners; 3 from three members | none | a local folder |
+| self-hosted cluster | each app process | 3 (or `copies`), plus learners up to `standbys` | optional: a witness on a third machine when there are two | optional: S3 or compatible. Without it, snapshots and history stay on replicas' disks |
+| fero deploy | each copy, with its own disk | 3: the copies, topped up with log replicas when there are fewer than three copies | the platform's shared log tier | S3 |
 
 ### 4.1 L0: storage and io
 
-**On a log node.**
-- **One journal per log node.** Every append, to any loglet, goes into one journal file. One `fdatasync` covers a batch: at most every millisecond, or every megabyte. This is group commit.
-- **An entry store.** After the journal fsync, entries are written to entry files grouped by loglet, with an index from (loglet, offset) to position, and a per-partition index so a replay of one partition skips the rest. The journal is truncated once the entry files cover it (BookKeeper's journal and entry log).
-- **What `persisted` waits for.** The journal fsync that covers the record, on a quorum of the loglet's log nodes. A Raft vote, term or entry is never answered before its own fsync.
-- **Sealing is durable.** A log node records that a loglet is sealed (4.2) in its journal before it answers, and from then on refuses appends to it.
-- **Boot checks.** Every record carries a crc32c and its predecessor's offset (v4's chain, V3-8). A log node drops a loglet's copy from the first record that fails, and reports it so the copy can be repaired from the others.
-- **Directory fsyncs.** Creating or renaming any file fsyncs its directory. One failed fsync condemns the store (v4's fsyncgate latch): the log node stops acknowledging and is replaced.
+**On every member** (a server or a log member).
+- **One journal per process.** Every Raft entry, term and vote, for every shard the process holds, goes into one journal file. One `fdatasync` covers a batch: at most every millisecond, or every megabyte. So a process with 1,000 shards pays one fsync per batch, not 1,000. This is group commit, as CockroachDB and TiKV share one log engine across their groups.
+- **Segments.** After the journal fsync, entries are written to segment files per shard, with an index from offset to position, and a per-partition index so a replay of one partition skips the rest. The journal is truncated once the segments cover it.
+- **What `persisted` waits for.** The journal fsync that covers the entry, on a majority of the shard's voters. A term or vote is never used before its own fsync.
+- **Boot checks.** Every record carries a crc32c and its predecessor's offset (v4's chain, V3-8). A process that finds a record that fails drops that shard's log from it, and reports it.
+- **A replica that cannot vouch for its log comes back as a new replica.** That is a replica whose disk is new, that dropped damaged records at boot, or that stopped uncleanly under `durability: 'memory'` (decision 4b). It gets a new disk incarnation: it never votes with the old identity, and the shard's leader adds it back as a learner and removes the old one (4.2).
+- **Directory fsyncs.** Creating or renaming any file fsyncs its directory. One failed fsync condemns the store (v4's fsyncgate latch): the process stops acknowledging, and its replicas come back as new ones.
 - **One process per dir.**
   - v4's lock file and lease thread stay (V4-59).
   - Every file carries the lease's epoch in its name, and a holder writes only files of its own epoch.
@@ -244,273 +256,255 @@ L0  storage and io        log node storage · group commit · object store · sn
 **The object store.**
 - **An interface with five calls:** put, get (with a byte range), list, delete, and put-if-absent.
 - **Implementations:** S3 or a compatible store, and a local folder. The local folder works only when every process is on one box.
-- **Without an object store** in a multi-box cluster, sealed loglets stay on their log nodes, and snapshots are written to E log nodes, as loglets are. Cold servers read them there.
-- **Sealed loglets** are uploaded as segment files, with their partition index.
-- **Snapshots are cut by the shard's writer only.**
-  - Each is written put-if-absent, under a name keyed by (shard incarnation, offset).
-  - It is named in the metadata, by compare-and-swap, only after the put is confirmed.
-- **When a loglet's copies may be deleted.** All of these must hold:
-  - its upload is confirmed, or a merged snapshot base at or above its end is named and stored (a single incremental layer covers nothing on its own);
-  - no background merge is reading it;
-  - no fork or split child still needs it;
-  - the shard's `history` allows it.
-- **Old offsets** are read from the object store: slower than log nodes, and cached by the server that reads them.
+- **Without an object store** in a multi-box cluster, each full replica keeps its own snapshots and the shard's history on its disk, and a new replica gets a snapshot streamed from the leader (Raft's InstallSnapshot).
+- **Old segments** are uploaded by the shard's leader, with their partition index, and named in the shard's log.
+- **Snapshots.**
+  - Every full replica cuts its own snapshots, for its own restarts.
+  - Only the leader uploads them: put-if-absent, under a name keyed by (shard incarnation, offset).
+  - A snapshot is named in the shard's log, by an entry, only after its put is confirmed.
+- **When a replica may drop its log below offset i.** All of these must hold:
+  - a snapshot covers i where the shard can still reach it: for a full replica, its own snapshot, or a merged base named in the object store (a single incremental layer covers nothing on its own); for a log replica, a merged base named in the object store, or else i is at or below the offset every full voter has snapshotted past, which the leader stamps on its appends;
+  - the segment is uploaded, or the shard's `history` allows dropping it;
+  - no split child still needs it;
+  - no fork references it.
+- **Old offsets** are read from segments, on replicas' disks or in the object store: slower than recent ones, and cached by the server that reads them.
 
 **On a server.**
-- **The rows it folds** are in memory, as a copy-on-write structure, so a snapshot can be cut at one offset.
+- **The rows it folds** are in memory, as a copy-on-write structure, so a snapshot can be cut at one offset, and a split can cut the fold in two without copying.
 - **State larger than memory** is opt-in per resource. Cold rows are read through from the latest snapshot layers in the object store or on local disk, with the hot set in memory.
-- **Nothing on a server's disk is needed for durability.** A server may keep a local cache of snapshots to start faster.
+- **Its disk holds its replicas' logs and its own snapshots.** Without log members, that is where durability is.
 
 **Transports.**
-- TCP, TLS, WebSocket (browsers, with no bridge), and in-process (worlds, the simulator, and a server that is its own log node).
+- TCP, TLS, WebSocket (browsers, with no bridge), and in-process (worlds and the simulator).
 - Frames are v4's: encoded once, with a crc32c, and the same bytes are the journal row and the wire (V3-8).
-- A frame is sent at the end of the event-loop turn that made it (decision 9).
+- A frame is sent at the end of the event-loop turn that made it (decision 9). One frame to a peer carries the messages of every shard the two share.
 
 ### 4.2 L1: the log
 
-Three published designs, each doing one job:
+One published design, run once per shard, plus the engineering that published multi-Raft systems use:
 
 | Job | Design | Source |
 |---|---|---|
-| keep the cluster's facts | Raft | Ongaro and Ousterhout, 2014; the TLA+ spec |
-| store one stretch of a shard's log | a quorum log with one writer, sealing and recovery | Apache BookKeeper's ledger protocol, with Vanlightly's TLA+ spec; Delos's NativeLoglet |
-| join stretches into one log, and change writers | a chain of loglets, changed by compare-and-swap on the metadata | "Virtual Consensus in Delos", OSDI 2020 |
+| order and copy one shard's log, and change its writer | Raft, with PreVote, CheckQuorum, learners, one-at-a-time membership changes and leadership transfer | Ongaro and Ousterhout, 2014; Ongaro's thesis and his 2015 fix; the TLA+ spec |
+| run thousands of groups per process | one journal; one frame per peer; quiet idle groups | CockroachDB's and TiKV's multi-Raft |
+| keep the cluster's facts | one more shard, `#meta` | CockroachDB's system ranges |
+| place replicas | a ring over members (rendezvous hashing), applied by each shard's own leader | v4's ring; CockroachDB's replicate queue, run per range |
 
 #### Clusters, genesis and discovery
 
 - **One cluster per project.** Its resources are entries in its catalog. This replaces v4's one cluster per resource, with its own port, membership and heartbeats each.
 - **A cluster id**, minted at genesis, rides every HELLO. Different ids never link, and both sides say so, naming both ids and the fix.
-- **Exactly one genesis.**
-  - Across boxes, the first voters start with the same `voters` list.
-  - On one box, the first process of a project's run creates `cluster-id` in the run's folder under `.fero/` with an exclusive create.
-  - Everyone else joins as a learner.
-  - A process given cross-box `hosts` and no `voters` never founds a cluster; it joins its hosts' cluster, or waits and says "no voters configured".
+- **Exactly one genesis**, which creates `#meta`.
+  - Across boxes, the founding members start with the same `seeds` list, which becomes `#meta`'s first voters.
+  - On one box, the first process of a project's run creates `cluster-id` in the run's folder under `.fero/` with an exclusive create, and is `#meta`'s only voter.
+  - Everyone else joins: it writes its member record to `#meta`, through any member.
+  - A process given cross-box `hosts` and no `seeds` never founds a cluster; it joins its hosts' cluster, or waits and says "no seeds configured".
   - **A stale run folder.**
-    - A process that finds `cluster-id` but reaches no voter within `connect.wait` waits. It says which voter it needs, and where that voter's dir is.
-    - If no dir in the run folder holds any of the cluster's metadata (the dirs were wiped), the file is stale. The process renames it aside, says so, and founds a new cluster with a new id.
-    - Otherwise `fero recover --new-cluster` can make it a cluster from its own copy of the metadata. A learner's copy may be behind, and the command says so.
+    - A process that finds `cluster-id` but reaches no member within `connect.wait` waits. It says which member it needs, and where that member's dir is.
+    - If no dir in the run folder holds any of the cluster's `#meta` (the dirs were wiped), the file is stale. The process renames it aside, says so, and founds a new cluster with a new id.
+    - Otherwise `fero recover --new-cluster` can make it a cluster from its own copy of `#meta`. That copy may be behind, and the command says so.
 - **Finding a resource.** A name resolves to its project's cluster through the box directory or `hosts`, as today. Remote names carry the project: `shop/stock`.
 
-#### The metadata
+#### A shard is a Raft group
 
-One Raft group: one, three or five voters, which may include a witness that holds only the metadata. Every other process follows it as a learner. Its leader is the **controller**. It holds:
+- **Its replicas.** Each shard has `copies` voters (3 by default), and learners up to `standbys` full replicas in all. Its leader is its only writer.
+- **Raft as published, plus the fixes practice added.**
+  - Term, vote and entries are fsynced before any reply that depends on them.
+  - Membership changes one voter at a time, and a new leader first commits an entry of its own term (Ongaro's 2015 fix).
+  - A new voter joins as a learner and is promoted only once it has caught up (etcd's rule).
+  - PreVote and CheckQuorum, so a returning replica cannot unseat a working leader, and a cut-off leader steps down within `election.ms`.
+  - A replica is its member id plus its disk incarnation (4.1).
+  - Leadership transfer on a planned stop or move, so neither waits for an election timeout.
+- **Who stands for election.**
+  - Each full voter has a rank for the shard: a rendezvous hash of (shard, member). So leaders spread across servers, as a ring would place them.
+  - Rank 1 stands after `election.ms`. Each lower rank waits one more `election.step` (200 ms), plus jitter, so one candidate usually stands alone.
+  - A replica whose fold is behind its own log by more than `lag.max` waits one more step, so warm replicas win.
+  - A log replica stands only when no full voter has stood for twice `election.ms` (below).
+  - Raft's vote rule still decides who can win: a candidate's log must be at least as up to date as the voter's. Ranks change only who tries first.
+- **The commit.**
+  - The leader sends each batch to every voter and learner at once, and writes its own journal in parallel.
+  - A batch commits when a majority of voters, the leader counted once its own fsync lands, have it on disk.
+  - The leader stamps the commit offset on later batches. When a commit lands with nothing else in flight, it sends the commit offset at once, on a small ping, then goes quiet. So a follower, and a client it serves, never waits for the next batch to see a write.
+- **Reads.** Every full replica folds committed entries, and serves reads and subscriptions (4.4). A `fresh` read uses Raft's read index: the leader confirms with a majority that it still leads (one round trip, no fsync), then answers once its fold reaches the commit offset it had then.
+- **A new leader** commits an entry of its own term, which also commits every earlier entry in its log. It answers nothing until its fold reaches its log end.
+- **The model.** Raft's published TLA+ spec with Ongaro's fix, plus properties for fero's additions:
+  - ranked candidacy changes only who tries first, never who can win;
+  - a log replica that leads never accepts a client write;
+  - a replica that cannot vouch for its log never votes under its old identity;
+  - healing, planner hints and splits are ordinary entries, so every Raft property covers them.
 
-| Record | Holds |
-|---|---|
-| member | id, life (random per process start), session epoch, disk incarnation, roles (server, log node, voter, witness), addresses (listen and advertised), capacity, code hashes it can run, kernel version |
-| resource | name, config (4.5), allowed code hashes, seed applied, write gate (open, or read-only with a reason) |
-| shard | resource, number, incarnation, split lineage, its **chain** (below), its snapshots, the server that should write it, the servers that should follow it |
-| cluster | id, cluster version, current and next door secret, CA key envelopes, revoked certificates |
+#### Log replicas
 
-Raft as published, plus the fixes practice added:
-- Term, vote and entries are fsynced before any reply.
-- Membership changes one voter at a time, and a new leader first commits an entry of its own term (Ongaro's 2015 fix).
-- PreVote and CheckQuorum, so a returning voter cannot unseat a working leader, and a cut-off leader steps down.
-- A voter is its member id plus its disk incarnation. A member back without its disk rejoins as a learner, and is replaced by two single-voter changes.
-- Leadership transfer on a planned stop, so a roll never waits for an election timeout.
+- **What they are.** A log replica votes and keeps the log, but never folds rows or serves clients. A log member holds log replicas for many shards. Spanner's witness replicas are the precedent.
+- **Why.** Durability needs voters, not servers. With log replicas:
+  - two machines survive either one's crash, with a witness on a third failure domain;
+  - fero deploy's smallest projects have three voters;
+  - a project's servers can sleep, while its log replicas and the object store keep everything.
+- **When healing uses them.** Only when a shard has fewer server candidates than `copies` (below), or a planner places them.
+- **Leading only to repair.** A log replica cannot judge conditions, ops or rules, so it never takes a client write. When it leads, it does only this:
+  1. commit an entry of its own term;
+  2. if a full voter is live, bring it up to date and hand it leadership;
+  3. else add a full replica (a server with the resource's code hashes) as a learner, which loads the latest snapshot from the object store and the tail from the log replica; promote it; then hand it leadership.
 
-**What the metadata is not.**
-- It is not on the write path. A server appends to its open loglet without touching the metadata.
-- So **writes continue while the metadata group is down**. What waits is any change: a new writer, a split, a new member.
+  Until then the shard refuses writes with the reason, `no-writer`, and `cluster.health` says which server it waits for.
+- **Without an object store,** a log replica cannot build a new full replica from its log alone, since it never holds a snapshot. It waits for a full voter to come back with its disk, and says so.
 
-#### A shard's log: a chain of loglets
+#### Who writes, and handover
 
-```
-shard 7:  [loglet 1: offsets 0–899, sealed, in the object store]
-          [loglet 2: offsets 900–1,412, sealed, on log nodes A C E]
-          [loglet 3: offsets 1,413–…, open, writer S2, on log nodes B C D]
-```
+- **One writer per shard:** its Raft leader. For a moment, two replicas may each think they lead, in different terms. Only one can commit, because a commit needs a majority and any two majorities overlap. A deposed leader's in-flight writes were never answered (4.3, "no answer before commit").
+- **A planned handover** (a roll, a drain, a move).
+  1. The leader stops taking new writes to the shard. Writes that arrive meanwhile wait, or get `moved` with the target.
+  2. It brings the target up to its log end, then sends Raft's TimeoutNow, and the target stands at once.
 
-- **The chain is a metadata record.** Each entry names the loglet, its first offset, its last offset once sealed, its writer and epoch, and its log nodes.
-- **Offsets run on across loglets**, so the shard has one log, and a version or cursor never goes backwards.
+  The pause is about one round trip and one fsync. If a failover happens meanwhile, the higher term wins, as always.
+- **A failover** (a crash, a hang).
+  - The followers miss the leader for `election.ms`. The top-ranked live full voter runs PreVote, then the election.
+  - A server that led hundreds of shards fails over in parallel: their elections run at once, with their messages batched into shared frames.
+- **Warm and cold.** Every full replica folds its shard, so it is warm. Only a log replica's repair is cold: seconds per gigabyte.
+- **The writer's time.** `t = max(last t in the log, clock)`. A member whose clock is more than `skew.max` (1 s) from the median of its peers' clocks (carried on link pings) does not stand for election, and hands over the shards it leads.
 
-#### The loglet protocol (BookKeeper's)
+#### Failure detection
 
-A loglet has one writer, and E log nodes (its copies: 3 by default). A write commits when Q of them have it on disk. Q is always a majority of E or more (2 of 3; 3 of 5), never less: below a majority, losing a minority could lose a committed write.
-
-1. **Append.**
-   - The writer sends each batch to all E log nodes.
-   - A batch is committed when it and every batch before it in the loglet have Q copies on disk.
-   - The committed point is the end of that prefix, never a batch past a gap.
-   - The writer stamps the committed point on later batches.
-   - When a commit lands with nothing else in flight, it sends the committed point at once, on a small ping, then goes quiet. This is BookKeeper's explicit last-add-confirmed. So a standby, and a client it serves, never waits for the next batch to see a write.
-2. **Seal.**
-   - Only two actors ever seal a loglet:
-     - its own writer, to stop at a known end (a handover, a split, a change of log nodes);
-     - a server taking the shard over (below).
-   - A sealer sends `SEAL` with its epoch.
-   - A log node records the seal on disk, then refuses every ordinary append to that loglet.
-3. **Recovery**, after a seal by a server taking over.
-   - **The seal set.** The sealer needs seal acknowledgements from at least E − Q + 1 log nodes whose copy of the loglet is whole. A log node that found its copy damaged at boot (4.1) says so, and does not count.
-   - **Reading forward.** It then reads from every log node of the loglet it can reach, starting at the highest committed point any of them reports.
-   - **Absent versus unknown.**
-     - A batch is **absent** only when every node in a set of E − Q + 1 whole copies **that have recorded the seal** answers "I do not have it".
-     - A "no" from a node that has not recorded the seal counts for nothing, since the old writer can still land the batch there.
-     - A node that does not answer is **unknown**, never absent: the sealer waits for it, or reaches more nodes.
-     - Treating silence as absence is the class of bug Vanlightly's TLA+ work found in BookKeeper's recovery.
-   - **Recovery writes.**
-     - Each batch found, up to the first absent one, is re-written to Q log nodes with a recovery write carrying the sealer's epoch.
-     - Sealed log nodes accept recovery writes from that epoch, and nothing else (BookKeeper's recovery add).
-   - **The end.** The first absent batch fixes the loglet's last offset.
-   - A batch that never committed may be kept or dropped by this. Its writer was never told it committed (4.3, "no answer before commit").
-4. **Close.**
-   - Every close of a loglet is one compare-and-swap on the shard's chain, against the chain version the closer read. It records the last offset and opens the next loglet.
-   - If two closers race, exactly one swap succeeds. The other re-reads the chain and adopts the winner's end.
-
-**What a reader may see of a loglet.**
-- **An open loglet:** up to the committed point its writer last stamped.
-- **A closed loglet:** up to the end the chain records, never past it, even if a losing recovery re-wrote batches beyond it.
-- **A sealed loglet not yet closed:** nothing beyond the last committed point the reader already had. Readers wait for the close.
-
-**One reconfigurer per thing.**
-- **The writer changes its loglet's log nodes.**
-  - It does so when a log node's link closes, or when that node misses three acknowledgements in a row past `ack.ms` (1 s in TypeScript, 200 ms native).
-  - It then seals its own loglet at its committed end, and opens the next on other log nodes, by the same compare-and-swap.
-  - So one GC pause on a log node does not re-open every loglet it holds. BookKeeper likewise changes ensembles on a failed connection, not on one slow acknowledgement.
-- **The controller changes writers, and only that.**
-- So a log node's failure is repaired by the shard's writer within `ack.ms`, not by a session lapse.
-
-**What a loglet survives.** With E = 3 and Q = 2: writes continue with one log node down, and recovery needs two whole copies. With E = 5 and Q = 3: two down.
-
-**Disks that lie.**
-- A log node that shut down uncleanly checks every copy's chain at boot (crc and predecessor), and marks any copy it cannot vouch for as damaged, so it does not count toward recovery.
-- A disk that acknowledged an fsync and then lost the write cannot be detected on its own.
-- Recovery narrows this by reading every copy it can reach, not only the seal set, and waits up to `recovery.wait` (1 s) for all E before it closes.
-- The residual case, a lying disk among exactly Q copies with the others unreachable, is named here, not hidden.
-
-**The models.** Each rule above is a property in the L1 TLA+ spec, starting from Vanlightly's BookKeeper spec:
-- recovery never closes below a committed batch;
-- unknown is never absent;
-- a closed loglet's end is the same for every reader;
-- sealed nodes accept only the sealer's recovery writes.
-
-#### Writers, handover and failover
-
-- **One writer per shard:** whoever opened its open loglet.
-- **Changing writer.** Seal and recover the open loglet. Then one compare-and-swap of the chain closes it, and opens a new loglet with the new writer, an epoch one higher, and fresh log nodes.
-- **Two servers can never both write a shard.** If two try to take it over, the swap lets exactly one through. The loser's loglet is sealed, so its appends fail.
-- **A planned handover** (a roll, a scale-down, a rebalance).
-  1. The old writer stops taking writes, and waits for its in-flight batches to commit.
-  2. It seals its own loglet at that end.
-  3. It closes the loglet by the same compare-and-swap, naming the warm follower as the next writer.
-
-  If a failover already took the shard, the swap fails, and the old writer adopts the winner's end. The pause is one seal and one metadata commit: a few milliseconds on fast disks.
-- **A failover** (a crash, or a hang).
-  - The server's session lapses (below). The controller assigns each of its shards to another server, preferring warm followers.
-  - Each new writer seals, recovers and swaps.
-  - A server that wrote hundreds of shards fails over in parallel: seals run at once, and the controller batches the chain changes into a few metadata entries.
-- **Warm and cold takeover.**
-  - A warm follower already folds the shard, so it takes over at once.
-  - A cold server first reads the latest snapshot and the tail, from the object store, or from log nodes when there is none. That takes seconds per gigabyte.
-  - `standbys` sets how many servers keep each shard warm (default: every server, up to 5).
-- **How followers read.**
-  - A standby tails the shard's loglet from the log nodes, long-polling on the committed point, as Pulsar's readers tail BookKeeper.
-  - The writer does not push to standbys, only to its own subscribers.
-  - Phase 2 measures this against the writer pushing to two standbys before it is fixed.
-- **Who decides who writes.**
-  - The controller, by a placement policy: v4's ring over the live servers by default, weighted by load and memory.
-  - The policy is not in the safety path; sealing and the swap are. A stale decision costs one extra handover, never two writers.
-- **The writer's time.** `t = max(last t in the log, clock)`. A server more than `skew.max` (1 s) off the controller's clock is not given shards.
-
-#### Sessions and failure detection
-
-Every server and log node keeps a session with the controller: a heartbeat each tick (100 ms by default), sent from the kernel's own thread (decision 13).
+Two members that share a shard exchange a link ping every `ping.ms` (500 ms) when no other frame went their way, sent from the kernel's own thread (decision 13). Every shard the two share uses that ping. While a shard is busy, its Raft messages ride the same frames.
 
 | Event | Detected after (default) | What happens |
 |---|---|---|
-| a server's session lapses | `session.ms`: 2 s in TypeScript, 1 s native; tunable down to 500 ms | its session epoch is fenced: writers refuse forwards carrying it. Its shards go to new writers. It re-registers with a new epoch when it returns |
-| a log node's link to a writer closes, or it misses three acknowledgements past `ack.ms` | `ack.ms`: 1 s in TypeScript, 200 ms native | that writer seals and re-opens its loglet on other log nodes (one reconfigurer) |
-| a log node's session lapses | `session.ms` | no new loglets go to it; sealed loglets it held are re-copied from their other copies, or from the object store |
-| the controller changes | — | session timers restart, so a controller failover never fences a healthy cluster. A server that died just before is detected after up to twice `session.ms` |
-| a server's main thread (methods, views) stalls past 5 s while its kernel thread is fine | the kernel's watchdog | it answers method calls `busy`, so clients go to another server. Its shards keep being written on the kernel thread, and `cluster.health` says why |
-| a member is gone past `evict.after` (10 min) | that long | if it was a voter, a learner is promoted first, then the gone voter removed, one change at a time |
+| a leader's process stops | `election.ms`: 2 s in TypeScript, 1 s native; tunable down to 500 ms | each of its shards elects, ranked (above) |
+| a follower stops | — | its shards carry on with a majority. After `evict.after`, each shard's leader replaces it (healing) |
+| a leader loses touch with a majority | `election.ms` | CheckQuorum: it steps down, and its pending answers are `unknown` |
+| a quiet shard's leader dies | `election.ms` of missed link pings | the followers wake the shard and elect |
+| a member's main thread (methods, views) stalls past 5 s while its kernel thread is fine | the kernel's watchdog | it answers method calls `busy`, so clients go to another server. Its shards keep being written on the kernel thread, and `cluster.health` says why |
+| a member is gone past `evict.after` (10 min), or a planner says it is `gone` | that long, or at once | each shard's leader replaces it, one change at a time |
+| `#meta` loses its majority | — | writes and failovers carry on everywhere. Joins, new resources and directory updates wait |
 
-- **Sessions only decide who should write; sealing makes it safe.** A server that wakes after its session lapsed finds its loglet sealed, and its appends refused.
+- **Quiet shards.** A leader whose shard has had no writes for two ticks sends one "quiet at offset i" to its followers, and stops sending for that shard, as CockroachDB's ranges quiesce. Any write wakes it. A quiet shard costs nothing on the wire beyond its members' link pings.
+- **CheckQuorum on a quiet shard** uses the link pings: a leader that has lost its links to a majority of the shard's voters for `election.ms` steps down.
 - **Why 2 s.** Failover could be faster, but a 500 ms timeout flaps on a JavaScript GC pause. 2 s is still half of v4's eviction, and native or tuned clusters can go lower.
+
+#### Healing: one rule, run by each shard's leader
+
+There is no controller. Each shard's leader keeps its own shard's replicas where they belong.
+
+- **The target.** A placement stored in the shard's log, if a planner set one. Otherwise the ring:
+  - **candidates** are servers with the resource's code hashes and room, that are not draining or gone; log members count too when there are fewer such servers than `copies`;
+  - **voters:** the top candidates by rank, servers first. Their number is the largest odd number up to `copies` that the candidates allow: 1, 3 or 5. A shard with two voters could not survive either one's crash, so it never settles at two;
+  - **one voter** (fewer than three candidates) is the cluster's first member still live, by its join offset in `#meta`, so example 01 behaves as v4 does;
+  - **learners:** the next servers by rank, up to `standbys` full replicas in all.
+- **The steps.** When the shard's replicas differ from the target, the leader makes one change at a time, each a Raft entry:
+  - **a gone voter** (its link down past `evict.after`, or reported `gone`) is removed first, then its replacement is added as a learner, and promoted once caught up. Removing it first costs nothing: it was already not answering;
+  - **a live voter not in the target** is removed only after its replacement is a caught-up voter;
+  - a new replica loads a snapshot (from the object store, or streamed from the leader) and the tail.
+- **Fewer voters than `copies` is never silent.** `cluster.health` and one stderr line say how many voters each shard has, and why.
+- **Leaders spread.** When the rank-1 full voter has been live and caught up for `settle.ms` (30 s), the leader hands leadership to it. So leadership returns after a failover, without flapping.
+- **Pacing.** Each member loads at most two snapshots at a time and answers `busy` to more, and a leader that hears `busy` backs off. With rendezvous hashing, a new member takes about `copies`/n of the replicas, and a gone one gives up only its own.
+- **Members.** The leader reads members from `#meta`, which every member follows, and liveness from its own links. A stale view only delays or repeats a step: every step is a Raft change in the shard's own log, so it is safe whatever the view.
+- **Splits** are also the leader's own decision, by size and load (below).
+
+#### The planner (optional)
+
+- **Who.** Anything holding the admin key: the `fero` CLI (`fero run --copies 3`, `fero scale`, `fero drain`), fero deploy's platform (its rolls and autoscaler), or an operator's script. A cluster runs without one.
+- **What it sends.** Hints. A shard hint names the shard config it read: the offset of the shard's last membership change.
+
+| Hint | Does |
+|---|---|
+| `drain(member)` | written to `#meta`. Leaders hand over the shards it leads, then healing moves its replicas off, since a draining member is never a target |
+| `gone(member, life)` | written to `#meta`. Leaders replace it now, instead of after `evict.after` |
+| `lead(shard, member)` | a leadership transfer to that full voter |
+| `place(shard, members)` | stores a target in the shard's log, which healing then follows. `place(shard, null)` returns the shard to the ring |
+| `split(shard, at?)` | the leader splits now (below) |
+
+- **Why a stale planner is harmless.** A shard applies a hint only if its config is still the one the hint names. Otherwise it refuses `stale-plan`, with the current config. And every change a hint causes is a Raft change in the shard's own log. So two planners at once can waste moves, never break anything. A lease row in `#meta` keeps two from fighting.
+- **What a planner adds.** Placement by load and memory, not only the ring; drains before stops; acting at once on a machine it knows is gone; splits ahead of load.
+- **Precedents.** Redis Cluster fails over by itself, and rebalances with an outside tool (`redis-cli --cluster rebalance`). CockroachDB has no central planner. TiKV requires one (PD), which fero avoids.
+
+#### `#meta`, the cluster's own shard
+
+- **A system resource, replicated like any shard:** 3 voters from three members (5 if set), chosen by the same ring and healed by the same rule. Every member follows it as a subscriber (4.4), so every member has the members and the directory.
+
+| Record | Holds |
+|---|---|
+| member | id, life (random per process start), disk incarnation, roles (server, log), addresses (listen and advertised), capacity, code hashes it can run, kernel version, join offset, state (live, draining, gone) |
+| resource | name, config (4.5), allowed code hashes, seed applied, write gate (open, or read-only with a reason) |
+| shard | resource, hash range, incarnation, split lineage, and its last known replicas and leader. **This is a hint:** each shard's own log is the truth, and leaders refresh this record after each change, the newest config winning |
+| cluster | id, cluster version, current and next door secret, CA key envelopes, revoked certificates, the planner lease |
+
+- **What `#meta` is not.** It is not on the write path, and not in any shard's failover. While its majority is lost, writes and failovers carry on. Joins, new resources and directory updates wait.
 
 #### Scaling up and down
 
 **What moves, and from where.**
-- Servers never copy rows from each other's disks.
-- A server that starts following a shard reads its snapshot and tail from the object store or the log nodes. So data does move to the new server, from storage, as a Raft learner's catch-up would from a peer.
-- Durability never depends on how many servers there are.
+- A server that becomes a replica of a shard copies it: the latest snapshot from the object store (or streamed from the leader) and the tail from the leader. So adding a server moves data to it: about `copies`/n of all replicas, paced.
+- Durability depends on each shard's voters, not on how many servers run, and log replicas can be voters.
 
 | Change | What happens |
 |---|---|
-| add a server | it registers. The controller gives it shards to follow, then to write, paced, one handover at a time. It reads each shard's snapshot and tail as it starts following |
-| remove a server | each shard it writes is handed over to a warm follower; then it stops |
-| add a log node | new loglets are placed on it. To spread faster, writers roll busy loglets early (seal at a known end and re-open), so their next loglets land on it |
-| remove a log node | no new loglets go to it, and writers roll the open loglets it holds. It leaves once every sealed loglet it holds is uploaded or re-copied. That can take longer than `leave.ms`: it stays as a draining log node until done. A forced stop is a restart, so nothing only it holds is dropped |
+| add a server | it joins `#meta`. Rings now rank it, and each shard whose target now includes it adds it, one change at a time, paced by snapshot loads |
+| remove a server | with a planner: it is drained first (leaders hand over, then replace its replicas), then it stops. Without one, Ctrl-C is a `leave` (below) |
+| add a log member | it joins. Shards with fewer server candidates than `copies` place voters on it |
 | a shard gets big or busy | it **splits** (below) |
-| a shard is empty and quiet | it may merge with its sibling. The merged shard's offsets start after the larger of the two ends; it combines both shards' dedup outcomes and fence tokens (safe, because the issuer window is global). Merging shards that hold data is phase 5 |
-| scale to zero (sleep) | each writer seals its loglet at a known end; servers stop; log nodes and the object store keep everything |
-| wake | a server reads snapshots, then opens new loglets |
+| scale to zero (sleep) | needs log replicas: the servers stop, and the log replicas and the object store keep everything |
+| wake | a server starts. Each shard's leading log replica brings it up to date, or adds it, then hands it leadership (repair, above) |
 
 **Splits.**
-- **A split is the writer's act.** Told to split, it stops taking writes to the shard and seals its own loglet at its end X. One compare-and-swap then closes the parent and opens two children, each starting at X + 1 with one more hash bit.
-- **If the writer dies mid-split,** the server that takes over recovers the parent's end X′, and opens the children at X′ + 1 in the same swap. A seal cannot choose its offset; the swap records whatever end recovery found.
-- **A child's cold start** is the parent's latest snapshot at or below X, plus the parent's tail up to X, filtered by the child's hash bit. The parent's loglets from that snapshot to X are kept until each child has written its own snapshot.
-- **Each child inherits** the parent's dedup outcomes and fence tokens, filtered to its partitions.
-- **When they land.** Splits land in phase 4, where fero deploy first needs them, after phase 2's sweep is green without them.
-
-**Pacing.** The controller:
-- makes one change per shard at a time;
-- waits for a follower to be warm before handing over;
-- paces splits by a budget per minute;
-- refuses a scale-down whose servers could not hold the shards they would follow.
+- **A split is the leader's act:** one entry in the shard's log, at offset X, naming two children. Each has half the hash range, one more hash bit, and the parent's replicas.
+- **Every replica, as it applies the entry, creates both children.** Each child starts as a Raft group whose first state is the parent's state at X, filtered to its range: a copy-on-write cut of the fold on full replicas, and on log replicas a reference to the parent's log. No data moves between machines.
+- **Children's offsets continue from X + 1,** so a partition's versions and cursors never go back. The parent's leader stands first in each child, so the children have leaders within a round trip. A replica that has not applied the split yet holds the children's messages until it does.
+- **If the leader dies before the split entry commits,** the entry may be dropped like any uncommitted entry. If it committed, every replica has it.
+- **After the split,** the parent refuses writes `moved`, naming the children, and cursors on the parent resolve to the children by the lineage.
+- **Each child inherits** the parent's dedup outcomes, highest call ids and fence tokens, filtered to its partitions.
+- **The parent's log up to X** is kept until each child has a snapshot of its own.
+- **Healing then spreads** the children's replicas and leaders by their own ranks.
+- **When they land.** Splits land in phase 4, where fero deploy first needs them, after phase 2's sweep is green without them. Merges are phase 5.
 
 **What stays limited,** said plainly:
-1. **Memory.** With `standbys` at every server, every server holds every row. Adding servers adds clients and CPU, not room for rows. Room grows only with fewer standbys and partial follow sets (then some reads hop), or with state larger than memory (then cold reads hit storage).
-2. **Fold CPU.** Every standby folds every write of its shards. So a project's write rate is bounded by one server's fold rate, unless servers follow subsets.
-3. **One partition, one writer.**
-4. **The metadata's write rate.** Every close, split and snapshot name is a Raft commit. Loglets roll by size, or on a change of writer or log nodes, never by time, and changes are batched.
-5. **Chain length.** Every roll adds a loglet, so chains are trimmed as their loglets are deleted.
-6. **Wake time.** A snapshot read: about a second when small, about a minute for 10 GB.
-7. **Under-replication windows.**
-   - Between a log node failing and its writer re-opening (up to `ack.ms`), batches commit on fewer copies.
-   - When servers are also log nodes, every server crash under-replicates every loglet it held, until they are re-copied.
-8. **A commit** costs at least one fsync and one round trip to the log nodes.
+1. **One partition, one writer.**
+2. **A new replica copies its shard.** Adding a server moves about `copies`/n of all replicas to it, from the object store where there is one.
+3. **Memory.** Each full replica holds its shards' rows. Room grows with servers only while `standbys` is below the server count; at the default, every server up to five holds every row.
+4. **Fold CPU.** Every full replica folds every write of its shards.
+5. **A commit** costs at least one fsync and one round trip to a majority of voters.
+6. **Two voters cannot survive a crash.** So below three candidates a shard has one voter, and a crash of its machine stops that shard's writes until it returns, unless a witness makes three.
+7. **Many groups.** Each shard costs its Raft state in memory, and frames while it is busy. Quiet shards cost only their members' link pings. Phase 2 pins 10,000 idle shards per process.
+8. **Wake time.** A snapshot read: about a second when small, about a minute for 10 GB.
 
 #### Leaving, restarting and stopping
 
 | Stop | Used by | What happens |
 |---|---|---|
-| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in | **Shards:** hands over every shard it writes. **Votes:** if it is a voter, a learner is promoted first, then it leaves the metadata group, one change at a time. The last voter of a cluster hands its vote to another member before it goes. **Storage:** if it is a log node, it drains (above). The server part is bounded by `leave.ms` (4 s), and `destroy()` says whether it was clean |
-| `restart` | the same signals under a supervisor (`FERO_SUPERVISED`), rolls, restart-all | hands over every shard it writes, and transfers metadata leadership if it holds it. Stays a voter and a log node |
+| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader removes it, if the remaining live voters stay a majority of the new set. Dead voters (links down past `election.ms`) are removed first, when that is what lets the leave carry (as V4-60). A shard where neither is safe keeps it as a voter, and `destroy()` names it. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
+| `restart` | the same signals under a supervisor (`FERO_SUPERVISED`), rolls, restart-all | hands over every shard it leads, and stays a replica of all of them |
 
 - **A crash** is a restart that skipped the handover.
 - **Two machines.**
-  - Each loglet has E = 2 and Q = 2. One machine's crash pauses writes until the survivor seals (it needs one whole copy: its own) and re-opens each loglet with one copy.
-  - That swap needs the metadata, and two voters cannot outvote a crash. So two machines need a **witness on a third failure domain**: a tiny process on a third machine, or a small cloud VM, holding only the metadata.
+  - Each shard has one voter, the first member, and the other machine is a learner. A crash of the learner's machine changes nothing. A crash of the voter's machine stops writes until it returns, as in v4.
+  - A **witness on a third failure domain** (a log member on a tiny third machine, or a small cloud VM) makes three voters: two full and one log. Then either machine's crash is survived: the other leads, with the witness for its majority.
   - A witness on one of the two machines only heals the other machine's crash, as in v4 (DESIGN-LEAVE §7b).
-  - The survivor then writes with one copy: the explicit price of two machines.
-  - fero deploy needs none of this, since its data's copies are on the log tier.
+  - fero deploy tops up from its log tier, so two copies survive either one's crash.
 - **Example 01** (two processes on one box, no witness).
-  - The first process is the only voter, and each loglet has both processes as copies.
-  - Ctrl-C on either is a `leave`: it hands over its shards, and the voter hands its vote over first. The other carries on with one copy, and says so.
-  - A crash of the non-voter: the voter re-opens each loglet with one copy and carries on.
-  - A crash of the voter: the other is read-only until it returns, as in v4.
+  - The first process founds the cluster. It is every shard's voter, and the second is a learner.
+  - Ctrl-C on the first is a `leave`: it promotes the second, hands over, then leaves. The other carries on alone, and says so.
+  - Ctrl-C on the second: it stops being a learner, and nothing else changes.
+  - A crash of the second changes nothing. A crash of the first: the other is read-only until it returns, as in v4.
 
 #### Mixed versions, recovery and routing
 
-- **Mixed versions.** Frames carry the protocol version. The controller raises the cluster version only when every member runs the new kernel, as Kafka's `metadata.version` does.
+- **Mixed versions.** Frames carry the protocol version. The cluster version lives in `#meta`, and is raised only when every member runs the new kernel, as Kafka's `metadata.version` is.
 - **Operator recovery.**
-  - `fero recover --new-cluster`, when the metadata quorum is permanently lost. One surviving voter rewrites the configuration to itself, as etcd's force-new-cluster does, and a new cluster id is minted.
-  - `fero recover --unclean <shard>`, when fewer than E − Q + 1 copies of an open loglet survive. It closes the loglet at the longest surviving copy, reports what may be lost, and bumps the shard's incarnation, so stale cursors are refused instead of waiting.
+  - `fero recover --unclean <shard>`, when a shard's voters have permanently lost their majority. One surviving replica forces a configuration of itself, as etcd's force-new-cluster does, here for one shard. It reports what may be lost, and bumps the shard's incarnation, so stale cursors are refused instead of waiting.
+  - `fero recover --new-cluster`, the same for `#meta`, minting a new cluster id.
 - **Routing.**
   - The partition-to-shard function is a fixed 64-bit hash with a full avalanche finaliser, versioned with the frame format.
-  - A writer refuses a record whose partition is not in its shard (`wrong-shard`).
-  - Clients send writes to their server, which maps each row key to its shard (a custom `partition` function runs only on servers). Clients may cache the writer a server named for a row key, and follow `moved` hints.
-- **Who dials whom.** Servers and log nodes dial only members the metadata names, plus their `hosts` and the box directory. Never an address a client claims.
-- **Hosted metadata.** fero deploy runs one metadata group per log-tier cell, with each project in its own namespace and quota, as Delos runs one MetaStore. Not one group per project: 10,000 projects would be 10,000 Raft groups.
+  - A leader refuses a record whose partition is not in its shard (`wrong-shard`).
+  - Clients send writes to their server, which maps each row key to its shard (a custom `partition` function runs only on servers) and forwards to the shard's leader. It finds the leader from its own replicas, or from `#meta`'s directory. A stale answer costs one `moved`, which names the current leader, or the children of a split.
+- **Who dials whom.** Members dial only members `#meta` names, plus their `hosts` and the box directory. Never an address a client claims.
+- **Hosted.** Each project's `#meta` is a shard like the others, on the project's own copies and log replicas, and quiet ones cost nothing. A log-tier process runs one log member per project, sharing the process and its journal, with a quota each.
 
 ### 4.3 L2: fold and ops
 
-**The record.** A batch has one header: the loglet's epoch, the base offset and the writer's time `t`. Each record inside has its own offset (base plus index), its own attempt id, and data's delta.
+**The record.** A batch has one header: the leader's term, the base offset and the writer's time `t`. Each record inside has its own offset (base plus index), its own attempt id, and data's delta.
 
 | Field | Why |
 |---|---|
-| epoch | which writer wrote it; stale writers are sealed out (4.2) |
+| term | which leader wrote it; a deposed leader cannot commit (4.2) |
 | offset | the log's order; versions; cursors; retention |
 | writer time `t` | TTLs, leases, `ctx.now()` at the writer; `max(previous t, clock)`, carried across writers |
 | attempt id (issuer, call id) | dedup of retried writes. The issuer is the process id plus its life, so a restarted process never repeats an id |
@@ -518,12 +512,12 @@ Every server and log node keeps a session with the controller: a heartbeat each 
 **At the writer, in this order:**
 1. **Dedup.**
    - **What it checks.** If the attempt id is in the shard's log, committed or in the writer's uncommitted tail, the writer answers with the original offset, and nothing else runs.
-   - **No answer before commit.** Every answer (a dedup answer, a refusal such as `conflict`) is judged against the writer's log-end state, so it waits until the committed point reaches the version it was judged against. If the writer loses the shard first, the answer is `unknown`, and the issuer retries at the new writer.
+   - **No answer before commit.** Every answer (a dedup answer, a refusal such as `conflict`) is judged against the writer's log-end state, so it waits until the commit offset reaches the version it was judged against. If the leader loses leadership first, the answer is `unknown`, and the issuer retries at the new leader.
    - **What the issuer promises.** Its call ids rise. It has at most 1,024 attempts outstanding in all, counted from its oldest unacknowledged one (`issuer.window`). It stops retrying an attempt after half the horizon (5 min).
    - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor, kept by id. An issuer silent for the retry horizon (5 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
    - **The floor.** An attempt at or below (highest id seen) − 1,024 that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
-   - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server that forwards an attempt adds its session epoch, and writers refuse forwards from a fenced epoch.
-   - **Across writers.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new writer takes the higher of the snapshot's and the recovered tail's highest id, so the floor never drops below where the old writer had moved it.
+   - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server forwards an attempt only over the link to the leader it had when it took the attempt; after any break it answers `retry`, and the issuer retries. A leader closes a link that misses pings for `election.ms`, so a frozen server's late forward never lands.
+   - **Across leaders.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new leader holds every committed entry (Raft's leader completeness), and folds its whole log before it answers. So the floor never drops below where the old leader had moved it.
 2. **Shape checks that need the current row.**
    - Array holes (`sparse-hole`, V4-28/33).
    - An insert under an existing row.
@@ -555,7 +549,7 @@ A refusal is not appended. A retried refused write is judged afresh.
 **Two states on the writer.**
 - The *committed state* is the fold up to the committed point. Readers and subscribers see it.
 - The *log-end state* adds the uncommitted batches in flight. Dedup, rules and conditions are judged against it, and answers wait for commit.
-- A new writer starts from the committed state of the recovered loglet, so it has no overlay to drop.
+- A new leader's log may end with entries of earlier terms not yet committed. Raft never drops them from its own log, and its first entry of its own term commits them, so they belong in its log-end state, and it has no overlay to drop.
 
 **Row retention** (3.1) runs on the writer's tick, as records with a reason.
 
@@ -569,13 +563,13 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 |---|---|
 | selector | `resource`; `partitions: [...]` (a follow set); `prefix`; `view` (a server-side view, 4.5); `shard` (servers and relays) |
 | mode | `state`: a snapshot, then deltas, conflated per row for a slow reader. `log`: every record from the cursor, never conflated |
-| cursor | the cluster id, the resource's incarnation, then per shard its incarnation, the offset last seen, and (for a `none` resource) the writer's epoch; or `'latest'`, `'earliest'` |
+| cursor | the cluster id, the resource's incarnation, then per shard its incarnation, the offset last seen, and (for a `none` resource) the leader's term; or `'latest'`, `'earliest'` |
 
 - **Who serves.**
-  - Any server that folds the shard: its writer, or a follower. Always up to the committed point, and never before its fold has reached the subscriber's cursor.
-  - Standbys fold by tailing the log nodes (4.2), and read the object store for older offsets.
+  - Any full replica of the shard: its leader, a follower or a learner. Always up to the commit offset, and never before its fold has reached the subscriber's cursor.
+  - Older offsets come from segments, on replicas' disks or in the object store.
   - A follower that falls behind the tail and reloads a snapshot ends its `log` subscriptions on that shard with `expired`, and re-snapshots its `state` subscriptions.
-  - A one-shot read at a server that neither folds nor relays the partition is refused `moved`, with the current writer. A relay answers only after its upstream snapshot has landed, never from an empty fold.
+  - A one-shot read at a server that neither folds nor relays the partition is refused `moved`, naming a full replica. A relay answers only after its upstream snapshot has landed, never from an empty fold.
   - A server that stops folding or relaying a partition ends that part of each subscription with `END` and the cursor, so the subscriber resubscribes elsewhere and never waits on a silent server.
   - A server asked for a partition it does not fold subscribes upstream itself, and becomes a relay for it.
 - **Cursors know their log.** A cursor whose cluster id, resource incarnation or shard incarnation does not match is refused `unknown-log`. Past retention, `expired` with the earliest available.
@@ -603,8 +597,8 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 |---|---|
 | `follow(keys)` | a live view of exactly those partitions |
 | `read({ from })` | log mode, from a cursor |
-| `read(key, { fresh: true })` | a linearizable read: the writer appends a no-op and answers once it commits, which fails if its loglet has been sealed. It costs one commit: an fsync and a round trip |
-| `set`, `update`, `remove`, `incr`, `push` | writes, with `{ if, ttl, confirm }` |
+| `read(key, { fresh: true })` | a linearizable read: the leader confirms with a majority that it still leads (Raft's read index), then answers once its fold reaches the commit offset. One round trip, no fsync |
+| `set`, `update`, `remove`, `incr`, `push` | writes, with `{ if, ttl, confirm }`; `confirm: 'sent'` only on a plain write (3.2) |
 | `cluster.writes.lookup(id)` | the outcome of an attempt |
 
 - **Honest partial views.** On a process that follows only some partitions, a sync read of an unfollowed row throws `shortfall`, and an operator over all of `data` throws `holistic`.
@@ -628,21 +622,17 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - `rules.read(peer, partition)` runs where a subscription is served.
 - **Code on writers.**
   - The `partition` function runs only on servers.
-  - Each server registers the code hashes it can run, and the controller gives a shard only to a server that has its resource's hashes.
+  - Each server registers the code hashes it can run. Healing and the planner make a server a full replica of a shard only if it has the resource's hashes, and a leader refuses a target without them.
 - **Identity and security.**
   - A client presents a token signed by the cluster; `ctx.peer` carries its claims. The shared client key stays as the simplest token.
   - TLS with a cluster CA, so clients verify servers.
-    - The CA key lives in the metadata only as envelopes encrypted to each voter's key.
+    - The CA key lives in `#meta` only as envelopes encrypted to each of `#meta`'s voters' keys.
     - Joins use single-use join tokens (`fero join-token`); fero deploy mints one per machine.
     - A client checks a server against the CA fingerprint in its own credential.
-    - Each member gets its own certificate at join. A removed member's certificate is revoked in the metadata.
-  - The secret rotates through the metadata: current and next, during a window.
-- **`cluster.writable`** is true when every shard of the resource has a writer whose open loglet reached Q acknowledgements within `ack.ms`. `cluster.shards` details each shard, including how many copies its loglets really have.
-- **Fewer log nodes than `copies`.** A loglet gets as many copies as there are log nodes, and `cluster.health` and one stderr line say so. So two processes on one box after one leaves is visibly one copy.
-- **A floor.**
-  - A writer never re-opens a loglet below `copies.min`: 2 by default, whenever at least two log nodes have live sessions.
-  - Below the floor, the shard refuses writes with the reason, rather than shrink silently.
-  - With a single log node (one process, the free tier), one copy is the stated setup.
+    - Each member gets its own certificate at join. A removed member's certificate is revoked in `#meta`.
+  - The secret rotates through `#meta`: current and next, during a window.
+- **`cluster.writable`** is true when every shard of the resource has a leader on a full replica that heard from a majority of its voters within `election.ms`. `cluster.shards` details each shard: its voters, learners and leader, and how many of them are live.
+- **Fewer members than `copies`.** A shard has as many voters as its candidates allow (1, 3 or 5; 4.2), and `cluster.health` and one stderr line say so. So two processes on one box is visibly one voter and one learner.
 - **Defining and changing a resource.**
   - The first `fero(name, opts)` that creates a resource writes its config to the catalog, which is the source of truth from then on.
   - A later open with different options is refused, naming the difference, unless an `alter` in progress allows its code hash.
@@ -651,32 +641,32 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 
 | Scope | Lives in | Keys | Changes |
 |---|---|---|---|
-| node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `voters`, roles (`server`, `log`, `voter`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `issuer.window` | restart that node |
-| cluster | the metadata | voter count, witness, default `copies`, `session.ms`, `ack.ms`, `evict.after`, `skew.max`, placement weights, cluster version | online |
-| resource | the catalog | `shards` (the starting count), `copies` (E, default 3), `copies.min` (2), `quorum` (Q, a majority of E or more), `standbys` (warm followers per shard), `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
+| node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `seeds`, roles (`server`, `log`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `issuer.window` | restart that node |
+| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `election.step`, `evict.after`, `settle.ms`, `skew.max`, `lag.max`, cluster version | online |
+| resource | the catalog | `shards` (the starting count, default 1), `copies` (voters per shard, default 3), `standbys` (full replicas per shard, voters and learners), `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
 
-- **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. A solo node is the same code: a server that is its own log node and voter, over a local-folder object store.
+- **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. A solo node is the same code: a server that is the only voter of every shard, over a local-folder object store.
 
 ### 4.6 L5: libraries and adapters
 
 L5 is built only from L4 calls; each library is a file with its own tests, and none adds a wire verb:
 - the queue, consumer groups, locks, presence, rate limits and loaders (5.3);
 - the RESP, Kafka-protocol and WebSocket gateways;
-- the `fero` CLI: `run`, `test`, `deploy`, `ls`, `debug`, `recover`, `join-token`.
+- the `fero` CLI: `run`, `test`, `deploy`, `ls`, `debug`, `recover`, `join-token`, and the planner's verbs (`drain`, `gone`, `lead`, `place`, `split`), which fero deploy's platform also uses.
 
 ### 4.7 The wire
 
 | Family | Verbs | Layer |
 |---|---|---|
 | link | `HELLO`, `DOOR`, `PING`, `DIAG` | L0 |
-| metadata | `VOTE`, `APPEND`, `SNAPSHOT` (Raft); `SESSION` | L1 |
-| loglet | `LOG-APPEND`, `LOG-ACK`, `LOG-READ`, `LOG-DATA`, `LOG-SEAL`, `LOG-SEALED` | L1 |
+| raft | `VOTE`, `VOTED`, `APPEND`, `APPENDED`, `SNAPSHOT`, `TIMEOUT-NOW`, `QUIET` | L1 |
+| plan | `PLAN`, `PLAN-ACK` | L1 |
 | writes | `WRITE`, `WRITE-ACK` | L1, L2 |
 | flow | `SUB`, `SNAP`, `DELTA`, `END`, `CREDIT`, `FOLLOW`, `UNFOLLOW` | L3 |
 | methods | `CALL`, `RESULT`, `SUBREC` | L4 |
 | admin | `DEFINE`, `ALTER`, `RECOVER` | L4 |
 
-29 verbs in seven families, each family owned by one layer and one published protocol.
+28 verbs in eight families, each owned by one layer. PreVote is a `VOTE` with a flag. Every Raft verb carries its shard, and one frame carries many shards' messages.
 
 ## 5. How each pattern is built
 
@@ -712,7 +702,7 @@ socket.on('join', (room) => web.follow(room).tap((r) => socket.send(r)))        
 socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: fero.now() })
 ```
 
-- **A message** is appended once by its room's shard writer, committed on a quorum of log nodes, and delivered to the webservers that follow that room, encoded once.
+- **A message** is appended once by its room's shard leader, committed on a majority of the shard's voters, and delivered to the webservers that follow that room, encoded once.
 - **A webserver** never receives a room it does not follow. One that reconnects passes its cursor and misses nothing within a day.
 
 ### 5.3 The libraries
@@ -745,11 +735,11 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
 
 ### 6.1 fero deploy
 
-**What the log-first shape changes for the platform.**
-- **The copies of the data live on the shared log tier and in S3, not on the project's servers.** So a project's servers (its "copies" in the deploy doc) are disposable compute, chosen for clients and CPU alone.
-- **Durability is the same at every tier.** The free tier's single server writes to the same three-copy log tier as a paid project.
-- **Sleep and wake.** A sleeping project has no servers. Waking loads snapshots from S3 and opens new loglets: about a second for a small project.
-- **"Two copies are refused" stops mattering.** Servers can be one, two or ten; the data's copies are the log tier's business.
+**What Raft per shard changes for the platform.**
+- **The copies are the replicas.** Each copy has its own disk, as the deploy doc already plans, and holds the shards it replicates.
+- **Log replicas top up.** With fewer than three copies, the platform's log tier supplies log replicas, so every project, the free tier included, has three voters. "Two copies are refused" can go: two copies and one log replica survive either copy's crash.
+- **Sleep and wake.** A sleeping project's log replicas and S3 keep everything. Waking, a copy loads its shards (from its own disk, or from S3), and each shard's log replica hands it leadership: about a second for a small project.
+- **The platform is the planner** (4.2). A roll drains each copy before it stops. The autoscaler adds copies, and drains them before removing them. A machine Fly destroyed is reported `gone` at once, so its replicas are replaced without waiting `evict.after`.
 
 **The fourteen needs.**
 
@@ -758,8 +748,8 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
 | 1 | the `fero` command and the npm build | L5 |
 | 2 | `file`, `scale`, `size` from the file | node-scope config |
 | 3 | a box directory that lists names, runs and folders | unchanged; one project is one cluster |
-| 4 | a caught-up signal | a server is caught up when it is a warm follower of every shard it is meant to take: `cluster.me.caughtUp` |
-| 5 | a full restart, and a restart after one-by-one stops | servers hold nothing durable; restart-all is servers stopping and starting, and the log tier never stops |
+| 4 | a caught-up signal | a number: for each shard the copy replicates, how far its log and its fold are behind the leader's commit offset. `cluster.me.caughtUp` when every gap is under `lag.max` |
+| 5 | a full restart, and a restart after one-by-one stops | each shard elects once a majority of its voters is back, in any order; there are no eligible-leader rules |
 | 6 | a joining copy skips its seed | a seed is applied once, when the resource is created |
 | 7 | listen and advertised addresses apart; bracketed IPv6 | the member record holds both |
 | 8 | TLS for clients, one public address | L0 transport and the cluster CA; clients route through any server |
@@ -768,33 +758,33 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
 | 11 | a new version's contract reported before it joins | the allowed-hash list: the deploy adds the hash first |
 | 12 | no deleted row comes back | structural: one log per shard; removal markers live only inside snapshot layers, merged in order on one machine, never collected across copies as v4's tombstones were; snapshots that replace |
 | 13 | refuse writes with a reason while reads go on | the resource's write gate (unpaid); a server memory bound (near full) |
-| 14 | group commit | the log nodes' journal |
+| 14 | group commit | one journal per process, for every shard it holds (4.1) |
 | later | rolling a contract change | allowed hashes over normalised source |
 | later | state larger than memory | cold rows read through from snapshot layers |
 | new | moving a v4 `dir` to v5 | `fero migrate`: v4's WAL and snapshot become one v5 snapshot per shard |
 
 **A roll on v5.**
-1. Server 1 hands over each shard it writes to a warm follower: a few milliseconds each.
-2. It restarts on the new files and loads its shards as a follower.
-3. When `caughtUp` says so, the next server goes.
+1. The platform drains copy 1 of leadership: each shard it leads is handed to a warm voter, in about one round trip and one fsync.
+2. Copy 1 restarts on the new files, with its disk, and catches up as a follower.
+3. When `caughtUp` says so, the next copy goes.
 
-Clients see at most a pause of one handover per shard.
+Clients see at most a pause of one handover per shard, and no election timeout.
 
 ### 6.2 fero test
 
 | # | Piece | On v5 |
 |---|---|---|
-| 1 | the world in `fero()` | a solo node is the whole stack in one process: server, log node and voter, over a local-folder object store and the in-process transport |
+| 1 | the world in `fero()` | a solo node is the whole stack in one process: a server that is the only voter of every shard, over a local-folder object store and the in-process transport |
 | 2 | the clock and ids | writer time under the world's clock; `fero.id()` from the world's seed |
 | 3 | input keys | call keys in `#calls` |
 | 4 | `fero test` as a verb | L5 |
 | 5 | components ship their stand-ins | unchanged |
 | 6 | the test block in the viewer | captures carry offsets, so inputs, records and asks line up |
 | 7 | the spec and the layout | unchanged |
-| 8 | the store: forks, versions, proposals | **a fork is a new chain whose first loglet points at the parent's snapshot at an offset**: loglets and snapshots are immutable, so a fork costs one metadata record |
+| 8 | the store: forks, versions, proposals | **a fork is a new shard whose first state is the parent's snapshot at an offset**: segments and snapshots are immutable, so a fork costs one `#meta` record |
 | 9 | the tape at the live edge | a resource with `history: '14d'` and rows keyed by match key |
 | 10 | the ai component and `fero change` | unchanged |
-| 11 | app steps in the simulator | methods run as sim steps against L0 to L3, under the same seeds |
+| 11 | app steps in the simulator | methods run as sim steps against L0 to L3, under the same seeds. The planner is one more sim client, whose hints arrive stale, duplicated and out of order |
 
 ## 7. The backtest, summarised
 
@@ -811,7 +801,9 @@ Clients see at most a pause of one handover per shard.
 | HISTORY, DIRECTORY, CONFIG, monitors | 334 | 68 | 184 | 28 | 54 | 38 | 4 | 1 | 11 |
 | **Total** | **1,313** | **426** | **555** | **136** | **196** | **142** | **12** | **3** | **39** |
 
-**The log-first rewrite.**
+**This draft (Raft per shard).** The same agents re-judge the same 876 cases against this draft; the results land here, above the log-first ones they replace.
+
+**The log-first rewrite (the last draft).**
 - The same four agents re-judged every case whose answer touched L0 or L1 (876 of the 1,313) against the rewrite: membership, leave, eviction, handover, durability, client failover, discovery and scale. Answers in L2 to L5 carried over.
 - They also compared each case's answer with the earlier one: better, the same, or worse.
 
@@ -865,19 +857,19 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 
 | Layer | Measure | Today (v4) | TS | Native | How | Bar |
 |---|---|---|---|---|---|---|
-| L0 | persisted appends per log node | about 250/s | 50k/s | 500k/s | one journal, one fdatasync per ≤ 1 ms batch, `writev` | BookKeeper, Kafka per broker |
-| L1 | appends per shard writer | 14k/s through the api, 73k/s raw | 150k/s | 2M/s | pipelined, batched across shards per log node link | Redpanda |
-| L1 | commit latency, p99, persisted | — | fsync p99 + 2 ms | fsync p99 + 0.5 ms | send to E log nodes at once, commit at Q; when the writer is also a log node, its own fsync runs in parallel | Kafka acks=all, BookKeeper |
-| L1 | planned handover (a roll step) | — | 20 ms | 5 ms on NVMe; about 15 ms on a disk with 4 ms fsyncs | three fsyncs in a row (the last commit, the seal, the metadata entry) and a warm follower | — |
-| L1 | failover to writable | about 4 s | 2.2 s | 1.1 s | `session.ms`, then seal, recover and swap (a few ms) | KRaft (9 s default) |
-| L1 | adding a server, per GB of its shards | v4: about 7 s per GB, copied from peers | 10 to 20 s from S3 in one stream; 2 to 5 s with parallel reads | the same | snapshot layers read in parallel; the tail from log nodes | — |
-| L1 | idle traffic, n = 100 | about 20k frames/s | under 3,000 frames/s | the same | sessions to the controller (about 2,000 frames/s); one idle ping per loglet after its last batch, then silence | — |
+| L0 | persisted appends per process | about 250/s | 50k/s | 500k/s | one journal for every shard, one fdatasync per ≤ 1 ms batch, `writev` | Kafka per broker, etcd |
+| L1 | appends per shard leader | 14k/s through the api, 73k/s raw | 150k/s | 2M/s | pipelined, batched across shards per peer link | Redpanda (Raft per partition) |
+| L1 | commit latency, p99, persisted | — | fsync p99 + 2 ms | fsync p99 + 0.5 ms | send to every voter at once, commit at a majority; the leader's own fsync runs in parallel | Kafka acks=all, etcd |
+| L1 | planned handover (a roll step) | — | 10 ms | 2 ms on NVMe; about 6 ms on a disk with 4 ms fsyncs | bring a warm voter to the log end, then TimeoutNow: one round trip and the new term's fsync | — |
+| L1 | failover to writable | about 4 s | 2.2 s | 1.1 s | `election.ms`, then PreVote, the vote and the first own-term commit (a few ms) | KRaft (9 s default) |
+| L1 | adding a server, per GB of its replicas | v4: about 7 s per GB, copied from peers | 10 to 20 s from S3 in one stream; 2 to 5 s with parallel reads | the same | snapshot layers read in parallel; the tail from the leader | — |
+| L1 | idle traffic, n = 100 | about 20k frames/s | under 10,000 frames/s | the same | one link ping per member pair that shares a shard, each `ping.ms`; quiet shards send nothing of their own | CockroachDB's quiesced ranges |
 | L2 | fold per record | about 10 µs | 2 µs | 0.2 µs | header-only decode, no per-record objects | — |
 | L2 | conditional op at the writer | none | 3 µs | 0.5 µs | lookup and compare in the append path | Redis INCR server time |
 | L3 | fan-out per relay core | about 9k/s (about 110 µs per relayed record) | 100k deliveries/s | 3M/s | per-shard index, encode once, `writev` | NATS core |
 | L4 | read of a held row | in-process | under 100 ns | the same | immutable rows | Redis GET: a network round trip |
 | L4 | method call, caller is the writer | — | 10 µs | 5 µs | in-process | Redis Lua |
-| L4 | `fresh` read | — | one commit | one commit | a no-op append | etcd's linearizable read |
+| L4 | `fresh` read | — | one round trip | one round trip | Raft's read index, no fsync | etcd's linearizable read |
 | L4 | view update per change | 5,000 filter views: about 500 µs a write | 1 µs per affected view | the same | shared declarative views, `group` routing | — |
 
 **Where fero can win outright:**
@@ -889,17 +881,18 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 
 **Where it should match:**
 - raw log bytes per disk and network card;
-- commit latency, which costs one fsync plus one round trip to the log nodes, as any replicated log does.
+- commit latency, which costs one fsync plus one round trip to a majority, as any replicated log does.
 
-**What the log-first shape costs:**
-- When log nodes are separate machines, a write takes one more network hop than when the writer is itself a copy. That is about 0.1 to 0.3 ms in one region.
-- A cold server takes seconds per gigabyte to start, which warm followers hide.
+**What Raft per shard costs:**
+- A server that becomes a replica copies its share of the data, from the object store when there is one.
+- Many small groups: their Raft state in memory, and a link ping per member pair. Quiet groups send nothing of their own.
+- More idle frames than the log-first draft (which pinged one controller), and fewer than v4.
 
 **What carries the targets:**
-- **Bytes end to end.** Batches stay encoded from writer to log node to follower, and only the fold decodes.
+- **Bytes end to end.** Batches stay encoded from leader to follower, and only the fold decodes.
 - **No work per view per record.** Shared `group` routing: one lookup per record, not one predicate per view. Measured on v4: 5,000 filters cost 450 to 510 µs a write; one `group`, 10 to 20 µs.
-- **Nothing on a timer that grows with data.** v4's compaction rescans every large lane each heartbeat (43% of CPU in a two-member run; a separate task is queued). In v5, retention seals and uploads whole loglets.
-- **Group commit on log nodes.**
+- **Nothing on a timer that grows with data.** v4's compaction rescans every large lane each heartbeat (43% of CPU in a two-member run; a separate task is queued). In v5, retention drops or uploads whole segments.
+- **Group commit:** one journal per process.
 
 **Measuring.** On a pinned quiet runner:
 
@@ -914,7 +907,7 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 **TypeScript first, native next.**
 - L0 to L3 are a deterministic machine behind one interface. Build them in TypeScript under the simulator, then in Rust behind the same interface, and compare effects byte for byte under the same seeds.
 - In TypeScript, a server's kernel runs on a worker thread (decision 13). It owns the rows in a compact form, and the main thread holds an immutable projection of the rows the process reads or serves views over.
-- Log nodes need no JavaScript at all. Natively, a log node is a small, separate program.
+- Log members need no JavaScript at all. Natively, a log member is a small, separate program.
 
 ## 9. Measured today
 
@@ -957,23 +950,23 @@ Measured on `main` (d7c9efe) on this session's container (Node 22, a cloud VM). 
 ### 10.2 What keeps v5 fast
 
 1. **Published mechanisms, each in one layer.**
-   - L1 is Raft, BookKeeper's loglet and Delos's chain: three published designs, two with public TLA+ specifications (Raft's; Vanlightly's of BookKeeper).
-   - Gone: lanes, stamps, digests, tombstones, compaction frontiers, orphans, sheds, latches, teachers, floors, FEED words, in-sync sets and eligible leaders.
+   - L1 is Raft, as published, with the fixes practice added: one protocol, with a public TLA+ spec, run once per shard with the engineering CockroachDB and TiKV publish.
+   - Gone: lanes, stamps, digests, tombstones, compaction frontiers, orphans, sheds, latches, teachers, floors, FEED words, in-sync sets and eligible leaders; and the last draft's loglets, seals, chains, sessions and controller.
    - The new mechanisms are not only in L2 and L3 (the log-end overlay, budgeted dedup, per-row conflation, snapshot-replace, the read-your-writes wait, writer time and fences).
-   - Log-first adds some in L0 and L1 too:
-     - split lineage in the chain;
-     - cursors resolved through it;
-     - snapshot layers with removal markers, and their coupling to loglet retention;
-     - the composition of Raft, loglets and chains with sessions and placement. Delos has no public TLA+, so that glue is fero's own to model.
-   - All of these get models (point 2), and merges of shards that hold data wait until phase 5.
-   - L1 is about twice the code of Raft per shard (V5-LOG-FIRST-REVIEW), and phase 2 is bigger for carrying scaling. That is the price of designing scaling in now rather than bolting it on.
+   - fero adds some to L0 and L1 too:
+     - ranked candidacy, and leadership handed back after `settle.ms`;
+     - log replicas, which lead only to repair;
+     - healing's one rule, and planner hints checked against the shard's config;
+     - splits as one entry, with lineage for cursors;
+     - snapshot layers with removal markers, and their coupling to log retention.
+   - Each is an ordinary Raft entry or a choice of who stands, so Raft's properties cover them. All get models (point 2), and merges wait until phase 5.
+   - L1 is about the size of plain Raft per shard (5 to 6k lines, V5-LOG-FIRST-REVIEW), half the log-first draft's, and phase 2 still carries scaling.
    - Each layer's doc opens with its mechanism list. Adding one means naming what it replaces, or why it cannot be a library.
 2. **Check every layer against a model before code.**
-   - **L1 in TLA+, as three specs that compose.**
-     - Raft is trusted from its published model, plus Ongaro's fix.
-     - The loglet starts from Vanlightly's BookKeeper spec.
-     - The chain and its compare-and-swap follow Delos.
-     - Checked exhaustively at small sizes: 3 log nodes, 2 shards, 2 servers, crashes, partitions, restarts, power loss, a lying disk, a split during recovery, snapshot layers against loglet deletion, and an object store that is slow or down.
+   - **L1 in TLA+, as one spec.**
+     - Raft's published model, plus Ongaro's fix, is the base.
+     - fero's additions are added to it: ranked candidacy, log replicas that lead only to repair, replicas that cannot vouch for their log, healing's steps, planner hints, and splits as entries.
+     - Checked exhaustively at small sizes: 3 to 4 members, 2 shards and a split, a log replica, crashes, partitions, restarts, power loss, a lying disk, a stale planner, snapshot layers against log deletion, and an object store that is slow or down.
    - **L3 in TLA+:** cursors (including their resolution through split lineage), snapshots that replace, credits, failover.
    - **L2 against a reference model:** a 200-line sequential interpreter of records, conditions, ops and dedup, run against the code on random sequences.
    - **The simulator checks the code against the specs** by replaying each seeded run through them (trace validation).
@@ -996,11 +989,11 @@ Scaling is built in phase 2, with the kernel, not bolted on later. Each phase en
 | Phase | Builds | Done when |
 |---|---|---|
 | 0. Decide | section 12; v4 frozen for features (deploy-blocking fixes only); CI and a pinned runner; data's commits pushed | decisions recorded; CI green on v4 |
-| 1. Specify | the L1 TLA+ specs (Raft composition, loglet, chain), the L3 spec, the L2 reference model; the L0 to L4 interfaces; every backtest case as a named test | the model checker is green; every case has a test name |
-| 2. The log | **The simulator first:** v4's executive gains node kinds (servers, log nodes, voters) and an object store whose calls complete as sim events. Then L0 (log node journal and entry store, the object-store interface with its local-folder version, snapshots on log nodes) and L1 (metadata Raft, loglets, chains, handover, failover, sessions, simple placement) in TypeScript, with v5 monitors and trace validation | 1,000-seed sweeps green with servers and log nodes joining, leaving and crashing; kill -9 of everything, and a simulated power loss, lose no persisted write; the follower read path measured; the L0 to L2 TS pins |
+| 1. Specify | the L1 TLA+ spec (Raft, plus fero's additions), the L3 spec, the L2 reference model; the L0 to L4 interfaces; every backtest case as a named test | the model checker is green; every case has a test name |
+| 2. The log | **The simulator first:** v4's executive gains many shards per node, member roles, and an object store whose calls complete as sim events. Then L0 (the journal for every shard, segments, the object-store interface with its local-folder version) and L1 (Raft per shard with its multi-Raft engineering, `#meta`, healing, ranked candidacy, handover) in TypeScript, with v5 monitors and trace validation | 1,000-seed sweeps green with servers joining, leaving and crashing; kill -9 of everything, and a simulated power loss, lose no persisted write; 10,000 idle shards per process pinned; the L0 to L2 TS pins |
 | 3. Surface | L2, L3 and L4 (v4's api ported: data binding, methods, door, config, rules, identity); the carried v4 bugs fixed; prototypes of the queue, groups and locks libraries | examples 01 to 44 pass; every backtest case passes or is marked not applicable with its reason |
-| 4. Platform | the S3 object store; separate log nodes and the hosted log tier; **splits, load-aware placement and pacing; the witness**; sleep and wake; worlds, call keys, tapes, forks, caught-up, rolls; TLS and the CA; `fero migrate`; the npm build | the café from "fero test" runs on v5; fero deploy milestones 1 and 2 run against a local log tier with an S3-compatible store |
-| 5. Native and reach | the Rust L0 to L3 (and a native log node) behind the same interface; merges of shards that hold data; relays; `rules.read`; mergeable views across shards; the finished libraries; the RESP, Kafka and WebSocket gateways | every row of section 8 is a green pin in the native column, on the pinned runner |
+| 4. Platform | the S3 object store; **log replicas, the witness and the hosted log tier; splits; the planner and its hints; load-aware placement**; sleep and wake; worlds, call keys, tapes, forks, caught-up, rolls; TLS and the CA; `fero migrate`; the npm build | the café from "fero test" runs on v5; fero deploy milestones 1 and 2 run against a local log tier with an S3-compatible store |
+| 5. Native and reach | the Rust L0 to L3 (and a native log member) behind the same interface; merges of shards; relays; `rules.read`; mergeable views across shards; the finished libraries; the RESP, Kafka and WebSocket gateways | every row of section 8 is a green pin in the native column, on the pinned runner |
 
 **The carried v4 bugs, fixed in phase 3.** These are in parts v5 keeps, each fixed with its failing test first:
 
@@ -1027,9 +1020,9 @@ Scaling is built in phase 2, with the kernel, not bolted on later. Each phase en
 - The data engine and the method plane.
 - The examples and their checks.
 - The perf harness.
-- The ring, as the placement policy.
+- The ring, as healing's placement rule (rendezvous hashing).
 
-**What is replaced.** The kernel's log, streams, scope, most of write, membership (by Raft) and confirm (by quorum commits); FEED words, digests, tombstone GC and compaction.
+**What is replaced.** The kernel's log, streams, scope, most of write, membership (by Raft per shard) and confirm (by majority commits); FEED words, digests, tombstone GC and compaction.
 
 ## 12. Decisions for you
 
@@ -1037,44 +1030,46 @@ Reply "defaults" to take every pick, or name a change ("3b").
 
 1. **Replace v4's kernel.** a) v5's kernel under v4's api and tools, v4 frozen for features (my pick). b) Evolve v4 one mechanism at a time.
 2. **The shape of L1.** Two independent reviews compare these: [V5-REPLICATION.md](V5-REPLICATION.md) and [V5-LOG-FIRST-REVIEW.md](V5-LOG-FIRST-REVIEW.md).
-   - a) **The log first** (this draft; my pick).
-     - Durability is on log nodes and object storage; servers are disposable; storage scales on its own.
-     - The reviewer: choose it "only if fero deploy is the primary product".
-     - The cost: about twice the L1 code (10 to 11k lines against 5 to 6k), a third protocol to model, and a storage tier to operate. Its conditions for phase 1 are met in this draft.
-     - My reason: fero deploy, fero studio and agents are where fero is going, and they are where this shape wins (6.1).
-   - b) **Raft per shard, with servers as the copies.**
-     - One protocol and one node kind: cheaper and simpler below the hosted tier, never-cold failover, and free follower reads.
-     - But scaling servers moves their data, and durability depends on how many servers run.
+   - a) **Raft per shard** (this draft; my pick).
+     - One protocol, with a public TLA+ spec. Every resource starts as one shard, so a small project is plain Raft.
+     - The cluster heals itself; a planner is optional; log replicas give witnesses and fero deploy's top-up.
+     - The cost: a server that becomes a replica copies its shards, and many small groups need multi-Raft's engineering.
+   - b) **The log first** (the last draft).
+     - Durability on a separate log tier; servers disposable; storage scales on its own.
+     - The cost: about twice the L1 code, three protocols, and a storage tier to operate. Its reviewer: choose it "only if fero deploy is the primary product".
    - c) Kafka's in-sync sets under a controller (the earlier drafts).
 3. **Language.** a) TypeScript first, Rust behind the same interface in phase 5 (my pick). b) Rust from the start.
-4. **Durability.** a) `persisted` (a quorum of log nodes on disk) and `none` only (my pick). b) Also `committed`, acknowledged before fsync.
+4. **Durability.**
+   - a) `persisted` (a majority of voters on disk) and `none` per resource, plus `confirm: 'sent'` for a plain write that need not wait for its commit (my pick).
+   - b) Also `memory` per resource: a majority holds it, and disks are written within a second, as Kafka's default. The price: a replica that stops uncleanly comes back as a new one (4.1), so an unclean stop of a majority at once needs `fero recover`.
+   - c) `persisted` and `none` only.
 5. **One cluster per project.** a) Resources are catalog entries (my pick). b) One cluster per resource, as v4.
 6. **What Ctrl-C, SIGTERM and `destroy()` do.** a) `leave`, and `restart` under `FERO_SUPERVISED` (my pick). b) Always `restart`.
 7. **Defaults.**
    - a) My pick:
-     - 16 starting shards, then split and merge;
-     - `copies` 3 with a majority quorum, or as many log nodes as there are when fewer;
-     - `standbys`: every server, up to 5;
-     - one voter, or 3 once there are three members;
-     - a 100 ms tick, `session.ms` 2 s, `ack.ms` 1 s (200 ms native), `evict.after` 10 min;
+     - one starting shard per resource, then split;
+     - `copies` 3 voters (1 below three candidates); `standbys`: every server, up to 5;
+     - `#meta`: 1 voter, then 3 from three members;
+     - a 100 ms tick, `ping.ms` 500 ms, `election.ms` 2 s (1 s native), `election.step` 200 ms, `evict.after` 10 min, `settle.ms` 30 s;
      - `history: 0`, `rows: true`.
    - b) Name your own.
-8. **Where log nodes run when self-hosting.** a) In the same processes as the servers, by default, with separate log nodes as an option (my pick). b) Always separate.
+8. **Log replicas.** a) Optional: servers are the replicas by default; log members serve as a witness on a third machine, and as fero deploy's log tier (my pick). b) None: every replica is a server, so two machines cannot survive a crash.
 9. **The object store outside fero deploy.**
    - a) Optional (my pick):
      - a local folder on one box;
      - S3 when configured;
-     - across boxes without one, log nodes keep sealed loglets and snapshots.
+     - across boxes without one, full replicas keep snapshots and history on their disks, and a log replica can repair only when a full replica returns.
    - b) Required everywhere: simpler code paths, but local dev needs an S3-compatible store.
-10. **The witness.** a) Supported from phase 4, run on a third failure domain, since two-machine self-hosting needs it (my pick). b) Earlier, in phase 2.
+10. **The witness.** a) A log member on a third failure domain, from phase 4, since two-machine self-hosting needs it (my pick). b) Earlier, in phase 2.
 11. **When a frame leaves.** a) At the end of the event-loop turn that made it (my pick, as v4). b) Send a turn's first small frame at once.
 12. **Streaming method results.** a) Stream a method's returned view, `move` records carried (my pick). b) Snapshots only.
 13. **Where the TypeScript kernel runs.** a) On a worker thread, with user code on the main thread (my pick). b) On the main thread, as v4.
 14. **A field write to a missing row.** a) Refused `absent-row` (my pick). b) It creates the row.
 15. **fero deploy before v5.** a) Build deploy milestones 1 and 2 on v4 now, then move to v5 at phase 4 (my pick). b) Wait for v5.
 16. **The development rules of 10.2.** a) Adopt them for v5 from phase 1 (my pick). b) For v4 too, now.
-17. **Hosted metadata.** a) One metadata group per log-tier cell, with a namespace and quota per project (my pick). b) One group per project.
-18. **How standbys read.** a) They tail the log nodes, as Pulsar's readers do (my pick, measured in phase 2). b) The writer pushes to them.
+17. **Hosted metadata.** a) Each project's `#meta` is a shard on its own copies and log replicas; quiet ones cost nothing (my pick). b) One shared metadata group per log-tier cell, with a namespace per project.
+18. **How followers get the log.** a) The leader pushes to every voter and learner, as Raft does (my pick). b) Learners tail a voter instead, to spare the leader's network.
+19. **The planner.** a) Optional: healing by each shard's leader is the default, and the CLI and fero deploy's platform send hints (my pick). b) Required, as TiKV's PD: one planner decides all placement.
 
 ## 13. The reviews
 
@@ -1092,7 +1087,7 @@ What it said to keep, all of which this draft keeps:
 - cursors with a log identity, snapshot-replace and per-row conflation;
 - TypeScript first behind a deterministic interface.
 
-**The replication question.** A second reviewer compared Kafka's shape, Raft per shard, ring-computed views and a shared log ([V5-REPLICATION.md](V5-REPLICATION.md)). It recommended Raft per shard, and called the shared log "the right hosted evolution, later". This draft takes the shared log now, because scaling was meant to be designed in from the start.
+**The replication question.** A second reviewer compared Kafka's shape, Raft per shard, ring-computed views and a shared log ([V5-REPLICATION.md](V5-REPLICATION.md)). It recommended Raft per shard, and called the shared log "the right hosted evolution, later". The log-first draft took the shared log anyway; this draft returns to Raft per shard, keeping that draft's object store, and adding healing without a controller, an optional planner, and log replicas.
 
 **The log-first rewrite.** The second reviewer critiqued it ([V5-LOG-FIRST-REVIEW.md](V5-LOG-FIRST-REVIEW.md)).
 - **Its verdict:** "the skeleton is sound: seal-then-CAS is the right fence", the same shape as Neon's safekeepers and Pulsar over BookKeeper. But not ready for phase 1 as written.
