@@ -343,7 +343,7 @@ One published design, run once per shard, plus the engineering that published mu
   - A replica is its member id plus its disk incarnation (4.1).
   - Leadership transfer on a planned stop or move, so neither waits for an election timeout.
 - **Who stands for election.**
-  - Raft's randomized timeouts: each full voter stands after a random time between `election.ms` and twice that, as the Raft paper does, so one candidate usually stands alone, even when many shards fail over at once.
+  - Raft's randomized timeouts: each full voter stands after `election.ms` plus a random part of up to `election.jitter` (500 ms in TypeScript, 250 ms native). The random part only needs to be large against a round trip (about a millisecond in one region), so two survivors almost never stand at once, even when many shards fail over together. The Raft paper's range, one to two timeouts, would add a second to every failover on average.
   - Two kinds of candidate wait longer. A member whose clock is more than `skew.max` (1 s) from its peers' median waits twice as long, and `cluster.health` says so; it can still lead when it alone can win. A log replica stands only when no full voter has **won** an election for twice `election.ms`; a full voter that keeps standing and losing (its log is behind) does not hold it back (below).
   - Raft's vote rule decides who can win: a candidate's log must be at least as up to date as the voter's.
   - Leadership is spread afterwards, by the hand-back (healing, below), not by who stands first.
@@ -396,7 +396,7 @@ Two members that share a shard exchange a link ping every `ping.ms` (500 ms) whe
 
 | Event | Detected after (default) | What happens |
 |---|---|---|
-| a leader's process stops | `election.ms`: 2 s in TypeScript, 1 s native; tunable down to 500 ms | each of its shards elects (above) |
+| a leader's process stops | `election.ms` plus up to `election.jitter`: 2 to 2.5 s in TypeScript, 1 to 1.25 s native; tunable down to 500 ms | each of its shards elects (above) |
 | a follower stops | — | its shards carry on with a majority. After `evict.after`, each shard's leader replaces it (healing) |
 | a leader loses touch with a majority | `election.ms` | CheckQuorum: it steps down, and its pending answers are `unknown` |
 | a quiet shard's leader dies | `election.ms` of missed link pings | the followers wake the shard and elect |
@@ -703,7 +703,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 | Scope | Lives in | Keys | Changes |
 |---|---|---|---|
 | node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `seeds`, roles (`server`, `log`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `connect.wait` | restart that node |
-| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, `issuer.window`, `shard.bytes`, `shard.rate`, `shrink.after`, cluster version | online through `fero.alter('#meta', change)`, which checks each key's range and the keys against each other (say, `election.ms` above twice `ping.ms`, `skew.max` below `election.ms`) and refuses with the reason. `issuer.window` may only be raised online: a lower window would put in-flight attempts below the floor |
+| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `election.jitter`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, `issuer.window`, `shard.bytes`, `shard.rate`, `shrink.after`, cluster version | online through `fero.alter('#meta', change)`, which checks each key's range and the keys against each other (say, `election.ms` above twice `ping.ms`, `skew.max` below `election.ms`) and refuses with the reason. `issuer.window` may only be raised online: a lower window would put in-flight attempts below the floor |
 | resource | the catalog | `slots` (1,024, fixed when defined), `copies` (voters per shard, default 3), `standbys` (full replicas per shard, voters and learners), `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
 
 - **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. A solo node is the same code: a server that is the only voter of every shard, over a local-folder object store.
@@ -978,7 +978,7 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 | L1 | commit latency, p99, persisted | — | fsync p99 + 2 ms | fsync p99 + 0.5 ms | send to every voter at once, commit at a majority; the leader's own fsync runs in parallel | Kafka acks=all, etcd |
 | L1 | slot move | — | about 10 ms unwritable | about 2 ms | copy first, then fence, the delta and open: about one round trip | Redis Cluster's resharding |
 | L1 | planned handover (a roll step) | — | 10 ms | 2 ms on NVMe; about 6 ms on a disk with 4 ms fsyncs | bring a warm voter to the log end, then TimeoutNow: one round trip and the new term's fsync | — |
-| L1 | failover to writable | about 4 s | 2.2 s | 1.1 s | `election.ms`, then PreVote, the vote and the first own-term commit (a few ms) | KRaft (9 s default) |
+| L1 | failover to writable | about 4 s | about 2.2 s on average, 2.5 s at worst | about 1.1 s, 1.25 s at worst | `election.ms`, then PreVote, the vote and the first own-term commit (a few ms) | KRaft (9 s default) |
 | L1 | adding a server, per GB of its replicas | v4: about 7 s per GB, copied from peers | 10 to 20 s from S3 in one stream; 2 to 5 s with parallel reads | the same | snapshot layers read in parallel; the tail from the leader | — |
 | L1 | idle traffic, n = 100 | about 20k frames/s | about 20,000 frames/s when every pair shares a shard (100 × 99 × 2 a second); about 10,000 with `ping.ms` at 1 s | the same | one link ping per member pair that shares a shard, each way, each `ping.ms`; quiet shards send nothing of their own | CockroachDB's store liveness and quiesced ranges |
 | L2 | fold per record | about 10 µs | 2 µs | 0.2 µs | header-only decode, no per-record objects | — |
@@ -1067,7 +1067,7 @@ Measured on `main` (d7c9efe) on this session's container (Node 22, a cloud VM). 
 ### 10.2 What keeps v5 fast
 
 1. **Published mechanisms, each in one layer.**
-   - L1 is Raft, as published, with the fixes practice added: one protocol, with a public TLA+ spec, run once per shard with the engineering CockroachDB and TiKV publish.
+   - L1 is Raft, as published, with the fixes practice added: one protocol, with a public TLA+ spec, run once per shard with the engineering CockroachDB and TiKV publish. Its core is ported from etcd's raft, not written afresh (decision 22).
    - Gone: lanes, stamps, digests, tombstones, compaction frontiers, orphans, sheds, latches, teachers, floors, FEED words, in-sync sets and eligible leaders; and the last draft's loglets, seals, chains, sessions and controller.
    - The new mechanisms are not only in L2 and L3 (the log-end overlay, budgeted dedup, per-row conflation, snapshot-replace, the read-your-writes wait, writer time and fences).
    - fero adds some to L0 and L1 too:
@@ -1113,7 +1113,7 @@ Scaling is built in phase 2, with the kernel, not bolted on later. Each phase en
 |---|---|---|
 | 0. Decide | section 12; v4 frozen for features (deploy-blocking fixes only); CI and a pinned runner; data's commits pushed | decisions recorded; CI green on v4 |
 | 1. Specify | the L1 TLA+ spec (Raft, plus fero's additions), the L3 spec, the L2 reference model with the client-session trial; the L0 to L4 interfaces, with the record header and cursors in the slot shape; every backtest case as a named test | the model checker is green; every case has a test name |
-| 2. The log | **The simulator first:** v4's executive gains many shards per node, member roles, and an object store whose calls complete as sim events. Then L0 (the journal for every shard, segments, the object-store interface with its local-folder version) and L1 (Raft per shard with its multi-Raft engineering, `#meta`, healing, handover; one shard per resource) in TypeScript, with v5 monitors and trace validation | 1,000-seed sweeps green with servers joining, leaving and crashing; kill -9 of everything, and a simulated power loss, lose no persisted write; 2,000 idle shards per process pinned; the L0 to L2 TS pins |
+| 2. The log | **The simulator first:** v4's executive gains many shards per node, member roles, and an object store whose calls complete as sim events. Then L0 (the journal for every shard, segments, the object-store interface with its local-folder version) and L1 (Raft per shard, its core ported from etcd's raft, with its multi-Raft engineering, `#meta`, healing, handover; one shard per resource) in TypeScript, with v5 monitors and trace validation | 1,000-seed sweeps green with servers joining, leaving and crashing; kill -9 of everything, and a simulated power loss, lose no persisted write; 2,000 idle shards per process pinned; the L0 to L2 TS pins |
 | 3. Surface | L2, L3 and L4 (v4's api ported: data binding, methods, door, config, rules, identity); the carried v4 bugs fixed; prototypes of the queue, groups and locks libraries | examples 01 to 44 pass; every backtest case passes or is marked not applicable with its reason |
 | 4. Platform | the S3 object store; **log replicas, the witness and the hosted log tier; slot moves and the shard rule; the planner and its hints; load-aware placement**; sleep and wake; worlds, call keys, tapes, forks, caught-up, rolls; TLS and the CA; `fero migrate`; the npm build | the café from "fero test" runs on v5; fero deploy milestones 1 and 2 run against a local log tier with an S3-compatible store |
 | 5. Native and reach | the Rust L0 to L3 (and a native log member) behind the same interface; `durability: 'none'` and `confirm: 'sent'`; relays; `rules.read`; mergeable views across shards; the finished libraries; the RESP, Kafka and WebSocket gateways | every row of section 8 is a green pin in the native column, on the pinned runner |
@@ -1173,7 +1173,7 @@ Reply "defaults" to take every pick, or name a change ("3b").
      - 1,024 slots per resource, one starting shard, then the shard rule (`shard.bytes` 4 GB, `shard.rate` half the leader's measured capacity);
      - `copies` 3 voters (1 for a shard created below three candidates, never lowered by healing); `standbys`: every server, up to 5;
      - `#meta`: 1 voter, then 3 from three members;
-     - a 100 ms tick, `ping.ms` 500 ms, `election.ms` 2 s (1 s native), `evict.after` 10 min, `settle.ms` 30 s, `catchup.max` 10 min;
+     - a 100 ms tick, `ping.ms` 500 ms, `election.ms` 2 s (1 s native), `election.jitter` 500 ms (250 ms native), `evict.after` 10 min, `settle.ms` 30 s, `catchup.max` 10 min;
      - `history: 0`, `rows: true`.
    - b) Name your own.
 8. **Log replicas.** a) Optional: servers are the replicas by default; log members serve as a witness on a third machine, and as fero deploy's log tier (my pick). b) None: every replica is a server, so two machines cannot survive a crash.
@@ -1199,6 +1199,9 @@ Reply "defaults" to take every pick, or name a change ("3b").
     - c) **A fixed shard count per resource** (16), re-keyed by a library into a new generation when outgrown ([V5-PRIMITIVE.md](V5-PRIMITIVE.md)).
     - d) **Fixed slots, free groups** (an independent judge of a to c; my pick; [V5-UNITS.md](V5-UNITS.md)). Each resource has 1,024 slots that never change, and a partition hashes to one slot forever. A resource starts as one Raft group holding every slot, and groups are added and removed as load needs. Each record carries its slot's own sequence number, so versions, cursors and fence tokens are (slot, seq) and never depend on which group holds a slot. One mechanism, moving a slot (fence it, copy it, open it, as Redis Cluster and Couchbase do), does scale-up, scale-down, rebalancing and hot slots. Deletes splits, merges and cursor lineage, and keeps per-resource `copies`. Costs: one varint per record, cursors over a whole resource up to about 8 KB, and data copied once per move.
 21. **The other proposed cuts.** **Chosen: a,** folded into this draft. a) Take all four (my pick): the kernel becomes five operations on a log (append, read, snapshot, change members, hand over), with L2 and L3 as fero's standard library over it; drop ranked candidacy, keeping Raft's random timers and the `settle.ms` hand-back, as Kafka's preferred-leader rebalance does; defer `durability: 'none'` and `confirm: 'sent'` to phase 5, so pub/sub is `history: 0, rows: false` on the persisted log until then; try Raft's client sessions (Ongaro's thesis, chapter 6) against the dedup floor in phase 1. b) Name the ones to keep or drop.
+22. **Where the Raft core comes from.**
+    - a) **Port etcd's raft to TypeScript** (my pick). It is already a pure state machine: messages and ticks in, a "ready" batch of entries to save, messages to send and entries to apply out. That is the shape of fero's deterministic kernel, and it carries years of production fixes (PreVote, CheckQuorum, learners, leadership transfer, read index). The Rust phase uses raft-rs, TiKV's port of the same code, so both kernels share one design. Both are Apache 2.0: the ported files keep that licence and a NOTICE inside fero's MIT repository.
+    - b) Write Raft from the paper and its TLA+ spec. No outside code, but every subtle bug etcd already fixed is fero's to find again.
 
 ## 13. The reviews
 

@@ -117,7 +117,7 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-105 | A reader's cursor has a newer slot epoch than the server it reaches | The server is behind: it answers `retry`; only an older epoch is refused `unknown-log` (4.4) |
 | R-106 | A write under a removed intermediate field recreates it | Refused `absent-path`, as a write to a missing row is `absent-row` (4.3) |
 | R-107 | A method re-run diverges, and its k-th write goes to a different slot | Not caught, said plainly; handlers must be deterministic given input and `ctx`, whose `now` and `id` are fixed by the call claim (4.5) |
-| R-108 | Many shards fail over at once, and votes split | Each voter stands after a random time between `election.ms` and twice that, as the Raft paper does (4.2) |
+| R-108 | Many shards fail over at once, and votes split | Each voter stands after `election.ms` plus up to `election.jitter`, a spread far larger than a round trip, so two rarely stand at once; failover stays about 2.2 s on average (4.2, 8) |
 
 ## Part 1: v4's hard cases
 
