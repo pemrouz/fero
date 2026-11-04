@@ -253,6 +253,8 @@ L0  storage and io        one journal per process · group commit · segments ·
   - **A torn or short record at the end of the journal** is truncated. No completed fsync covered it, so it was never acknowledged, and the replica still vouches for everything before it. So a power loss of every voter loses only what no one was told committed.
   - **Damage** is a bad record followed by a good one, or a missing segment. It affects only the shards whose records are damaged. If a damaged journal record's shard cannot be read, every shard with a record after it in the journal is affected.
 - **A replica that cannot vouch for its log comes back as a new replica.** That is a replica whose disk is new, whose records are damaged (above), or that stopped uncleanly under `durability: 'memory'` (decision 4b). It never votes with the old identity: the shard's leader adds it back as a learner and removes the old one (4.2).
+- **A dir knows whose it is.** Its boot record names its cluster id and project. A process opening a dir of another cluster or project refuses, naming both, rather than adopt it.
+- **Disks that lie.** A disk that acknowledged an fsync and then lost the write cannot be detected on its own. If it is among the only majority that committed an entry, and the others are lost, that entry is lost. This residual case is named here, not hidden.
 - **A disk incarnation** is a random 128-bit id, written when the dir is created. A new or wiped disk can never repeat an old one, so it can never vote as the replica it replaced.
 - **Directory fsyncs.** Creating or renaming any file fsyncs its directory. One failed fsync condemns the store (v4's fsyncgate latch): the process stops acknowledging, and its replicas come back as new ones.
 - **One process per dir.**
@@ -270,6 +272,7 @@ L0  storage and io        one journal per process · group commit · segments ·
   - Every full replica cuts its own snapshots, for its own restarts.
   - Only the leader uploads them: put-if-absent, under a name keyed by (shard incarnation, offset).
   - A snapshot is named in the shard's log, by an entry, only after its put is confirmed.
+  - A replica acknowledges a snapshot installed from the leader or the object store only after it is fsynced.
 - **When a replica may drop its log below offset i.** All of these must hold, and the covering snapshot is fsynced locally, or its put confirmed, first:
   - a snapshot covers i where the shard can still reach it: for a full replica, its own snapshot, or a merged base named in the object store (a single incremental layer covers nothing on its own); for a log replica, a merged base named in the object store, or else i is at or below the offset every full voter has snapshotted past, which the leader stamps on its appends;
   - the segment is uploaded, or the shard's `history` allows dropping it;
@@ -305,13 +308,13 @@ One published design, run once per shard, plus the engineering that published mu
 - **One cluster per project.** Its resources are entries in its catalog. This replaces v4's one cluster per resource, with its own port, membership and heartbeats each.
 - **A cluster id**, minted at genesis, rides every HELLO. Different ids never link, and both sides say so, naming both ids and the fix.
 - **Exactly one genesis**, which creates `#meta`.
-  - Across boxes, the founding members start with the same `seeds` list, which becomes `#meta`'s first voters. A seed founds only when it reaches a majority of the seeds and none of them has a cluster id. They then hold `#meta`'s first election, and the winner's first entry carries the cluster id it mints; no seed takes client traffic before it has applied that entry. A seed restarted without its dir finds a cluster id at another seed, and joins as a new replica.
+  - Across boxes, the founding members start with the same `seeds` list, which becomes `#meta`'s first voters. A seed founds only when it reaches a majority of the seeds and none of them has a cluster id. They then hold `#meta`'s first election, and the winner's first entry carries the cluster id it mints; no seed takes client traffic before it has applied that entry. A seed restarted without its dir finds a cluster id at another seed, and joins as a new replica. Seeds compare a hash of their `seeds` lists in HELLO, and refuse to found on a mismatch, naming both lists. A process that has a one-box `cluster-id` file never founds from `seeds`: the file wins, and it joins that cluster or waits.
   - On one box, the first process of a project's run creates `cluster-id` in the run's folder under `.fero/` with an exclusive create, and is `#meta`'s only voter.
   - Everyone else joins: it writes its member record to `#meta`, through any member.
   - A process given cross-box `hosts` and no `seeds` never founds a cluster; it joins its hosts' cluster, or waits and says "no seeds configured".
   - **A stale run folder.**
     - A process that finds `cluster-id` but reaches no member within `connect.wait` waits. It says which member it needs, and where that member's dir is.
-    - If no dir in the run folder holds any of the cluster's `#meta` (the dirs were wiped), the file is stale. The process renames it aside, says so, and founds a new cluster with a new id.
+    - If no dir in the run folder holds any of the cluster's `#meta`, and none is still locked by a live process (the dirs were wiped), the file is stale. The process renames it aside, says so, and founds a new cluster with a new id.
     - Otherwise `fero recover --new-cluster` can rebuild `#meta` from its own copy. That copy may be behind, and the command says so.
 - **Finding a resource.** A name resolves to its project's cluster through the box directory or `hosts`, as today. Remote names carry the project: `shop/stock`.
 
@@ -405,7 +408,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
   - **healing never lowers a shard's voter count.** Only a `leave` (below) or an operator does;
   - **a gone voter** (its link down past `evict.after`, or reported `gone`) is removed only when a replacement candidate exists, and that replacement is added as a learner in the next step, and promoted once caught up. The shard has two voters only between those steps. Removing the gone one first costs nothing: it was already not answering;
   - **with no replacement,** the gone voter stays in the configuration. The shard is under-replicated and says so, and its live majority still commits. So a 10-minute partition of one of three members never shrinks a shard below three voters;
-  - **a live voter not in the target** is removed only after its replacement is a caught-up voter;
+  - **a live voter not in the target** is removed only after its replacement is a voter whose log reaches the leader's commit offset, exactly, not merely within `lag.max`. So no step lowers the number of voters holding a committed entry;
   - a new replica loads a snapshot (from the object store, or streamed from the leader) and the tail. It counts as caught up when it is within `lag.max` of the leader's commit offset. One that has not caught up within `catchup.max` (10 min), say on a shard too hot to follow, is reported, and a planner can place the shard elsewhere.
 - **Under-replication is never silent.** `cluster.health` and one stderr line say when a shard has fewer live voters than `copies`, and why.
 - **A removed replica** learns it from the leader's refusal, or from `#meta`'s shard record. It stops standing for elections and serving its rows at once; PreVote keeps it from disturbing the shard meanwhile. It deletes its copy once `#meta` shows the shard's current configuration without it, as CockroachDB's replica GC does.
@@ -494,6 +497,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 - **A crash** is a restart that skipped the handover.
 - **Two machines.**
   - Each shard has one voter, the first member, and the other machine is a learner. A crash of the learner's machine changes nothing. A crash of the voter's machine stops writes until it returns, as in v4.
+  - An acknowledged write is then on one disk until the learner has it, usually within a millisecond. `copies: 2` makes two voters instead: every write is on both disks, and a crash of either stops writes. The log-first draft gave both at once only by needing a witness to carry on.
   - A **witness on a third failure domain** (a log member on a tiny third machine, or a small cloud VM) makes three voters: two full and one log. Then either machine's crash is survived: the other leads, with the witness for its majority.
   - A witness on one of the two machines only heals the other machine's crash, as in v4 (DESIGN-LEAVE §7b).
   - fero deploy tops up from its log tier, so two copies survive either one's crash.
@@ -532,10 +536,10 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 1. **Dedup.**
    - **What it checks.** If the attempt id is in the shard's log, committed or in the writer's uncommitted tail, the writer answers with the original offset, and nothing else runs.
    - **No answer before commit.** Every answer (a dedup answer, a refusal such as `conflict`) is judged against the writer's log-end state, so it waits until the commit offset reaches the version it was judged against. If the leader loses leadership first, the answer is `unknown`, and the issuer retries at the new leader.
-   - **What the issuer promises.** Its call ids rise. It has at most 1,024 attempts outstanding in all, counted from its oldest unacknowledged one (`issuer.window`). It stops retrying an attempt after half the horizon (5 min).
+   - **What the issuer promises.** Its call ids rise. It has at most `issuer.window` (1,024) attempts outstanding in all, counted from its oldest unacknowledged one. The window is a cluster key, so every issuer and every writer use the same one. It stops retrying an attempt after half the horizon (5 min).
    - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor (a commit, or an appended refusal), kept by id. An issuer silent for the retry horizon (5 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
-   - **The floor.** An attempt at or below (highest id seen) − 1,024 that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
-   - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server forwards an attempt only over the link to the leader it had when it took the attempt; after any break it answers `retry`, and the issuer resends. A leader closes a link that misses pings for `election.ms`, so a frozen server's late forward never lands. These bound how late a copy can arrive; what makes every answer unique is the log: committed outcomes, and the appended refusals of resent attempts (below).
+   - **The floor.** An attempt at or below (highest id seen) − `issuer.window` that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
+   - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server forwards an attempt only over the link to the leader it had when it took the attempt; after any break it answers `retry`, and the issuer resends. Resends back off with jitter, from `election.step` up to `election.ms`, and a `no-writer` or `moved` answer carries a retry-after, so an election never brings a retry storm. A leader closes a link that misses pings for `election.ms`, so a frozen server's late forward never lands. These bound how late a copy can arrive; what makes every answer unique is the log: committed outcomes, and the appended refusals of resent attempts (below).
    - **Across leaders.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new leader holds every committed entry (Raft's leader completeness), and folds its whole log before it answers. So the floor never drops below where the old leader had moved it.
 2. **Shape checks that need the current row.**
    - Array holes (`sparse-hole`, V4-28/33).
@@ -663,8 +667,8 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 
 | Scope | Lives in | Keys | Changes |
 |---|---|---|---|
-| node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `seeds`, roles (`server`, `log`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `issuer.window` | restart that node |
-| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `election.step`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, cluster version | online |
+| node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `seeds`, roles (`server`, `log`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `connect.wait` | restart that node |
+| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `election.step`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, `issuer.window`, cluster version | online through `fero.alter('#meta', change)`, which checks each key's range and the keys against each other (say, `election.ms` above twice `ping.ms`, `skew.max` below `election.ms`) and refuses with the reason |
 | resource | the catalog | `shards` (the starting count, default 1), `copies` (voters per shard, default 3), `standbys` (full replicas per shard, voters and learners), `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
 
 - **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. A solo node is the same code: a server that is the only voter of every shard, over a local-folder object store.

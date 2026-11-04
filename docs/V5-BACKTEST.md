@@ -42,7 +42,7 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-30 (L-24, L-31) | A planned handover meets in-flight writes, or races a failover | The leader stops taking new writes, brings the target to its log end, then sends TimeoutNow; writes meanwhile wait or get `moved`; if a failover happens meanwhile, the higher term wins (4.2) |
 | R-31 (L-25) | A slow server keeps leading | A planner places by load; without one, a member past `skew.max`, or a replica whose fold lags past `lag.max`, does not stand, and hands over (4.2) |
 | R-32 (L-26) | A read from the object store gets stale data | Segments and snapshots are written once, under unique names, and never overwritten (4.1) |
-| R-33 (L-34) | A disk lied about an fsync, and its copy is part of the only majority | Boot checks catch damaged records, and such a replica comes back as a new one; an acknowledged write lost by a disk that lies cannot be detected on its own, the residual case, named (4.1) |
+| R-33 (L-34) | A disk lied about an fsync, and its copy is part of the only majority | Boot checks catch damaged records, and such a replica comes back as a new one; an acknowledged write lost by a disk that lies cannot be detected on its own: the residual case, named in 4.1, "Disks that lie" |
 | R-34 (L-35) | Healing shrinks a shard to fewer voters than `copies`, silently | Healing never lowers a voter count; a gone voter is removed only when a replacement exists; under-replication is reported on `cluster.health` and stderr (4.2, 4.5) |
 | R-35 (L-36) | A member's main thread hangs while its kernel thread keeps pinging | The watchdog answers calls `busy`; its shards keep being written (4.2) |
 | R-36 (L-37) | A run folder's dirs were wiped but its `cluster-id` file stayed | The file is renamed aside and a new cluster is founded, said on stderr (4.2) |
@@ -78,6 +78,13 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-66 | A huge batch, catch-up or bundled frame stalls a link | Batches cap at 1 MB, catch-up appends at 4 MB, bundled frames at 1 MB; big records are cut between markers (4.1) |
 | R-67 | The journal or log is dropped before the segment or snapshot covering it is on disk | Journal truncation waits for the covering segments' fsync; log drops wait for the snapshot's fsync or confirmed put (4.1) |
 | R-68 | A new learner, still loading its snapshot, serves a read as if rows were absent | A replica serves only once ready: snapshot loaded and fold at the commit offset it started from; until then `moved` (4.4) |
+| R-69 | Two founders start with different `seeds` lists, or a process has both `seeds` and a one-box `cluster-id` file | Seeds compare list hashes and refuse to found on a mismatch; the `cluster-id` file wins over `seeds` (4.2) |
+| R-70 | A stale-looking `cluster-id` file while a dir is still locked by a live process | Not stale: only wiped and unlocked dirs make it stale (4.2) |
+| R-71 | A process opens another project's dir | The boot record names cluster id and project; a mismatch is refused, naming both (4.1) |
+| R-72 | Healing removes a live voter whose replacement is only within `lag.max` | Removal waits until the replacement's log reaches the commit offset exactly (4.2) |
+| R-73 | Every election brings a resend storm | Resends back off with jitter from `election.step` to `election.ms`; `no-writer` and `moved` carry a retry-after (4.3) |
+| R-74 | Issuers and writers disagree on `issuer.window`, so a lost write looks committed | `issuer.window` is a cluster key, and the floor uses it (4.3, 4.5) |
+| R-75 | A cluster key changes online to a value that breaks another | `fero.alter('#meta', change)` checks ranges and cross-key rules, and refuses with the reason (4.5) |
 
 ## Part 1: v4's hard cases
 
