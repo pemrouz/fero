@@ -98,6 +98,16 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-86 | A slot moves while an issuer is resending an attempt to it | Outcomes tagged with the slot move with it, and the issuer's highest id merges by `max`, so a late copy at the new shard is a dedup hit or below the floor, never fresh (4.2, 4.3) |
 | R-87 | Two slot moves of one resource at once, or a grow and a shrink racing | One move at a time per resource, by a lease row in `#meta`; shrinking waits a quarter of both limits for `settle.ms`, so it cannot chase a grow (4.2) |
 | R-88 | A subscriber is reading slot s at the old shard when the fence lands | It gets `END` with its position, and resubscribes at the new shard, which serves from that position once open (4.2, 4.4) |
+| R-89 | A's leader appends `fenced` and is deposed before it commits, while B opens the slot | Every move step acts only on committed entries; A fences only after B's `importing` commits, and streams and answers `moved` only after `fenced` commits; B serves only after `open` commits (4.2) |
+| R-90 | B's leader is deposed with `importing` uncommitted, and A fences to a shard that knows nothing of the slot | A fences only after B reports `importing` committed; until `open`, B answers `retry`, never `moved(A)` (4.2) |
+| R-91 | A `log` reader (a tape, a derived resource) resumes below a move's fence | B answers `moved(A)`, or `expired` once `history` lapsed; a replay reads A's segments for the slot, then B's (4.2) |
+| R-92 | `recover --unclean` restores a shard from a copy older than a move's fence | The recovered shard re-fences every slot the slot table places elsewhere, never reopens one, and shows the list first (4.2) |
+| R-93 | A recovered `#locks` shard reuses sequence numbers, so a new token looks older than the highest seen | Versions and fence tokens compare as (epoch, sequence) (2) |
+| R-94 | A slot move carries fence tokens for locks that live in `#locks`, while B already holds a higher one | A's whole per-lock table is carried and merged by `max` at B (4.2) |
+| R-95 | A daily load cycle makes a resource shrink every night and grow every morning | Shrinking waits `shrink.after` (6 h), and only when the sibling stays under half of both limits afterwards (4.2) |
+| R-96 | A client with a stale route dials a shard deleted by a shrink | A shard is deleted only after a grace period with no slots in the table, and its former members answer `moved` from the table meanwhile (4.2) |
+| R-97 | A client link carries a `recover` inside an `ASK` | Admin `ASK`s need the admin key, checked at the door before the payload reaches the library (4.1) |
+| R-98 | An issuer's oldest unacknowledged attempt sits exactly at the floor | The window is a span of ids: highest issued minus oldest unacknowledged is below `issuer.window`, so the oldest is always above the floor (4.3) |
 
 ## Part 1: v4's hard cases
 

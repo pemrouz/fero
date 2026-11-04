@@ -118,10 +118,10 @@ A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4
 - It starts as one shard holding every slot. From then on, the shard rule (4.2) adds shards as load grows and removes them as it falls, moving slots between them. That allows up to 1,024 shards per resource, and there is no shard count to choose.
 
 **Positions.**
-- Every record carries its slot's own sequence number, stamped by the shard's leader.
+- Every record carries its slot's own sequence number, stamped by the shard's leader in log-end order. A new leader stamps on from its committed state, after any uncommitted tail it drops.
 - A reader's position in a partition is the partition and that number. The slot comes from the partition's hash, so it is never said. The numbers rise, with gaps where other partitions of the same slot wrote.
 - A reader of a whole resource holds one number per slot: at most 1,024, about 8 KB.
-- A row's version and a lock's fence token are slot numbers too. None of them names a shard, so moving a slot breaks no cursor, version or fence.
+- A row's version and a lock's fence token are slot numbers too, compared as (epoch, sequence), so a number reused after a recovery never looks newer than it is. None of them names a shard, so moving a slot breaks no cursor, version or fence.
 - A slot also has an epoch, which changes only when `fero recover --unclean` may have lost its records. A position from an older epoch is refused `unknown-log`, and the reader takes a fresh snapshot.
 - **Why a counter per slot, not per partition.** By default a partition is one row: a counter per partition would be millions of counters, which would have to outlive their rows (or a row deleted and made again would count from 1, and a reader would skip or repeat), and a whole-resource reader would need one number per partition. The cost of per-slot numbers: they are not gap-free per partition, so "how far behind am I in this room" is not a subtraction. An app that needs a gap-free count keeps one with `incr`.
 
@@ -251,7 +251,7 @@ L0  storage and io        one journal per process · group commit · segments ·
 | Setup | Servers | Voters per shard | Log members | Object store |
 |---|---|---|---|---|
 | one process: local dev, fero test, a single copy | 1 | 1: itself | none | a local folder |
-| a few processes on one box (example 01) | each process | 1 (the first member) while there are fewer than three, the others learners; 3 from three members | none | a local folder |
+| a few processes on one box (example 01) | each process | 1 (the member that created the shard) while there are fewer than three candidates, the others learners; 3 from three | none | a local folder |
 | self-hosted cluster | each app process | 3 (or `copies`), plus learners up to `standbys` | optional: a witness on a third machine when there are two | optional: S3 or compatible. Without it, snapshots and history stay on replicas' disks |
 | fero deploy | each copy, with its own disk | 3: the copies, topped up with log replicas when there are fewer than three copies | the platform's shared log tier | S3 |
 
@@ -303,7 +303,7 @@ L0  storage and io        one journal per process · group commit · segments ·
 - Frames are v4's: encoded once, with a crc32c, and the same bytes are the journal row and the wire (V3-8).
 - A frame is sent at the end of the event-loop turn that made it (decision 9). One frame to a peer carries the messages of every shard the two share.
 - **Sizes are capped.** A Raft batch is at most 1 MB, a catch-up `APPEND` at most 4 MB, and a frame bundling many shards is cut at 1 MB. A record bigger than a batch is cut into frames between begin and end markers, as big rows are (4.4).
-- **Member verbs only on member links.** Raft verbs are accepted only on links from members that passed the door; on a client link they close it, as v4 drops VIEW and VOTE there. Planner and admin `ASK`s need the admin key.
+- **Member verbs only on member links.** Raft verbs are accepted only on links from members that passed the door; on a client link they close it, as v4 drops VIEW and VOTE there. Planner and admin `ASK`s (hints, define, alter, recover) need the admin key, checked at the door (L0) before the payload reaches the standard library, so a client link can never carry a `recover`. The forward-once rule of 4.3 applies to every `ASK` that carries a write.
 
 ### 4.2 L1: the log
 
@@ -481,20 +481,26 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 | wake | a server starts. Each shard's leading log replica brings it up to date, or adds it, then hands it leadership (repair, above) |
 
 **Moving a slot.** The one way data changes shards, pull-style, as Redis Cluster's IMPORTING and Vitess's cut-over do. To move slot s from shard A to shard B:
-1. **B's leader appends `importing(s, from A)`,** and copies s while A still takes writes: by subscribing to s at A in `state` mode, or from A's latest snapshot in the object store.
-2. **A's leader appends `fenced(s, to B)`.** From then it answers `moved(B)` for s, and streams what changed since B's copy, plus the carried state (below).
-3. **B's leader appends `open(s, seq N)`,** where N is s's last sequence number, and serves s.
+Every step acts only on **committed** entries: appending is not enough, since a leader can be deposed before its entry commits.
+1. **B's leader commits `importing(s, from A)`,** then copies s while A still takes writes: by subscribing to s at A in `state` mode, or from A's latest snapshot in the object store. From then until `open` commits, B answers writes to s `retry`, with a retry-after, never `moved(A)`.
+2. **A's leader commits `fenced(s, to B, N)`,** where N is s's last sequence number, only after B reports that its `importing` has committed. Only once `fenced` commits does A answer `moved(B)` for s, and send B what changed since its copy, then `END(N)`, then the carried state (below). A appends nothing to s after the fence, so that delta is complete.
+3. **B's leader commits `open(s, N)`,** and serves s only after it commits.
 
 - **The slot is unwritable for about one round trip:** between the fence and the open, since the bulk copy happened before the fence.
-- **Carried state:** the slot's rows and its sequence and epoch; per issuer, the committed outcomes tagged with s (4.3), and the issuer's highest call id, merged by `max` at B (ids rise globally, so a higher floor is always safe; without the merge, a late copy of a committed write could land at B as fresh); the highest fence token per lock in s.
-- **Crashes.** Either leader resumes from its own log. A cancels a move only after B appends `abort(s)`, and B aborts only before `open`.
+- **Writes in flight at A when it fences** were appended before the fence, so they commit or fail at A as usual, and A answers them; their effects are in the delta.
+- **Carried state:** the slot's rows and its sequence and epoch; per issuer, the committed outcomes tagged with s (4.3), and the issuer's highest call id, merged by `max` at B; and A's whole table of highest fence tokens per lock, also merged by `max`, since locks live in `#locks`, not in s, and B may already hold a higher token from another slot.
+- **Why the `max` merge is safe.** A writer that saw id h knows the issuer issued h. By the issuer's window (4.3), every id at or below h − `issuer.window` already has a definitive answer, whichever shard gave it. So raising B's floor forgets only answered attempts. Without the merge, a late copy of a committed write could land at B as fresh.
+- **Crashes.** Each leader resumes from its own committed log. A new A leader with a committed `fenced` re-sends from B's position. A new B leader with a committed `importing` re-subscribes at A. A cancels a move only after B commits `abort(s)`, and B aborts only before `open`.
+- **A lost B.** If B is permanently lost after the fence, s stays fenced at A until an operator acts: `fero recover` or the planner's `move(s, A)`, which re-imports s into A.
 - **The slot table** in `#meta` is a hint, refreshed after each move. The truth is the fence and open entries in the shards' own logs, and a stale route costs one `moved`.
-- **Readers** need nothing: positions are per slot (2). A subscriber of s at A gets `END` at the fence, with its position, and resubscribes at B.
-- **The model:** at most one shard has a slot open at any time; a slot's sequence never goes back; every committed write to s is at B when B opens.
+- **`state` readers** need nothing: positions are per slot (2). A subscriber of s at A gets `END` at the fence, with its position, and resubscribes at B.
+- **`log` readers** (a tape, a derived resource, `read({ from })`) at a position below N are answered by B `moved(A)`, or `expired` once `history` has lapsed. s's records before N stay in A's segments or the object store, and a replay across a move reads A's segments for s, then B's.
+- **A shard is deleted** only once its segments are uploaded or its `history` has lapsed, and once the slot table has shown none of its slots for a grace period (`settle.ms`). Meanwhile its former members answer `moved` from the table, so a client with a stale route is never left dialling nothing.
+- **The model:** at most one shard has a committed `open` for a slot with no later committed `fenced`; no slot sequence number is stamped by two shards; a slot's sequence never goes back; every committed write to s is at B when B opens.
 
 **The shard rule,** the only automatic policy for data, run by each shard's leader as healing is:
 - **Grow.** Over `shard.bytes` (4 GB) or `shard.rate` (half the leader's measured write capacity), the leader creates a shard (one `#meta` record; healing places it) and moves half its slots there.
-- **Shrink.** Under a quarter of both for `settle.ms`, and not the resource's last shard, it moves its slots to its smallest sibling, then deletes itself.
+- **Shrink.** Under a quarter of both for `shrink.after` (6 h), so a daily cycle does not move gigabytes each night and back each morning; not the resource's last shard; and only when its smallest sibling stays under half of both limits after taking its slots, so a shrink never sets off a grow. Then it moves its slots there and is deleted (above).
 - **One move at a time per resource,** by a lease row in `#meta`, paced like snapshot loads.
 - **A hot slot** can get a shard of its own. A hot partition is still one writer.
 - **The planner** may say `move(slot, shard)` and `shards(resource, n)`, checked like any hint.
@@ -536,13 +542,14 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 - **Mixed versions.** Frames carry the protocol version. The cluster version lives in `#meta`, and is raised only when every member runs the new kernel, as Kafka's `metadata.version` is.
 - **Operator recovery.**
   - `fero recover --unclean <shard>`, when a shard's voters have permanently lost their majority. One surviving replica forces a configuration of itself, as TiKV's `unsafe-recover` and CockroachDB's `debug recover` do for one range. It reports what may be lost, and bumps the shard's incarnation in `#meta` and the epoch of each slot it holds, so stale cursors are refused instead of waiting.
+  - **Recovery and moves.** The surviving copy may be from before a move's fence. So a recovered shard re-fences every slot the slot table places elsewhere, never reopens one, and shows the operator the list first. For recovery, the table is the authority.
   - **The residual case:** if the "lost" majority was only partitioned, it may still elect under the old incarnation. Its leader learns the bump from `#meta` when it can reach it, and stops; until then two writers exist under two incarnations, and the command says so before it runs.
   - `fero recover --new-cluster`, the same for `#meta` (etcd's force-new-cluster is the whole-cluster precedent). It bumps `#meta`'s incarnation and keeps the cluster id, so cursors on healthy shards stay valid. Members compare `#meta`'s incarnation in HELLO: one with a lower incarnation stops its `#meta` replica, adopts the higher one, and comes back as a new replica of it. So an old voter returning with its dir never revives the old `#meta`. On the bump, every shard leader re-writes its shard record and every server re-registers its resources, so a `#meta` rebuilt from a copy that was behind learns every shard and resource made since.
   - **Both commands refuse** while any voter they would drop answers, and name it. A voter that cannot be reached is named too, so the operator sees what may still come back.
 - **Routing.**
   - The partition-to-shard function is a fixed 64-bit hash with a full avalanche finaliser, versioned with the frame format.
   - A leader refuses a record whose partition is not in its shard (`wrong-shard`).
-  - Clients send writes to their server, which maps each row key to its shard (a custom `partition` function runs only on servers) and forwards to the shard's leader. It finds the leader from its own replicas, or from `#meta`'s directory. A stale answer costs one `moved`, which names the current leader, or the children of a split.
+  - Clients send writes to their server, which maps each row key to its shard (a custom `partition` function runs only on servers) and forwards to the shard's leader. It finds the leader from its own replicas, or from `#meta`'s directory. A stale answer costs one `moved`, which names the current leader, or the shard a slot moved to.
 - **Who dials whom.** Members dial only members `#meta` names, plus their `hosts` and the box directory. Never an address a client claims.
 - **Hosted.** Each project's `#meta` is a shard like the others, on the project's own copies and log replicas, and quiet ones cost nothing. A log-tier process runs one log member per project, sharing the process and its journal, with a quota each.
 
@@ -560,11 +567,11 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 
 **At the writer, in this order:**
 1. **Dedup.**
-   - **What it checks.** If the attempt id is in the shard's log, committed or in the writer's uncommitted tail, the writer answers with the original offset, and nothing else runs.
+   - **What it checks.** If the attempt id is in the shard's log, committed or in the writer's uncommitted tail, the writer answers with the original position (slot, epoch, sequence), and nothing else runs. An outcome carried by a slot move keeps its position, which an offset could not.
    - **No answer before commit.** Every answer (a dedup answer, a refusal such as `conflict`) is judged against the writer's log-end state, so it waits until the commit offset reaches the version it was judged against. If the leader loses leadership first, the answer is `unknown`, and the issuer retries at the new leader.
-   - **What the issuer promises.** Its call ids rise. It has at most `issuer.window` (1,024) attempts outstanding in all, counted from its oldest unacknowledged one. The window is a cluster key, so every issuer and every writer use the same one. It stops retrying an attempt after half the horizon (5 min).
+   - **What the issuer promises.** Its call ids rise. Its ids span less than `issuer.window` (1,024): its highest issued id minus its oldest unacknowledged id is always below the window. The window is a cluster key, so every issuer and every writer use the same one. It stops retrying an attempt after half the horizon (5 min).
    - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor (a commit, or an appended refusal), kept by id. Each outcome is tagged with its slot, so a slot move carries it (4.2). An issuer silent for the retry horizon (5 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
-   - **The floor.** An attempt at or below (highest id seen) − `issuer.window` that is not among the outcomes is a late duplicate of a committed write, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
+   - **The floor.** An attempt at or below (highest id seen) − `issuer.window` that is not among the outcomes is a late duplicate of an answered attempt, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
    - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server forwards an attempt only over the link to the leader it had when it took the attempt; after any break it answers `retry`, and the issuer resends. Resends back off with jitter, from 200 ms up to `election.ms`, and a `no-writer` or `moved` answer carries a retry-after, so an election never brings a retry storm. A leader closes a link that misses pings for `election.ms`, so a frozen server's late forward never lands. These bound how late a copy can arrive; what makes every answer unique is the log: committed outcomes, and the appended refusals of resent attempts (below).
    - **Across leaders.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new leader holds every committed entry (Raft's leader completeness), and folds its whole log before it answers. So the floor never drops below where the old leader had moved it.
 2. **Shape checks that need the current row.**
@@ -695,7 +702,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 | Scope | Lives in | Keys | Changes |
 |---|---|---|---|
 | node | the config cascade, as today | `uuid`, `dir`, `listen`, `advertise`, `hosts`, `seeds`, roles (`server`, `log`), `object` (the object store), `secret`, `secret.client`, `rendezvous`, `heartbeat.ms`, `redial.*`, `leave.ms`, `journal.cap`, `diag.allow`, `signals`, `memory`, `cache`, `connect.wait` | restart that node |
-| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, `issuer.window`, `shard.bytes`, `shard.rate`, cluster version | online through `fero.alter('#meta', change)`, which checks each key's range and the keys against each other (say, `election.ms` above twice `ping.ms`, `skew.max` below `election.ms`) and refuses with the reason. `issuer.window` may only be raised online: a lower window would put in-flight attempts below the floor |
+| cluster | `#meta` | `#meta`'s `copies`, default `copies`, `ping.ms`, `election.ms`, `evict.after`, `settle.ms`, `catchup.max`, `skew.max`, `lag.max`, `issuer.window`, `shard.bytes`, `shard.rate`, `shrink.after`, cluster version | online through `fero.alter('#meta', change)`, which checks each key's range and the keys against each other (say, `election.ms` above twice `ping.ms`, `skew.max` below `election.ms`) and refuses with the reason. `issuer.window` may only be raised online: a lower window would put in-flight attempts below the floor |
 | resource | the catalog | `slots` (1,024, fixed when defined), `copies` (voters per shard, default 3), `standbys` (full replicas per shard, voters and learners), `partition`, `history`, `rows`, `durability`, `validation`, `rules`, `methods`, `load` | online through `fero.alter`; code by allowed hash |
 
 - **Worlds** (fero test): a bound world resolves names to stand-ins, makes server markers into solo nodes, and supplies `now` and `id`. A solo node is the same code: a server that is the only voter of every shard, over a local-folder object store.
@@ -770,7 +777,7 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
   - Offsets are rows written with a fence on the generation, so a zombie consumer cannot commit.
 - **Locks.**
   - A lock is a row in `#locks`, claimed with `if: { absent }` or `{ expired: 'lease' }`. Its token is the claim's version.
-  - Protected writes carry `if: { fence: { lock, token } }`. Each shard keeps the highest token seen per lock, in its state, and a slot move carries it.
+  - Protected writes carry `if: { fence: { lock, token } }`. Each shard keeps the highest token seen per lock, in its state, and a slot move carries it. A limit, said plainly: fence tables are per shard, so a stale holder writing to a shard that has never seen the lock is accepted there. Writes a lock protects should live in partitions the lock's holders always write, or check the lock's current token with `if: { equals }` on the lock row.
   - A lock records the offsets its holder wrote at, so the next holder's reads can carry them as minimums.
 - **Transactions across partitions** (sagas: readers can see the intermediate states).
   1. Take the locks in key order.
@@ -1237,5 +1244,12 @@ Also made: a clamp on writer time; a log replica stands when no full voter has *
 - **Confirmed safe:** the learner-vote rule ("neither depends on the voter knowing its own role"), and the leave probe rule, as V4-60's choice of availability over copies.
 - **On a simpler primitive,** it proposed project-wide lanes in place of shards that split; see [V5-PRIMITIVE.md](V5-PRIMITIVE.md) for a second view, and decision 20.
 
-**Fixed slots, free shards.** An independent judge weighed shards that split, project lanes, fixed shards per resource, and fixed slots with free shards ([V5-UNITS.md](V5-UNITS.md)): "fix the names, free the groups." The user chose that (20d) and the smaller cuts (21a), and this draft folds both in. Positions are a partition and its slot's own number, not a counter per partition, so state stays bounded and whole-resource readers stay small (2). Not yet re-reviewed.
+**Fixed slots, free shards.** An independent judge weighed shards that split, project lanes, fixed shards per resource, and fixed slots with free shards ([V5-UNITS.md](V5-UNITS.md)): "fix the names, free the groups." The user chose that (20d) and the smaller cuts (21a), and this draft folds both in. Positions are a partition and its slot's own number, not a counter per partition, so state stays bounded and whole-resource readers stay small (2).
+
+**The review of fixed slots.** The same reviewer: "Yes, on three edits to 'Moving a slot' and recovery (M1–M3)." All three are made.
+- **M1:** every move step acts only on committed entries, and A fences only after B's `importing` commits. Before, a leader deposed after appending `fenced` could leave two shards writing one slot.
+- **M2:** `log` readers below a move's fence are sent back to the old shard's segments, and a shard is deleted only once its history is safe and no route points at it.
+- **M3:** a recovered shard re-fences every slot the table places elsewhere, and versions and fence tokens compare as (epoch, sequence).
+- **Also made:** fence tables carried whole and merged by `max`; why the `max` merge of call ids is safe, with the window stated as a span of ids; `shrink.after` (6 h) and a shrink that cannot set off a grow; the admin key checked at the door for `ASK`s; positions, not offsets, in dedup answers; and the stale rows.
+- **Its view of the shape:** "Fixed names, per-slot counters, groups free to move, no lineage. With M1–M3 and the stale rows fixed, this is the document I would start phase 1 from." 
 
