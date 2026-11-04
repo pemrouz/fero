@@ -32,9 +32,9 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-20 (L-13, L-33) | A snapshot is named before its upload finished, or log is dropped while only an incremental layer covers it | A snapshot is named in the shard's log only after its put is confirmed; log is dropped only under a merged base, with no split child, fork or `history` still needing it (4.1) |
 | R-21 | A log replica drops log that the only remaining full replica's snapshot does not cover | A log replica drops log only under a merged base in the object store, or below the offset every full voter has snapshotted past, as stamped by the leader (4.1) |
 | R-22 (L-16) | A fork points at a snapshot that retention later deletes | Forks hold references in `#meta`; nothing referenced is deleted (4.1) |
-| R-23 (L-17) | Writer time jumps on a change of leader | `t = max(last t in the log, clock)`; a member more than `skew.max` off its peers' median does not stand for election (4.2) |
+| R-23 (L-17) | Writer time jumps on a change of leader | `t = max(last t in the log, min(clock, peers' median + skew.max))`; a skewed member is ranked last, never barred (4.2) |
 | R-24 (L-18, L-38) | A retry reaches the new leader after a failover, or the dedup floor rose on refused attempts before it | Outcomes and each issuer's highest call id are shard state, in the log and in snapshots; a new leader folds its whole log before it answers (4.3) |
-| R-25 (L-19) | Two machines, one crashes | Below three candidates each shard has one voter, the first member; a crash of its machine stops writes until it returns. A witness on a third failure domain makes three voters, so either crash is survived (4.2) |
+| R-25 (L-19) | Two machines, one crashes | A shard created below three candidates has one voter, the member that created it; a crash of its machine stops writes until it returns. A witness on a third failure domain makes three voters, so either crash is survived (4.2) |
 | R-26 (L-14, L-20) | The full replicas crash and a log replica is the only up-to-date voter left | It leads only to repair: hands over to a returning full voter, or adds a server from the object store, promotes it and hands over. It never takes a client write; the shard says `no-writer` until then (4.2) |
 | R-27 | A log replica must repair, and there is no object store | It cannot build a full replica from its log alone, so it waits for a full voter to return with its disk, and says so (4.2) |
 | R-28 (L-22) | A noisy project on fero deploy's shared log tier | One log member per project, with a quota each; each project has its own cluster id and `#meta` (4.2) |
@@ -43,19 +43,35 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-31 (L-25) | A slow server keeps leading | A planner places by load; without one, a member past `skew.max`, or a replica whose fold lags past `lag.max`, does not stand, and hands over (4.2) |
 | R-32 (L-26) | A read from the object store gets stale data | Segments and snapshots are written once, under unique names, and never overwritten (4.1) |
 | R-33 (L-34) | A disk lied about an fsync, and its copy is part of the only majority | Boot checks catch damaged records, and such a replica comes back as a new one; an acknowledged write lost by a disk that lies cannot be detected on its own, the residual case, named (4.1) |
-| R-34 (L-35) | Healing shrinks a shard to fewer voters than `copies`, silently | Voters are the largest odd number the candidates allow, a live voter is removed only after its replacement is a caught-up voter, and `cluster.health` and stderr say how many voters each shard has (4.2, 4.5) |
+| R-34 (L-35) | Healing shrinks a shard to fewer voters than `copies`, silently | Healing never lowers a voter count; a gone voter is removed only when a replacement exists; under-replication is reported on `cluster.health` and stderr (4.2, 4.5) |
 | R-35 (L-36) | A member's main thread hangs while its kernel thread keeps pinging | The watchdog answers calls `busy`; its shards keep being written (4.2) |
 | R-36 (L-37) | A run folder's dirs were wiped but its `cluster-id` file stayed | The file is renamed aside and a new cluster is founded, said on stderr (4.2) |
 | R-37 (L-07) | `#meta` loses its majority | Writes and failovers carry on; joins, new resources and directory updates wait; a stale directory costs one `moved` (4.2) |
-| R-38 | A member leaves while another voter of the same shard is dead | Dead voters are removed first when that lets the leave carry; a shard where neither is safe keeps the leaver as a voter, and `destroy()` names it (4.2) |
+| R-38 | A member leaves while another voter of the same shard is dead | Voters dead past `evict.after` are removed first when that lets the leave carry; a shard where neither is safe keeps the leaver as a voter, and `destroy()` names it (4.2) |
 | R-39 | A replica whose fold lags far behind wins an election | Raft elects only complete logs; a replica whose fold lags past `lag.max` waits one more step; a new leader answers only once its fold reaches its log end (4.2) |
 | R-40 | A planner places a shard on a server without the resource's code | The leader refuses a target without the resource's code hashes (4.5) |
-| R-41 | A frozen server forwards an attempt late | It forwards only over the link it had when it took the attempt; the leader closed that link after `election.ms` of missed pings, so the forward never lands, and the issuer retries (4.3) |
+| R-41 | A frozen server forwards an attempt late | Links and budgets bound how late a copy can arrive: a server forwards only over the link it had, which the leader closed after `election.ms` of missed pings. The log makes answers unique: a resent attempt's refusal is appended, so a late copy finds it (4.3) |
 | R-42 | A member holds thousands of shards, and each would fsync and ping alone | One journal per process, with one fsync per batch; one link ping per member pair; quiet shards send nothing (4.1, 4.2) |
 | R-43 | A `fresh` read reaches a deposed leader | Read index: it confirms that a majority still follows it before it answers (4.2, 4.5) |
 | R-44 | Example 01's voter leaves | It promotes the learner, hands over leadership, then removes itself, all while both are live (4.2) |
 | R-45 | A gone voter is replaced while one more voter is down | A gone voter is removed first (it was not answering anyway), then its replacement is added as a learner and promoted, so no step needs more live voters than before (4.2) |
-| R-46 | `confirm: 'sent'` on a write whose leader then dies | The promise said only "appended"; the write's outcome stays in `cluster.writes`, and a client's view shows it only if it commits; refused on conditions and ops (3.2) |
+| R-46 | `confirm: 'sent'` on a write whose leader then dies | The answer carries the attempt id, never an offset; the write stays pending and is resent after failover, so dedup finds it; a client's view shows it only once it commits; refused on conditions and ops (3.2) |
+| R-47 | A power loss of every voter, each journal ending in a torn record | A torn tail is truncated, and the replica still vouches for everything before it; only damage mid-log makes a replica a new one (4.1) |
+| R-48 | One of three members is partitioned past `evict.after`, with no replacement candidate | Healing never lowers a voter count: the gone voter stays, the shard is reported under-replicated, and its live majority commits (4.2) |
+| R-49 | An attempt is refused, then a stale earlier copy of it arrives (a queued frame on a closed link) | The refusal of a resent attempt is appended under its id, so the stale copy finds it and gets the same answer (4.3) |
+| R-50 | A `sent` write's offset is reused by the next leader | The `sent` answer carries no offset; the write is matched by attempt id and resent after failover (3.2) |
+| R-51 | A sleeping free-tier project wakes on a fresh copy, with only log replicas left | Log members hold full replicas of `#meta`, so it takes the new member record; each shard's log replica then adds the copy and hands it leadership (4.2) |
+| R-52 | A leader's clock jumps a year ahead for one batch | `t` is clamped to the peers' median plus `skew.max`, so no TTL or lease is poisoned (4.2) |
+| R-53 | A full voter whose log is behind keeps standing and losing, so a log replica never stands | A log replica stands when no full voter has won for twice `election.ms` (4.2) |
+| R-54 | A fresh disk repeats an old disk incarnation and votes as the old replica | Disk incarnations are random 128-bit ids, written when the dir is created (4.1) |
+| R-55 | A leader quiets a shard while a follower lags | A leader quiets only when every live voter has its commit offset; a follower told "quiet at i" while below it asks to wake (4.2) |
+| R-56 | A `fresh` read at a quiet shard's deposed leader after links return | The read index is a per-shard message carrying the term; link pings never confirm leadership (4.2) |
+| R-57 | A member returns as rank 1 for thousands of shards | It takes back at most ten leaderships a second (4.2) |
+| R-58 | A member leaves while a peer is in a GC pause | Only voters dead past `evict.after` are removed for a leave; a shorter silence keeps the leaver as a voter, and `destroy()` says so (4.2) |
+| R-59 | A follower restarts during a roll while its shards are quiet | When a link comes back, each side reports its log end per shared shard, and the leader wakes any shard whose follower is behind (4.2) |
+| R-60 | A new leader overwrites a follower's uncommitted tail, then the follower loses power | The follower journals a cut record before the new entries and starts a new segment; boot replays cuts in order (4.1) |
+| R-61 | A replica removed while it was down comes back | It learns of its removal from the leader or `#meta`, stops serving, and deletes its copy once `#meta` shows the configuration without it; if re-added first, its copy seeds the learner (4.2) |
+| R-62 | Two members leave a three-voter shard one after the other | Each leave promotes a caught-up learner first, so the voter count holds while learners remain (4.2) |
 
 ## Part 1: v4's hard cases
 
