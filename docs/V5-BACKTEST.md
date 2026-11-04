@@ -58,7 +58,7 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-46 | `confirm: 'sent'` on a write whose leader then dies | The answer carries the attempt id, never an offset; the write stays pending and is resent after failover, so dedup finds it; a client's view shows it only once it commits; refused on conditions and ops (3.2) |
 | R-47 | A power loss of every voter, each journal ending in a torn record | A torn tail is truncated, and the replica still vouches for everything before it; only damage mid-log makes a replica a new one (4.1) |
 | R-48 | One of three members is partitioned past `evict.after`, with no replacement candidate | Healing never lowers a voter count: the gone voter stays, the shard is reported under-replicated, and its live majority commits (4.2) |
-| R-49 | An attempt is refused, then a stale earlier copy of it arrives (a queued frame on a closed link) | The refusal of a resent attempt is appended under its id, so the stale copy finds it and gets the same answer (4.3) |
+| R-49 | An attempt is refused, then another copy of it arrives: a frame queued on a closed link, or a first send still in flight when a timeout resent it | A resent copy's refusal is appended under its id, so a later copy finds it; an issuer that has resent accepts only its latest copy's answer, so a first send's unappended refusal is ignored (4.3) |
 | R-50 | A `sent` write's offset is reused by the next leader | The `sent` answer carries no offset; the write is matched by attempt id and resent after failover (3.2) |
 | R-51 | A sleeping free-tier project wakes on a fresh copy, with only log replicas left | Log members hold full replicas of `#meta`, so it takes the new member record; each shard's log replica then adds the copy and hands it leadership (4.2) |
 | R-52 | A leader's clock jumps a year ahead for one batch | `t` is clamped to the peers' median plus `skew.max`, so no TTL or lease is poisoned (4.2) |
@@ -89,6 +89,9 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-77 | One voter crashed seconds ago, then another member leaves a three-voter shard | A voter silent past `election.ms` that does not answer probes for the rest of `leave.ms` is removed first, so the stayer keeps writing (V4-60) (4.2) |
 | R-78 | `#meta` is recovered with `--new-cluster`, then an old voter returns with its dir | Members compare `#meta`'s incarnation in HELLO; the lower one stops its `#meta` replica and rejoins the new one (4.2) |
 | R-79 | `recover` is run while a voter it would drop is still alive | Both recover commands refuse while any voter they would drop answers, naming it (4.2) |
+| R-80 | A leave during a roll leaves a shard one voter, and the restarted member returns | Healing raises a voter count only to an odd number, so the returning member is a learner until a third candidate arrives (4.2) |
+| R-81 | `issuer.window` is lowered online while attempts are in flight | It may only be raised online (4.5) |
+| R-82 | `recover --new-cluster` rebuilds `#meta` from a copy that was behind | On the incarnation bump every leader re-writes its shard record and every server re-registers its resources (4.2) |
 
 ## Part 1: v4's hard cases
 
