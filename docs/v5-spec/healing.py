@@ -64,6 +64,10 @@ class G:
     E = 1            # client entries
     MUT = frozenset()
     FIX = frozenset()  # proposed fixes to try (see FIXES)
+    ROUND = 2        # 2: the revised text; 1: the text the first round checked
+    PLANNER = False  # the scenario's events are planner retire/undrain, not Ctrl-C
+    PL = 0           # planner events
+    CHURN = 8        # configuration changes allowed between two outside events
     FINE = False     # replicate to one follower per step
     ANY = False      # healing may take any enabled step, not the doc's order
     META = True      # #meta has a majority, so the draining mark is written
@@ -85,7 +89,10 @@ PROPS = {
     'P4-settleeven':'the shard never settles with an even voter count',
     'P5-stuck':     'after faults stop, with a live majority, the shard elects and commits',
     'P6-paused':    'a leave never removes a voter that is only paused',
-    'P7-draining':  'no healing step adds or promotes a draining or departed member',
+    'P7-draining':  'no healing step adds or promotes a retiring or departed member',
+    'P8-replace':   '(round 2) a settled shard has no gone voter while a live candidate is free',
+    'P9-churn':     '(round 2) no more than CHURN configuration changes without an outside event',
+    'P10-retire':   '(round 2, planner) a retired member ends with no replica (informational)',
 }
 
 # --------------------------------------------------------------------------
@@ -182,6 +189,23 @@ def prev_voters(log):
                 r = cf[k - 1][0]
                 break
         _PV[log] = r
+    return r
+
+
+_LVC = {}
+
+
+def last_voter_change(log):
+    """(the voters before the latest change of voters, that change's tag)."""
+    r = _LVC.get(log)
+    if r is None:
+        r = (None, (None, None))
+        cf = [ENT[x][2] for x in log if ENT[x][1] == CFG]
+        for k in range(len(cf) - 1, 0, -1):
+            if cf[k][0] != cf[k - 1][0]:
+                r = (cf[k - 1][0], cf[k][2])
+                break
+        _LVC[log] = r
     return r
 
 
@@ -326,7 +350,7 @@ def elect(s, cx, c, T, forced, from_leader, label):
     reps = list(reps)
     rc = reps[c]
     V = cfgs(rc[LOG])[0][1]
-    grants = 1
+    grants = 1 if cx.rid[c] in V else 0          # a demoted candidate does not count itself
     voters_granting = [c]
     for (m, i) in V:
         if m == c:
@@ -381,7 +405,226 @@ def elect(s, cx, c, T, forced, from_leader, label):
 
 def config_steps(s, cx, L):
     """The doc's healing and leave steps leader L may take now. Each is
-    (rule, subject member, new voters, new learners, extra)."""
+    (rule, subject, new voters, new learners, the replica it adds or removes)."""
+    if G.ROUND == 1:
+        return config_steps_r1(s, cx, L)
+    return config_steps_r2(s, cx, L)
+
+
+def promoted_by(log, tag):
+    """The voter added by the configuration entry carrying this tag, or None."""
+    prev = None
+    for x in log:
+        e = ENT[x]
+        if e[1] != CFG:
+            continue
+        if e[2][2] == tag and prev is not None:
+            added = set(e[2][0]) - set(prev)
+            return added.pop() if len(added) == 1 else None
+        prev = e[2][0]
+    return None
+
+
+def config_steps_r2(s, cx, L):
+    """Round 2: DESIGN-V5 4.2 as revised after round 1 (swaps promote first,
+    gone from the leader's own links, retiring left to its leave, two voters
+    step back to one, the leave waits for its replacement's commit offset)."""
+    mems, reps = s[0], s[1]
+    N = len(mems)
+    r = reps[L]
+    log, commit = r[LOG], r[COMMIT]
+    latest = cfgs(log)[0]
+    V, Lr, tag = latest[1], latest[2], latest[3]
+    Vs, Ls = set(V), set(Lr)
+    rid, up, lk = cx.rid, cx.up, cx.lk
+    MUT = G.MUT
+    steps = []
+    waiting = set()
+
+    def link(m):
+        return m == L or lk[L][m]
+
+    def long_down(m):
+        # its link to this leader has been down past evict.after (or #meta says gone)
+        return mems[m][GONE] and not link(m)
+
+    def live_m(m):
+        return up[m] and link(m)
+
+    def v_gone(v):
+        m, i = v
+        if mems[m][INC] != i and up[m] and link(m):
+            return True          # cannot vouch: its member came back as a new replica
+        return long_down(m)
+
+    def retiring(m):
+        return mems[m][DRAIN]
+
+    def cand(m):
+        if retiring(m) or mems[m][LEFT]:
+            return False
+        if 'ignore-own-link' in MUT:
+            return True          # only #meta's mark, which this model leaves out
+        return not long_down(m)
+
+    cands = [m for m in range(N) if cand(m)]
+    live_c = [m for m in cands if live_m(m)]
+    nv, nlive = len(V), len(live_c)
+    if 'heal-lower' in MUT:
+        k = max(1, min(G.COPIES, nlive))
+    elif 'promote-even' in MUT:
+        k = G.COPIES if nlive >= G.COPIES else max(min(nv, G.COPIES), min(nlive, G.COPIES))
+    else:
+        k = G.COPIES if nlive >= G.COPIES else min(nv, G.COPIES)
+    if k == 1:
+        incumbent = [v[0] for v in V if v[0] in cands and v == rid[v[0]]]
+        T = incumbent[:1] if incumbent else cands[:1]
+    else:
+        T = cands[:k]
+    Tset = set(T)
+    quorum = sum(1 for (m, i) in V if mems[m][INC] == i and link(m) and up[m]) >= maj(len(V))
+    info = (V, Lr, k, Tset, nlive, live_c, waiting)
+
+    # "then remove the old voter in the very next step"
+    if tag[0] == 'heal-swap-promote' and tag[1] in Vs:
+        x = tag[1]
+        if 'swap-exact-remove' in G.FIX:
+            # proposed fix: remove the old voter once the new one holds the commit
+            # offset again (its own promotion included); if the new one is gone
+            # instead, the very next step removes it, and the old voter stays
+            nw = promoted_by(log, tag)
+            if nw is not None and nw in Vs:
+                if v_gone(nw) and quorum:
+                    return [('heal-gone', nw, tdel(V, nw), tdel(Lr, nw), nw)], info
+                if nw != rid[nw[0]] or not live_m(nw[0]) or lcp(reps[nw[0]][LOG], log) < commit:
+                    return [], info
+        nl_ = tadd(Lr, x) if (x[0] in cands and x == rid[x[0]] and x not in Ls) else tdel(Lr, x)
+        return [('heal-swap-remove', x, tdel(V, x), nl_, x)], info
+
+    # ---- healing ------------------------------------------------------
+    owned = set()                 # a retiring voter is left to its own leave
+    if 'heal-ignores-retiring' not in MUT:
+        owned = set(v for v in V if mems[v[0]][LEAVING] and up[v[0]] and v == rid[v[0]])
+    X = [v for v in V if not (v[0] in Tset and v == rid[v[0]]) and v not in owned]
+    gone_X = [v for v in X if v_gone(v)]
+    live_X = [v for v in X if not v_gone(v) and live_m(v[0]) and v == rid[v[0]]]
+    M_live = [t for t in T if rid[t] not in Vs and live_m(t)]
+    # growth: below the target, promote a caught-up learner of the target, to an odd count
+    if nv < k:
+        for t in M_live:
+            l = rid[t]
+            if l not in Ls:
+                continue
+            if 'promote-uncaught' not in MUT and lcp(reps[t][LOG], log) < commit - G.LAG:
+                continue
+            if (nv + 1) % 2 == 1 or (nv == 1 and nlive >= G.COPIES) or 'promote-even' in MUT:
+                steps.append(('heal-promote', t, tadd(V, l), tdel(Lr, l), l))
+            break
+    # a swap: add the replacement as a learner, let it reach the commit offset
+    # exactly, promote it, then remove the old voter in the very next step
+    swap_x = (gone_X if quorum else []) + live_X
+    if swap_x and M_live and nv >= k:
+        x, t = swap_x[0], M_live[0]
+        l = rid[t]
+        if 'swap-remove-first' in MUT and x in gone_X:
+            steps.append(('heal-gone', x, tdel(V, x), tdel(Lr, x), x))
+        elif l not in Ls:
+            steps.append(('heal-add', t, V, tadd(Lr, l), l))
+        else:
+            need = commit - G.LAG if 'live-remove-lag' in MUT else commit
+            if lcp(reps[t][LOG], log) >= need:
+                steps.append(('heal-swap-promote', x, tadd(V, l), tdel(Lr, l), l))
+    # a gone voter with no replacement is removed only when the voters left are
+    # still an odd number at or above the target
+    if quorum:
+        for x in gone_X:
+            surplus = nv - 1 >= max(k, 1) and (nv - 1) % 2 == 1 and 'no-gone-surplus' not in MUT
+            if surplus or ('gone-no-repl' in MUT and not M_live):
+                steps.append(('heal-gone', x, tdel(V, x), tdel(Lr, x), x))
+                break
+    # add live candidates as learners (standbys: every server)
+    for m in live_c:
+        if rid[m] not in Vs and rid[m] not in Ls:
+            steps.append(('heal-add', m, V, tadd(Lr, rid[m]), rid[m]))
+            break
+    # a surplus live voter, once the target is all voters
+    if nv > k and not [t for t in T if rid[t] not in Vs]:
+        for u in live_X:
+            nl_ = tadd(Lr, u) if (u[0] in cands and u not in Ls) else Lr
+            steps.append(('heal-rmlive', u, tdel(V, u), nl_, u))
+            break
+    if 'heal-lower' in MUT and nv > k:
+        for u in V:
+            if (u[0] not in Tset or v_gone(u)) and u[0] != L:
+                steps.append(('heal-shrink', u, tdel(V, u), tdel(Lr, u), u))
+    # two voters step back to one
+    if ('no-two-to-one' not in MUT and nv == 2 and nlive < G.COPIES and G.COPIES != 2
+            and rid[L] in Vs
+            and ('two-to-one-retiring' in MUT or not any(retiring(v[0]) for v in V))):
+        for u in V:
+            if u[0] != L:
+                nl_ = tadd(Lr, u) if (u[0] in cands and u == rid[u[0]] and u not in Ls) else Lr
+                steps.append(('heal-demote', u, tdel(V, u), nl_, u))
+    # learners whose member is retiring, departed, long down, or on a stale disk
+    for l in Lr:
+        m = l[0]
+        stale = l != rid[m] and up[m] and link(m)
+        if stale or retiring(m) or mems[m][LEFT] or long_down(m):
+            steps.append(('heal-rmlearner', l, V, tdel(Lr, l), l))
+
+    # ---- the leave ----------------------------------------------------
+    for m in range(N):
+        if not mems[m][LEAVING] or not up[m]:
+            continue
+        lid = rid[m]
+        if lid in Ls and L != m:
+            steps.append(('leave-learner', m, V, tdel(Lr, lid), lid))
+        if lid not in Vs:
+            continue
+        promoted = ('leave-promote', m) in tags_of(log)
+        caught = [l for l in Lr if l == rid[l[0]] and live_m(l[0])
+                  and not retiring(l[0]) and not mems[l[0]][LEFT]
+                  and lcp(reps[l[0]][LOG], log) >= commit - G.LAG]
+        no_promote = 'leave-no-promote' in MUT
+        if not promoted and caught and not no_promote:
+            l = caught[0]
+            steps.append(('leave-promote', m, tadd(V, l), tdel(Lr, l), l))
+        if promoted or not caught or no_promote:
+            def live_leave(v):
+                mm, i = v
+                if mems[mm][INC] != i:
+                    return False
+                if mm == L:
+                    return True
+                if not lk[L][mm]:
+                    return False
+                if 'leave-paused' in MUT and mems[mm][PAUSED]:
+                    return False
+                return True
+            rest = tdel(V, lid)
+            safe = len(rest) >= 1 and sum(live_leave(v) for v in rest) >= maj(len(rest))
+            exact = True
+            if promoted and 'leave-not-exact' not in MUT:
+                # "once that learner's log reaches the leader's commit offset, exactly"
+                rp = promoted_by(log, ('leave-promote', m))
+                if rp is not None and rp in Vs and (
+                        rp != rid[rp[0]] or lcp(reps[rp[0]][LOG], log) < commit):
+                    exact = False
+                    if rp == rid[rp[0]] and live_m(rp[0]):
+                        waiting.add(m)   # it will catch up within leave.ms
+            if L != m and len(rest) >= 1 and exact and (safe or 'leave-always-remove' in MUT):
+                steps.append(('leave-leaver', m, rest, Lr, lid))
+            if not safe and quorum and 'leave-no-dead' not in MUT:
+                for d in rest:
+                    if not live_leave(d):
+                        rest2 = tdel(V, d)
+                        if sum(live_leave(v) for v in rest2) >= maj(len(rest2)):
+                            steps.append(('leave-dead', d[0], rest2, tdel(Lr, d), d))
+    return steps, info
+
+
+def config_steps_r1(s, cx, L):
+    """Round 1: DESIGN-V5 4.2 as first reviewed (kept for --round 1)."""
     mems, reps = s[0], s[1]
     N = len(mems)
     r = reps[L]
@@ -552,6 +795,8 @@ def config_steps(s, cx, L):
 HEAL_ORDER = ['heal-gone', 'heal-shrink', 'heal-add', 'heal-promote', 'heal-rmlive', 'heal-demote',
               'heal-rmlearner']
 LEAVE_ORDER = ['leave-promote', 'leave-dead', 'leave-leaver', 'leave-learner']
+HEAL_ORDER2 = ['heal-swap-remove', 'heal-gone', 'heal-shrink', 'heal-promote', 'heal-swap-promote',
+               'heal-add', 'heal-rmlive', 'heal-demote', 'heal-rmlearner']
 
 
 def ordered(steps):
@@ -560,7 +805,7 @@ def ordered(steps):
     the target, drop stale learners); the leave takes its own next step. The
     two interleave freely. (--any-order offers every enabled step.)"""
     out = []
-    for order in (HEAL_ORDER, LEAVE_ORDER):
+    for order in (HEAL_ORDER if G.ROUND == 1 else HEAL_ORDER2, LEAVE_ORDER):
         best = None
         for st in steps:
             if st[0] in order and (best is None or order.index(st[0]) < order.index(best[0])):
@@ -570,17 +815,106 @@ def ordered(steps):
     return out
 
 
-def holders(mems, reps, V, com, j):
-    """Vouching voters of V that hold committed entry j (1-based)."""
+def holders(mems, reps, V, com, j, ans=None):
+    """Vouching voters of V that hold committed entry j (1-based). With ans
+    (round 2: "answering"), only those for which ans(member) is true."""
     n = 0
     for (m, i) in V:
-        if mems[m][INC] == i and lcp(reps[m][LOG], com) >= j:
+        if mems[m][INC] == i and lcp(reps[m][LOG], com) >= j and (ans is None or ans(m)):
             n += 1
     return n
 
 
 def check_step(s, cx, L, step, info):
     """Properties of one healing or leave step (P2, P3, P6, P7)."""
+    if G.ROUND == 2:
+        return check_step_r2(s, cx, L, step, info)
+    return check_step_r1(s, cx, L, step, info)
+
+
+ADMITTED_P2 = ('leave-leaver-no-replacement', 'leave-dead')   # the revised 10.2's own exceptions
+
+
+def check_step_r2(s, cx, L, step, info):
+    """Round 2. P2 is the revised 10.2 property: no healing step reduces the
+    answering, vouching voters holding a committed entry, unless a replacement
+    voter already holds it; a leave may, only when no caught-up learner exists
+    or by removing dead voters."""
+    mems, reps, com = s[0], s[1], s[5]
+    rule, subj, Vn, Ln, who = step
+    V, Lr, k, Tset, nlive, live_c, _ = info
+    log = reps[L][LOG]
+    viols = []
+
+    def ans(m):
+        return mems[m][UP] and (m == L or cx.lk[L][m])
+
+    # a leader cut off from a majority cannot commit this step before
+    # CheckQuorum steps it down, and once its links return the others answer
+    # again: P2 judges only a leader that reaches a majority of its voters
+    reach = sum(1 for (m, i) in V if mems[m][INC] == i and ans(m)) >= maj(len(V))
+
+    if len(Vn) < len(V):                                    # a removal
+        removed = who
+        pv, ptag = last_voter_change(log)
+        base = V
+        # a removal pairs only with its own promotion: a swap's, or the one made
+        # for this leaver (then "before" means before that promotion)
+        mine = ((rule == 'heal-swap-remove' and ptag[0] == 'heal-swap-promote')
+                or (rule == 'leave-leaver' and ptag == ('leave-promote', subj)))
+        if mine and pv is not None and len(pv) + 1 == len(V) and set(pv) < set(V):
+            base = pv
+        for j in range(len(com), 0, -1):
+            if not reach:
+                break
+            hb = holders(mems, reps, base, com, j, ans)
+            ha = holders(mems, reps, Vn, com, j, ans)
+            if ha < hb:
+                kind = rule
+                if rule == 'leave-leaver':
+                    kind = 'leave-leaver-after-promote' if base is not V else 'leave-leaver-no-replacement'
+                if base is not V:
+                    nw = (set(V) - set(base)).pop()
+                    if holders(mems, reps, (nw,), com, j) == 1 and not ans(nw[0]):
+                        kind += '-replacement-down'     # it holds the entry, but does not answer
+                viols.append(('P2-holders', '%s removes %s: committed entry %d held by %d '
+                              'answering vouching voters before, %d after'
+                              % (kind, fmt_set((removed,)), j, hb, ha), kind))
+                break
+        if rule.startswith('heal-'):
+            ok = False
+            if rule == 'heal-swap-remove':
+                ok = True                                   # right after its promotion
+            elif rule == 'heal-gone':
+                ok = len(Vn) >= max(k, 1) and len(Vn) % 2 == 1   # the surplus rule
+            elif rule == 'heal-demote':
+                ok = len(V) == 2 and nlive < G.COPIES and not any(mems[v[0]][DRAIN] for v in V)
+            elif rule == 'heal-rmlive':
+                ok = len(Vn) >= k
+            if not ok:
+                viols.append(('P3-lower', '%s lowers the voter count %d -> %d'
+                              % (rule, len(V), len(Vn)), rule))
+        if rule == 'leave-dead':
+            m = removed[0]
+            if mems[m][UP] and mems[m][INC] == removed[1] and (m == L or cx.lk[L][m]):
+                viols.append(('P6-paused', 'the leave removes voter %d, which is up and '
+                              'linked (paused=%s)' % (m, mems[m][PAUSED]), rule))
+    if rule in ('heal-promote', 'heal-swap-promote') and len(Vn) % 2 == 0:
+        growth = rule == 'heal-promote' and len(V) == 1 and nlive >= G.COPIES
+        swap = rule == 'heal-swap-promote'                  # its removal is forced next
+        if not (growth or swap):
+            viols.append(('P3-even', 'healing raises the voter count %d -> %d'
+                          % (len(V), len(Vn)), rule))
+    if rule in ('heal-promote', 'heal-add', 'heal-swap-promote'):
+        m = who[0]
+        if mems[m][DRAIN] or mems[m][LEFT] or mems[m][LEAVING]:
+            viols.append(('P7-draining', '%s targets member %d, which is retiring'
+                          % (rule, m), rule))
+    return viols
+
+
+def check_step_r1(s, cx, L, step, info):
+    """Round 1 (kept for --round 1)."""
     mems, reps, com = s[0], s[1], s[5]
     rule, subj, Vn, Ln, who = step
     V, Lr, k, Tset, nlive, live_c, _ = info
@@ -663,6 +997,9 @@ def exit_ready(s, cx, m):
         steps, info = config_steps(s, cx, L)
         if m in info[6]:
             busy = True
+        lt = cfgs(reps[L][LOG])[0][3]
+        if lt[0] == 'heal-swap-promote' and lt[1] in cfgs(reps[L][LOG])[0][1]:
+            busy = True                  # the swap's removal comes first
         for st in steps:
             if st[0].startswith('leave-') and (st[1] == m or st[0] == 'leave-dead'):
                 busy = True
@@ -716,13 +1053,18 @@ def succ0(s, mode, tcap):
     up, resp, lk, rid = cx.up, cx.resp, cx.lk, cx.rid
     out = []
     MUT = G.MUT
+    # win[-1] counts configuration changes since the last event outside the
+    # protocol (a fault, a return, a heal, a pause ending, time passing, a
+    # Ctrl-C or a planner hint): a churn without end shows as a large count
+    ew = win[:-1] + (0,)
+    cw = win[:-1] + (win[-1] + 1,)
 
     # ---- protocol ----------------------------------------------------
     for m in range(N):
         if mems[m][PAUSED]:
             ms = list(mems)
             ms[m] = mems[m][:PAUSED] + (False,) + mems[m][PAUSED + 1:]
-            out.append((('unpause', m), freeze(ms, reps, nf, nl, nc, com, win), None))
+            out.append((('unpause', m), freeze(ms, reps, nf, nl, nc, com, ew), None))
 
     for L in cx.leaders:
         rL = reps[L]
@@ -787,14 +1129,15 @@ def succ0(s, mode, tcap):
                 viols = check_step(s, cx, L, step, info) if logL[:len(com)] == com else []
                 if v:
                     viols.append(v)
-                out.append((('cfg', L, rule, subj, Vn, Ln, who), freeze(mems, rs, nf, nl, nc, c2, win),
+                out.append((('cfg', L, rule, subj, Vn, Ln, who), freeze(mems, rs, nf, nl, nc, c2, cw),
                             viols or None))
-        # leadership hand-over by a leaving leader (TimeoutNow)
-        if mems[L][LEAVING]:
+        # leadership hand-over by a leaving leader, or (round 2) a retiring one,
+        # "as drain: leaders hand over the shards it leads" (TimeoutNow)
+        if mems[L][LEAVING] or (G.ROUND == 2 and mems[L][DRAIN]):
             for t in range(N):
                 if t == L or rid[t] not in V or not lk[L][t] or not resp[t]:
                     continue
-                if reps[t][LOG] != logL or mems[t][LEAVING]:
+                if reps[t][LOG] != logL or mems[t][LEAVING] or (G.ROUND == 2 and mems[t][DRAIN]):
                     continue
                 T = max(reps[t][TERM], rL[TERM]) + 1
                 if T > tcap:
@@ -807,12 +1150,17 @@ def succ0(s, mode, tcap):
         rc = reps[c]
         if not resp[c] or rc[LEADER] or cx.heard[c]:
             continue
-        lc = cfgs(rc[LOG])[0]
+        lc, pc = cfgs(rc[LOG])
         if lc is None:
             continue                                     # a new replica: no configuration
         V = lc[1]
         if rid[c] not in V:
-            continue                                     # learners never stand
+            # learners never stand. Proposed fix 'stand-when-demoted': a member
+            # demoted by the newest entry in its log may still stand (it does not
+            # count its own vote), as Ongaro's thesis lets a server outside its
+            # latest configuration stand; etcd applies a change only on commit
+            if not ('stand-when-demoted' in G.FIX and pc is not None and rid[c] in pc[1]):
+                continue
         pre = 1
         tmax = rc[TERM]
         for (m, i) in V:
@@ -826,6 +1174,8 @@ def succ0(s, mode, tcap):
             if 'learner-no-vote' in MUT and not own_voter(reps[m][LOG], rid[m]):
                 continue
             pre += 1
+        if rid[c] not in V:
+            pre -= 1                                     # its own vote does not count
         if pre < maj(len(V)):
             continue
         T = tmax + 1
@@ -836,6 +1186,8 @@ def succ0(s, mode, tcap):
     # evict.after elapses (time passing, not a fault): the gone mark
     cc = cfgs(com)[0]
     known = set(x[0] for x in cc[1])          # voters: a gone learner is only dropped and re-added
+    if G.ROUND == 2:
+        known |= set(x[0] for x in cc[2])     # round 2: candidates are judged by the leader's own link
     for m in range(N):
         mm = mems[m]
         if mm[GONE] or m not in known:
@@ -848,7 +1200,7 @@ def succ0(s, mode, tcap):
         if (not mm[UP]) or cut:
             ms = list(mems)
             ms[m] = mm[:GONE] + (True,) + mm[GONE + 1:]
-            out.append((('gone', m), freeze(ms, reps, nf, nl, nc, com, win), None))
+            out.append((('gone', m), freeze(ms, reps, nf, nl, nc, com, ew), None))
 
     if mode == 1:
         return out
@@ -859,11 +1211,11 @@ def succ0(s, mode, tcap):
         if not mm[UP] and not mm[LEFT]:
             ms = list(mems)
             ms[m] = (True, mm[INC], mm[SIDE], False, False, mm[DRAIN], False, False)
-            out.append((('return', m), freeze(ms, reps, nf, nl, nc, com, win), None))
+            out.append((('return', m), freeze(ms, reps, nf, nl, nc, com, ew), None))
         if mm[SIDE] == 1:
             ms = list(mems)
             ms[m] = mm[:SIDE] + (0, mm[PAUSED], False) + mm[GONE + 1:]
-            out.append((('heal', m), freeze(ms, reps, nf, nl, nc, com, win), None))
+            out.append((('heal', m), freeze(ms, reps, nf, nl, nc, com, ew), None))
 
     if mode == 2:
         return out
@@ -884,30 +1236,54 @@ def succ0(s, mode, tcap):
                     else:
                         ms[m] = (False, mm[INC] + 1, mm[SIDE], False, mm[GONE], mm[DRAIN], False, left)
                         rs[m] = (0, -1, (), False, 0)
-                    out.append((('crash', m, keep), freeze(ms, rs, nf + 1, nl, nc, com, win), None))
+                    out.append((('crash', m, keep), freeze(ms, rs, nf + 1, nl, nc, com, ew), None))
                 if mm[SIDE] == 0:
                     ms = list(mems)
                     ms[m] = mm[:SIDE] + (1,) + mm[SIDE + 1:]
-                    out.append((('part', m), freeze(ms, reps, nf + 1, nl, nc, com, win), None))
+                    out.append((('part', m), freeze(ms, reps, nf + 1, nl, nc, com, ew), None))
                 if not mm[PAUSED]:
                     ms = list(mems)
                     ms[m] = mm[:PAUSED] + (True,) + mm[PAUSED + 1:]
-                    out.append((('pause', m), freeze(ms, reps, nf + 1, nl, nc, com, win), None))
+                    out.append((('pause', m), freeze(ms, reps, nf + 1, nl, nc, com, ew), None))
                 if mm[LEAVING]:
                     ms = list(mems)
                     ms[m] = (False, mm[INC], mm[SIDE], False, mm[GONE], mm[DRAIN], False, True)
                     rs = list(reps)
                     r = reps[m]
                     rs[m] = (r[TERM], r[VOTED], r[LOG], False, 0)
-                    out.append((('cutoff', m), freeze(ms, rs, nf + 1, nl, nc, com, win), None))
-    if nl < G.LV:
+                    out.append((('cutoff', m), freeze(ms, rs, nf + 1, nl, nc, com, ew), None))
+    if nl < G.LV and not G.PLANNER:
         for m in range(N):
             mm = mems[m]
             if mm[UP] and not mm[PAUSED] and not mm[LEAVING] and not mm[LEFT]:
                 drain = G.META and 'no-draining' not in MUT
                 ms = list(mems)
                 ms[m] = (True, mm[INC], mm[SIDE], False, mm[GONE], drain or mm[DRAIN], True, False)
-                out.append((('leave', m, drain), freeze(ms, reps, nf, nl + 1, nc, com, win), None))
+                out.append((('leave', m, drain), freeze(ms, reps, nf, nl + 1, nc, com, ew), None))
+    # a planner (scenarios with one): retire, undrain, and stop once retired
+    if G.PLANNER and nl < G.PL:
+        for m in range(N):
+            mm = mems[m]
+            if mm[UP] and not mm[LEAVING] and not mm[LEFT]:
+                ms = list(mems)
+                if not mm[DRAIN]:
+                    ms[m] = mm[:DRAIN] + (True,) + mm[DRAIN + 1:]
+                    out.append((('retire', m), freeze(ms, reps, nf, nl + 1, nc, com, ew), None))
+                else:
+                    ms[m] = mm[:DRAIN] + (False,) + mm[DRAIN + 1:]
+                    out.append((('undrain', m), freeze(ms, reps, nf, nl + 1, nc, com, ew), None))
+    if G.PLANNER:
+        cc2 = cfgs(com)[0]
+        for m in range(N):
+            mm = mems[m]
+            if (mm[UP] and mm[DRAIN] and not mm[LEAVING] and not mm[LEFT]
+                    and rid[m] not in cc2[1] and rid[m] not in cc2[2]):
+                ms = list(mems)
+                ms[m] = (False, mm[INC], mm[SIDE], False, mm[GONE], True, False, True)
+                rs = list(reps)
+                r = reps[m]
+                rs[m] = (r[TERM], r[VOTED], r[LOG], False, 0)
+                out.append((('stop', m), freeze(ms, rs, nf, nl, nc, com, ew), None))
     return out
 
 
@@ -936,7 +1312,7 @@ def reported(s, V):
     """The doc: cluster.health says so when a shard has fewer live voters than
     copies. (Proposed fix 'report-dead': also whenever any voter is not live.)"""
     lv = live_voters(s, V)
-    if 'report-dead' in G.FIX:
+    if 'report-dead' in G.FIX or (G.ROUND == 2 and 'report-copies-only' not in G.MUT):
         return lv < max(G.COPIES, len(V))
     return lv < G.COPIES
 
@@ -996,7 +1372,7 @@ def settled(s, cx):
         return None
     log = reps[L][LOG]
     latest = cfgs(log)[0]
-    for (m, i) in latest[1]:
+    for (m, i) in latest[1] + (latest[2] if G.ROUND == 2 else ()):
         if m != L and not cx.lk[L][m] and not mems[m][GONE]:
             return None                  # evict.after has not yet run out for it
     for (m, i) in latest[1] + latest[2]:
@@ -1022,7 +1398,9 @@ RULE_TEXT = {
     'heal-rmlive': 'healing removes live voter (not in target)',
     'heal-rmlearner': 'healing removes learner',
     'heal-shrink': 'healing shrinks (mutant) removing',
-    'heal-demote': 'healing steps back to one voter (fix), demoting',
+    'heal-demote': 'healing steps back to one voter, demoting',
+    'heal-swap-promote': 'healing promotes (a swap)',
+    'heal-swap-remove': 'healing removes (the swap\'s next step)',
     'leave-learner': 'the leave removes learner',
     'leave-promote': 'the leave promotes learner',
     'leave-leaver': 'the leave removes the leaver',
@@ -1048,6 +1426,8 @@ def fmt_label(lab):
         what = fmt_set((who,))[1:-1]
         if rule.startswith('leave-') and who[0] != subj:
             what += ' (for the leave of %d)' % subj
+        if rule == 'heal-swap-promote':
+            what += ' to replace %s' % fmt_set((subj,))[1:-1]
         return 'leader %d: %s %s -> voters %s learners %s' % (
             L, RULE_TEXT.get(rule, rule), what, fmt_set(Vn), fmt_set(Ln))
     if k in ('elect', 'transfer'):
@@ -1071,8 +1451,15 @@ def fmt_label(lab):
         return 'member %d pauses (GC, shorter than the probe window)' % lab[1]
     if k == 'cutoff':
         return 'leaving member %d is cut off and exits mid-leave' % lab[1]
+    if k == 'retire':
+        return 'a planner retires member %d' % lab[1]
+    if k == 'undrain':
+        return 'a planner undrains member %d' % lab[1]
+    if k == 'stop':
+        return 'the planner stops retired member %d (it holds no replica)' % lab[1]
     if k == 'leave':
-        return 'member %d gets Ctrl-C: leave%s' % (lab[1], ' (marked draining)' if lab[2] else ' (no draining mark)')
+        word = 'retiring' if G.ROUND == 2 else 'draining'
+        return 'member %d gets Ctrl-C: leave%s' % (lab[1], (' (marked %s)' % word) if lab[2] else ' (no mark)')
     return str(lab)
 
 
@@ -1136,9 +1523,11 @@ def initial(kind):
             mems.append((True, 0, 0, False, False, False, False, False))
             reps.append((1, 0, log, m == 0, 1 if m == 0 else 0))
         else:
-            mems.append((False, 0, 0, False, False, False, False, False))
+            # not started yet; in round 2 its link has never reached the
+            # leader, so it is not a candidate until it starts
+            mems.append((False, 0, 0, False, G.ROUND == 2, False, False, False))
             reps.append((0, -1, I(()), False, 0))
-    win = tuple([-1, 0] + [-1] * (G.MAXT + 4))
+    win = tuple([-1, 0] + [-1] * (G.MAXT + 4) + [0])     # the last slot counts churn
     return N, freeze(mems, reps, 0, 0, 0, log, win)
 
 
@@ -1155,9 +1544,15 @@ SCENARIOS = {
     'three-m':     ('three', 2, 1, 0, 5, '3 members, 3 voters (mutant bounds)'),
     'one-m':       ('one', 1, 1, 0, 5, 'one voter, one learner, a third starts later (mutant bounds)'),
     'four-m':      ('four', 1, 1, 0, 5, '4 members, 3 voters and a learner (mutant bounds)'),
+    # a planner instead of Ctrl-C: retire and undrain (the last field), then stop
+    'three-retire': ('three', 2, 0, 0, 5, '3 members, 3 voters, a planner retires or undrains', 2),
+    'four-retire':  ('four', 1, 0, 0, 5, '4 members, 3 voters and a learner, a planner retires '
+                                         'or undrains', 2),
 }
 
-DEFAULT_SCENARIOS = ['two', 'three', 'one', 'four', 'four-2leave', 'four-arrive']
+DEFAULT_SCENARIOS = ['two', 'three', 'one', 'four', 'four-2leave', 'four-arrive',
+                     'three-retire', 'four-retire']
+DEFAULT_SCENARIOS_R1 = ['two', 'three', 'one', 'four', 'four-2leave', 'four-arrive']
 
 FIXES = {
     'leave-exact':  'the leave removes the leaver only once its promoted replacement '
@@ -1166,8 +1561,38 @@ FIXES = {
                     'are still an odd number at or above the target',
     'report-dead':  'cluster.health reports a shard whenever any voter is not live, '
                     'not only when live voters are fewer than copies',
+    'swap-exact-remove': '(round 2) a swap removes the old voter once the new one holds the '
+                    'commit offset again; if the new one is gone instead, it is removed',
+    'stand-when-demoted': '(round 2) a member demoted by the newest entry in its log may still '
+                    'stand, not counting its own vote',
     'two-to-one':   'two voters with fewer than three live candidates, neither leaving, step '
                     'back to one voter and a learner (an exception to "never lowers")',
+}
+
+MUTANTS2 = {
+    'swap-remove-first':  'a swap removes the gone voter first, then adds and promotes (S8 reverted)',
+    'heal-ignores-retiring': 'healing also replaces a retiring voter while its leave runs (S2)',
+    'ignore-own-link':    'a leader keeps as a candidate a member its own link has not reached '
+                          'within evict.after (S3)',
+    'leave-not-exact':    'the leave removes the leaver when its replacement is within lag.max',
+    'report-copies-only': 'cluster.health counts live voters against copies only',
+    'no-gone-surplus':    'a surplus gone voter is never removed',
+    'no-two-to-one':      'two voters never step back to one',
+    'two-to-one-retiring': 'two voters step back to one even when one is retiring',
+    'gone-no-repl':       'healing removes a gone voter with no replacement (E1)',
+    'heal-lower':         'healing shrinks the voter count to the live candidates (E1)',
+    'promote-even':       'healing raises a voter count to two (F2, R-80)',
+    'promote-uncaught':   'healing promotes a learner before it caught up',
+    'live-remove-lag':    'a swap promotes its replacement within lag.max (H-172, R-72)',
+    'leave-paused':       'the leave counts a merely paused voter as dead (R-58)',
+    'leave-no-dead':      'the leave never removes dead voters first (S-207, R-77, V4-60)',
+    'leave-no-promote':   'the leave removes the leaver without promoting a learner first (R-62)',
+    'leave-always-remove': 'the leave removes the leaver even when that loses the live majority',
+    'no-draining':        'the leave writes no retiring mark (D-081, R-64)',
+    'learner-no-vote':    'a learner refuses votes (S-037, R-76)',
+    'ghost-votes':        'a replica that lost its disk votes under its old identity (R-54)',
+    'no-own-term':        'a new leader changes the configuration before committing in its term',
+    'no-config-wait':     'a change is appended before the previous one committed',
 }
 
 MUTANTS = {
@@ -1203,20 +1628,23 @@ class Result:
         self.stuck = {}       # class -> (count, example index)
         self.capped = 0
         self.minf = {}        # key -> fewest faults that reach it
+        self.maxcc = 0        # most configuration changes between two outside events
 
 
 def clear_caches():
     """Each search starts afresh, so a process that runs many (--mutants)
     does not keep every earlier search's entries and sub-tuples alive."""
-    for d in (ENT_ID, _I, _CFG, _TAGS, _LP, _PV):
+    for d in (ENT_ID, _I, _CFG, _TAGS, _LP, _PV, _LVC):
         d.clear()
     del ENT[:]
 
 
 def explore(scn, mutants=frozenset(), quiet=False, limit=None, liveness=True):
     clear_caches()
-    init_kind, F, LV, E, MAXT, _ = SCENARIOS[scn]
+    init_kind, F, LV, E, MAXT = SCENARIOS[scn][:5]
+    PL = SCENARIOS[scn][6] if len(SCENARIOS[scn]) > 6 else 0
     G.F, G.LV, G.E, G.MAXT, G.MUT = F, LV, E, MAXT, frozenset(mutants)
+    G.PLANNER, G.PL = PL > 0, PL
     G.META = True
     N, s0 = initial(init_kind)
     t0 = time.time()
@@ -1257,9 +1685,33 @@ def explore(scn, mutants=frozenset(), quiet=False, limit=None, liveness=True):
                 prop = 'P4-settle2' if nv == 2 else 'P4-settleeven'
                 record(prop, cause, i, None, 'settled with voters %s; the count was last set by %s'
                        % (fmt_set(V), cause))
+            if G.ROUND == 2:
+                mems = s[0]
+                gone_v = [v for v in V if (mems[v[0]][INC] != v[1] and mems[v[0]][UP]
+                                           and (v[0] == L or cx.lk[L][v[0]]))
+                          or (mems[v[0]][GONE] and v[0] != L and not cx.lk[L][v[0]])]
+                free = [m for m in range(len(mems)) if mems[m][UP] and (m == L or cx.lk[L][m])
+                        and not mems[m][DRAIN] and not mems[m][LEFT] and cx.rid[m] not in V]
+                if gone_v and free:
+                    record('P8-replace', '', i, None, 'settled with gone voter %s while member %d '
+                           'is a live candidate' % (fmt_set(gone_v), free[0]))
+                Lr = cfgs(s[1][L][LOG])[0][2]
+                stuck_r = [m for m in range(len(mems)) if mems[m][DRAIN] and mems[m][UP]
+                           and not mems[m][LEAVING] and (cx.rid[m] in V or cx.rid[m] in Lr)]
+                if stuck_r:
+                    record('P10-retire', 'voter' if cx.rid[stuck_r[0]] in V else 'learner', i, None,
+                           'settled with retiring member %d still a %s'
+                           % (stuck_r[0], 'voter' if cx.rid[stuck_r[0]] in V else 'learner'))
         for lab, t, viols in succ(s, 0, G.MAXT):
             R.edges += 1
             lab = labels.setdefault(lab, lab)
+            cc = t[6][-1]
+            if cc > R.maxcc:
+                R.maxcc = cc
+            if cc > G.CHURN:
+                record('P9-churn', '', i, lab, '%d configuration changes with no fault, return, '
+                       'pause, time passing or Ctrl-C between them' % cc)
+                continue
             j = index.get(t)
             if j is None:
                 j = len(states)
@@ -1342,7 +1794,7 @@ def stuck_pass(R):
                         t = seen[t]
                 return True
             for lab, t, _ in succ(s, mode, tcap):
-                if t in seen:
+                if t in seen or t[6][-1] > G.CHURN:
                     continue
                 if mode == 1:
                     k = known(t)
@@ -1466,14 +1918,15 @@ def print_trace(R, i, lab=None, out=sys.stdout, final=True):
 
 
 def report(scn, R, out=sys.stdout, traces=True):
-    _, F, LV, E, MAXT, what = SCENARIOS[scn]
-    print('== %s: %s' % (scn, what), file=out)
+    _, F, LV, E, MAXT, what = SCENARIOS[scn][:6]
+    print('== %s: %s (round %d)' % (scn, what, G.ROUND), file=out)
     print('   bounds: faults %d, leaves %d, client entries %d, terms <= %d; mutants %s; fixes %s; %s'
           % (F, LV, E, MAXT, ','.join(sorted(G.MUT)) or 'none', ','.join(sorted(G.FIX)) or 'none',
              ('per-follower replication' if G.FINE else 'append-and-send') +
              (', any step order' if G.ANY else '')), file=out)
     print('   %d states, %d transitions, %.1fs' % (R.states, R.edges, R.secs), file=out)
-    print('   settled states by voter count: %s' % dict(sorted(R.settled.items())), file=out)
+    print('   settled states by voter count: %s; most configuration changes between outside '
+          'events: %d' % (dict(sorted(R.settled.items())), R.maxcc), file=out)
     held = [p for p in PROPS if not any(k[0] == p for k in R.viol)]
     print('   held: %s' % ' '.join(held), file=out)
     for key in sorted(R.viol):
@@ -1509,6 +1962,10 @@ def signature(R):
     return sig
 
 
+def mutant_table():
+    return MUTANTS2 if G.ROUND == 2 else MUTANTS
+
+
 def run_mutants(scns, mutants, a):
     print('Mutants: each removes one rule. Caught = on the same bounds it reaches a violation '
           'or a stuck class that the design as written does not, or reaches one with fewer '
@@ -1523,7 +1980,7 @@ def run_mutants(scns, mutants, a):
         print('  baseline %-8s %8d states, %.0fs' % (scn, R.states, R.secs))
         sys.stdout.flush()
     for mu in mutants:
-        print('-- mutant %s: %s' % (mu, MUTANTS[mu]))
+        print('-- mutant %s: %s' % (mu, mutant_table()[mu]))
         caught_any = False
         for scn in scns:
             R = explore(scn, {mu}, quiet=True, limit=a.limit, liveness=not a.no_liveness)
@@ -1556,6 +2013,9 @@ def main():
     ap.add_argument('--mutant', action='append', default=[], help='run with this rule removed')
     ap.add_argument('--mutants', action='store_true', help='run every mutant on every scenario')
     ap.add_argument('--list', action='store_true')
+    ap.add_argument('--round', type=int, default=2, choices=(1, 2),
+                    help='2: the revised text (default); 1: the text the first round checked')
+    ap.add_argument('--churn', type=int, help='configuration changes allowed between outside events')
     ap.add_argument('--mutant-traces', action='store_true', help='with --mutants: print each new trace')
     ap.add_argument('--no-liveness', action='store_true')
     ap.add_argument('--no-traces', action='store_true')
@@ -1569,16 +2029,21 @@ def main():
     ap.add_argument('--maxterm', type=int)
     a = ap.parse_args()
     if a.list:
+        G.ROUND = a.round
         for k, v in SCENARIOS.items():
-            print('%-12s %s (faults %d, leaves %d, entries %d)' % (k, v[5], v[1], v[2], v[3]))
+            print('%-12s %s (faults %d, leaves %d, entries %d%s)' % (
+                k, v[5], v[1], v[2], v[3], (', planner events %d' % v[6]) if len(v) > 6 else ''))
         print()
-        for k, v in MUTANTS.items():
-            print('%-20s %s' % (k, v))
+        for k, v in mutant_table().items():
+            print('%-22s %s' % (k, v))
         return
     G.FINE = a.fine
     G.ANY = a.any_order
     G.FIX = frozenset(a.fix)
-    scns = a.scenario or DEFAULT_SCENARIOS
+    G.ROUND = a.round
+    if a.churn:
+        G.CHURN = a.churn
+    scns = a.scenario or (DEFAULT_SCENARIOS if G.ROUND == 2 else DEFAULT_SCENARIOS_R1)
     for scn in scns:
         b = list(SCENARIOS[scn])
         if a.faults is not None:
@@ -1591,7 +2056,7 @@ def main():
             b[4] = a.maxterm
         SCENARIOS[scn] = tuple(b)
     if a.mutants:
-        run_mutants(a.scenario or MUTANT_SCENARIOS, a.mutant or list(MUTANTS), a)
+        run_mutants(a.scenario or MUTANT_SCENARIOS, a.mutant or list(mutant_table()), a)
         return
     for scn in scns:
         R = explore(scn, set(a.mutant), limit=a.limit, liveness=not a.no_liveness)
