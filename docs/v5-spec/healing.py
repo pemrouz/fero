@@ -4,11 +4,13 @@ healing.py: a small exhaustive model checker for DESIGN-V5 section 4.2,
 "Healing: one rule, run by each shard's leader" and "Leaving, restarting
 and stopping". Plain Python 3, standard library only.
 
-    python3 healing.py                 # six scenarios, the design as written (~20 min)
+    python3 healing.py                 # round 2: eight scenarios, the revised text (~25 min)
     python3 healing.py --scenario four # one scenario
-    python3 healing.py --mutants       # one rule removed at a time (~40 min)
-    python3 healing.py --fix leave-exact --fix gone-surplus --fix report-dead
-                                       # the proposed fixes (see FIXES)
+    python3 healing.py --mutants       # round 2's mutants, one rule each (~1 hour)
+    python3 healing.py --fix swap-exact-remove --fix stand-when-demoted
+                                       # round 2's proposed fixes (see FIXES)
+    python3 healing.py --round 1       # the text round 1 checked (with --mutants,
+                                       # --fix leave-exact, gone-surplus, report-dead, two-to-one)
     python3 healing.py --fine --any-order --faults 1
                                        # the finer model: per-follower
                                        # replication, any step order

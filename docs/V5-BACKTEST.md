@@ -149,6 +149,10 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-137 | A recovered shard reopens a slot, then another shard's in-flight `s → B` lands in the table (slot-move spike, round 2) | The recovery writes the slot's row at the slot's new epoch before it reopens (4.2) |
 | R-138 | An old incarnation of B reports an abort after A has fenced on B's new incarnation, which then opens (slot-move spike, round 2) | B's reports carry its incarnation; A's fence records it, sends `END` only to it, and reopens only on an abort from it or a newer one (4.2) |
 | R-139 | A reopens at N after a recovered B had already stamped positions above N, so one position names two records (slot-move spike, round 2) | B's abort carries its epoch, and `unfenced` reopens in the higher epoch; the lost-B command bumps the epoch too (4.2) |
+| R-140 | A cut-off leader demotes a member by an entry only that member gets; healed, it holds the longest log, refuses its vote, and never stands, so a live majority waits (healing spike, round 2) | A membership change takes effect when it commits, as in etcd's raft (4.2) |
+| R-141 | A swap's new voter pauses and misses its own promotion, then the old voter is removed (healing spike, round 2) | The old voter is removed only once the new voter's log reaches the commit offset again, its own promotion included; if the new voter is gone first, it is removed instead (4.2) |
+| R-142 | A leave's promoted learner crashes before the leaver is removed (healing spike, round 2) | Removing the leaver is still right, and 10.2 lists it as a leave exception (10.2) |
+| R-143 | A planner retires a member of a three-member shard with `copies: 3` (healing spike, round 2) | The retire stays pending and `cluster.health` says why; going below `copies` is a leave (4.2) |
 
 ## Part 1: v4's hard cases
 
