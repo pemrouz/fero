@@ -1,29 +1,30 @@
 # healing.py: a model check of healing and leave
 
-[healing.py](healing.py) is a small exhaustive model checker for two parts of [DESIGN-V5.md](../DESIGN-V5.md) §4.2: "Healing: one rule, run by each shard's leader" and the `leave` row of "Leaving, restarting and stopping". It is plain Python 3, standard library only. It explores every reachable state within its bounds, breadth first, so each counterexample below is a shortest one.
+[healing.py](healing.py) is a small exhaustive model checker for [DESIGN-V5.md](../DESIGN-V5.md) §4.2: "Healing: one rule, run by each shard's leader", the planner table, the `leave` row of "Leaving, restarting and stopping", and the healing property of §10.2. It is plain Python 3, standard library only. It explores every reachable state within its bounds, breadth first, so each counterexample below is a shortest one.
+
+There have been two rounds:
+- **Round 2** checks the text as revised after round 1: swaps promote first, `gone` comes from each leader's own links, a leave marks `retiring`, and two voters step back to one. It is the default, and is reported first.
+- **Round 1** checked the text before that. Its results are kept below as they were reported, and `--round 1` reruns them.
 
 ```sh
-python3 healing.py                     # the design as written, six scenarios (about 20 min on one core)
+python3 healing.py                     # round 2, eight scenarios (about 25 min on one core)
 python3 healing.py --scenario three    # one scenario
-python3 healing.py --mutants           # fourteen mutants, one rule removed each
-python3 healing.py --fix leave-exact --fix gone-surplus --fix report-dead --fix two-to-one
-python3 healing.py --fine --any-order  # the slower, finer model (see "Reductions")
+python3 healing.py --mutants           # round 2's 22 mutants (about an hour)
+python3 healing.py --fix swap-exact-remove --fix stand-when-demoted   # round 2's proposed fixes
+python3 healing.py --any-order --faults 1   # every step order (see "Reductions")
+python3 healing.py --round 1           # round 1's model, its mutants with --mutants, its fixes with --fix
 python3 healing.py --list
 ```
 
-## Results in short
+## Round 2 in short
 
-- **Raft safety held everywhere.** At most one leader per term; no new leader lacked a committed entry; no commit overwrote one. A committed entry was always on a majority of the committed configuration's voters, or the shard was reported under-replicated, except in one case (finding 3).
-- **Healing never raised a voter count to an even number, and never lowered one** (P3). A paused voter was never removed by a leave (P6). Healing never targeted a leaving member (P7). With a live majority, the shard always got a writable leader again (P5).
-- **Five design findings** (below):
-  1. The leave can remove the leaver before its replacement holds the newest commit.
-  2. A dead fourth voter is never removed.
-  3. A dead fourth voter is never reported.
-  4. A shard can sit at two voters, where the doc says it should have one or three.
-  5. §10.2's property is broken by healing's own gone-voter step, as worded.
-
-  Findings 1 to 3 are gaps in the rules. Finding 4 is a contradiction with a real cost: either crash then stops writes. Finding 5 is wording. Each has a proposed fix, and the fixes for 1 to 4 were checked by the same model.
-- **Twelve of fourteen mutants are caught.** The two not caught guard against things this model has no notion of: time to catch up, and five members (see "Mutants").
+- **Raft safety held everywhere** (P1). Healing never raised a count to an even number, and never lowered one except where the text says (P3). A shard never settled at two or four voters (P4). A leave never removed a paused voter (P6). No healing step targeted a retiring member (P7). Healing always replaced a gone voter when a live candidate was free (P8). No configuration churned: at most 8 changes ever came between two outside events, so nothing flaps (P9).
+- **One new stuck state with a live majority** (P5, `four`, 36 states). It is a Raft-level gap that round 2's swap made reachable (finding R2-1).
+- **The swap's removal step is too early** (P2, finding R2-2). The new voter can lack its own promotion when "the very next step" removes the old one.
+- **§10.2 still misses two exceptions** (finding R2-3): the step from two voters back to one, and a leave whose promoted learner fails before the leaver's removal.
+- **A planner `retire` with no replacement never completes** (finding R2-4).
+- **Your three questions.** A shard does not settle at four voters or flap. Two-to-one and a swap do not fight, even in any step order. A member back after `gone` costs one swap and stops.
+- **Mutants:** see the round-2 table below.
 
 ## Words used here
 
@@ -31,6 +32,9 @@ python3 healing.py --list
 - A **voter** counts toward commits and elections. A **learner** copies the log but does not count.
 - **Committed** means a leader saw a majority of its configuration's voters hold the entry.
 - **Gone** means a member's link has been down past `evict.after`, or a planner said so.
+- **Answering** (round 2, §10.2): up and linked to the leader. A paused voter counts: it answers within the probe window.
+- **Retiring** (round 2): marked for good by a leave or a planner's `retire`; never a candidate. Round 1 called this `draining`. In round 2 `draining` gives up leadership only, and is not modelled.
+- A **swap** (round 2): add the replacement as a learner, let it reach the commit offset exactly, promote it, then remove the old voter in the very next step.
 - **Dead**, for a leave, means the member's link is down and it does not answer the leader's probes within `leave.ms`. A **paused** member (a GC pause shorter than the probe window) answers in time.
 - **Settled** means healing has nothing left to do: a leader that can write, nobody leaving or paused, every reachable member caught up, every unreachable voter already marked gone, and no healing step enabled.
 - **Stuck** means no fault-free path leads to a leader that can write.
@@ -57,7 +61,204 @@ python3 healing.py --list
 - Crashes, partitions, pauses and cut-offs count against the fault budget. Returns, heals, the end of a pause and the gone mark (time passing) are free.
 - A member that leaves, or crashes while leaving, never comes back. A Ctrl-C means the operator wants it gone.
 
-**Healing, as written.**
+## Round 2: the revised text
+
+### What changed in the model
+
+**Healing, as the text now says.**
+- **Candidates** are members that are not retiring, not departed, and that the leader's own link has reached within `evict.after`. A member that never started has never been reached, so it is not a candidate until it starts.
+- **Gone** is per leader: its own link down past `evict.after`. `#meta`'s `gone` mark is left out. The model relies on each leader's own link, which the text says is enough. That mark is also what makes the `ignore-own-link` mutant matter: without it, only `#meta` would ever drop a dead member.
+- **The target** is as in round 1: three voters once three candidates are live, or the incumbent for a one-voter shard; never even, never lowered.
+- **The steps**, one at a time, in this order:
+  1. **The swap's removal**, forced as "the very next step" after a swap's promotion. No leave step may come between.
+  2. A gone voter removed with no replacement, only when the voters left are still odd and at or above the target.
+  3. Growth to an odd count, by a learner within `lag.max`.
+  4. **A swap**, for a gone voter (by a leader with quorum) or a live voter not in the target: add the learner, wait for the commit offset exactly, promote.
+  5. Add live candidates as learners.
+  6. A surplus live voter, once the target is all voters.
+  7. **Two voters step back to one:** fewer than three live candidates, neither voter retiring, `copies` not 2.
+  8. Drop stale learners.
+- **A retiring voter is left to its own leave** while that leave runs. Afterwards, healing treats it as any voter not in the target.
+
+**The leave** marks the member `retiring`. Then the leader:
+1. promotes a caught-up learner;
+2. removes the leaver once that learner's log reaches the commit offset exactly, waiting within `leave.ms` while the learner is live;
+3. removes dead voters first, by the probe rule, when that is what lets the leave carry;
+4. keeps the leaver as a voter when neither step is safe.
+
+A leaving or retiring leader hands over first.
+
+**The planner** (two new scenarios):
+- `retire` and `undrain`, with up to two hints;
+- `stop`, once a retired member holds no replica (a scale-in);
+- `drain` and `lead` move only leadership, and are not modelled.
+
+**Under-replication** is reported when live voters are fewer than `copies` or than the configuration's voters.
+
+### Properties added or changed
+
+| | Property |
+|---|---|
+| P2 | The revised §10.2: "no healing step reduces the number of **answering**, vouching voters that hold a committed entry, unless a replacement voter already holds it; a leave may, only when no caught-up learner exists or by removing dead voters". A removal is paired only with its own promotion: a swap's removal with that swap's promotion, a leaver's removal with the learner promoted for it. Only a leader that reaches a majority is judged, since a cut-off leader cannot commit the step before CheckQuorum steps it down. |
+| P3 | Allowed: growth 1 -> 2 -> 3; a swap's promotion to four with its removal forced next; the swap's removal; the surplus rule; two voters stepping back to one. Nothing else lowers or makes an even count. |
+| P8 | New: a settled shard has no gone voter while a live candidate is free. Healing finishes its swaps. |
+| P9 | New: no more than 8 configuration changes in a row without an outside event (a fault, a return, a heal, a pause ending, time passing, Ctrl-C or a planner hint). A loop, such as two rules fighting or a returning member churning, shows here. States past the cap are not explored. |
+| P10 | New, for the planner scenarios, and informational: a retired member ends with no replica. |
+
+### Runs
+
+The revised text, with the stuck search. All on one core each; about 25 minutes in all.
+
+| Scenario | Members | Faults | Leaves / hints | Client entries | States | Time |
+|---|---|---|---|---|---|---|
+| `two` (example 01) | 2 | 2 | 1 | 1 | 14,203 | 2 s |
+| `three` | 3 | 2 | 1 | 1 | 1,344,467 | 255 s |
+| `one` (1 voter growing to 3) | 3 | 2 | 1 | 0 | 890,126 | 174 s |
+| `four` (3 voters, 1 learner) | 4 | 2 | 1 | 0 | 4,827,906 | 892 s |
+| `four-2leave` | 4 | 1 | 2 | 0 | 230,714 | 69 s |
+| `four-arrive` | 4 | 1 | 1 | 0 | 40,812 | 8 s |
+| `three-retire` (planner) | 3 | 2 | 2 hints | 0 | 120,843 | 15 s |
+| `four-retire` (planner) | 4 | 1 | 2 hints | 0 | 194,650 | 22 s |
+
+Any-order runs, for "do rules fight":
+
+| Scenario | Faults | States | Most changes between outside events |
+|---|---|---|---|
+| `one` | 1 | 25,106 | 6 |
+| `three` | 2 | 198,437 | 6 |
+| `four` | 1 | 12,930 | 5 |
+| `four-arrive` | 1 | 51,370 | 6 |
+| `four-retire` | 1 | 199,531 | 6 |
+
+All of them hold P1, P3, P4, P6, P7, P8 and P9.
+
+**What held, everywhere:**
+- P1, all four parts. P1-durable now holds in `four` too: the report counts the configuration's voters.
+- P3, P4, P6, P7, P8 and P9. The most configuration changes between two outside events was 8, in `four`.
+- P5 everywhere except `four` (finding R2-1).
+
+**What was violated:**
+
+| Scenario | P2 | P5 | P10 |
+|---|---|---|---|
+| `two` | - | - | - |
+| `three` | heal-demote; leave-no-replacement (admitted) | - | - |
+| `one` | heal-demote; leave-no-replacement | - | - |
+| `four` | heal-demote; **heal-swap-remove**; leave-no-replacement; leave-after-promote, replacement down | **36 states** | - |
+| `four-2leave` | heal-demote; leave-no-replacement; leave-after-promote, replacement down | - | - |
+| `four-arrive` | heal-demote; leave-no-replacement; leave-after-promote, replacement down | - | - |
+| `three-retire` | - | - | retire never completes |
+| `four-retire` | **heal-swap-remove** (and replacement down) | - | retire never completes |
+
+### Findings, and the sentences still wrong
+
+#### R2-1. A shard with a live majority waits for a cut-off leader (P5)
+
+**Trace** (`four`, 6 steps, two faults):
+1. Member 1 is partitioned away.
+2. `evict.after` passes.
+3. Leader 0 promotes learner 3 to replace 1: voters {0,1,2,3}. This commits on 0, 2 and 3.
+4. Member 0 is partitioned onto 1's side.
+5. "The very next step": 0 removes 1, which stays a learner: voters {0,2,3}. The entry reaches only 1.
+6. Member 1's partition heals.
+
+Now 1, 2 and 3 are linked: three of the four voters of the committed configuration. But:
+- 2 and 3 need 1's vote, and 1 refuses it: its log is longer.
+- 1 never stands: in its own log it is a learner.
+- 0 is cut off.
+
+The shard waits for 0, though a live majority is there.
+
+**The sentences:**
+- "A change takes effect when appended" (the single-server rule the model was asked to use).
+- §4.2, "A learner ... never stands itself".
+
+Together they make a member demoted by an uncommitted entry into a voter that blocks and cannot stand. Round 2 makes this reachable because the swap's removal comes at once, even from a leader that has just lost its links. It is not specific to swaps: any demotion of a voter can do it.
+
+**Fix:** either say that fero's raft applies a configuration change when it commits, as etcd's raft does (decision 22 ports it), or add to §4.2: "A member demoted by an entry that is not yet committed still stands, and does not count its own vote", as Ongaro's thesis lets a server outside its latest configuration stand. `--fix stand-when-demoted` checks the second: see "Fixes checked".
+
+#### R2-2. The swap removes the old voter before the new one holds its own promotion (P2)
+
+**Trace** (`four-retire`, 4 steps, one fault):
+1. Learner 3, caught up, pauses.
+2. A planner retires member 0.
+3. Leader 0 promotes 3 to replace 0: voters {0,1,2,3}. This commits on 0, 1 and 2; 3 misses it.
+4. "The very next step" removes 0: voters {1,2,3}.
+
+The promotion entry, which is committed, is now on 2 of 3 voters, where it was on 3.
+
+A second trace (4 steps): 3 is promoted, then crashes, and the next step still removes 0, which was live. In `four`, a returning member and a lost disk give the same with no planner.
+
+**The sentence:** "let its log reach the leader's commit offset, exactly, not merely within `lag.max`; promote it; then remove the old voter in the very next step. ... No step lowers the number of answering voters holding a committed entry". The commit offset is checked before the promotion, but the promotion itself moves it.
+
+**Fix:** "promote it; then, once its log reaches the commit offset again, its own promotion included, remove the old voter in the very next step. If the new voter is gone first, that step removes it instead, and the old voter stays." The leave row already says this for its own replacement. `--fix swap-exact-remove` removes every case.
+
+#### R2-3. §10.2 misses two exceptions (P2)
+
+**The sentence:** "no healing step reduces the number of answering, vouching voters that hold a committed entry, unless a replacement voter already holds it; a leave may, only when no caught-up learner exists or by removing dead voters, and says so".
+
+- **Two voters stepping back to one** (`three`, 3 steps) is a healing step that removes an answering holder, with no replacement. §4.2 itself calls it "the one step by which healing lowers a voter count".
+- **A leave whose promoted learner fails before the leaver's removal** (`four`, 4 steps):
+  1. Member 1 gets Ctrl-C.
+  2. Learner 3 is promoted for it, and catches up.
+  3. 3 crashes.
+  4. The leave removes 1: the remaining live voters are a majority.
+
+  Removing 1 is right: keeping it would leave {0,1,2,3} with only two live members once 1 exits. But it lowers the answering holders, and the sentence does not allow it.
+
+**Fix:** "no healing step reduces the number of answering, vouching voters that hold a committed entry, unless a replacement voter already holds it, except two voters stepping back to one; a leave may, only when no caught-up learner exists, when the learner it promoted fails before the leaver is removed, or by removing dead voters, and says so".
+
+#### R2-4. A planner `retire` with no replacement never completes (P10)
+
+**Trace** (`three-retire`, 1 step): a planner retires member 0 of three. No candidate can replace it, healing never lowers a count, and the step back to one is for two voters only. So 0 stays a voter for good, and the scale-in "retires a copy before it stops it" waits for ever. It is the same in `four-retire` after two retires.
+
+**The sentence:** `retire(member)`, "As `drain`, and healing moves its replicas off, since a retiring member is never a candidate. A scale-in retires a copy before it stops it".
+
+**Fix:** say what happens. For example: "When no candidate can replace it, a retire stays pending and `cluster.health` says why. To go below `copies` members, the copy leaves (Ctrl-C), which may lower the count". Or let the leader remove a retiring voter as a leave would, when the remaining live voters stay a majority.
+
+### Your three questions
+
+- **Can a shard now settle at four voters, or flap?** No.
+  - P4 held in every run: no settled state had two or four voters.
+  - The surplus rule settles a swap cut off between its steps.
+  - P9 held: at most 8 configuration changes came between outside events. In any step order it was 6.
+- **Can two-to-one and a swap fight?** No.
+  - Their conditions do not overlap. Two-to-one needs fewer than three live candidates. A swap needs a free live candidate in the target, at the target count.
+  - With every step order allowed, no run churned or settled at two or four.
+  - Two-to-one did need "neither voter retiring". Without it (`two-to-one-retiring`), a one-voter leave and the step back undo each other. The model then finds a shard stuck for good after a Ctrl-C alone.
+- **Can a member back after `gone` cause churn without end?** No. Its return is an outside event. It is taken back as a learner, and at most one swap follows (add, promote, remove: three changes). The return costs one fault each time it happens, so it cannot loop on its own.
+
+### Stuck states
+
+Every stuck state lacks a live majority, except finding R2-1. The classes, counts aside, are round 1's, and so is whether the doc admits them. Round 2 adds no "settles at two" source. Two voters now come only from a leave in flight, or a step back not yet taken.
+
+### Mutants (round 2)
+
+MUTANTS_TABLE
+
+### Fixes checked
+
+FIXES_TABLE
+
+## Round 1: the first review
+
+These are round 1's results as reported, on the text as it then stood. `python3 healing.py --round 1` reruns them; the state counts can differ slightly, since round 2 added a churn counter to the state. Findings 1 to 5 below are now in the text: they are what round 2 checked.
+
+### Results in short
+
+- **Raft safety held everywhere.** At most one leader per term; no new leader lacked a committed entry; no commit overwrote one. A committed entry was always on a majority of the committed configuration's voters, or the shard was reported under-replicated, except in one case (finding 3).
+- **Healing never raised a voter count to an even number, and never lowered one** (P3). A paused voter was never removed by a leave (P6). Healing never targeted a leaving member (P7). With a live majority, the shard always got a writable leader again (P5).
+- **Five design findings** (below):
+  1. The leave can remove the leaver before its replacement holds the newest commit.
+  2. A dead fourth voter is never removed.
+  3. A dead fourth voter is never reported.
+  4. A shard can sit at two voters, where the doc says it should have one or three.
+  5. §10.2's property is broken by healing's own gone-voter step, as worded.
+
+  Findings 1 to 3 are gaps in the rules. Finding 4 is a contradiction with a real cost: either crash then stops writes. Finding 5 is wording. Each has a proposed fix, and the fixes for 1 to 4 were checked by the same model.
+- **Twelve of fourteen mutants are caught.** The two not caught guard against things this model has no notion of: time to catch up, and five members (see "Mutants").
+
+**Healing, as round 1 modelled it.**
 - **The target** is the ring, with rank = member number. Candidates are members that are not draining, departed or gone.
   - There are 3 target voters once three candidates are live. Otherwise the voter count stays as it is ("never lowers", "only to an odd number").
   - A one-voter shard keeps its incumbent ("Its one voter stays the incumbent across restarts").
@@ -69,7 +270,7 @@ python3 healing.py --list
   5. Learners whose member is gone, draining, departed or on a stale disk are dropped.
 - `lag.max` is one entry.
 
-**The leave, as written.**
+**The leave, as round 1 modelled it.**
 1. Ctrl-C marks the member `draining`.
 2. A leaving leader hands over first. As a shard's only voter, it first promotes a learner.
 3. The leader then promotes one caught-up learner, if there is one, "so the voter count holds".
@@ -82,7 +283,7 @@ python3 healing.py --list
 - CheckQuorum steps a cut-off leader down within `election.ms`. That is before `evict.after` and before the leave's probe window ends. So only a leader that reaches a majority acts on a link that has been down for a long time.
 - A leaving leader waits while a reachable voter can take its hand-over (or, as the only voter, while a reachable learner can catch up). A paused one answers within `leave.ms`.
 
-## Properties
+### Properties
 
 | | Property | How it is checked |
 |---|---|---|
@@ -94,7 +295,7 @@ python3 healing.py --list
 | P6 | A merely paused member is never removed by a leave | At every leave removal of a voter other than the leaver. |
 | P7 | No healing step targets a draining member | At every add and promote. |
 
-## Runs
+### Runs
 
 The design as written. Times include the stuck search. All on one core each.
 
@@ -124,9 +325,9 @@ Terms are bounded at 5 in the search, and at 8 in the stuck search. The two smal
 
 Client entries add only log positions in this model. Each leader's own-term entry and every configuration change are committed entries too, tracked the same way. A client entry costs 5 to 9 times the states, so 4-member runs use none. The 3-member run with one client entry found the same classes as with none.
 
-## Design findings
+### Design findings
 
-### 1. The leave removes the leaver before its replacement holds the newest commit
+#### 1. The leave removes the leaver before its replacement holds the newest commit
 
 **Trace** (`four-arrive`, 6 steps, one fault):
 1. Member 3 starts. The leader, 0, adds it as a learner, and it catches up.
@@ -141,7 +342,7 @@ The newest committed entry is now on 2 of the 3 voters, where it was on 3. The r
 
 **Fix:** in the leave row, "then it removes the leaver once the promoted learner's log reaches the leader's commit offset, exactly, as healing's live-voter rule does". This costs about one round trip inside `leave.ms`. `--fix leave-exact` removes every case of it in every scenario.
 
-### 2. A shard can settle at four voters, one of them dead, for good
+#### 2. A shard can settle at four voters, one of them dead, for good
 
 **Trace** (`four`, 4 steps, one fault):
 1. Member 1 gets Ctrl-C.
@@ -159,7 +360,7 @@ The run found two more paths to the same end:
 
 **Fix:** "a gone voter is also removed, with no replacement, when the voters left are still an odd number at or above the target". It would also be better to say that healing leaves a leaving voter to the leave, so only one of them promotes a replacement. `--fix gone-surplus` removes every settle at four.
 
-### 3. Under-replication goes unreported while a shard has four voters
+#### 3. Under-replication goes unreported while a shard has four voters
 
 **Trace** (`four`, 4 steps, two faults):
 1. Member 1 pauses.
@@ -173,7 +374,7 @@ Entries up to the promotion are now on 2 of the 4 voters. There are 3 live voter
 
 **Fix:** report when the live voters are fewer than `copies` **or fewer than the configuration's voters**. `--fix report-dead` removes every case of it.
 
-### 4. A shard can sit at two voters, though the doc says it should not
+#### 4. A shard can sit at two voters, though the doc says it should not
 
 Three ways, all found as settled states:
 - **(a) A leave from three voters with no learner** (`three`, 2 steps, no fault). Member 1 gets Ctrl-C, and the leave removes it: voters {0,2}. Only two members remain. Healing never lowers and raises only to an odd number, so the shard keeps two voters for good, and either crash stops its writes (stuck class "two voters, one down"). The leave row allows the leave to lower the count. But limit 6 says "So below three candidates a shard has one voter", and the one-voter rule exists because "a shard with two voters could not survive either one's crash".
@@ -186,7 +387,7 @@ Three ways, all found as settled states:
 
 `--fix two-to-one` results are in "Checking the fixes".
 
-### 5. §10.2's property, as worded, is broken by healing's own gone-voter step
+#### 5. §10.2's property, as worded, is broken by healing's own gone-voter step
 
 **Trace** (`four`, 3 steps, one fault):
 1. Member 1 crashes, keeping its disk.
@@ -197,7 +398,7 @@ Member 1's disk still holds every committed entry, so the vouching voters holdin
 
 **Fix:** word §10.2 as "no step reduces the number of **answering** vouching voters ...", or list the exceptions: removing a gone voter as the first half of its replacement, and the two leave steps below.
 
-## Which P2 breaks a leave is allowed
+### Which P2 breaks a leave is allowed
 
 The leave row lets a leave lower the voter count, so two of its steps may break P2. The checker labels each removal:
 
@@ -209,7 +410,7 @@ The leave row lets a leave lower the voter count, so two of its steps may break 
 
 Healing steps break P2 only by the gone-voter removal (finding 5).
 
-## Stuck states, and whether the doc admits them
+### Stuck states, and whether the doc admits them
 
 No stuck state had a live majority in any run, so P5 holds. Every stuck state lacks a majority of live voters. "Until a member returns" means returns and heals fix it. "Permanent" means they do not: the members needed left for good, or lost their disks.
 
@@ -221,7 +422,7 @@ No stuck state had a live majority in any run, so P5 holds. Every stuck state la
 | voters lost disks | `three`: two members lose their disks | Yes: beyond what a majority survives. `fero recover --unclean`. |
 | majority down or cut off | `three`: two members crash | Yes: plain Raft. |
 
-## Mutants
+### Mutants
 
 `python3 healing.py --mutants` removes one rule at a time. It runs each mutant and the design on the same smaller bounds:
 - `two`: 2 faults, 1 client entry;
@@ -259,7 +460,7 @@ The `learner-no-vote` catch is R-76 exactly (`one-m`, 4 steps):
 
 Now 0 needs 1's vote. 1 is still a learner in its own log, so it never votes, and nobody else can stand. The design survives this, because learners answer vote requests by the log rule.
 
-## Checking the fixes
+### Checking the fixes
 
 The same six scenarios, with the fixes applied:
 
