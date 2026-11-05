@@ -136,6 +136,14 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-124 | Each duplicate of a resent copy below the floor appends a fresh `stale-attempt` refusal (slot-move spike) | A `stale-attempt` refusal is never appended (4.3) |
 | R-125 | B serves `log` readers below N after A is deleted, but A's segments were themselves carried from an earlier move | The carried state names every segment holding s's records below N, and the list grows over chained moves (4.2) |
 | R-126 | A shrink with `history: 'all'` and no object store waits for ever to delete the old shard | Said plainly: the old shard stays, holding no slot, to serve old records (4.2) |
+| R-127 | A leave promotes a "caught-up" learner that is paused or one entry behind, then removes the leaver, so the newest commit sits on two of three voters (healing spike) | The leaver is removed only once the promoted learner's log reaches the leader's commit offset, exactly (4.2) |
+| R-128 | A leaver crashes after its learner is promoted, and the shard keeps four voters, one dead, for good (healing spike) | A gone voter is removed with no replacement when the voters left are still odd and at or above the target (4.2) |
+| R-129 | A shard holds four voters, one dead, and its three live voters equal `copies`, so nothing is reported (healing spike) | `cluster.health` also reports fewer live voters than the configuration holds (4.2) |
+| R-130 | A leave from three with no learner, or growth from one to three cut short, leaves a shard at two voters for good (healing spike) | With fewer than three live candidates and neither voter retiring, two voters step back to one and a learner (4.2) |
+| R-131 | Healing and a leave both promote a replacement for the same leaver, and the shard holds five voters (healing spike) | Healing leaves a retiring voter to its own leave while the leave runs (4.2) |
+| R-132 | A roll's `drain` moves every replica off each copy in turn | `drain` gives up leadership only; `retire` moves replicas and is what a leave and a scale-in use; `undrain` clears either (4.2) |
+| R-133 | With no planner, nobody marks a dead member `gone`, so the ring keeps ranking it as a voter | A leader leaves out members its own link has not reached within `evict.after`, and `#meta`'s leader writes `gone` from its own links (4.2) |
+| R-134 | A gone voter's replacement copies a snapshot for minutes while the shard has two voters, and a returning gone voter is thrown away | A swap promotes first: learner, exact catch-up, promote, then remove the old voter in the next step (4.2) |
 
 ## Part 1: v4's hard cases
 

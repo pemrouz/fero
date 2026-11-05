@@ -4,10 +4,21 @@ healing.py: a small exhaustive model checker for DESIGN-V5 section 4.2,
 "Healing: one rule, run by each shard's leader" and "Leaving, restarting
 and stopping". Plain Python 3, standard library only.
 
-    python3 healing.py                 # every scenario, the design as written
+    python3 healing.py                 # six scenarios, the design as written (~20 min)
     python3 healing.py --scenario four # one scenario
-    python3 healing.py --mutants       # one rule removed at a time
+    python3 healing.py --mutants       # one rule removed at a time (~40 min)
+    python3 healing.py --fix leave-exact --fix gone-surplus --fix report-dead
+                                       # the proposed fixes (see FIXES)
+    python3 healing.py --fine --any-order --faults 1
+                                       # the finer model: per-follower
+                                       # replication, any step order
     python3 healing.py --list          # scenarios and mutants
+
+By default a new entry reaches every reachable, responsive member in the
+step that appends it (a follower lags only through a crash, partition or
+pause); healing and the leave each take their next step in the doc's order,
+and interleave freely; a leaver exits in the step its leader decides.
+--fine and --any-order lift the first two; healing.md has the cross-check.
 
 What it models (healing.md says it in plain English):
   * ONE shard, as an abstract Raft group. Replicas are (member, disk
@@ -381,6 +392,7 @@ def config_steps(s, cx, L):
     rid, up, lk = cx.rid, cx.up, cx.lk
     MUT = G.MUT
     steps = []
+    waiting = set()      # leavers whose removal waits for the replacement (fix)
 
     def link(m):
         return m == L or lk[L][m]
@@ -471,6 +483,14 @@ def config_steps(s, cx, L):
             if u[0] not in Tset or v_gone(u):
                 if u[0] != L:
                     steps.append(('heal-shrink', u[0], tdel(V, u), tdel(Lr, u), u))
+    # proposed fix 'two-to-one': two voters and fewer than three live
+    # candidates step back to one voter (the leader) and a learner
+    if ('two-to-one' in G.FIX and nv == 2 and nlive < G.COPIES
+            and all(v[0] in cands and v == rid[v[0]] for v in V)):   # neither is leaving
+        for u in V:
+            if u[0] != L and live_m(u[0]) and u == rid[u[0]]:
+                nl_ = tadd(Lr, u) if u[0] in cands else Lr
+                steps.append(('heal-demote', u[0], tdel(V, u), nl_, u))
     # a learner whose member is gone, draining, departed or a stale disk
     for l in Lr:
         m = l[0]
@@ -513,8 +533,11 @@ def config_steps(s, cx, L):
             if 'leave-exact' in G.FIX:
                 # the fix: the replacement must hold the leader's commit offset
                 rp = last_promoted(log)
-                if rp is not None and rp in Vs and rp != lid and lcp(reps[rp[0]][LOG], log) < commit:
-                    exact = False
+                if rp is not None and rp in Vs and rp != lid and (
+                        rp != rid[rp[0]] or lcp(reps[rp[0]][LOG], log) < commit):
+                    exact = False        # it cannot vouch, or lacks a committed entry
+                    if rp == rid[rp[0]] and live_m(rp[0]):
+                        waiting.add(m)   # it will catch up within leave.ms
             if L != m and len(rest) >= 1 and exact and (safe or 'leave-always-remove' in MUT):
                 steps.append(('leave-leaver', m, rest, Lr, lid))
             if not safe and quorum and 'leave-no-dead' not in MUT:
@@ -523,10 +546,11 @@ def config_steps(s, cx, L):
                         rest2 = tdel(V, d)
                         if sum(live_leave(v) for v in rest2) >= maj(len(rest2)):
                             steps.append(('leave-dead', d[0], rest2, tdel(Lr, d), d))
-    return steps, (V, Lr, k, Tset, nlive, live_c)
+    return steps, (V, Lr, k, Tset, nlive, live_c, waiting)
 
 
-HEAL_ORDER = ['heal-gone', 'heal-shrink', 'heal-add', 'heal-promote', 'heal-rmlive', 'heal-rmlearner']
+HEAL_ORDER = ['heal-gone', 'heal-shrink', 'heal-add', 'heal-promote', 'heal-rmlive', 'heal-demote',
+              'heal-rmlearner']
 LEAVE_ORDER = ['leave-promote', 'leave-dead', 'leave-leaver', 'leave-learner']
 
 
@@ -559,7 +583,7 @@ def check_step(s, cx, L, step, info):
     """Properties of one healing or leave step (P2, P3, P6, P7)."""
     mems, reps, com = s[0], s[1], s[5]
     rule, subj, Vn, Ln, who = step
-    V, Lr, k, Tset, nlive, live_c = info
+    V, Lr, k, Tset, nlive, live_c, _ = info
     log = reps[L][LOG]
     viols = []
     if len(Vn) < len(V):                                    # a removal
@@ -580,7 +604,13 @@ def check_step(s, cx, L, step, info):
                 break
         if rule.startswith('heal-'):
             if rule == 'heal-gone':
-                pass                                        # sanctioned transient
+                # sanctioned as the first half of a replacement, or (a proposed
+                # fix) when a surplus voter goes and the count stays at the target
+                if (not any(cx.rid[m] not in V for m in live_c)
+                        and len(Vn) < max(k, min(len(V), G.COPIES))):
+                    viols.append(('P3-lower', 'heal-gone removes %s with no replacement '
+                                  'candidate: %d -> %d voters' % (fmt_set((removed,)), len(V), len(Vn)),
+                                  'heal-gone-no-replacement'))
             elif len(Vn) < min(k, G.COPIES) or (rule != 'heal-rmlive'):
                 viols.append(('P3-lower', '%s lowers the voter count %d -> %d'
                               % (rule, len(V), len(Vn)), rule))
@@ -615,15 +645,24 @@ def exit_ready(s, cx, m):
         if L != m and not cx.lk[L][m]:
             continue
         if L == m:
-            V = cfgs(reps[L][LOG])[0][1]
-            for t in range(N):
-                if (t != L and cx.rid[t] in V and cx.lk[L][t] and cx.resp[t]
-                        and reps[t][LOG] == reps[L][LOG] and not mems[t][LEAVING]):
+            # it hands over first: it brings a reachable voter (a paused one
+            # answers within leave.ms) up to its log end, then TimeoutNow; as
+            # the only voter, it first waits for a reachable learner to catch
+            # up so that it can promote it
+            c = cfgs(reps[L][LOG])[0]
+            V, Lr = c[1], c[2]
+            others = [v for v in V if v[0] != L]
+            pool = others if others else Lr
+            for (t, i) in pool:
+                if (cx.rid[t] == (t, i) and cx.lk[L][t] and not mems[t][LEAVING]
+                        and not mems[t][DRAIN]):
                     busy = True
         if not can_change(s, L):
             continue
         decided = True
-        steps, _ = config_steps(s, cx, L)
+        steps, info = config_steps(s, cx, L)
+        if m in info[6]:
+            busy = True
         for st in steps:
             if st[0].startswith('leave-') and (st[1] == m or st[0] == 'leave-dead'):
                 busy = True
@@ -743,7 +782,9 @@ def succ0(s, mode, tcap):
                 rs[L] = (rL[TERM], rL[VOTED], I(logL + (e,)), True, rL[COMMIT])
                 send_all(mems, rs, L, cx)
                 c2, v = advance(mems, rs, L, com)
-                viols = check_step(s, cx, L, step, info)
+                # a leader missing a committed entry can never commit (Leader
+                # Completeness), so only an up-to-date leader's steps are judged
+                viols = check_step(s, cx, L, step, info) if logL[:len(com)] == com else []
                 if v:
                     viols.append(v)
                 out.append((('cfg', L, rule, subj, Vn, Ln, who), freeze(mems, rs, nf, nl, nc, c2, win),
@@ -799,7 +840,11 @@ def succ0(s, mode, tcap):
         mm = mems[m]
         if mm[GONE] or m not in known:
             continue
-        cut = any(up[x] and cx.side[x] != mm[SIDE] for x in range(N))
+        # gone is read only by a leader with quorum, so only a member cut off
+        # from the larger side (side 1 on a tie) can usefully be marked
+        mine = sum(1 for x in range(N) if up[x] and cx.side[x] == mm[SIDE])
+        other = sum(1 for x in range(N) if up[x] and cx.side[x] != mm[SIDE])
+        cut = other > 0 and (mine < other or (mine == other and mm[SIDE] == 1))
         if (not mm[UP]) or cut:
             ms = list(mems)
             ms[m] = mm[:GONE] + (True,) + mm[GONE + 1:]
@@ -870,13 +915,30 @@ def succ0(s, mode, tcap):
 # state predicates
 
 def live_voters(s, V):
+    """Voters that are up, can vouch for their disk, and are not cut off on the
+    smaller side of a partition (a paused one counts: its pause is short)."""
     mems = s[0]
-    return sum(1 for (m, i) in V if mems[m][UP] and mems[m][INC] == i and not mems[m][LEFT])
+    N = len(mems)
+    n = 0
+    for (m, i) in V:
+        mm = mems[m]
+        if not mm[UP] or mm[INC] != i or mm[LEFT]:
+            continue
+        mine = sum(1 for x in range(N) if mems[x][UP] and mems[x][SIDE] == mm[SIDE])
+        other = sum(1 for x in range(N) if mems[x][UP] and mems[x][SIDE] != mm[SIDE])
+        if other > 0 and (mine < other or (mine == other and mm[SIDE] == 1)):
+            continue
+        n += 1
+    return n
 
 
 def reported(s, V):
-    """The doc: cluster.health says so when a shard has fewer live voters than copies."""
-    return live_voters(s, V) < G.COPIES
+    """The doc: cluster.health says so when a shard has fewer live voters than
+    copies. (Proposed fix 'report-dead': also whenever any voter is not live.)"""
+    lv = live_voters(s, V)
+    if 'report-dead' in G.FIX:
+        return lv < max(G.COPIES, len(V))
+    return lv < G.COPIES
 
 
 def writable(s, cx=None):
@@ -960,6 +1022,7 @@ RULE_TEXT = {
     'heal-rmlive': 'healing removes live voter (not in target)',
     'heal-rmlearner': 'healing removes learner',
     'heal-shrink': 'healing shrinks (mutant) removing',
+    'heal-demote': 'healing steps back to one voter (fix), demoting',
     'leave-learner': 'the leave removes learner',
     'leave-promote': 'the leave promotes learner',
     'leave-leaver': 'the leave removes the leaver',
@@ -1101,6 +1164,10 @@ FIXES = {
                     'holds the leader\'s commit offset, exactly',
     'gone-surplus': 'a gone voter is removed with no replacement when the voters left '
                     'are still an odd number at or above the target',
+    'report-dead':  'cluster.health reports a shard whenever any voter is not live, '
+                    'not only when live voters are fewer than copies',
+    'two-to-one':   'two voters with fewer than three live candidates, neither leaving, step '
+                    'back to one voter and a learner (an exception to "never lowers")',
 }
 
 MUTANTS = {
@@ -1135,9 +1202,19 @@ class Result:
         self.secs = 0.0
         self.stuck = {}       # class -> (count, example index)
         self.capped = 0
+        self.minf = {}        # key -> fewest faults that reach it
+
+
+def clear_caches():
+    """Each search starts afresh, so a process that runs many (--mutants)
+    does not keep every earlier search's entries and sub-tuples alive."""
+    for d in (ENT_ID, _I, _CFG, _TAGS, _LP, _PV):
+        d.clear()
+    del ENT[:]
 
 
 def explore(scn, mutants=frozenset(), quiet=False, limit=None, liveness=True):
+    clear_caches()
     init_kind, F, LV, E, MAXT, _ = SCENARIOS[scn]
     G.F, G.LV, G.E, G.MAXT, G.MUT = F, LV, E, MAXT, frozenset(mutants)
     G.META = True
@@ -1154,6 +1231,7 @@ def explore(scn, mutants=frozenset(), quiet=False, limit=None, liveness=True):
     def record(prop, kind, i, lab, text):
         key = (prop, kind)
         R.count[key] = R.count.get(key, 0) + 1
+        R.minf[key] = min(R.minf.get(key, 99), states[i][2])
         if key not in R.viol:
             R.viol[key] = (i, lab, text, depth[i] + (1 if lab is not None else 0))
 
@@ -1296,12 +1374,13 @@ def stuck_pass(R):
         cls = classify_stuck(s, search)
         c = classes.get(cls)
         if c is None:
-            classes[cls] = [1, j]
+            classes[cls] = [1, j, s[2]]
         else:
             c[0] += 1
+            c[2] = min(c[2], s[2])
     R.stuck = classes
     R.live = res
-    for cls, (cnt, j) in classes.items():
+    for cls, (cnt, j, _) in classes.items():
         if cls[0] == 'LIVE MAJORITY':
             key = ('P5-stuck', 'live majority, ' + cls[1])
             R.count[key] = cnt
@@ -1405,7 +1484,7 @@ def report(scn, R, out=sys.stdout, traces=True):
             print_trace(R, i, lab, out)
     if R.stuck:
         print('   stuck states (no fault-free path to a writable leader):', file=out)
-        for cls, (cnt, j) in sorted(R.stuck.items(), key=lambda kv: -kv[1][0]):
+        for cls, (cnt, j, _) in sorted(R.stuck.items(), key=lambda kv: -kv[1][0]):
             print('     %-34s %-24s x%d' % (cls[0], cls[1], cnt), file=out)
             if traces:
                 print_trace(R, j, None, out)
@@ -1422,16 +1501,20 @@ MUTANT_SCENARIOS = ['two', 'three-m', 'one-m', 'four-m']
 
 
 def signature(R):
-    """What a run found: violation keys, and stuck classes (as P5 keys)."""
-    sig = set(R.viol)
-    for cls in R.stuck:
-        sig.add(('P5-stuck', cls[0] + ', ' + cls[1]))
+    """What a run found: each violation key and stuck class (as a P5 key),
+    with the fewest faults that reach it."""
+    sig = dict((k, R.minf[k]) for k in R.viol if k[0] != 'P5-stuck')
+    for cls, (cnt, j, nf) in R.stuck.items():
+        sig[('P5-stuck', cls[0] + ', ' + cls[1])] = nf
     return sig
 
 
 def run_mutants(scns, mutants, a):
-    print('Mutants: each removes one rule; caught = it adds a violation or a stuck class '
-          'the design as written does not have, on the same bounds.')
+    print('Mutants: each removes one rule. Caught = on the same bounds it reaches a violation '
+          'or a stuck class that the design as written does not, or reaches one with fewer '
+          'faults. Healing and the leave may take any enabled step (--any-order), so a '
+          'mutant\'s extra choice is never masked by the step order.')
+    G.ANY = True
     base = {}
     for scn in scns:
         G.FIX = frozenset()
@@ -1444,7 +1527,8 @@ def run_mutants(scns, mutants, a):
         caught_any = False
         for scn in scns:
             R = explore(scn, {mu}, quiet=True, limit=a.limit, liveness=not a.no_liveness)
-            new = sorted(signature(R) - base[scn])
+            sig = signature(R)
+            new = sorted(k for k in sig if k not in base[scn] or sig[k] < base[scn][k])
             caught_any = caught_any or bool(new)
             print('   %-8s %8d states  %s' % (scn, R.states, 'caught by:' if new else 'not caught'))
             shown = set()
@@ -1452,11 +1536,13 @@ def run_mutants(scns, mutants, a):
                 if key[0] in shown and key[0] != 'P5-stuck':
                     continue
                 shown.add(key[0])
+                how = ('new' if key not in base[scn] else
+                       'with %d fault(s), the design needs %d' % (sig[key], base[scn][key]))
                 if key in R.viol:
                     i, lab, text, d = R.viol[key]
-                    print('      %s [%s]: %s (%d steps)' % (key[0], key[1], text, d))
+                    print('      %s [%s] (%s): %s (%d steps)' % (key[0], key[1], how, text, d))
                 else:
-                    print('      %s [%s]' % key)
+                    print('      %s [%s] (%s)' % (key[0], key[1], how))
                 if a.mutant_traces and key in R.viol:
                     i, lab, text, d = R.viol[key]
                     print_trace(R, i, lab, sys.stdout, final=False)

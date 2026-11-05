@@ -413,23 +413,24 @@ Two members that share a shard exchange a link ping every `ping.ms` (500 ms) whe
 There is no controller. Each shard's leader keeps its own shard's replicas where they belong.
 
 - **The target.** A placement stored in the shard's log, if a planner set one. Otherwise the ring:
-  - **candidates** are servers with the resource's code hashes and room, that are not draining or gone; log members count too when there are fewer such servers than `copies`;
+  - **candidates** are servers with the resource's code hashes and room, that are not `retiring` or `gone` in `#meta`, and that the leader's own link has reached within `evict.after`; log members count too when there are fewer such servers than `copies`. A `draining` member stays a candidate: draining gives up leadership, not replicas;
   - **voters:** `copies` of them (3 by default), the top candidates by rank, servers first;
   - **learners:** the next servers by rank, up to `standbys` full replicas in all;
   - **a shard created with fewer than three candidates** starts with one voter, the member that created it (in example 01, the first process), and the others as learners. A shard with two voters could not survive either one's crash, so it grows from one to three as candidates arrive, passing through two only for the moment of the change. Its one voter stays the incumbent across restarts.
   - **healing raises a voter count only to an odd number:** from one to three once three candidates are live, never to two. With an even number of candidates, the extra one is a learner. So a shard a leave left with one voter takes a returning member back as a learner until a third candidate arrives.
+  - **two voters step back to one.** A shard can still end at two: a leave from three with no learner, or growth from one to three cut short by a crash between its two promotions. With fewer than three live candidates, neither voter `retiring`, and `copies` not 2, the leader demotes the other voter to a learner. This is the one step by which healing lowers a voter count, and it matches the choice for two machines (Leaving, below). The healing spike found the shard otherwise sits at two for good, where either crash stops its writes.
 - **The steps.** When the shard's replicas differ from the target, the leader makes one change at a time, each a Raft entry:
-  - **healing never lowers a shard's voter count.** Only a `leave` (below) or an operator does;
-  - **a gone voter** (its link down past `evict.after`, or reported `gone`) is removed only when a replacement candidate exists, and that replacement is added as a learner in the next step, and promoted once caught up. The shard has two voters only between those steps. Removing the gone one first costs nothing: it was already not answering;
-  - **with no replacement,** the gone voter stays in the configuration. The shard is under-replicated and says so, and its live majority still commits. So a 10-minute partition of one of three members never shrinks a shard below three voters;
-  - **a live voter not in the target** is removed only after its replacement is a voter whose log reaches the leader's commit offset, exactly, not merely within `lag.max`. So no step lowers the number of voters holding a committed entry;
+  - **healing never lowers a shard's voter count,** except two voters stepping back to one (above). Only a `leave` (below) or an operator does;
+  - **a swap promotes first, then removes.** Every replacement, of a gone voter or of a live voter not in the target, goes: add the replacement as a learner; let its log reach the leader's commit offset, exactly, not merely within `lag.max`; promote it; then remove the old voter in the very next step. So the shard holds one extra voter only between those two steps, never two fewer, and a gone voter that comes back while its replacement catches up is still a voter. No step lowers the number of answering voters holding a committed entry;
+  - **a gone voter** is one whose link has been down past `evict.after`, or that `#meta` marks `gone`. With no replacement candidate it stays in the configuration: the shard is under-replicated and says so, and its live majority still commits. So a 10-minute partition of one of three members never shrinks a shard below three voters. It is removed with no replacement only when the voters left are still an odd number at or above the target, which settles a swap or a leave cut off between its two steps;
+  - **a retiring voter is left to its own leave** while the leave runs, so only one of them promotes a replacement. After `leave.ms`, healing treats it as any other voter not in the target;
   - a new replica loads a snapshot (from the object store, or streamed from the leader) and the tail. It counts as caught up when it is within `lag.max` of the leader's commit offset. One that has not caught up within `catchup.max` (10 min), say on a shard too hot to follow, is reported as a `cluster.health` row naming the shard and the member, and a planner's `place` can move the shard elsewhere.
-- **Under-replication is never silent.** `cluster.health` and one stderr line say when a shard has fewer live voters than `copies`, and why.
+- **Under-replication is never silent.** `cluster.health` and one stderr line say when a shard has fewer live voters than `copies`, or fewer than the voters in its configuration, and why. The second catches a shard holding four voters, one dead, after a cut-off swap, whose three live voters equal `copies`.
 - **A removed replica** learns it from the leader's refusal, or from `#meta`'s shard record. It stops standing for elections and serving its rows at once; PreVote keeps it from disturbing the shard meanwhile. It deletes its copy once `#meta` shows the shard's current configuration without it, as CockroachDB's replica GC does.
 - **A copy on a returning disk is reused.** Until it is deleted, if healing adds that member back as a learner, it starts from the log it has, and the leader sends only the tail it lacks (Raft's log matching repairs any divergence). So a member back after `evict.after` copies only what changed. If its copy was deleted meanwhile, it asks for a snapshot, as any new replica does.
 - **Leaders spread.** Each shard's preferred leader is the full voter the ring ranks first for it. When it has been live and caught up for `settle.ms` (30 s), the leader hands leadership to it, as Kafka's preferred-leader rebalance does. So leadership returns after a failover, without flapping. A member takes back at most ten leaderships a second, so a member returning as the preferred leader of 3,000 shards does not take them in one tick.
 - **Pacing.** Each member loads at most two snapshots at a time and answers `busy` to more, and a leader that hears `busy` backs off. With rendezvous hashing, a new member takes about `copies`/n of the replicas, and a gone one gives up only its own.
-- **Members.** The leader reads members from `#meta`, which every member follows, and liveness from its own links. A stale view only delays or repeats a step: every step is a Raft change in the shard's own log, so it is safe whatever the view.
+- **Members.** The leader reads members from `#meta`, which every member follows, and liveness from its own links. **Who writes `gone`:** a planner, or else `#meta`'s own leader, from its own links: a member its links have not reached for `evict.after` is marked `gone`, and the mark is cleared when that life reaches it again. So the ring stops ranking a dead member with no planner, and a member back after an hour is a candidate again, taken back by a swap like any other. A stale view only delays or repeats a step: every step is a Raft change in the shard's own log, so it is safe whatever the view.
 - **Slot moves** are also decided by each shard's leader, by size and load (the shard rule, below).
 
 #### The planner (optional)
@@ -439,7 +440,9 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 
 | Hint | Does |
 |---|---|
-| `drain(member)` | written to `#meta`. Leaders hand over the shards it leads, then healing moves its replicas off, since a draining member is never a target |
+| `drain(member)` | written to `#meta`. Leaders hand over the shards it leads, and it is no shard's preferred leader while drained. It keeps its replicas. A roll drains each copy before it restarts it |
+| `retire(member)` | written to `#meta`. As `drain`, and healing moves its replicas off, since a retiring member is never a candidate. A scale-in retires a copy before it stops it; a `leave` retires itself |
+| `undrain(member)` | clears `drain` or `retire` |
 | `gone(member, life)` | written to `#meta`. Leaders replace it now, instead of after `evict.after`. A leader whose link to that life is up ignores it |
 | `lead(shard, member)` | a leadership transfer to that full voter. It also sets the shard's preferred leader, so the `settle.ms` hand-back does not undo it |
 | `place(shard, members)` | stores a target in the shard's log, which healing then follows. `place(shard, null)` returns the shard to the ring |
@@ -447,7 +450,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 | `shards(resource, n)` | asks the shard rule for n shards; slots are moved until there are |
 
 - **Why a stale planner is harmless.** A shard applies a hint only if its config is still the one the hint names. Otherwise it refuses `stale-plan`, with the current config. And every change a hint causes is a Raft change in the shard's own log. So two planners at once can waste moves, never break anything. A lease row in `#meta` keeps two from fighting.
-- **What a planner adds.** Placement by load and memory, not only the ring; drains before stops; acting at once on a machine it knows is gone; slot moves ahead of load.
+- **What a planner adds.** Placement by load and memory, not only the ring; drains before restarts and retirements before stops; acting at once on a machine it knows is gone; slot moves ahead of load.
 - **Precedents.** Redis Cluster fails over by itself, and rebalances with an outside tool (`redis-cli --cluster rebalance`). CockroachDB has no central planner. TiKV requires one (PD), which fero avoids.
 
 #### `#meta`, the cluster's own shard
@@ -457,7 +460,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 
 | Record | Holds |
 |---|---|
-| member | id, life (random per process start), disk incarnation, roles (server, log), addresses (listen and advertised), capacity, code hashes it can run, kernel version, join offset, state (live, draining, gone) |
+| member | id, life (random per process start), disk incarnation, roles (server, log), addresses (listen and advertised), capacity, code hashes it can run, kernel version, join offset, state (live, draining, retiring, gone) |
 | resource | name, config (4.5), allowed code hashes, seed applied, write gate (open, or read-only with a reason) |
 | shard | resource, incarnation, the slots it holds (together, the slot table), and its last known replicas and leader. **This is a hint:** each shard's own log is the truth, and leaders refresh this record after each change, the newest config winning |
 | cluster | id, cluster version, current and next door secret, CA key envelopes, revoked certificates, the planner lease |
@@ -473,7 +476,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 | Change | What happens |
 |---|---|
 | add a server | it joins `#meta`. Rings now rank it, and each shard whose target now includes it adds it, one change at a time, paced by snapshot loads |
-| remove a server | with a planner: it is drained first (leaders hand over, then replace its replicas), then it stops. Without one, Ctrl-C is a `leave` (below) |
+| remove a server | with a planner: it is retired first (leaders hand over, then replace its replicas), then it stops. Without one, Ctrl-C is a `leave` (below) |
 | add a log member | it joins. Shards with fewer server candidates than `copies` place voters on it |
 | a shard gets big or busy | it hands half its slots to a new shard (the shard rule, below) |
 | a shard gets small and quiet | it hands its slots to a sibling and is deleted |
@@ -526,7 +529,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 
 | Stop | Used by | What happens |
 |---|---|---|
-| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **First** it marks itself `draining` in `#meta`, so no healing step, its own shards' included, targets it again. If `#meta` has no majority, the leave goes on without the mark after `leave.ms`. **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver, if the remaining live voters stay a majority of the new set. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters are removed first, when that is what lets the leave carry (as V4-60). For a leave, a voter is dead when its link has been down past `election.ms` and it still does not answer the leader's probes for the rest of `leave.ms` (4 s), longer than any GC pause the timeouts tolerate. A paused voter answers in time, and is kept. A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
+| `leave` | Ctrl-C, SIGTERM or `destroy()` when not under a supervisor; scale-in without a planner | **First** it marks itself `retiring` in `#meta`, so no healing step, its own shards' included, targets it again. If `#meta` has no majority, the leave goes on without the mark after `leave.ms`. **Leadership:** it hands over every shard it leads. **Votes:** in each shard where it is a voter, the leader first promotes a caught-up learner, if there is one, so the voter count holds; then it removes the leaver once that learner's log reaches the leader's commit offset, exactly, as a swap does, and only if the remaining live voters stay a majority of the new set. Removing it sooner left the newest commit on two of three voters in the healing spike. So two members leaving one after the other do not leave a shard with one voter while learners remain. Dead voters are removed first, when that is what lets the leave carry (as V4-60). For a leave, a voter is dead when its link has been down past `election.ms` and it still does not answer the leader's probes for the rest of `leave.ms` (4 s), longer than any GC pause the timeouts tolerate. A paused voter answers in time, and is kept. A shard where neither is safe keeps it as a voter, and `destroy()` names it, along with any dead voter it removed. **One voter:** if it is a shard's only voter, it promotes a learner first, then hands over, then leaves. Bounded by `leave.ms` (4 s). Healing later adds replacements |
 | `restart` | the same signals under a supervisor (`FERO_SUPERVISED`), rolls, restart-all | hands over every shard it leads, and stays a replica of all of them |
 
 - **A crash** is a restart that skipped the handover.
@@ -697,7 +700,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
     - Each member gets its own certificate at join. A removed member's certificate is revoked in `#meta`.
   - The secret rotates through `#meta`: current and next, during a window.
 - **`cluster.writable`** is true when every shard of the resource has a leader on a full replica that heard from a majority of its voters within `election.ms`. `cluster.shards` details each shard: its voters, learners and leader, and how many of them are live.
-- **Fewer members than `copies`.** A shard created with fewer than three candidates has one voter, healing never lowers a voter count, and `cluster.health` and one stderr line say when a shard has fewer live voters than `copies` (4.2). So two processes on one box is visibly one voter and one learner.
+- **Fewer members than `copies`.** A shard created with fewer than three candidates has one voter, healing never lowers a voter count, and `cluster.health` and one stderr line say when a shard has fewer live voters than `copies`, or than its configuration holds (4.2). So two processes on one box is visibly one voter and one learner.
 - **Defining and changing a resource.**
   - The first `fero(name, opts)` that creates a resource writes its config to the catalog, which is the source of truth from then on.
   - A later open with different options is refused, naming the difference, unless an `alter` in progress allows its code hash.
@@ -717,7 +720,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 L5 is built only from L4 calls; each library is a file with its own tests, and none adds a wire verb:
 - the queue, consumer groups, locks, presence, rate limits and loaders (5.3);
 - the RESP, Kafka-protocol and WebSocket gateways;
-- the `fero` CLI: `run`, `test`, `deploy`, `ls`, `debug`, `recover`, `join-token`, and the planner's verbs (`drain`, `gone`, `lead`, `place`, `move`, `shards`), which fero deploy's platform also uses.
+- the `fero` CLI: `run`, `test`, `deploy`, `ls`, `debug`, `recover`, `join-token`, and the planner's verbs (`drain`, `retire`, `undrain`, `gone`, `lead`, `place`, `move`, `shards`), which fero deploy's platform also uses.
 
 ### 4.7 The wire
 
@@ -923,7 +926,7 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 | Rows | The case | Answer (section) |
 |---|---|---|
 | D-050, H-057 | founders could each mint a cluster id, or disagree on `seeds` | the winner of `#meta`'s first election mints it; seeds compare list hashes; a `cluster-id` file wins (4.2) |
-| D-081, D-085 | healing could add back a member that is leaving | a leave marks it `draining` first (4.2) |
+| D-081, D-085 | healing could add back a member that is leaving | a leave marks it `retiring` first (4.2) |
 | D-084, C-033 | a quiet shard leaves a lagging follower stale | quiet only when every live voter has the commit offset; a returning link reports log ends (4.2) |
 | D-119 | Raft verbs on a client link | member links only; plan verbs need the admin key (4.1) |
 | D-303 | no caps on batches or bundled frames | 1 MB batches and frames, 4 MB catch-up appends (4.1) |
@@ -1088,7 +1091,7 @@ Measured on `main` (d7c9efe) on this session's container (Node 22, a cloud VM). 
      - Raft's published model, plus Ongaro's fix, is the base.
      - fero's additions are added to it: log replicas that lead only to repair, replicas that cannot vouch for their log, healing's steps, planner hints, and slot moves.
      - Properties beyond Raft's own:
-       - no healing or leave step reduces the number of vouching voters that hold a committed entry, unless a replacement voter already holds it;
+       - no healing step reduces the number of answering, vouching voters that hold a committed entry, unless a replacement voter already holds it; a leave may, only when no caught-up learner exists or by removing dead voters, and says so;
        - under-replication is always reported;
        - at most one shard has a slot open at any time, and a slot's sequence and epoch never go back;
        - the repair program of log replicas, including `#meta`, always reaches a full leader when a server is available;
