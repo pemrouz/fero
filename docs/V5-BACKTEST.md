@@ -144,6 +144,11 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-132 | A roll's `drain` moves every replica off each copy in turn | `drain` gives up leadership only; `retire` moves replicas and is what a leave and a scale-in use; `undrain` clears either (4.2) |
 | R-133 | With no planner, nobody marks a dead member `gone`, so the ring keeps ranking it as a voter | A leader leaves out members its own link has not reached within `evict.after`, and `#meta`'s leader writes `gone` from its own links (4.2) |
 | R-134 | A gone voter's replacement copies a snapshot for minutes while the shard has two voters, and a returning gone voter is thrown away | A swap promotes first: learner, exact catch-up, promote, then remove the old voter in the next step (4.2) |
+| R-135 | A recovered B, whose copy shows a finished import, resumes the move and opens while the table names A (slot-move spike, round 2) | A recovered shard ends its part in every move of a slot it leaves shut: it aborts an import, cancels an unfenced export, and never reopens through an old fence (4.2) |
+| R-136 | A late `s → B` lands in `#meta` over B's write-back `s → A`, or a recovered B no longer knows it wrote `s → B` (slot-move spike, round 2) | Table rows are versioned (epoch, move, incarnation, step) and `#meta` keeps the highest; B always writes `s → A` back on an abort (4.2) |
+| R-137 | A recovered shard reopens a slot, then another shard's in-flight `s → B` lands in the table (slot-move spike, round 2) | The recovery writes the slot's row at the slot's new epoch before it reopens (4.2) |
+| R-138 | An old incarnation of B reports an abort after A has fenced on B's new incarnation, which then opens (slot-move spike, round 2) | B's reports carry its incarnation; A's fence records it, sends `END` only to it, and reopens only on an abort from it or a newer one (4.2) |
+| R-139 | A reopens at N after a recovered B had already stamped positions above N, so one position names two records (slot-move spike, round 2) | B's abort carries its epoch, and `unfenced` reopens in the higher epoch; the lost-B command bumps the epoch too (4.2) |
 
 ## Part 1: v4's hard cases
 

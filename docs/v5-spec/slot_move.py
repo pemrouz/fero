@@ -615,7 +615,7 @@ class Model:
                     else:
                         na = (A[0], A[1], A[2], A[3], A[4], (tgt,))
                         nmsg = net | {('export', tgt, None)}
-                    add((('A-export', tgt),
+                    add((('A-export', tgt, self.named),
                          (put(0, na), table, cl, nmsg, (started + 1, recovered, maxpos))))
 
         # ---- A cancels on its own, before its fence (a choice)
@@ -1157,7 +1157,12 @@ class Model:
                 if e[0] == 'exporting':
                     return False                # a move appended, not yet committed
         elif A[5]:
-            return False
+            # the mutant without names: the move in A's memory is finished when
+            # A's fence to that target stands and the target holds s open
+            F = self.fence_of(A, None, A[0])
+            tgt = A[5][0]
+            if F is None or F[1] != tgt or not is_open(shards[tgt][0], False):
+                return False
         for x in range(1, self.K):
             sh = shards[x]
             if self.live_import(sh[0] + sh[1]):
@@ -1389,6 +1394,8 @@ def say(lab):
     if k == 'stale':
         return f'{NAMES[lab[1]]} refuses w{lab[2]} copy {lab[3]} stale-attempt' + took_text(lab[4])
     if k == 'A-export':
+        if not lab[2]:
+            return f"A's leader starts a move to {NAMES[lab[1]]}, kept in its memory only"
         return f"A's leader appends exporting(s, to {NAMES[lab[1]]})"
     if k == 'A-cancel':
         return f"A's leader appends cancel({nm(lab[1])}) on its own"
