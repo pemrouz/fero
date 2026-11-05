@@ -24,7 +24,7 @@ python3 healing.py --list
 - **§10.2 still misses two exceptions** (finding R2-3): the step from two voters back to one, and a leave whose promoted learner fails before the leaver's removal.
 - **A planner `retire` with no replacement never completes** (finding R2-4).
 - **Your three questions.** A shard does not settle at four voters or flap. Two-to-one and a swap do not fight, even in any step order. A member back after `gone` costs one swap and stops.
-- **Mutants:** see the round-2 table below.
+- **Mutants:** 19 of 22 caught, including your three new ones: `swap-remove-first`, `heal-ignores-retiring` and `ignore-own-link`.
 
 ## Words used here
 
@@ -67,7 +67,7 @@ python3 healing.py --list
 
 **Healing, as the text now says.**
 - **Candidates** are members that are not retiring, not departed, and that the leader's own link has reached within `evict.after`. A member that never started has never been reached, so it is not a candidate until it starts.
-- **Gone** is per leader: its own link down past `evict.after`. `#meta`'s `gone` mark is left out. The model relies on each leader's own link, which the text says is enough. That mark is also what makes the `ignore-own-link` mutant matter: without it, only `#meta` would ever drop a dead member.
+- **Gone** is per leader: its own link down past `evict.after`. `#meta`'s `gone` mark is left out, as if `#meta` had lost its majority. That is the harder case, and the runs show a leader's own link is enough. It is also why the `ignore-own-link` mutant matters: a leader that waits for `#meta`'s mark then never drops a dead member.
 - **The target** is as in round 1: three voters once three candidates are live, or the incumbent for a one-voter shard; never even, never lowered.
 - **The steps**, one at a time, in this order:
   1. **The swap's removal**, forced as "the very next step" after a swap's promotion. No leave step may come between.
@@ -86,7 +86,7 @@ python3 healing.py --list
 3. removes dead voters first, by the probe rule, when that is what lets the leave carry;
 4. keeps the leaver as a voter when neither step is safe.
 
-A leaving or retiring leader hands over first.
+A leaving leader hands over first. A retiring one may hand over, as `drain` says, or remove itself by a swap.
 
 **The planner** (two new scenarios):
 - `retire` and `undrain`, with up to two hints;
@@ -234,11 +234,51 @@ Every stuck state lacks a live majority, except finding R2-1. The classes, count
 
 ### Mutants (round 2)
 
-MUTANTS_TABLE
+`python3 healing.py --mutants` removes one rule at a time. It uses the same bounds as round 1:
+- `two`: 2 faults, 1 client entry;
+- `three-m`: 2 faults;
+- `one-m` and `four-m`: 1 fault.
+
+Every step order is allowed. A mutant is caught when it reaches a violation or stuck class the design does not, or reaches one with fewer faults. Runs stop at 1.5M states; what they found is still real.
+
+| Mutant (the rule removed or broken) | Earlier finding | Caught by |
+|---|---|---|
+| `swap-remove-first`: a swap removes the gone voter first (S8 undone) | S8 | P3-lower: 3 -> 2 voters (`three-m`, `one-m`, `four-m`) |
+| `heal-ignores-retiring`: healing also replaces a retiring voter while its leave runs | S2 | P2 at healing's removal of the leaver (every scenario); P5 (`one-m`) |
+| `ignore-own-link`: a leader keeps as a candidate a member its own link has not reached within `evict.after` | S3 | P8: settled with a gone voter while member 3 is free (`four-m`, 2 steps) |
+| `leave-not-exact`: the leave removes the leaver when its replacement is within `lag.max` | round 1, finding 1 | P2, leave after promote (`three-m`, `one-m`, `four-m`) |
+| `report-copies-only`: health counts live voters against `copies` only | round 1, finding 3 | P1-durable, with `--fine` at one fault (5 steps). The default model needs two faults for it, more than `four-m` has |
+| `no-gone-surplus`: a surplus gone voter is never removed | round 1, finding 2 | P4: settles at four (`four-m`) |
+| `no-two-to-one`: two voters never step back | round 1, finding 4 | P4: settles at two (`three-m`, `one-m`, `four-m`) |
+| `two-to-one-retiring`: step back even when a voter is retiring | | P5: stuck for good after one Ctrl-C and no fault (`two`, `one-m`); P3 |
+| `gone-no-repl`: remove a gone voter with no replacement | E1 | P3-lower |
+| `heal-lower`: shrink to the live candidates | E1 | P3-lower; P2; P5 with a live majority (`three-m`) |
+| `promote-even`: raise 1 -> 2 with two candidates | F2, R-80 | P3-even; **P9: it and the step back undo each other without end** |
+| `promote-uncaught`: promote a learner before it caught up | etcd's rule | not caught |
+| `live-remove-lag`: a swap promotes a replacement within `lag.max` | H-172, R-72 | **not caught** |
+| `leave-paused`: a paused voter counts as dead | R-58 | P6 |
+| `leave-no-dead`: never remove dead voters first | S-207, R-77 | P5: stuck after one crash; the design needs two |
+| `leave-no-promote`: no promotion before removing the leaver | R-62 | P5: stuck for good after a Ctrl-C and no fault |
+| `leave-always-remove`: remove the leaver even when the live majority goes | | P5: stuck after one crash; the design needs two |
+| `no-draining`: no `retiring` mark | D-081, R-64 | P7: healing re-adds the leaver; P9: the leave and healing churn |
+| `learner-no-vote`: learners refuse votes | S-037, R-76 | P5: stuck for good with a live majority |
+| `ghost-votes`: a replica that lost its disk votes as its old self | R-54 | P1, all of election, completeness and prefix |
+| `no-own-term`: change the configuration before committing in the term | Ongaro 2015 | not caught |
+| `no-config-wait`: a change before the previous one commits | | P1, and P9 |
+
+**19 of 22 caught.** The three misses:
+- **`promote-uncaught`.** Catch-up takes no time in this model, as in round 1.
+- **`no-own-term`.** Ongaro's counterexample needs five members, as in round 1.
+- **`live-remove-lag`.** New, and it says something about the text. In round 2 the commit offset checked *before* a swap's promotion protects nothing. A learner one entry behind gets the promotion entry with everything else, and what P2 needs is that the new voter holds the offset when the old one goes. That is the check finding R2-2 asks for. With it, the check before promotion only spares commits a lagging fourth voter.
 
 ### Fixes checked
 
-FIXES_TABLE
+| Run | Fixes | States | Result |
+|---|---|---|---|
+| `four`, 2 faults | `swap-exact-remove`, `stand-when-demoted` | 6,073,388 (1186 s) | P5 holds: no stuck state with a live majority. No P2 at a swap's removal. P1, P3, P4, P6–P10 hold. Left: P2 at the step back and at a leave whose learner failed, which is finding R2-3's wording, and the admitted leave step |
+| `four-retire`, 1 fault | `swap-exact-remove` | 173,260 | P2 holds. Left: P10, the retire with no replacement (finding R2-4) |
+
+Finding R2-3 changes only words. Finding R2-4 needs a decision about what a stuck retire should do, so it has no fix to check.
 
 ## Round 1: the first review
 
@@ -507,12 +547,18 @@ Each of these first showed as a property failure. In each case the model was wro
 - Steps by a stale leader that lacked a committed entry were judged, though they can never commit.
 - A partitioned voter counted as live for the under-replication report.
 
+Round 2 added these:
+- A removal was paired with any earlier promotion: healing's growth, or a promotion made for another leaver. It is now paired only with its own: a swap's removal with that swap's promotion, a leaver's removal with the learner promoted for it. With the wrong pairing, two admitted leave steps looked like the round-1 bug.
+- P2 judged a leader cut off from its majority. Such a leader cannot commit the step before CheckQuorum steps it down, and once its links return the others answer again.
+- Two things in the proposed fixes themselves. The swap fix must drop the new voter if it goes gone first, or the forced next step waits for ever. And, from round 1's fix, two-to-one needs "neither voter retiring", or it loops with a one-voter leave.
+
 ## What the abstraction leaves out
 
-- **One shard.** No `#meta` (the draining mark is always written; the `no-draining` mutant covers a leave without it), no planner hints other than `gone`, no planner `place` targets, and no slot moves.
+- **One shard.** No `#meta`: the retiring mark is always written (the `no-draining` mutant covers a leave without it), and `gone` comes from the leader's own links, with `#meta`'s mark left out. Of the planner's hints, only `retire`, `undrain` and the scale-in's stop are modelled. `drain` and `lead` move only leadership, and there are no `place` targets and no slot moves.
+- **`copies` is 3.** The "`copies` not 2" clause of the step back is not exercised.
 - **No log replicas or witness, no snapshots, no object store.** "Caught up" is one entry (`lag.max`). There is no time to catch up, so `catchup.max` and the etcd caught-up rule cannot matter here.
 - **Time is only ordering.** `election.ms` < `leave.ms` < `evict.after`, with no clocks, `settle.ms` hand-backs, preferred-leader moves or `skew.max`.
 - **Messages are steps, not packets.** There is no loss, reordering or duplication beyond what crashes, partitions and pauses create. Elections, PreVote and CheckQuorum are atomic guards. There is no read index and no quiet shards.
 - **Disks fail only at a crash.** No torn tails, no damage mid-log, no lying disks, no `durability: 'memory'`.
 - **Leavers never return,** and a crash during a leave is final. A `restart` under a supervisor is a plain crash and return.
-- **Bounds:** 2 to 4 members, 1 or 2 faults, 1 or 2 leaves, 0 or 1 client entries, terms at most 5.
+- **Bounds:** 2 to 4 members, 1 or 2 faults, 1 or 2 leaves or planner hints, 0 or 1 client entries, terms at most 5, and at most 8 configuration changes between outside events.
