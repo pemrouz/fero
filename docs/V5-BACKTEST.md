@@ -118,6 +118,13 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-106 | A write under a removed intermediate field recreates it | Refused `absent-path`, as a write to a missing row is `absent-row` (4.3) |
 | R-107 | A method re-run diverges, and its k-th write goes to a different slot | Not caught, said plainly; handlers must be deterministic given input and `ctx`, whose `now` and `id` are fixed by the call claim (4.5) |
 | R-108 | Many shards fail over at once, and votes split | Each voter stands after `election.ms` plus up to `election.jitter`, a spread far larger than a round trip, so two rarely stand at once; failover stays about 2.2 s on average (4.2, 8) |
+| R-109 | A paused lock holder resumes and writes, through a saga step, to a shard that has never seen the lock | Every shard's writer follows `#locks` and refuses a fence token below the lock's version it has seen; the lease margin covers the follow lag (5.3) |
+| R-110 | A leader's clock is hours behind, and it alone can lead | Writer time is clamped on both sides of the peers' median, so `t` neither leaps ahead nor freezes (4.2) |
+| R-111 | A method re-run on another server writes something different | Ids are (call key, k), the same on any server; content hashes ride the records, so a dedup hit with a different hash is `call-diverged` (4.5) |
+| R-112 | A keyed call makes more writes than the issuer window | Refused: a keyed call may make at most `issuer.window` writes (4.5) |
+| R-113 | A planner's `lead` is undone by the hand-back 30 s later | `lead` also sets the shard's preferred leader (4.2) |
+| R-114 | A TTL tick scans every row | The writer keeps an expiry heap; a tick costs what expires (4.3) |
+| R-115 | A new replica loads an old snapshot layer holding a slot that has since moved | A snapshot records which slots its shard holds open at its offset (3.4) |
 
 ## Part 1: v4's hard cases
 

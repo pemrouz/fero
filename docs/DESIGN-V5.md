@@ -207,7 +207,7 @@ v4's logs are its state, and compaction trims them. v5 keeps three things apart.
 - Each snapshot writes only the rows changed since the previous one, plus a removal marker for each row removed since. Layers are laid out by slot, with a per-slot index, so a slot move or a one-slot reader reads only its slot's bytes. A background merge folds layers together in order, as an LSM tree does, and drops the markers once no older layer remains below them.
 - A cold start applies the base, then each layer in order, so a removed row stays removed.
 - So a big object with small changes means small snapshots.
-- A snapshot is cut from copy-on-write state, so it is the state at exactly one offset.
+- A snapshot is cut from copy-on-write state, so it is the state at exactly one offset. It records which slots its shard holds open at that offset, so a replica loading it never takes a moved slot's old rows as live.
 
 **A window of deltas alone cannot rebuild a picture.** So:
 - A `state` subscriber always starts from a snapshot, then gets deltas. One that falls behind gets a fresh snapshot.
@@ -388,7 +388,7 @@ One published design, run once per shard, plus the engineering that published mu
   - The followers miss the leader for `election.ms`. The full voter whose timeout fires first runs PreVote, then the election.
   - A server that led hundreds of shards fails over in parallel: their elections run at once, with their messages batched into shared frames.
 - **Warm and cold.** Every full replica folds its shard, so it is warm. Only a log replica's repair is cold: seconds per gigabyte.
-- **The writer's time.** `t = max(last t in the log, min(clock, peers' median + skew.max))`, where the peers' clocks ride the link pings. So a clock that jumps ahead (a VM resumed after a year) cannot stamp a far-future `t` that expires every TTL and lease. A clock behind only holds `t` still until it catches up. A skewed member waits longer to stand (above), never barred.
+- **The writer's time.** `t = max(last t in the log, clamp(clock, peers' median − skew.max, peers' median + skew.max))`, where the peers' clocks ride the link pings. So a clock that jumps ahead (a VM resumed after a year) cannot stamp a far-future `t` that expires every TTL and lease, and a clock hours behind cannot hold `t` still, freezing every TTL, lease and `ctx.now()`. A skewed member waits longer to stand (above), never barred.
 
 #### Failure detection
 
@@ -441,7 +441,7 @@ There is no controller. Each shard's leader keeps its own shard's replicas where
 |---|---|
 | `drain(member)` | written to `#meta`. Leaders hand over the shards it leads, then healing moves its replicas off, since a draining member is never a target |
 | `gone(member, life)` | written to `#meta`. Leaders replace it now, instead of after `evict.after`. A leader whose link to that life is up ignores it |
-| `lead(shard, member)` | a leadership transfer to that full voter |
+| `lead(shard, member)` | a leadership transfer to that full voter. It also sets the shard's preferred leader, so the `settle.ms` hand-back does not undo it |
 | `place(shard, members)` | stores a target in the shard's log, which healing then follows. `place(shard, null)` returns the shard to the ring |
 | `move(slot, shard)` | moves one slot now (below) |
 | `shards(resource, n)` | asks the shard rule for n shards; slots are moved until there are |
@@ -570,8 +570,8 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 1. **Dedup.**
    - **What it checks.** If the attempt id is in the shard's log, committed or in the writer's uncommitted tail, the writer answers with the original position (slot, epoch, sequence), and nothing else runs. An outcome carried by a slot move keeps its position, which an offset could not.
    - **No answer before commit.** Every answer (a dedup answer, a refusal such as `conflict`) is judged against the writer's log-end state, so it waits until the commit offset reaches the version it was judged against. If the leader loses leadership first, the answer is `unknown`, and the issuer retries at the new leader.
-   - **What the issuer promises.** Its call ids rise. Its ids span less than `issuer.window` (1,024): its highest issued id minus its oldest unacknowledged id is always below the window. The window is a cluster key, so every issuer and every writer use the same one. It stops retrying an attempt after half the horizon (5 min).
-   - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor (a commit, or an appended refusal), kept by id. Each outcome is tagged with its slot, so a slot move carries it (4.2). An issuer silent for the retry horizon (5 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
+   - **What the issuer promises.** Its call ids rise. Its ids span less than `issuer.window` (1,024): its highest issued id minus its oldest unacknowledged id is always below the window. The window is a cluster key, so every issuer and every writer use the same one. It stops retrying an attempt after half the retry horizon: the horizon is 10 minutes, so retries stop at 5.
+   - **What the writer keeps.** Per issuer and shard: the highest call id seen, and every committed outcome above the floor (a commit, or an appended refusal), kept by id. Each outcome is tagged with its slot, so a slot move carries it (4.2). An issuer silent for the whole retry horizon (10 min) is forgotten, from memory and from snapshots, so this state is bounded by active issuers.
    - **The floor.** An attempt at or below (highest id seen) − `issuer.window` that is not among the outcomes is a late duplicate of an answered attempt, and is refused `stale-attempt`. Above the floor, an attempt not among the outcomes never committed, and is judged fresh.
    - **No late arrivals.** An attempt carries a time budget its issuer sets to half the horizon, and every hop subtracts the time it held it, on its own monotonic clock. A server forwards an attempt only over the link to the leader it had when it took the attempt; after any break it answers `retry`, and the issuer resends. Resends back off with jitter, from 200 ms up to `election.ms`, and a `no-writer` or `moved` answer carries a retry-after, so an election never brings a retry storm. A leader closes a link that misses pings for `election.ms`, so a frozen server's late forward never lands. These bound how late a copy can arrive; what makes every answer unique is the log: committed outcomes, and the appended refusals of resent attempts (below).
    - **Across leaders.** The outcomes, and each issuer's highest call id seen, are part of the shard's state, so snapshots carry both. A new leader holds every committed entry (Raft's leader completeness), and folds its whole log before it answers. So the floor never drops below where the old leader had moved it.
@@ -612,7 +612,7 @@ Every step acts only on **committed** entries: appending is not enough, since a 
 - The *log-end state* adds the uncommitted batches in flight. Dedup, rules and conditions are judged against it, and answers wait for commit.
 - A new leader's log may end with entries of earlier terms not yet committed. Raft never drops them from its own log, and its first entry of its own term commits them, so they belong in its log-end state, and it has no overlay to drop.
 
-**Row retention** (3.1) runs on the writer's tick, as records with a reason.
+**Row retention** (3.1) runs on the writer's tick, as records with a reason. The writer keeps an expiry heap, so a tick costs what expires, not what is held. A `rows: { max }` limit is per resource, enforced per shard as its share of the slots. A lease condition (`{ expired: 'lease' }`) is judged by that shard's writer time, which may differ between shards by up to `skew.max`.
 
 **The fold** is data's: records apply through its hot lane in offset order, the same on writers, followers, clients and replays, with no LWW comparison anywhere.
 
@@ -648,7 +648,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
 - **Read-your-writes.** A write resolves when it has committed and, if this client follows the partition, its own subscription has passed the write's position.
 - **Failover.** The client resubscribes from its own cursor, and its waiting writes' positions go along as a minimum. The new server answers only once its fold has reached them, so a resolved write is always visible and no record in between is skipped.
 - **Reads after a write.** A client's reads carry the highest position it has seen per slot, and a server answers only once its fold has reached it.
-- **The pending-write queue** is bounded by count (1,024) and bytes (64 MB). When full, a new write is refused `backpressure`.
+- **The pending-write queue** is bounded by count (512, strictly below `issuer.window`, so the window's span rule always holds) and bytes (64 MB). When full, a new write is refused `backpressure`.
 
 ### 4.5 L4: surface
 
@@ -672,7 +672,7 @@ One verb serves followers, clients, relays, consumers and the viewer: **subscrib
   - **Call keys.** A call with a key claims a row in `#calls` (with a lease) before its handler runs, and stores the result, so a finished call never runs twice within the key's TTL.
   - **Re-runs.**
     - A handler whose server dies mid-call is re-run when its lease lapses.
-    - Its writes carry attempt ids derived from the call key, their order and a hash of their content, marked as resent. So a re-run's identical writes dedupe, and a re-run that writes something different to the same slot is refused `call-diverged`. Detection is per slot, said plainly: a re-run whose k-th write goes to another slot is not caught. So handlers must be deterministic given their input and `ctx`, as fero test already asks: `ctx.now()` is the call claim's writer time, and `ctx.id()` is derived from the call key and a counter, so a re-run sees the same values.
+    - Its writes carry attempt ids whose issuer is the call key and whose call id is the write's order k, so a re-run on any server issues the same ids. Each record also carries a hash of its content. So a re-run's identical writes dedupe, and a dedup hit whose content hash differs is refused `call-diverged`. A keyed call may make at most `issuer.window` writes. Detection is per slot, said plainly: a re-run whose k-th write goes to another slot is not caught. So handlers must be deterministic given their input and `ctx`, as fero test already asks: `ctx.now()` is the call claim's writer time, and `ctx.id()` is derived from the call key and a counter, so a re-run sees the same values.
   - **Fences.**
     - Every write a call makes carries `if: { fence: { lock: callKey, token } }`.
     - The runner renews the lease while it runs, and stops writing if its last renewal is older than the lease minus a margin (a round trip plus `skew.max`).
@@ -778,7 +778,7 @@ socket.on('say', (room, text) => web.data[`${room}/${fero.id()}`] = { text, at: 
   - Offsets are rows written with a fence on the generation, so a zombie consumer cannot commit.
 - **Locks.**
   - A lock is a row in `#locks`, claimed with `if: { absent }` or `{ expired: 'lease' }`. Its token is the claim's version.
-  - Protected writes carry `if: { fence: { lock, token } }`. Each shard keeps the highest token seen per lock, in its state, and a slot move carries it. A limit, said plainly: fence tables are per shard, so a stale holder writing to a shard that has never seen the lock is accepted there. Writes a lock protects should live in partitions the lock's holders always write, or check the lock's current token with `if: { equals }` on the lock row.
+  - Protected writes carry `if: { fence: { lock, token } }`. Each shard keeps the highest token seen per lock, in its state, and a slot move carries it. A limit, said plainly: fence tables are per shard, so a stale holder writing to a shard that has never seen the lock is accepted there. So every shard's writer follows `#locks`, as writers already follow `#sessions` for presence, and refuses a fence token below the lock's current version that it has seen. That closes the gap to the follow lag, which the holder's lease margin (a round trip plus `skew.max`) covers. A condition on another shard's row is impossible (conditions are judged at one writer, 4.3), so that is how a saga's steps stay safe against a paused holder.
   - A lock records the positions its holder wrote at, so the next holder's reads can carry them as minimums.
 - **Transactions across partitions** (sagas: readers can see the intermediate states).
   1. Take the locks in key order.
@@ -842,7 +842,7 @@ Clients see at most a pause of one handover per shard, and no election timeout.
 | 5 | components ship their stand-ins | unchanged |
 | 6 | the test block in the viewer | captures carry offsets, so inputs, records and asks line up |
 | 7 | the spec and the layout | unchanged |
-| 8 | the store: forks, versions, proposals | **a fork is a new shard whose first state is the parent's snapshot at an offset**: segments and snapshots are immutable, so a fork costs one `#meta` record |
+| 8 | the store: forks, versions, proposals | **a fork is a new resource whose shards start from the parent's shards' snapshots**: segments and snapshots are immutable, so a fork costs one `#meta` record per shard. On a solo node, or a resource of one shard, the fork is one consistent cut; across shards it is consistent per slot, since shards' offsets are unrelated |
 | 9 | the tape at the live edge | a resource with `history: '14d'` and rows keyed by match key |
 | 10 | the ai component and `fero change` | unchanged |
 | 11 | app steps in the simulator | methods run as sim steps against L0 to L3, under the same seeds. The planner is one more sim client, whose hints arrive stale, duplicated and out of order |
@@ -974,8 +974,8 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 | Layer | Measure | Today (v4) | TS | Native | How | Bar |
 |---|---|---|---|---|---|---|
 | L0 | persisted appends per process | about 250/s | 50k/s | 500k/s | one journal for every shard, one fdatasync per ≤ 1 ms batch, `writev` | Kafka per broker, etcd |
-| L1 | appends per shard leader | 14k/s through the api, 73k/s raw | 150k/s | 2M/s | pipelined, batched across shards per peer link | Redpanda (Raft per partition) |
-| L1 | commit latency, p99, persisted | — | fsync p99 + 2 ms | fsync p99 + 0.5 ms | send to every voter at once, commit at a majority; the leader's own fsync runs in parallel | Kafka acks=all, etcd |
+| L1 | appends per shard leader | 14k/s through the api, 73k/s raw | 50k/s | 2M/s | pipelined, batched across shards per peer link | Redpanda (Raft per partition) |
+| L1 | commit latency, p99, persisted | — | fsync p99 + 5 ms (GC and the group-commit window on two machines) | fsync p99 + 0.5 ms | send to every voter at once, commit at a majority; the leader's own fsync runs in parallel | Kafka acks=all, etcd |
 | L1 | slot move | — | about 10 ms unwritable | about 2 ms | copy first, then fence, the delta and open: about one round trip | Redis Cluster's resharding |
 | L1 | planned handover (a roll step) | — | 10 ms | 2 ms on NVMe; about 6 ms on a disk with 4 ms fsyncs | bring a warm voter to the log end, then TimeoutNow: one round trip and the new term's fsync | — |
 | L1 | failover to writable | about 4 s | about 2.2 s on average, 2.5 s at worst | about 1.1 s, 1.25 s at worst | `election.ms`, then PreVote, the vote and the first own-term commit (a few ms) | KRaft (9 s default) |
@@ -1077,7 +1077,7 @@ Measured on `main` (d7c9efe) on this session's container (Node 22, a cloud VM). 
      - slot moves (fence, copy, open), with per-slot sequences so cursors need no lineage;
      - snapshot layers with removal markers, and their coupling to log retention.
    - Each is an ordinary Raft entry or a choice of who stands, so Raft's properties cover log consistency for them. They do not cover replica counts, durability or the uniqueness of answers, and the review found its critical bugs exactly there (section 13). So the safety core is simpler than the log-first draft's, and the policy layer is about as novel. All of it gets models (point 2). The kernel itself is five operations on a log, with L2 and L3 as a library over it (decision 21).
-   - L1 is about the size of plain Raft per shard (5 to 6k lines, V5-LOG-FIRST-REVIEW), half the log-first draft's, and phase 2 still carries scaling.
+   - Plain Raft per shard is about 5 to 6k lines (V5-LOG-FIRST-REVIEW). Healing, slot moves, `#meta`, repair, leave and the planner add to that, so expect L1 near the log-first draft's size; porting etcd's raft (decision 22) shrinks the share that is fero's to get right.
    - Each layer's doc opens with its mechanism list. Adding one means naming what it replaces, or why it cannot be a library.
 2. **Check every layer against a model before code.**
    - **L1 in TLA+, as one spec.**
@@ -1202,6 +1202,14 @@ Reply "defaults" to take every pick, or name a change ("3b").
 22. **Where the Raft core comes from.**
     - a) **Port etcd's raft to TypeScript** (my pick). It is already a pure state machine: messages and ticks in, a "ready" batch of entries to save, messages to send and entries to apply out. That is the shape of fero's deterministic kernel, and it carries years of production fixes (PreVote, CheckQuorum, learners, leadership transfer, read index). The Rust phase uses raft-rs, TiKV's port of the same code, so both kernels share one design. Both are Apache 2.0: the ported files keep that licence and a NOTICE inside fero's MIT repository.
     - b) Write Raft from the paper and its TLA+ spec. No outside code, but every subtle bug etcd already fixed is fero's to find again.
+23. **Cuts a fresh reviewer proposes.** a) Take them (my pick):
+    - require an object store across boxes (decision 9b): it deletes five branches (log-replica repair without one, history after a shard is deleted, a shrink blocked on history, snapshots streamed from a busy leader, and waiting for a full voter to return). One box keeps the local folder; self-hosters can run MinIO;
+    - cut `copies: 2`: two voters cannot survive a crash, so it is a mode with a liveness cliff and no gain over one voter and a learner;
+    - cut `evict: 'lru'`: sampled touches are write traffic for what `cache: { memory }` already gives per process;
+    - cut the `vm` time budget for rules, and keep the watchdog quarantine;
+    - cut `confirm: 'sent'` outright, rather than defer it;
+    - grow by `shard.rate` only when some server does not yet lead a shard of the resource, since below `standbys` servers every server folds every write anyway.
+    b) Name the ones to keep. A seventh, collapsing the leave rules into `gone` from `#meta`'s leader, waits for the healing spike.
 
 ## 13. The reviews
 
