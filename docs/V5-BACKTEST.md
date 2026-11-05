@@ -6,7 +6,7 @@ Companion to [DESIGN-V5.md](DESIGN-V5.md). Part 1 maps every hard case recorded 
 
 ## Part 2: hard cases v5 brings
 
-These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, healing by each shard's leader, an optional planner, log replicas and splits) is known to get wrong when built carelessly. Each is a property the TLA+ spec checks (phase 1) and a monitor the simulator runs (phase 2). The log-first list (L-01 to L-38) is in git history (commit 0ad07a8); each L case that still applies is folded into a row below, with its number.
+These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, healing by each shard's leader, an optional planner, log replicas and slot moves) is known to get wrong when built carelessly. Each is a property the TLA+ spec checks (phase 1) and a monitor the simulator runs (phase 2). The log-first list (L-01 to L-38) is in git history (commit 0ad07a8); each L case that still applies is folded into a row below, with its number.
 
 | id | Case | v5's answer (DESIGN-V5) |
 |---|---|---|
@@ -125,6 +125,17 @@ These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, 
 | R-113 | A planner's `lead` is undone by the hand-back 30 s later | `lead` also sets the shard's preferred leader (4.2) |
 | R-114 | A TTL tick scans every row | The writer keeps an expiry heap; a tick costs what expires (4.3) |
 | R-115 | A new replica loads an old snapshot layer holding a slot that has since moved | A snapshot records which slots its shard holds open at its offset (3.4) |
+| R-116 | B opens a slot before the slot table is refreshed; later A loses its majority and is recovered from a copy older than the fence | B writes `s → B` into `#meta` before it commits `open`, so the table is never behind an open; recovery reopens a slot only when the table gives it, its copy holds the rows, and no reachable shard holds it open or is importing it (4.2) |
+| R-117 | A's leader dies after B commits `importing` and before the fence; A's new leader knows nothing of the move and starts another | A commits `exporting` first and owns the move: a new A leader carries it on or cancels it; one move of a slot at a time (4.2) |
+| R-118 | B gives the move up after A's fence has committed | B may abort only while its log has no `open`; it restores the table, and A then commits `unfenced`, which reopens s at A at N (4.2) |
+| R-119 | The bulk copy of half a 4 GB shard is committed at B after the fence, so the slot is unwritable for minutes | B commits the bulk before it reports ready; only the delta since then crosses after the fence (4.2) |
+| R-120 | A server replicates A but not B, and keeps serving s's rows frozen at the fence | A replica that does not replicate B switches s off when it applies A's `fenced`, and answers `moved(B)` (4.2) |
+| R-121 | A write arrives at A after A appended `fenced` but before it committed (slot-move spike) | A guard that forbids a step counts the leader's whole log: A takes no write to s once `fenced` is in its log (4.2) |
+| R-122 | B aborts after appending `open`, or opens after appending `abort`, and both commit (slot-move spike) | The same rule: B never aborts once `open` is in its log, nor opens once `abort` is (4.2) |
+| R-123 | A new leader keeps an earlier term's uncommitted write and stamps the next write from its committed state, giving two records one number (slot-move spike) | A new leader stamps on from its log end (2) |
+| R-124 | Each duplicate of a resent copy below the floor appends a fresh `stale-attempt` refusal (slot-move spike) | A `stale-attempt` refusal is never appended (4.3) |
+| R-125 | B serves `log` readers below N after A is deleted, but A's segments were themselves carried from an earlier move | The carried state names every segment holding s's records below N, and the list grows over chained moves (4.2) |
+| R-126 | A shrink with `history: 'all'` and no object store waits for ever to delete the old shard | Said plainly: the old shard stays, holding no slot, to serve old records (4.2) |
 
 ## Part 1: v4's hard cases
 
