@@ -1,0 +1,18 @@
+FeroBecomeLeader:drop-update-pendingConfChangeIndex:r02
+/\ pendingConfChangeIndex' = [pendingConfChangeIndex EXCEPT ![i] = Len(log[i])]      \* [u pendingConfChangeIndex]
+-> /\ UNCHANGED pendingConfChangeIndex      \* mutant: update dropped
+
+== two: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 2868] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:48:26)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:48:27.
+Progress: 281080 states checked, 483 traces generated (trace length: mean=70, var(x)=110, sd=10)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 3383] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:50:25)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:50:25.
+Progress: 461182 states checked, 694 traces generated (trace length: mean=70, var(x)=107, sd=10)

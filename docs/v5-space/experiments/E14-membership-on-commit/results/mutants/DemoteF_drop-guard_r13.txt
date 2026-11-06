@@ -1,0 +1,18 @@
+DemoteF:drop-guard:r13
+/\ j \in GetConfig(i)      \* [g]
+-> /\ TRUE      \* mutant: guard dropped
+
+== two: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 5084] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:58:55)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:58:55.
+Progress: 619163 states checked, 1061 traces generated (trace length: mean=70, var(x)=105, sd=10)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 5360] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 16:00:55)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 16:00:55.
+Progress: 471060 states checked, 705 traces generated (trace length: mean=70, var(x)=107, sd=10)

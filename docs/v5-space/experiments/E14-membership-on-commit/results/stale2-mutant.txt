@@ -1,0 +1,539 @@
+# run stale2-mutant: MCstale2.tla with stale2-mutant.cfg, 8 s wall, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 74 and seed -3613745337445953735 with 1 worker on 4 cores with 5461MB heap and 64MB offheap memory [pid: 29063] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-06 17:45:02)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:45:03.
+Error: Invariant MoreThanOneLeaderInv is violated.
+Error: The behavior up to this point is (trimmed: step, state, currentTerm, commitIndex, config, votesGranted, up; the last state in full):
+State 1: <Initial predicate>
+  step = 0
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 2: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 1
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 3: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 2
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 4: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 3
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 5: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 4
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 6: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 5
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 7: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 6
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 8: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 7
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 9: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 8
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 10: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 9
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 11: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 10
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 12: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 11
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 13: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 12
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 14: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 13
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 15: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 14
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 16: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 15
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 17: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 16
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 18: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 17
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 19: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 18
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 20: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 19
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 21: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 20
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 22: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 21
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 0)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 23: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 22
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 24: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 23
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 25: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 24
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 26: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 25
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 27: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 26
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 28: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 27
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 29: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 28
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 30: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 29
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 31: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 30
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 3)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 32: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 31
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 33: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 32
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 34: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 33
+  state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 35: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 34
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 36: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 35
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 37: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 36
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 38: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 37
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 39: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 38
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 40: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 39
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 41: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 40
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 42: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 41
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 43: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 42
+  state = (s1 :> "Leader" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 44: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 43
+  state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 45: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 44
+  state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 46: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 45
+  state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 47: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 46
+  state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 48: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 47
+  state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 49: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 48
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 50: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 49
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 51: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 50
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s1, s2, s3, s4}
+State 52: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 51
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s4})
+  up = {s1, s2, s3, s4}
+State 53: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+  step = 52
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+  currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+  up = {s1, s2, s3, s4}
+State 54: <Stale2Next line 80, col 15 to line 84, col 61 of module MCstale2>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 2
+/\ step = 53
+/\ faults = 0
+/\ currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+/\ goalv = FALSE
+/\ votedFor = (s1 :> s4 @@ s2 :> s2 @@ s3 :> s2 @@ s4 :> s4)
+/\ pendingMessages = <<>>
+/\ dead = {}
+/\ matchIndex = ( s1 :> (s1 :> 4 @@ s2 :> 4 @@ s3 :> 2 @@ s4 :> 4) @@
+  s2 :> (s1 :> 0 @@ s2 :> 4 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 4) )
+/\ commitIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 4)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 4 @@ s2 :> 4 @@ s3 :> 0 @@ s4 :> 4)
+/\ durableState = ( s1 :>
+      [ log |-> 4,
+        commitIndex |-> 4,
+        config |-> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 3,
+        votedFor |-> s4 ] @@
+  s2 :>
+      [ log |-> 4,
+        commitIndex |-> 3,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}],
+        currentTerm |-> 3,
+        votedFor |-> s2 ] @@
+  s3 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}],
+        currentTerm |-> 3,
+        votedFor |-> s2 ] @@
+  s4 :>
+      [ log |-> 4,
+        commitIndex |-> 4,
+        config |-> [jointConfig |-> <<{s1, s2, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 3,
+        votedFor |-> s4 ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Leader")
+/\ up = {s1, s2, s3, s4}
+/\ messages = ( [ mdest |-> s1,
+    msource |-> s4,
+    mtype |-> "AppendEntriesResponse",
+    mterm |-> 2,
+    msubtype |-> "app",
+    msuccess |-> TRUE,
+    mmatchIndex |-> 4 ] :>
+      1 )
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3] >> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+128 states generated, 71 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 54.
+Finished in 07s at (2026-11-06 17:45:07)
+Trace exploration spec path: ./MCstale2_TTrace_1793987100.tla

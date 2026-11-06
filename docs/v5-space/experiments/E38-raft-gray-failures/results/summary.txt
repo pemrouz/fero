@@ -1,0 +1,260 @@
+## Named topologies and leader transfer (PreVote, CheckQuorum, async writes on)
+
+| suite | n | case | seeds | longest gap after fault (E) | writable in 2E | elections after fault (max) | most elections per 10E | p99 before -> after (ms) |
+|---|---|---|---|---|---|---|---|---|
+| named | 3 | baseline | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 3 | leader-crash | 5 | 1.42 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named | 3 | cloudflare-2020: leader-follower link down (chain 2-1-3) | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 3 | follower-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 3 | leader isolated | 5 | 1.41 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named | 3 | one-way: leader cannot send | 5 | 1.41 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named | 3 | one-way: leader cannot receive | 5 | 3.21 | 0/5 | 1 | 1 | 3.0 -> 3.0 |
+| named | 3 | one-way: leader to 2 lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 3 | one-way: 2 to leader lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 3 | one-way: leader to 2 and 3 to leader lost | 5 | 3.44 | 0/5 | 1 | 1 | 3.0 -> 3.0 |
+| named | 5 | jensen quorum-loss: leader reaches only 2 | 5 | 1.45 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named | 5 | jensen constrained-election: leader dies, up-to-date 2,3 reach only each other and 4 | 5 | 1.33 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named | 5 | chain: leader reaches 2,3; 4,5 reach 3 only | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named | 5 | cloudflare-2020 in 5: leader-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | baseline | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | leader-crash | 5 | 1.12 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | cloudflare-2020: leader-follower link down (chain 2-1-3) | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | follower-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | leader isolated | 5 | 1.11 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | one-way: leader cannot send | 5 | 1.11 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | one-way: leader cannot receive | 5 | 2.11 | 3/5 | 1 | 1 | 3.0 -> 3.0 |
+| named, fero timers | 3 | one-way: leader to 2 lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | one-way: 2 to leader lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 3 | one-way: leader to 2 and 3 to leader lost | 5 | 2.13 | 2/5 | 1 | 1 | 3.0 -> 3.0 |
+| named, fero timers | 5 | jensen quorum-loss: leader reaches only 2 | 5 | 1.10 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 5 | jensen constrained-election: leader dies, up-to-date 2,3 reach only each other and 4 | 5 | 1.13 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 5 | chain: leader reaches 2,3; 4,5 reach 3 only | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers | 5 | cloudflare-2020 in 5: leader-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | baseline | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | leader-crash | 5 | 1.12 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | cloudflare-2020: leader-follower link down (chain 2-1-3) | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | follower-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | leader isolated | 5 | 1.12 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | one-way: leader cannot send | 5 | 1.12 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | one-way: leader cannot receive | 5 | 1.51 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | one-way: leader to 2 lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | one-way: 2 to leader lost | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 3 | one-way: leader to 2 and 3 to leader lost | 5 | 1.52 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 5 | jensen quorum-loss: leader reaches only 2 | 5 | 1.10 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 5 | jensen constrained-election: leader dies, up-to-date 2,3 reach only each other and 4 | 5 | 1.13 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 5 | chain: leader reaches 2,3; 4,5 reach 3 only | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| named, fero timers, CheckQuorum every E/4 | 5 | cloudflare-2020 in 5: leader-follower link down | 5 | 0.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| transfer | 3 | transfer to 2, none | 5 | 0.01 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| transfer | 3 | transfer to 2, target cut from leader | 5 | 1.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| transfer | 3 | transfer to 2, target cut from others | 5 | 0.01 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| transfer | 3 | transfer to 2, target one-way to leader | 5 | 1.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| transfer | 5 | transfer to 2, none | 5 | 0.01 | 5/5 | 1 | 0 | 3.0 -> 3.0 |
+| transfer | 5 | transfer to 2, target cut from leader | 5 | 1.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+| transfer | 5 | transfer to 2, target cut from others | 5 | 1.94 | 5/5 | 1 | 1 | 3.0 -> 3.0 |
+| transfer | 5 | transfer to 2, target one-way to leader | 5 | 1.01 | 5/5 | 0 | 0 | 3.0 -> 3.0 |
+
+## Every directed-link topology of 3 nodes (64), without and with a leader crash (PreVote, CheckQuorum on)
+
+| suite | PreVote | CheckQuorum | leader crash | connected majority (star) | runs | writable in 2E | writable later | never writable again | flaps | longest gap max (E) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sweep3 | True | True | False | True | 111 | 96 | 15 | 0 | 0 | 3.53 |
+| sweep3 | True | True | False | False | 81 | 0 | 0 | 81 | 0 | 60.00 |
+| sweep3-crash | True | True | True | True | 48 | 48 | 0 | 0 | 0 | 1.42 |
+| sweep3-crash | True | True | True | False | 144 | 0 | 0 | 144 | 0 | 60.00 |
+
+Runs with a connected majority that missed F-17 (writable in 2E, at most one election per 10E):
+
+| suite | PreVote | CheckQuorum | leader crash | links down | seeds failing | longest gap (E) | elections | still writing |
+|---|---|---|---|---|---|---|---|---|
+| sweep3 | True | True | False | 1>3,2>1 | 3 | 3.53 | 1 | True |
+| sweep3 | True | True | False | 1>2,3>1 | 3 | 3.23 | 1 | True |
+| sweep3 | True | True | False | 2>1,3>1 | 3 | 3.20 | 1 | True |
+| sweep3 | True | True | False | 1>2,2>1,3>1 | 3 | 3.23 | 1 | True |
+| sweep3 | True | True | False | 1>3,2>1,3>1 | 3 | 3.53 | 1 | True |
+
+## The same 64 topologies, PreVote and CheckQuorum each on and off
+
+| suite | PreVote | CheckQuorum | leader crash | connected majority (star) | runs | writable in 2E | writable later | never writable again | flaps | longest gap max (E) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ablate | False | False | False | True | 74 | 46 | 26 | 2 | 21 | 60.00 |
+| ablate | False | False | False | False | 54 | 0 | 0 | 54 | 0 | 60.00 |
+| ablate-crash | False | False | True | True | 32 | 32 | 0 | 0 | 0 | 1.11 |
+| ablate-crash | False | False | True | False | 96 | 0 | 0 | 96 | 0 | 60.00 |
+| ablate | False | True | False | True | 74 | 64 | 10 | 0 | 0 | 25.50 |
+| ablate | False | True | False | False | 54 | 0 | 0 | 54 | 0 | 60.00 |
+| ablate-crash | False | True | True | True | 32 | 32 | 0 | 0 | 0 | 1.11 |
+| ablate-crash | False | True | True | False | 96 | 0 | 0 | 96 | 0 | 60.00 |
+| ablate | True | False | False | True | 74 | 64 | 0 | 10 | 0 | 60.00 |
+| ablate | True | False | False | False | 54 | 0 | 0 | 54 | 0 | 60.00 |
+| ablate-crash | True | False | True | True | 32 | 32 | 0 | 0 | 0 | 1.06 |
+| ablate-crash | True | False | True | False | 96 | 0 | 0 | 96 | 0 | 60.00 |
+| ablate | True | True | False | True | 74 | 64 | 10 | 0 | 0 | 3.43 |
+| ablate | True | True | False | False | 54 | 0 | 0 | 54 | 0 | 60.00 |
+| ablate-crash | True | True | True | True | 32 | 32 | 0 | 0 | 0 | 1.06 |
+| ablate-crash | True | True | True | False | 96 | 0 | 0 | 96 | 0 | 60.00 |
+
+Runs with a connected majority that missed F-17 (writable in 2E, at most one election per 10E):
+
+| suite | PreVote | CheckQuorum | leader crash | links down | seeds failing | longest gap (E) | elections | still writing |
+|---|---|---|---|---|---|---|---|---|
+| ablate | False | False | False | 1>3 | 1 | 3.22 | 3 | True |
+| ablate | False | False | False | 1>2,2>1 | 1 | 4.90 | 1 | True |
+| ablate | False | False | False | 1>3,2>1 | 2 | 8.67 | 7 | True |
+| ablate | False | False | False | 1>2,2>3 | 2 | 4.27 | 5 | True |
+| ablate | False | False | False | 1>3,2>3 | 2 | 3.71 | 19 | True |
+| ablate | False | False | False | 1>2,3>1 | 2 | 8.30 | 3 | True |
+| ablate | False | False | False | 1>3,3>1 | 1 | 4.81 | 1 | True |
+| ablate | False | False | False | 2>1,3>1 | 2 | 60.00 | 0 | False |
+| ablate | False | False | False | 1>2,2>1,3>1 | 2 | 5.95 | 1 | True |
+| ablate | False | False | False | 1>3,2>1,3>1 | 2 | 6.56 | 1 | True |
+| ablate | False | False | False | 1>3,2>3,3>1 | 2 | 9.52 | 9 | True |
+| ablate | False | False | False | 1>2,3>2 | 2 | 3.70 | 19 | True |
+| ablate | False | False | False | 1>3,3>2 | 1 | 4.24 | 2 | True |
+| ablate | False | False | False | 1>2,2>1,3>2 | 2 | 9.45 | 9 | True |
+| ablate | False | False | False | 1>2,2>3,3>2 | 2 | 9.51 | 11 | True |
+| ablate | False | False | False | 1>3,2>3,3>2 | 2 | 9.45 | 9 | True |
+| ablate | False | False | False | 1>2 | 1 | 1.55 | 2 | True |
+| ablate | False | True | False | 1>3,2>1 | 2 | 5.20 | 1 | True |
+| ablate | False | True | False | 1>2,3>1 | 2 | 7.19 | 1 | True |
+| ablate | False | True | False | 2>1,3>1 | 2 | 3.06 | 1 | True |
+| ablate | False | True | False | 1>2,2>1,3>1 | 2 | 5.57 | 1 | True |
+| ablate | False | True | False | 1>3,2>1,3>1 | 2 | 25.50 | 1 | True |
+| ablate | True | False | False | 1>3,2>1 | 2 | 60.00 | 0 | False |
+| ablate | True | False | False | 1>2,3>1 | 2 | 60.00 | 0 | False |
+| ablate | True | False | False | 2>1,3>1 | 2 | 60.00 | 0 | False |
+| ablate | True | False | False | 1>2,2>1,3>1 | 2 | 60.00 | 0 | False |
+| ablate | True | False | False | 1>3,2>1,3>1 | 2 | 60.00 | 0 | False |
+| ablate | True | True | False | 1>3,2>1 | 2 | 3.43 | 1 | True |
+| ablate | True | True | False | 1>2,3>1 | 2 | 2.96 | 1 | True |
+| ablate | True | True | False | 2>1,3>1 | 2 | 2.95 | 1 | True |
+| ablate | True | True | False | 1>2,2>1,3>1 | 2 | 2.96 | 1 | True |
+| ablate | True | True | False | 1>3,2>1,3>1 | 2 | 3.43 | 1 | True |
+
+## Random directed-link topologies of 5 nodes (150 per seed), without and with a leader crash
+
+| suite | PreVote | CheckQuorum | leader crash | connected majority (star) | runs | writable in 2E | writable later | never writable again | flaps | longest gap max (E) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sweep5 | True | True | False | True | 280 | 213 | 62 | 5 | 0 | 60.00 |
+| sweep5 | True | True | False | False | 20 | 0 | 0 | 20 | 0 | 60.00 |
+| sweep5-crash | True | True | True | True | 240 | 240 | 0 | 0 | 0 | 1.87 |
+| sweep5-crash | True | True | True | False | 60 | 0 | 0 | 60 | 0 | 60.00 |
+
+Runs with a connected majority that missed F-17 (writable in 2E, at most one election per 10E):
+
+| suite | PreVote | CheckQuorum | leader crash | links down | seeds failing | longest gap (E) | elections | still writing |
+|---|---|---|---|---|---|---|---|---|
+| sweep5 | True | True | False | 1>3,1>5,2>1,2>3,3>2,4>1,4>5,5>2,5>3,5>4 | 1 | 3.25 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,1>5,2>1,3>1,4>2,4>3,4>5,5>1,5>3,5>4 | 1 | 60.00 | 0 | False |
+| sweep5 | True | True | False | 1>3,1>4,3>4,3>5,4>1,5>1,5>3 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,1>5,2>3,2>4,2>5,3>2,4>2,4>5,5>1,5>4 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,2>3,2>5,3>2,4>2,4>5,5>1 | 1 | 3.89 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>5,2>1,2>3,2>4,3>1,4>2,4>5,5>1 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>4,1>5,3>1,3>2,3>5,4>3,5>2,5>3 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,2>5,3>2,3>4,4>1,4>2,5>1,5>2 | 1 | 3.89 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>4,2>1,2>4,3>2,3>4,4>1,4>3 | 1 | 3.75 | 1 | True |
+| sweep5 | True | True | False | 1>4,1>5,2>3,2>4,2>5,3>1,3>2,4>2,5>1 | 1 | 3.79 | 1 | True |
+| sweep5 | True | True | False | 1>4,2>4,3>1,4>2,4>5,5>1,5>4 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>1,2>3,2>5,3>1,3>2,4>3,4>5,5>2 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>3,2>1,2>3,3>1,3>2,3>5,4>1,4>3 | 1 | 3.75 | 1 | True |
+| sweep5 | True | True | False | 1>4,1>5,2>4,3>1,4>3,5>1 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,2>1,2>3,2>4,3>2,3>4,4>1,4>2,5>1 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>4,1>5,2>1,3>4,4>1,4>3,4>5,5>3,5>4 | 1 | 3.09 | 1 | True |
+| sweep5 | True | True | False | 1>3,2>4,2>5,3>4,4>1,4>2,5>1,5>2,5>4 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,2>3,3>4,3>5,4>3,4>5,5>1 | 1 | 60.00 | 0 | False |
+| sweep5 | True | True | False | 1>2,2>1,3>1,3>2,4>1,4>2,4>3,5>2 | 1 | 3.75 | 1 | True |
+| sweep5 | True | True | False | 1>3,3>1,3>5,4>1,4>2,5>1,5>2,5>3 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,1>5,2>5,3>4,5>3 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,2>3,2>5,3>1,3>5,4>3,5>1,5>3,5>4 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,2>1,3>5,4>1,4>5,5>1 | 1 | 3.89 | 1 | True |
+| sweep5 | True | True | False | 1>3,2>1,4>1,4>2 | 1 | 3.75 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>3,2>5,3>5,4>1,4>3,5>1,5>2,5>3 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>3,3>2,4>1,5>2,5>3,5>4 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>5,2>1,3>1,4>1,5>4 | 2 | 3.08 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,2>3,2>5,3>1,3>2,4>2,5>1,5>2 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>5,2>1,2>4,2>5,3>2,4>1,4>2,4>5 | 1 | 3.89 | 1 | True |
+| sweep5 | True | True | False | 1>5,2>1,2>3,2>5,3>1,4>2,5>1,5>3,5>4 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>5,2>1,2>3,2>5,3>1,3>4,3>5,4>3,4>5,5>3,5>4 | 1 | 3.35 | 1 | True |
+| sweep5 | True | True | False | 1>2,2>1,3>1,3>2,4>1,4>3,5>1 | 1 | 3.25 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,2>4,2>5,3>1,3>2,4>1,4>2,4>5,5>1,5>4 | 1 | 60.00 | 0 | False |
+| sweep5 | True | True | False | 1>3,3>4,4>1,5>1 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,3>1,3>4,3>5,4>1,5>1 | 1 | 3.19 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,1>5,2>3,2>5,3>2,4>2 | 1 | 3.89 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>4,1>5,2>1,2>4,3>1,3>4,4>1,4>2,5>3,5>4 | 1 | 3.03 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,1>5,2>3,2>4,2>5,3>1,3>2,3>5,4>2,5>1,5>3 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,3>1,3>4,3>5,5>1,5>2 | 1 | 3.63 | 1 | True |
+| sweep5 | True | True | False | 1>4,2>1,2>4,3>1,3>5,5>1,5>4 | 1 | 3.02 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>4,1>5,2>4,4>3,4>5,5>2,5>3 | 1 | 3.56 | 1 | True |
+| sweep5 | True | True | False | 1>2,3>1,3>2,3>5,5>1,5>2 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>4,3>1,4>1,5>2 | 1 | 3.13 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>4,2>4,3>4,3>5,4>1,4>2,4>3,4>5,5>1,5>2,5>4 | 1 | 3.13 | 1 | True |
+| sweep5 | True | True | False | 2>1,2>5,3>1,3>5,5>1,5>3 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>3,2>1,5>1 | 1 | 3.02 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,1>4,2>3,2>4,2>5,4>2,4>3,5>4 | 1 | 3.48 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>5,2>3,3>1,3>4,4>1,4>3,4>5,5>1 | 1 | 60.00 | 0 | False |
+| sweep5 | True | True | False | 1>4,1>5,2>3,2>5,3>1,4>1,4>2,5>1 | 1 | 3.46 | 1 | True |
+| sweep5 | True | True | False | 3>1,3>4,4>1,4>3,5>1,5>2,5>4 | 1 | 3.13 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>4,1>5,2>4,3>4,4>3,5>2,5>3 | 1 | 3.13 | 1 | True |
+| sweep5 | True | True | False | 1>5,2>1,2>3,3>1 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>5,2>1,2>3,2>5,3>1,4>2,4>3,5>1 | 1 | 3.65 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,3>2,4>5,5>1,5>3 | 1 | 3.64 | 1 | True |
+| sweep5 | True | True | False | 1>2,1>3,1>4,2>1,2>4,2>5,3>2,4>1,4>5 | 1 | 3.48 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>1,2>3,3>4,4>2,4>3,4>5,5>1 | 1 | 60.00 | 0 | False |
+| sweep5 | True | True | False | 1>4,2>1,2>4,3>2,3>5,5>1,5>3 | 1 | 3.37 | 1 | True |
+| sweep5 | True | True | False | 1>3,1>5,2>1,4>1,4>2,5>1,5>2 | 1 | 3.55 | 1 | True |
+| sweep5 | True | True | False | 1>4,2>1,3>5,4>5,5>1,5>4 | 1 | 3.02 | 1 | True |
+| sweep5 | True | True | False | 1>2,2>4,3>1,3>2,3>4,4>1,5>2,5>3 | 1 | 3.48 | 1 | True |
+| ... | | | | 6 more topologies | | | | |
+
+## One node 10x slower (from the fault on; PreVote and CheckQuorum on)
+
+| n | writes | load | slow node | slowed | seeds | leader changed | p99 before (ms) | p99 after (ms) | ratio | longest gap (E) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3 | async (leader fsyncs in parallel) | 200/s | leader | cpu | 5 | never | 3.0 | 3.8 | 1.3x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 200/s | leader | fsync | 5 | never | 3.0 | 3.4 | 1.1x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 200/s | leader | both | 5 | never | 3.0 | 6.2 | 2.1x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 200/s | follower | cpu | 5 | never | 3.0 | 3.0 | 1.0x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 200/s | follower | fsync | 5 | never | 3.0 | 3.1 | 1.0x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 200/s | follower | both | 5 | never | 3.0 | 3.0 | 1.0x | 0.01 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | leader | cpu | 5 | 5/5, after 7.0 s | 3.1 | 2005.8 | 647.7x | 2.68 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | leader | fsync | 5 | never | 3.1 | 5.5 | 1.8x | 0.00 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | leader | both | 5 | 5/5, after 8.3 s | 3.1 | 3434.3 | 1108.9x | 4.15 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | follower | cpu | 5 | never | 3.1 | 3.4 | 1.1x | 0.00 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | follower | fsync | 5 | never | 3.1 | 4.6 | 1.5x | 0.00 |
+| 3 | async (leader fsyncs in parallel) | 2000/s | follower | both | 5 | never | 3.1 | 5.0 | 1.6x | 0.01 |
+| 3 | sync (fsync before send) | 200/s | leader | cpu | 5 | never | 5.0 | 8.3 | 1.7x | 0.01 |
+| 3 | sync (fsync before send) | 200/s | leader | fsync | 5 | never | 5.0 | 81.8 | 16.5x | 0.06 |
+| 3 | sync (fsync before send) | 200/s | leader | both | 5 | never | 5.0 | 101.8 | 20.5x | 0.06 |
+| 3 | sync (fsync before send) | 200/s | follower | cpu | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 3 | sync (fsync before send) | 200/s | follower | fsync | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 3 | sync (fsync before send) | 200/s | follower | both | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 3 | sync (fsync before send) | 2000/s | leader | cpu | 5 | never | 12.8 | 599.2 | 46.9x | 0.17 |
+| 3 | sync (fsync before send) | 2000/s | leader | fsync | 5 | never | 12.8 | 100.2 | 7.8x | 0.03 |
+| 3 | sync (fsync before send) | 2000/s | leader | both | 5 | never | 12.8 | 749.9 | 58.7x | 0.20 |
+| 3 | sync (fsync before send) | 2000/s | follower | cpu | 5 | never | 12.7 | 15.6 | 1.2x | 0.01 |
+| 3 | sync (fsync before send) | 2000/s | follower | fsync | 5 | never | 12.7 | 15.6 | 1.2x | 0.00 |
+| 3 | sync (fsync before send) | 2000/s | follower | both | 5 | never | 12.7 | 18.7 | 1.5x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | leader | cpu | 5 | never | 3.0 | 5.2 | 1.7x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | leader | fsync | 5 | never | 3.0 | 3.3 | 1.1x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | leader | both | 5 | never | 3.0 | 7.4 | 2.5x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | follower | cpu | 5 | never | 3.0 | 3.0 | 1.0x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | follower | fsync | 5 | never | 3.0 | 3.0 | 1.0x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 200/s | follower | both | 5 | never | 3.0 | 3.0 | 1.0x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | leader | cpu | 5 | 5/5, after 4.5 s | 3.3 | 47.5 | 14.6x | 2.28 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | leader | fsync | 5 | never | 3.3 | 6.2 | 1.9x | 0.01 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | leader | both | 5 | 5/5, after 6.3 s | 3.3 | 1089.9 | 333.9x | 2.90 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | follower | cpu | 5 | never | 3.3 | 3.6 | 1.1x | 0.00 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | follower | fsync | 5 | never | 3.3 | 5.2 | 1.6x | 0.00 |
+| 5 | async (leader fsyncs in parallel) | 2000/s | follower | both | 5 | never | 3.3 | 5.6 | 1.7x | 0.01 |
+| 5 | sync (fsync before send) | 200/s | leader | cpu | 5 | never | 5.0 | 9.8 | 2.0x | 0.01 |
+| 5 | sync (fsync before send) | 200/s | leader | fsync | 5 | never | 5.0 | 83.2 | 16.7x | 0.06 |
+| 5 | sync (fsync before send) | 200/s | leader | both | 5 | never | 5.0 | 129.4 | 26.0x | 0.06 |
+| 5 | sync (fsync before send) | 200/s | follower | cpu | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 5 | sync (fsync before send) | 200/s | follower | fsync | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 5 | sync (fsync before send) | 200/s | follower | both | 5 | never | 5.0 | 5.0 | 1.0x | 0.01 |
+| 5 | sync (fsync before send) | 2000/s | leader | cpu | 5 | 5/5, after 10.2 s | 16.3 | 4927.3 | 302.6x | 1.75 |
+| 5 | sync (fsync before send) | 2000/s | leader | fsync | 5 | never | 16.3 | 125.3 | 7.7x | 0.03 |
+| 5 | sync (fsync before send) | 2000/s | leader | both | 5 | 5/5, after 8.4 s | 16.3 | 3087.1 | 189.6x | 1.73 |
+| 5 | sync (fsync before send) | 2000/s | follower | cpu | 5 | never | 16.2 | 16.7 | 1.0x | 0.01 |
+| 5 | sync (fsync before send) | 2000/s | follower | fsync | 5 | never | 16.2 | 17.2 | 1.1x | 0.01 |
+| 5 | sync (fsync before send) | 2000/s | follower | both | 5 | never | 16.2 | 20.0 | 1.2x | 0.01 |
+

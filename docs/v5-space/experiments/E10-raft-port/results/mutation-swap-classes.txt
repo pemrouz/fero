@@ -1,0 +1,7 @@
+swap survivors: 127; independent (equivalent) 122; other 5
+other:
+  log_unstable.ts:76  this.offset = id.index + 1  <->  this.offsetInProgress = Math.max(this.offsetInProgress, this.offset)
+  log_unstable.ts:93  this.offset = s.Metadata!.GetIndex() + 1  <->  this.offsetInProgress = this.offset
+  storage.ts:101  this.snapshot = EnsureSnapshot(this.snapshot)  <->  this.snapshot.Metadata!.Index = i
+  tracker.ts:167  this.Next = this.Match + 1  <->  this.sentCommit = Math.min(this.sentCommit, this.Next - 1)
+  tracker.ts:172  this.Next = Math.max(Math.min(rejected, matchHint + 1), this.Match + 1)  <->  this.sentCommit = Math.min(this.sentCommit, this.Next - 1)

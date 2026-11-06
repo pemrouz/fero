@@ -1,0 +1,31 @@
+# DEV-10 mutants of the membership rules (tools/mutants.py): TLC -simulate -depth 80, one run per scenario:
+#   two {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}
+#   three+spare {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowLoseDisk': True, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}
+# design two {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}: violated None, ? states, 120 s
+# design three+spare {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowLoseDisk': True, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}: violated None, ? states, 120 s
+| mutant | rule | verdict | how |
+|---|---|---|---|
+| FeroBecomeLeader:drop-guard:r01 | `/\ votesGranted[i] \cap GetConfig(i) \in Quorum(GetConfig(i))` | caught | two: MoreThanOneLeaderInv; three+spare: MoreUpToDateCorrectInv |
+| FeroBecomeLeader:drop-update-pendingConfChangeIndex:r02 | `/\ pendingConfChangeIndex' = [pendingConfChangeIndex EXCEPT ![i] = Len(log[i])]` | not caught |  |
+| FeroBecomeLeader:drop-update-log:r03 | `/\ log' = [log EXCEPT ![i] = Append(@, [term \|-> currentTerm[i], type \|-> ValueEntry, value \|-> Noop])]` | not caught |  |
+| ProposeConf:drop-guard:r04 | `/\ state[i] = Leader` | caught | two: ElectionSafetyInv; three+spare: ElectionSafetyInv |
+| ProposeConf:drop-guard:r05 | `/\ pendingConfChangeIndex[i] <= commitIndex[i]` | caught | two: QuorumLogInvLive |
+| ProposeConf:flip-<=-to-<:r05 | `/\ pendingConfChangeIndex[i] <= commitIndex[i]` | not caught |  |
+| ProposeConf:drop-guard:r06 | `/\ ConfApplied(i)` | caught | two: QuorumLogInvLive |
+| ProposeConf:drop-guard:r07 | `/\ newVoters # {}` | not caught |  |
+| ProposeConf:drop-update-log:r08 | `/\ log' = [log EXCEPT ![i] = Append(@, [term \|-> currentTerm[i], type \|-> ConfigEntry, value \|-> [newconf \|-> newVoters, learners \|-> newLearners]])]` | not caught |  |
+| ProposeConf:drop-update-pendingConfChangeIndex:r09 | `/\ pendingConfChangeIndex' = [pendingConfChangeIndex EXCEPT ![i] = Len(log'[i])]` | caught | two: QuorumLogInvLive |
+| AddLearnerF:drop-guard:r10 | `/\ j \notin GetConfig(i) \cup GetLearners(i)` | not caught |  |
+| AddVoterF:drop-guard:r11 | `/\ j \notin GetConfig(i) \cup GetLearners(i)` | not caught |  |
+| PromoteF:drop-guard:r12 | `/\ j \in GetLearners(i)` | not caught |  |
+| DemoteF:drop-guard:r13 | `/\ j \in GetConfig(i)` | not caught |  |
+| RemoveF:drop-guard:r14 | `/\ j \in GetConfig(i) \cup GetLearners(i)` | not caught |  |
+| FeroApplyConf:drop-guard:r15 | `/\ LastConfIdx(log[i], commitIndex[i]) > 0` | not caught |  |
+| FeroApplyConf:flip->-to->=:r15 | `/\ LastConfIdx(log[i], commitIndex[i]) > 0` | not caught |  |
+| FeroApplyConf:drop-guard:r16 | `/\ ~ConfApplied(i)` | not caught |  |
+| FeroApplyConf:drop-update-config:r17 | `/\ config' = [config EXCEPT ![i] = CommittedConf(i)]` | not caught |  |
+| FeroApplyConf:drop-update-state:r18 | `/\ state' = [state EXCEPT ![i] = IF state[i] = Leader /\ i \notin CommittedConf(i).jointConfig[1] THEN Follower ELSE state[i]]` | not caught |  |
+| CanCampaign:drop-guard:r19 | `/\ i \in GetConfig(i)` | not caught |  |
+| CanCampaign:drop-guard:r20 | `/\ ConfApplied(i)` | not caught |  |
+
+22 mutants: 5 caught by a safety invariant in simulation, 17 not caught, 0 not run

@@ -1,0 +1,45 @@
+PASS interaction/async_storage_writes.txt  directives 44/44  32.8 ms
+PASS interaction/async_storage_writes_append_aba_race.txt  directives 47/47  9.7 ms
+PASS interaction/campaign.txt  directives 4/4  1.1 ms
+PASS interaction/campaign_learner_must_vote.txt  directives 12/12  9.4 ms
+PASS interaction/checkquorum.txt  directives 15/15  1.9 ms
+PASS interaction/confchange_disable_validation.txt  directives 9/9  0.8 ms
+PASS interaction/confchange_v1_add_single.txt  directives 6/6  1.5 ms
+PASS interaction/confchange_v1_remove_leader.txt  directives 21/21  2.4 ms
+PASS interaction/confchange_v1_remove_leader_stepdown.txt  directives 19/19  2.9 ms
+PASS interaction/confchange_v2_add_double_auto.txt  directives 19/19  3.9 ms
+PASS interaction/confchange_v2_add_double_implicit.txt  directives 6/6  1.3 ms
+PASS interaction/confchange_v2_add_single_auto.txt  directives 6/6  0.6 ms
+PASS interaction/confchange_v2_add_single_explicit.txt  directives 11/11  1.3 ms
+PASS interaction/confchange_v2_replace_leader.txt  directives 17/17  5.7 ms
+PASS interaction/confchange_v2_replace_leader_stepdown.txt  directives 17/17  5.2 ms
+PASS interaction/forget_leader.txt  directives 29/29  5.2 ms
+PASS interaction/forget_leader_prevote_checkquorum.txt  directives 29/29  8.1 ms
+PASS interaction/forget_leader_read_only_lease_based.txt  directives 7/7  1.2 ms
+PASS interaction/heartbeat_resp_recovers_from_probing.txt  directives 11/11  1.0 ms
+PASS interaction/lagging_commit.txt  directives 17/17  7.8 ms
+PASS interaction/prevote.txt  directives 16/16  4.9 ms
+PASS interaction/prevote_checkquorum.txt  directives 18/18  5.4 ms
+PASS interaction/probe_and_replicate.txt  directives 74/74  13.1 ms
+PASS interaction/replicate_pause.txt  directives 32/32  2.8 ms
+PASS interaction/single_node.txt  directives 4/4  0.2 ms
+PASS interaction/slow_follower_after_compaction.txt  directives 25/25  1.7 ms
+PASS interaction/snapshot_succeed_via_app_resp.txt  directives 18/18  0.8 ms
+PASS interaction/snapshot_succeed_via_app_resp_behind.txt  directives 25/25  1.4 ms
+PASS quorum/joint_commit.txt  directives 50/50  7.4 ms
+PASS quorum/joint_vote.txt  directives 39/39  0.4 ms
+PASS quorum/majority_commit.txt  directives 16/16  0.6 ms
+PASS quorum/majority_vote.txt  directives 22/22  0.1 ms
+PASS confchange/joint_autoleave.txt  directives 4/4  0.5 ms
+PASS confchange/joint_idempotency.txt  directives 3/3  0.2 ms
+PASS confchange/joint_learners_next.txt  directives 3/3  8.3 ms
+PASS confchange/joint_safety.txt  directives 15/15  0.2 ms
+PASS confchange/simple_idempotency.txt  directives 11/11  0.1 ms
+PASS confchange/simple_promote_demote.txt  directives 7/7  0.1 ms
+PASS confchange/simple_safety.txt  directives 11/11  0.1 ms
+PASS confchange/update.txt  directives 3/3  0.1 ms
+PASS confchange/zero.txt  directives 1/1  0.0 ms
+suite interaction: 28/28 files pass
+suite quorum: 4/4 files pass
+suite confchange: 9/9 files pass
+TOTAL: 41/41 files pass byte for byte; 743/743 directives matched before the first mismatch

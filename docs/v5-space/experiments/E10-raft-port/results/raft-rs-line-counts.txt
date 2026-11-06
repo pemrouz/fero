@@ -1,0 +1,33 @@
+## raft-rs 0.7.0 (crates.io), src/ (physical, non-blank, code; inline #[cfg(test)] modules included)
+     15      12      11  src/confchange.rs
+    355     325     237  src/confchange/changer.rs
+     86      77      76  src/confchange/datadriven_test.rs
+    107     101      57  src/confchange/restore.rs
+    210     179     117  src/config.rs
+    176     168     143  src/errors.rs
+    604     586      94  src/lib.rs
+    479     446     382  src/log_unstable.rs
+     74      65      58  src/quorum.rs
+    323     293     247  src/quorum/datadriven_test.rs
+     98      86      63  src/quorum/joint.rs
+    255     227     184  src/quorum/majority.rs
+   2919    2690    2114  src/raft.rs
+   1677    1567    1371  src/raft_log.rs
+    831     734     553  src/raw_node.rs
+    140     125      83  src/read_only.rs
+     53      48      27  src/status.rs
+    813     724     561  src/storage.rs
+    388     354     238  src/tracker.rs
+    426     364     320  src/tracker/inflights.rs
+    411     375     298  src/tracker/progress.rs
+     45      40      22  src/tracker/state.rs
+    179     158      94  src/util.rs
+  10664    9744    7350  TOTAL (physical, non-blank, code)
+## raft-rs: lines inside #[cfg(test)] modules or *_test.rs files
+2694
+## raft-proto 0.7.0 (hand-written part)
+    151     136     105  src/confchange.rs
+     40      36      30  src/confstate.rs
+     56      47      43  src/lib.rs
+    196     179     102  proto/eraftpb.proto
+    443     398     280  TOTAL (physical, non-blank, code)

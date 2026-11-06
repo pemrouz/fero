@@ -1,0 +1,289 @@
+[
+ {
+  "suite": "interaction",
+  "file": "interaction/async_storage_writes.txt",
+  "ok": true,
+  "passed": 44,
+  "total": 44
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/async_storage_writes_append_aba_race.txt",
+  "ok": true,
+  "passed": 47,
+  "total": 47
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/campaign.txt",
+  "ok": true,
+  "passed": 4,
+  "total": 4
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/campaign_learner_must_vote.txt",
+  "ok": true,
+  "passed": 12,
+  "total": 12
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/checkquorum.txt",
+  "ok": true,
+  "passed": 15,
+  "total": 15
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_disable_validation.txt",
+  "ok": true,
+  "passed": 9,
+  "total": 9
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v1_add_single.txt",
+  "ok": true,
+  "passed": 6,
+  "total": 6
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v1_remove_leader.txt",
+  "ok": true,
+  "passed": 21,
+  "total": 21
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v1_remove_leader_stepdown.txt",
+  "ok": true,
+  "passed": 19,
+  "total": 19
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_add_double_auto.txt",
+  "ok": true,
+  "passed": 19,
+  "total": 19
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_add_double_implicit.txt",
+  "ok": true,
+  "passed": 6,
+  "total": 6
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_add_single_auto.txt",
+  "ok": true,
+  "passed": 6,
+  "total": 6
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_add_single_explicit.txt",
+  "ok": true,
+  "passed": 11,
+  "total": 11
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_replace_leader.txt",
+  "ok": true,
+  "passed": 17,
+  "total": 17
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/confchange_v2_replace_leader_stepdown.txt",
+  "ok": true,
+  "passed": 17,
+  "total": 17
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/forget_leader.txt",
+  "ok": true,
+  "passed": 29,
+  "total": 29
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/forget_leader_prevote_checkquorum.txt",
+  "ok": true,
+  "passed": 29,
+  "total": 29
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/forget_leader_read_only_lease_based.txt",
+  "ok": true,
+  "passed": 7,
+  "total": 7
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/heartbeat_resp_recovers_from_probing.txt",
+  "ok": true,
+  "passed": 11,
+  "total": 11
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/lagging_commit.txt",
+  "ok": true,
+  "passed": 17,
+  "total": 17
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/prevote.txt",
+  "ok": true,
+  "passed": 16,
+  "total": 16
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/prevote_checkquorum.txt",
+  "ok": true,
+  "passed": 18,
+  "total": 18
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/probe_and_replicate.txt",
+  "ok": true,
+  "passed": 74,
+  "total": 74
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/replicate_pause.txt",
+  "ok": true,
+  "passed": 32,
+  "total": 32
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/single_node.txt",
+  "ok": true,
+  "passed": 4,
+  "total": 4
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/slow_follower_after_compaction.txt",
+  "ok": true,
+  "passed": 25,
+  "total": 25
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/snapshot_succeed_via_app_resp.txt",
+  "ok": true,
+  "passed": 18,
+  "total": 18
+ },
+ {
+  "suite": "interaction",
+  "file": "interaction/snapshot_succeed_via_app_resp_behind.txt",
+  "ok": true,
+  "passed": 25,
+  "total": 25
+ },
+ {
+  "suite": "quorum",
+  "file": "quorum/joint_commit.txt",
+  "ok": true,
+  "passed": 50,
+  "total": 50
+ },
+ {
+  "suite": "quorum",
+  "file": "quorum/joint_vote.txt",
+  "ok": true,
+  "passed": 39,
+  "total": 39
+ },
+ {
+  "suite": "quorum",
+  "file": "quorum/majority_commit.txt",
+  "ok": true,
+  "passed": 16,
+  "total": 16
+ },
+ {
+  "suite": "quorum",
+  "file": "quorum/majority_vote.txt",
+  "ok": true,
+  "passed": 22,
+  "total": 22
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/joint_autoleave.txt",
+  "ok": true,
+  "passed": 4,
+  "total": 4
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/joint_idempotency.txt",
+  "ok": true,
+  "passed": 3,
+  "total": 3
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/joint_learners_next.txt",
+  "ok": true,
+  "passed": 3,
+  "total": 3
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/joint_safety.txt",
+  "ok": true,
+  "passed": 15,
+  "total": 15
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/simple_idempotency.txt",
+  "ok": true,
+  "passed": 11,
+  "total": 11
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/simple_promote_demote.txt",
+  "ok": true,
+  "passed": 7,
+  "total": 7
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/simple_safety.txt",
+  "ok": true,
+  "passed": 11,
+  "total": 11
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/update.txt",
+  "ok": true,
+  "passed": 3,
+  "total": 3
+ },
+ {
+  "suite": "confchange",
+  "file": "confchange/zero.txt",
+  "ok": true,
+  "passed": 1,
+  "total": 1
+ }
+]

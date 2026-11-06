@@ -1,0 +1,1 @@
+ok: 4 groups x 3 replicas elected in 20 ms; 2000 proposals each applied identically on every replica in 262 ms (not a benchmark: no disk, no network, shared machine)
