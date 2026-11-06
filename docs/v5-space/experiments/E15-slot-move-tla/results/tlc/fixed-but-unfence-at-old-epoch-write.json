@@ -1,0 +1,21 @@
+{
+ "bound": "write",
+ "calm_states": 1725,
+ "complete": true,
+ "distinct_total": 1071165,
+ "errors": [],
+ "failed": [
+  6
+ ],
+ "kind": "reading",
+ "live_edges": 2459,
+ "live_stuck": 0,
+ "secs": 158.5,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1069440,
+ "steps": {
+  "6": 25
+ },
+ "variant": "fixed-but-unfence-at-old-epoch",
+ "workers": 2
+}

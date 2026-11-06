@@ -1,0 +1,14 @@
+{
+ "bound": "dedup",
+ "capped": false,
+ "failed": [],
+ "kind": "design",
+ "live_nodes": 5694,
+ "live_starts": 1257,
+ "live_stuck": 0,
+ "secs": 33.3,
+ "states": 351262,
+ "steps": {},
+ "transitions": 1624753,
+ "variant": "fixed"
+}

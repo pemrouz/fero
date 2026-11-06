@@ -1,0 +1,35 @@
+# batch name nodes read seed seconds nemesis pause compact
+# Every run: Maelstrom lin-kv, --rate 50, --concurrency 4n, server latency exponential mean 5 ms, --nemesis-interval 5.
+# Clean runs: partitions and SIGSTOP pauses together.
+A c3-ri-s1 3 readindex 1 100 partition 1 0
+A c3-ri-s2 3 readindex 2 100 partition 1 0
+A c3-ri-s3 3 readindex 3 100 partition 1 0
+A c3-log-s1 3 log 1 100 partition 1 0
+A c3-log-s2 3 log 2 100 partition 1 0
+A c3-log-s3 3 log 3 100 partition 1 0
+A c3-mix-s1 3 mixed 1 100 partition 1 0
+A c3-mix-s2 3 mixed 2 100 partition 1 0
+A c3-mix-s3 3 mixed 3 100 partition 1 0
+B c5-ri-s1 5 readindex 1 100 partition 1 0
+B c5-ri-s2 5 readindex 2 100 partition 1 0
+B c5-ri-s3 5 readindex 3 100 partition 1 0
+B c5-log-s1 5 log 1 100 partition 1 0
+B c5-log-s2 5 log 2 100 partition 1 0
+B c5-log-s3 5 log 3 100 partition 1 0
+B c5-mix-s1 5 mixed 1 100 partition 1 0
+B c5-mix-s2 5 mixed 2 100 partition 1 0
+B c5-mix-s3 5 mixed 3 100 partition 1 0
+# Clean runs with log compaction every 20 entries, so lagging followers get MsgSnap.
+C k3-mix-s1 3 mixed 1 100 partition 1 20
+C k3-mix-s2 3 mixed 2 100 partition 1 20
+C k5-mix-s1 5 mixed 1 100 partition 1 20
+C k5-mix-s2 5 mixed 2 100 partition 1 20
+# The planted bug: a follower answers reads from its own state, with no ReadIndex.
+D bug3-s1 3 buggy 1 100 partition 1 0
+D bug3-s2 3 buggy 2 100 partition 1 0
+D bug3-s3 3 buggy 3 100 partition 1 0
+D bug5-s1 5 buggy 1 100 partition 1 0
+D bug5-s2 5 buggy 2 100 partition 1 0
+D bug5-s3 5 buggy 3 100 partition 1 0
+D bug3-nofault-s1 3 buggy 1 60 none 0 0
+D bug5-nofault-s1 5 buggy 1 60 none 0 0

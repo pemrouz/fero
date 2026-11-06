@@ -1,0 +1,29 @@
+21:08:12 ==============================
+21:08:12 Pub Server RTT : 258µs
+21:08:12 Sub Server RTT : 165µs
+21:08:12 Message Payload: 16B
+21:08:12 Target Duration: 20s
+21:08:12 Target Msgs/Sec: 10000
+21:08:12 Target Band/Sec: 312K
+21:08:12 ==============================
+21:08:32 HDR Percentiles:
+21:08:32 10:       54µs
+21:08:32 50:       90µs
+21:08:32 75:       115µs
+21:08:32 90:       146µs
+21:08:32 99:       273µs
+21:08:32 99.9:     662µs
+21:08:32 99.99:    2.001ms
+21:08:32 99.999:   5.314ms
+21:08:32 99.9999:  7.261ms
+21:08:32 99.99999: 7.261ms
+21:08:32 100:      7.261ms
+21:08:32 ==============================
+21:08:32 Actual Msgs/Sec: 9998
+21:08:32 Actual Band/Sec: 312K
+21:08:32 Minimum Latency: 12µs
+21:08:32 Median Latency : 90µs
+21:08:32 Maximum Latency: 7.261ms
+21:08:32 1st Sent Wall Time : 3.385ms
+21:08:32 Last Sent Wall Time: 20.002754s
+21:08:32 Last Recv Wall Time: 20.002782s

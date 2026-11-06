@@ -1,0 +1,88 @@
+# E-45 resp-p1-fresh: 2026-11-06T21:13:27Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 5.77 4.26 4.95 7/269 17618
+# host: host.ts resp --listen 127.0.0.1:16390 --get fresh
+# tool: redis-benchmark -p 16390 -c 200 --threads 4 -r 100000 -d 100 --precision 3 -n 5000 -P 1 -t get
+ GET: rps=0.0 (overall: 0.0) avg_msec=-nan (overall: -nan)                                                          GET: rps=8976.1 (overall: 8870.1) avg_msec=21.637 (overall: 21.637)                                                                    ====== GET ======
+  5000 requests completed in 0.50 seconds
+  200 parallel clients
+  100 bytes payload
+  keep alive: 1
+  host configuration "save": 
+  host configuration "appendonly": yes
+  multi-thread: yes
+  threads: 4
+
+Latency by percentile distribution:
+0.000% <= 4.671 milliseconds (cumulative count 1)
+50.000% <= 14.271 milliseconds (cumulative count 2500)
+75.000% <= 20.063 milliseconds (cumulative count 3752)
+87.500% <= 28.991 milliseconds (cumulative count 4378)
+93.750% <= 37.343 milliseconds (cumulative count 4690)
+96.875% <= 39.871 milliseconds (cumulative count 4845)
+98.438% <= 42.111 milliseconds (cumulative count 4922)
+99.219% <= 53.791 milliseconds (cumulative count 4962)
+99.609% <= 54.335 milliseconds (cumulative count 4982)
+99.805% <= 54.751 milliseconds (cumulative count 4991)
+99.902% <= 55.583 milliseconds (cumulative count 4998)
+99.976% <= 55.871 milliseconds (cumulative count 4999)
+99.988% <= 59.263 milliseconds (cumulative count 5000)
+100.000% <= 59.263 milliseconds (cumulative count 5000)
+
+Cumulative distribution of latencies:
+0.000% <= 0.103 milliseconds (cumulative count 0)
+1.460% <= 5.103 milliseconds (cumulative count 73)
+5.280% <= 6.103 milliseconds (cumulative count 264)
+12.020% <= 7.103 milliseconds (cumulative count 601)
+19.700% <= 8.103 milliseconds (cumulative count 985)
+23.840% <= 9.103 milliseconds (cumulative count 1192)
+29.360% <= 10.103 milliseconds (cumulative count 1468)
+33.900% <= 11.103 milliseconds (cumulative count 1695)
+37.380% <= 12.103 milliseconds (cumulative count 1869)
+42.320% <= 13.103 milliseconds (cumulative count 2116)
+48.920% <= 14.103 milliseconds (cumulative count 2446)
+54.680% <= 15.103 milliseconds (cumulative count 2734)
+59.380% <= 16.103 milliseconds (cumulative count 2969)
+62.900% <= 17.103 milliseconds (cumulative count 3145)
+68.280% <= 18.111 milliseconds (cumulative count 3414)
+71.320% <= 19.103 milliseconds (cumulative count 3566)
+75.240% <= 20.111 milliseconds (cumulative count 3762)
+78.580% <= 21.103 milliseconds (cumulative count 3929)
+80.220% <= 22.111 milliseconds (cumulative count 4011)
+81.800% <= 23.103 milliseconds (cumulative count 4090)
+83.000% <= 24.111 milliseconds (cumulative count 4150)
+84.460% <= 25.103 milliseconds (cumulative count 4223)
+85.360% <= 26.111 milliseconds (cumulative count 4268)
+86.000% <= 27.103 milliseconds (cumulative count 4300)
+87.080% <= 28.111 milliseconds (cumulative count 4354)
+87.620% <= 29.103 milliseconds (cumulative count 4381)
+88.300% <= 30.111 milliseconds (cumulative count 4415)
+88.560% <= 31.103 milliseconds (cumulative count 4428)
+89.000% <= 32.111 milliseconds (cumulative count 4450)
+89.560% <= 33.119 milliseconds (cumulative count 4478)
+90.580% <= 34.111 milliseconds (cumulative count 4529)
+90.880% <= 35.103 milliseconds (cumulative count 4544)
+92.120% <= 36.127 milliseconds (cumulative count 4606)
+93.500% <= 37.119 milliseconds (cumulative count 4675)
+94.980% <= 38.111 milliseconds (cumulative count 4749)
+95.660% <= 39.103 milliseconds (cumulative count 4783)
+97.740% <= 40.127 milliseconds (cumulative count 4887)
+98.340% <= 41.119 milliseconds (cumulative count 4917)
+98.440% <= 42.111 milliseconds (cumulative count 4922)
+98.580% <= 43.103 milliseconds (cumulative count 4929)
+98.620% <= 44.127 milliseconds (cumulative count 4931)
+98.740% <= 49.119 milliseconds (cumulative count 4937)
+98.780% <= 52.127 milliseconds (cumulative count 4939)
+99.460% <= 54.111 milliseconds (cumulative count 4973)
+99.820% <= 55.103 milliseconds (cumulative count 4991)
+99.980% <= 56.127 milliseconds (cumulative count 4999)
+100.000% <= 60.127 milliseconds (cumulative count 5000)
+
+Summary:
+  throughput summary: 9900.99 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+       16.701     4.664    14.271    38.143    53.375    59.263
+
+# tool exit code 0, wall .678339566 s
+# host log:
+ready resp 127.0.0.1:16390 (gateway in s1; seed 1; resources kv {})
+summary (SIGTERM): [0.8 s real, 0.036 s virtual, 20054 events, 5000 verbs] conns=0 in=180077B out=25050B ops{CONFIG=2 GET=5000} errors{} cpu=0.88s rss=140MB

@@ -1,0 +1,2 @@
+NATS Core NATS subscriber stats: 2,259,864 msgs/sec ~ 34 MiB/sec
+NATS Core NATS publisher stats: 2,259,842 msgs/sec ~ 34 MiB/sec ~ min: 0.05us ~ avg: 0.36us ~ max: 30,532.57us ~ P50: 0.07us ~ P90: 0.09us ~ P99: 0.13us ~ P99.9: 8.50us

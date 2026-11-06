@@ -1,0 +1,20 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 1436,
+ "live_starts": 337,
+ "live_stuck": 0,
+ "secs": 47.2,
+ "states": 554754,
+ "steps": {
+  "1": 18,
+  "9": 16
+ },
+ "transitions": 1623554,
+ "variant": "abort-keeps-table"
+}

@@ -1,2 +1,2 @@
-# tsc Version 6.0.2, 2026-11-06T20:42:15Z
+# tsc Version 6.0.2, 2026-11-06T21:13:04Z
 ok: tsc --strict, exit 0
