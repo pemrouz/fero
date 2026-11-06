@@ -1,0 +1,18 @@
+{
+ "bound": "moves",
+ "capped": false,
+ "failed": [
+  9
+ ],
+ "kind": "reading",
+ "live_nodes": 3694,
+ "live_starts": 905,
+ "live_stuck": 0,
+ "secs": 84.9,
+ "states": 948381,
+ "steps": {
+  "9": 15
+ },
+ "transitions": 2456766,
+ "variant": "fixed-but-recovery-reads-table-only"
+}
