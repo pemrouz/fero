@@ -1,0 +1,9 @@
+{
+ "name": "e45-npm",
+ "private": true,
+ "dependencies": {
+  "@grpc/grpc-js": "1.14.7",
+  "@grpc/proto-loader": "0.8.1",
+  "hdr-histogram-js": "3.0.1"
+ }
+}

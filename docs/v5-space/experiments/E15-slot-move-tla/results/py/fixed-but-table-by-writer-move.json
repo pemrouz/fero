@@ -1,0 +1,18 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  9
+ ],
+ "kind": "reading",
+ "live_nodes": 175,
+ "live_starts": 61,
+ "live_stuck": 0,
+ "secs": 2.9,
+ "states": 24474,
+ "steps": {
+  "9": 16
+ },
+ "transitions": 64798,
+ "variant": "fixed-but-table-by-writer"
+}

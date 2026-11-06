@@ -1,0 +1,22 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  1,
+  7,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 461,
+ "live_starts": 119,
+ "live_stuck": 5,
+ "secs": 15.7,
+ "states": 106679,
+ "steps": {
+  "1": 14,
+  "7": 12,
+  "9": 12
+ },
+ "transitions": 315555,
+ "variant": "stream-before-fence-commits"
+}

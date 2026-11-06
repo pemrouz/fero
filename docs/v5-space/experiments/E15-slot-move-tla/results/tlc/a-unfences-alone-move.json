@@ -1,0 +1,23 @@
+{
+ "bound": "move",
+ "calm_states": 1789,
+ "complete": true,
+ "distinct_total": 184857,
+ "errors": [],
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "mutant",
+ "live_edges": 2933,
+ "live_stuck": 0,
+ "secs": 50.6,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 183068,
+ "steps": {
+  "1": 17,
+  "9": 16
+ },
+ "variant": "a-unfences-alone",
+ "workers": 2
+}

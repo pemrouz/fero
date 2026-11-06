@@ -1,0 +1,14 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [],
+ "kind": "reading",
+ "live_nodes": 205,
+ "live_starts": 69,
+ "live_stuck": 0,
+ "secs": 5.7,
+ "states": 45837,
+ "steps": {},
+ "transitions": 124715,
+ "variant": "fixed-but-unfence-at-old-epoch"
+}

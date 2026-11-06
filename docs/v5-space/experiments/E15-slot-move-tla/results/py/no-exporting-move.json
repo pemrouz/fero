@@ -1,0 +1,18 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  7
+ ],
+ "kind": "mutant",
+ "live_nodes": 270,
+ "live_starts": 99,
+ "live_stuck": 4,
+ "secs": 2.2,
+ "states": 35743,
+ "steps": {
+  "7": 3
+ },
+ "transitions": 81475,
+ "variant": "no-exporting"
+}

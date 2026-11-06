@@ -1,0 +1,14 @@
+{
+ "bound": "quick",
+ "capped": false,
+ "failed": [],
+ "kind": "design",
+ "live_nodes": 205,
+ "live_starts": 69,
+ "live_stuck": 0,
+ "secs": 0.7,
+ "states": 18070,
+ "steps": {},
+ "transitions": 45034,
+ "variant": "fixed"
+}

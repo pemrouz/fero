@@ -1,0 +1,20 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 256,
+ "live_starts": 81,
+ "live_stuck": 0,
+ "secs": 4.7,
+ "states": 50453,
+ "steps": {
+  "1": 20,
+  "9": 18
+ },
+ "transitions": 133692,
+ "variant": "guards-on-committed"
+}

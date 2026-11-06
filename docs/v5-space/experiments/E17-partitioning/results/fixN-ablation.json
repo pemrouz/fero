@@ -1,0 +1,1419 @@
+{
+ "option": "fixN",
+ "bounds": [
+  "grow",
+  "shrink",
+  "both",
+  "read",
+  "deep",
+  "twice"
+ ],
+ "pinned": [],
+ "base": {
+  "grow": {
+   "states": 28,
+   "edges": 37,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    28,
+    37,
+    4904428223017170883
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 28,
+   "edges": 37,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    28,
+    37,
+    5735467725971624804
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 41,
+   "edges": 60,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    41,
+    60,
+    1258147820368746239
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 61,
+   "edges": 94,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    61,
+    94,
+    1269821582773140918
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 58,
+   "edges": 101,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    58,
+    101,
+    10847735029298285757
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 4,
+   "edges": 3,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    4,
+    3,
+    5900585420068387294
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "greedy": [
+  [
+   "refuse.route",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "refuse.route"
+ ],
+ "verify": {
+  "twice1": {
+   "states": 6,
+   "edges": 5,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    6,
+    5,
+    691735500433262383
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "put_back": [],
+ "minimal": {
+  "grow": {
+   "states": 28,
+   "edges": 37,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    28,
+    37,
+    4904428223017170883
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 28,
+   "edges": 37,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    28,
+    37,
+    5735467725971624804
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 41,
+   "edges": 60,
+   "secs": 0.01,
+   "fail": {},
+   "digest": [
+    41,
+    60,
+    1258147820368746239
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 61,
+   "edges": 94,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    61,
+    94,
+    1269821582773140918
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 58,
+   "edges": 101,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    58,
+    101,
+    10847735029298285757
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 4,
+   "edges": 3,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    4,
+    3,
+    5900585420068387294
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "rules": [
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "only the partition's own group takes it",
+   "cmp": null,
+   "id": "write.route",
+   "alone": [
+    "shrink",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "shrink",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "an attempt already in the log is not applied again",
+   "cmp": null,
+   "id": "write.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "a token below the highest seen is not applied",
+   "cmp": ">=",
+   "id": "write.fence",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "the position is the group and the log index",
+   "cmp": null,
+   "id": "write.pos",
+   "alone": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (-1, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (-1, -1), 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (-1, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (-1, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "write.append",
+   "alone": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.route",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "an applied attempt is answered, not refused",
+   "cmp": null,
+   "id": "refuse.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "refused for good only on a committed higher token",
+   "cmp": "<",
+   "id": "refuse.stale",
+   "alone": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.answer",
+   "alone": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "serve only committed records",
+   "cmp": null,
+   "id": "read.committed",
+   "alone": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "only records after the cursor",
+   "cmp": ">",
+   "id": "read.after",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "the next one: none skipped",
+   "cmp": null,
+   "id": "read.next",
+   "alone": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w2', (0, 1))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w2', (0, 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.take",
+   "alone": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.cursor",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "write.route",
+   "caught": [
+    "shrink",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.dedup",
+   "caught": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.fence",
+   "caught": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.pos",
+   "caught": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (-1, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (-1, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.append",
+   "caught": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.dedup",
+   "caught": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.stale",
+   "caught": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.answer",
+   "caught": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.committed",
+   "caught": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.after",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.next",
+   "caught": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w2', (0, 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.take",
+   "caught": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.cursor",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "write.fence",
+   "caught": [
+    "read",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "refuse.stale",
+   "caught": [
+    "read",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "refuse",
+     "('w2', 'G0')"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "read.after",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (0, 0), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "write: pos <-> append",
+   "caught": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', (-1, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', (-1, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "read: take <-> cursor",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 28,
+    "shrink": 28,
+    "both": 41,
+    "read": 61,
+    "deep": 58,
+    "twice": 4
+   }
+  }
+ ]
+}

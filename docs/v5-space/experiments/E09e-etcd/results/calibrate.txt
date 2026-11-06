@@ -1,0 +1,37 @@
+put-1c ops/s 659.4901661236768 load 14.60 11.80 7.68 22/292 26245 err 
+put-1000c ops/s 6194.787915079874 load 15.10 12.01 7.80 17/295 26325 err 
+put-1000c-all ops/s 6020.869145274857 load 15.73 12.31 7.97 13/296 26409 err 
+range-l-1c ops/s 3053.5478486932475 load 15.67 12.36 8.00 20/285 26482 err 
+range-l-1000c ops/s 19301.192862164877 load 16.10 12.50 8.07 19/298 26579 err 
+range-s-1c ops/s 7654.797037592016 load 16.79 12.78 8.21 23/298 26673 err 
+range-s-1000c ops/s 21189.858305811962 load 16.04 12.75 8.25 16/297 26785 err 
+txn-put-1c ops/s 670.3691254017976 load 15.54 12.81 8.35 18/290 26883 err 
+txn-put-1000c ops/s 8253.335601471006 load 14.69 12.72 8.36 16/279 26982 err 
+lease-keepalive-1000c ops/s 9369.239816248013 load 15.15 12.93 8.50 17/288 27063 err 
+stm-1c ops/s 3317.5818638123824 load 14.52 12.86 8.53 16/277 27143 err 
+stm-1000c ops/s 6168.991207585134 load 13.97 12.80 8.56 12/277 27216 err 
+stm-lock-1c ops/s 265.95931814354276 load 14.13 12.85 8.60 12/279 27282 err 
+put-1c-nofsync ops/s 1637.3993338658347 load 14.78 13.07 8.74 14/279 27356 err 
+put-1000c-nofsync ops/s 7416.355438012848 load 14.55 13.11 8.82 12/272 27449 err 
+{
+ "lease-keepalive-1000c": 230000,
+ "lock-100c": 20,
+ "lock-1c": 20,
+ "put-1000c": 150000,
+ "put-1000c-all": 150000,
+ "put-1000c-nofsync": 190000,
+ "put-1c": 16000,
+ "put-1c-nofsync": 41000,
+ "range-l-1000c": 480000,
+ "range-l-1c": 76000,
+ "range-s-1000c": 530000,
+ "range-s-1c": 190000,
+ "stm-1000c": 150000,
+ "stm-1c": 83000,
+ "stm-lock-1c": 6600,
+ "txn-put-1000c": 210000,
+ "txn-put-1c": 17000
+}
+[exited with code 0]
+Calibration ran under the heavy lock on a busy box (load 14-16), not timed. totals.json = 2.5 x (calibrated ops/s x 25 s), rounded to 2 significant figures, so a quiet-box run lasts about 10-60 s.
+2026-11-06 18:00: stm configs changed before any timed run to write one key per txn (--txn-wr-percent=100); their calibrated totals (read-only txns) were replaced by hand: stm-1c 30000, stm-1000c 300000, stm-lock-1c 12000 (reasoned from txn-put's calibrated rate).
