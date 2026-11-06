@@ -54,5 +54,33 @@
   "tla_states": 25,
   "tla_steps": 24,
   "variant": "a-unfences-alone"
+ },
+ "a-unfences-alone-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 21,
+  "secs": 5.2,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "a-unfences-alone"
+ },
+ "a-unfences-alone-write-p5": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 5,
+  "py_steps": 24,
+  "secs": 4.8,
+  "tla_states": 25,
+  "tla_steps": 24,
+  "variant": "a-unfences-alone"
  }
 }

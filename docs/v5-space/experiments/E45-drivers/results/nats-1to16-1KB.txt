@@ -23,3 +23,28 @@
 
 NATS Core NATS publisher stats: 21,447 msgs/sec ~ 21 MiB/sec ~ min: 0.09us ~ avg: 0.44us ~ max: 43.32us ~ P50: 0.11us ~ P90: 0.13us ~ P99: 6.71us ~ P99.9: 29.31us
 
+
+  [1] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [2] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [3] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [4] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [5] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [6] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [7] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [8] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [9] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [10] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [11] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [12] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [13] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [14] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [15] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+  [16] 1,630 msgs/sec ~ 1.6 MiB/sec (2,000 msgs)
+
+ NATS Core NATS subscriber aggregated stats: 26,082 msgs/sec ~ 25 MiB/sec
+ message rates min 1,630 | avg 1,630 | max 1,630 | stddev 0 msgs
+
+# tool exit code 0, wall 2.338490817 s
+# host log:
+ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false,"durability":"none"})
+summary (SIGTERM): [2.5 s real, 1.091 s virtual, 27092 events, 2000 verbs] conns=0 in=2093689B out=33507714B ops{SUB=16 PUB=2000 deliver=32000} errors{} cpu=1.25s rss=159MB
