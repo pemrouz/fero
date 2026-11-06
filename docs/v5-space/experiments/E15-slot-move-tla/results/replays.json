@@ -194,5 +194,61 @@
   "tla_states": 16,
   "tla_steps": 15,
   "variant": "design"
+ },
+ "design-moves-p1": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 20,
+  "secs": 3.0,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "design"
+ },
+ "design-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 2.3,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "design"
+ },
+ "design-quick-p1": {
+  "bound": "quick",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 20,
+  "secs": 2.9,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "design"
+ },
+ "design-quick-p9": {
+  "bound": "quick",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 2.4,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "design"
  }
 }
