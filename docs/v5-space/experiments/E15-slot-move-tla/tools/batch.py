@@ -28,6 +28,7 @@ sm = tlcrun.sm
 
 # rough sizes (states) from slot_move.md, to plan the batches only
 WORKERS = int(os.environ.get('E15_WORKERS', '2'))
+TLC_MAX = 4.5e6
 SIZE = {'quick': 2e4, 'move': 6e4, 'moves': 1e6, 'write': 1.5e6, 'dedup': 3.6e5,
         'deep': 4e5, 'three': 8e6}
 CAPPED = {('table-after-open', 'write'), ('a-unfences-alone', 'write'), ('no-exporting', 'moves'),
@@ -48,7 +49,7 @@ def est(lane, v, b):
     n = size(v, b)
     if lane == 'tlc':
         return n / (6000 if WORKERS == 2 else 3500) + 6
-    return n / 12000 + 2
+    return n / 14000 + 2
 
 
 def done(lane, v, b):
@@ -56,11 +57,27 @@ def done(lane, v, b):
     return os.path.exists(os.path.join(ROOT, 'results', d, f'{v}-{b}.json'))
 
 
+def eligible(lane):
+    todo = [(v, b) for v, b in sm.plan() if not done(lane, v, b)]
+    if lane == 'tlc':
+        todo = [j for j in todo if os.path.exists(os.path.join(ROOT, 'results', 'py', f'{j[0]}-{j[1]}.json'))
+                and size(*j) <= TLC_MAX]
+    return todo
+
+
 def lane_run(lane, budget, t0, log):
     first = True
     while True:
         left = budget - (time.time() - t0)
-        todo = [(v, b) for v, b in sm.plan() if not done(lane, v, b)]
+        todo = eligible(lane)
+        if lane == 'tlc':
+            # TLC takes only runs whose size slot_move.py has measured and that
+            # fit one hold; bigger ones run in checkpointed segments (segments.py)
+            todo = [j for j in todo if os.path.exists(os.path.join(ROOT, 'results', 'py', f'{j[0]}-{j[1]}.json'))
+                    and size(*j) <= TLC_MAX]
+        else:
+            todo = [j for j in todo if j != ('fixed', 'three')] + \
+                   ([('fixed', 'three')] if ('fixed', 'three') in todo else [])
         if not todo:
             return
         fit = [j for j in todo if first or est(lane, *j) < left]
@@ -74,7 +91,8 @@ def lane_run(lane, budget, t0, log):
             line = json.dumps({k: r[k] for k in ('variant', 'bound', 'states', 'calm_states',
                                                  'failed', 'steps', 'complete')})
         else:
-            p = subprocess.run([sys.executable, os.path.join(HERE, 'pyrun.py'), v, b],
+            cap = ['--cap', '1000000'] if (v, b) == ('no-exporting', 'three') else []
+            p = subprocess.run([sys.executable, os.path.join(HERE, 'pyrun.py'), v, b] + cap,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             line = p.stdout.strip().splitlines()[-1] if p.stdout.strip() else f'error {p.returncode}'
         with log:
@@ -89,7 +107,7 @@ def main():
     ap.add_argument('--loop', action='store_true')
     a = ap.parse_args()
     if a.loop:
-        while any(not done(l, v, b) for l in a.lanes.split(',') for v, b in sm.plan()):
+        while any(eligible(l) for l in a.lanes.split(',')):
             subprocess.run([tlcrun.HEAVY, sys.executable, os.path.abspath(__file__),
                             '--budget', str(a.budget), '--lanes', a.lanes])
         return
