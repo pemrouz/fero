@@ -1,0 +1,8 @@
+[package]
+name = "raft_rs_hello"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+raft = "=0.7.0"
+slog = "2"
