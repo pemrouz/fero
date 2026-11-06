@@ -1,0 +1,47 @@
+# checks, 2026-11-06T15:11:40Z, node v22.22.0, data 63fea66, 4 vCPU, load 4.54 3.12 2.78
+ok cts-check-then-set (120 seeds, 39078 events, 1.76 s; faults hit: 180 elections, 55 tail entries lost, 0/0 moves done, 15 retries answered by dedup (0 from the tail))
+  serial at the writer, a slow call across a failover: both sold the last item in 120 of 120 races
+  naive  writer+writer 40/40 (20/20 with a leader change); writer+other 40/40 (20/20 with a leader change); other+other 40/40 (20/20 with a leader change)
+  fresh  writer+writer 40/40 (20/20 with a leader change); writer+other 40/40 (20/20 with a leader change); other+other 40/40 (20/20 with a leader change)
+  cond   writer+writer 0/40 (0/20 with a leader change); writer+other 0/40 (0/20 with a leader change); other+other 0/40 (0/20 with a leader change)
+  op     writer+writer 0/40 (0/20 with a leader change); writer+other 0/40 (0/20 with a leader change); other+other 0/40 (0/20 with a leader change)
+  serial writer+writer 0/40 (0/20 with a leader change); writer+other 0/40 (0/20 with a leader change); other+other 0/40 (0/20 with a leader change)
+ok p02-cache (60 seeds, 112609 events, 2.00 s; faults hit: 90 elections, 5 tail entries lost, 60/60 moves done, 1 retries answered by dedup (0 from the tail))
+  rows.max 8 over 2 groups: 17 runs held 9 rows (each group rounds its share up)
+  ttl lateness by writer time: calm max 0.0 ms over 30 seeds; with a leader change near the ttl max 2036.3 ms over 30
+ok p03-near-cache (60 seeds, 159458 events, 2.37 s; faults hit: 60 elections, 13 tail entries lost, 60/60 moves done, 1 retries answered by dedup (0 from the tail))
+ok p04-read-through (60 seeds, 49846 events, 0.58 s; faults hit: 60 elections, 2 tail entries lost, 57/60 moves done, 0 retries answered by dedup (0 from the tail))
+ok p05-rooms (60 seeds, 364060 events, 2.31 s; faults hit: 60 elections, 11 tail entries lost, 60/60 moves done, 4 retries answered by dedup (0 from the tail))
+ok p06-pubsub (60 seeds, 305655 events, 1.24 s; faults hit: 54 elections, 5 tail entries lost, 56/60 moves done, 0 retries answered by dedup (0 from the tail))
+  messages a subscriber missed: none 0 over 30 runs (x3 subscribers x10), persisted 0 over 30
+ok p07-stream (60 seeds, 319816 events, 1.54 s; faults hit: 120 elections, 9 tail entries lost, 60/60 moves done, 1 retries answered by dedup (0 from the tail))
+ok p08-consumer-groups (40 seeds, 1080681 events, 5.69 s; faults hit: 160 elections, 1 tail entries lost, 40/40 moves done, 7 retries answered by dedup (0 from the tail))
+  the paused member's commit was refused 'fenced' in 40 of 40 runs (else it found its shares gone before committing)
+ok p09-queue (40 seeds, 233586 events, 2.36 s; faults hit: 80 elections, 1 tail entries lost, 40/40 moves done, 1 retries answered by dedup (0 from the tail))
+ok p10-locks (40 seeds, 34646 events, 0.81 s; faults hit: 120 elections, 0 tail entries lost, 40/40 moves done, 0 retries answered by dedup (0 from the tail))
+  a stale token on a row the new holder never wrote: fenced in 40 of 40 runs
+ok p11-counters (60 seeds, 74342 events, 0.70 s; faults hit: 120 elections, 23 tail entries lost, 60/60 moves done, 22 retries answered by dedup (0 from the tail))
+ok p12-leaderboard (60 seeds, 127645 events, 1.64 s; faults hit: 60 elections, 5 tail entries lost, 60/60 moves done, 1 retries answered by dedup (0 from the tail))
+ok p13-presence (60 seeds, 74929 events, 0.78 s; faults hit: 90 elections, 8 tail entries lost, 60/60 moves done, 3 retries answered by dedup (0 from the tail))
+  removal after a kill: max 9808 ms with no #sessions failover (30 runs), 12382 ms with one (30 runs); session.ms 10000
+ok p15-saga (40 seeds, 85877 events, 0.99 s; faults hit: 120 elections, 0 tail entries lost, 40/40 moves done, 29 retries answered by dedup (0 from the tail))
+  outcomes: {"rec1:ok":40,"rec2:ok":40,"bad:conflict":40,"tx-1 taken over":25,"tx-2 taken over":28}
+ok p16-event-sourcing (60 seeds, 102056 events, 0.63 s; faults hit: 120 elections, 8 tail entries lost, 60/60 moves done, 3 retries answered by dedup (0 from the tail))
+ok p17-derive (40 seeds, 913679 events, 4.43 s; faults hit: 160 elections, 0 tail entries lost, 40/40 moves done, 164 retries answered by dedup (0 from the tail))
+  without attempt ids on the outputs: totals wrong in 10 of 40 runs (22 cents counted twice in all)
+ok p18-tapes (30 seeds run twice, identical; tape record/find/replay/window over 20 shuffled seeds; fork refused 'config': not built; 0.18 s)
+ok p19-clients (40 seeds, 39856 events, 0.32 s; faults hit: 40 elections, 1 tail entries lost, 40/40 moves done, 0 retries answered by dedup (0 from the tail))
+ok p20-shape (40 seeds, 66228 events, 0.65 s; faults hit: 133 elections, 3 tail entries lost, 40/40 moves done, 96 retries answered by dedup (0 from the tail))
+ok p21-request-reply (40 seeds, 98624 events, 1.19 s; faults hit: 37 elections, 1 tail entries lost, 36/40 moves done, 0 retries answered by dedup (0 from the tail))
+  a calm ask, minus the answerer's work: median 5.98 ms, max 7.44 ms of virtual time; one plain write from the asker: median 2.15 ms; outcomes {"timeout":17,"answer":383}
+ok p22-delayed (40 seeds, 217584 events, 1.92 s; faults hit: 80 elections, 3 tail entries lost, 40/40 moves done, 0 retries answered by dedup (0 from the tail))
+  a waiting take woke 3.51 ms (max) after the enqueue was acknowledged
+ok core-determinism (30 seeds run twice: traces and histories identical; 30 distinct traces)
+ok core-exactly-once (200 seeds, 527850 events, 2.49 s; faults hit: 400 elections, 220 tail entries lost, 200/200 moves done, 79 retries answered by dedup (1 from the tail))
+ok core-features (20 seeds, 113068 events, 1.13 s; faults hit: 0 elections, 0 tail entries lost, 0/0 moves done, 0 retries answered by dedup (0 from the tail))
+ok core-reader (100 seeds, 354935 events, 1.63 s; faults hit: 200 elections, 25 tail entries lost, 100/100 moves done, 6 retries answered by dedup (0 from the tail))
+ok p01-live-state (50 seeds, 68603 events, 0.42 s; faults hit: 100 elections, 58 tail entries lost, 50/50 moves done, 12 retries answered by dedup (0 from the tail))
+ok p14-invariants (99 seeds, 134217 events, 0.69 s; faults hit: 99 elections, 16 tail entries lost, 99/99 moves done, 4 retries answered by dedup (0 from the tail))
+  naive check-then-set, writer+writer: both callers sold the last item in 33 of 33 races
+  naive check-then-set, writer+other: both callers sold the last item in 33 of 33 races
+  naive check-then-set, other+other: both callers sold the last item in 33 of 33 races

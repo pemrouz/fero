@@ -1,0 +1,7 @@
+# TEST-01 bench (step 1's checks/test01.bench.ts after step 2's core fixes and step 3's history fields), 3 runs under /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/bin/timing, 2026-11-06T18:25:46Z, node v22.22.0, data 63fea66, 4 vCPU, load 4.45 3.33 4.28
+load 6.85 4.74 4.50
+{"node":"v22.22.0","load":"6.85 4.74 4.50 1/169 7622","node_only_ms":{"n":2000,"p50":0.0491,"p90":0.1016,"p99":0.441,"max":7.41},"scenario_ms":{"n":2000,"p50":0.1432,"p90":0.2597,"p99":3.5531,"max":8.72},"chaos200":{"ms":645.6,"events":274339,"failed":0,"us_per_event":2.35}}
+load 8.12 5.81 4.46
+{"node":"v22.22.0","load":"8.12 5.81 4.46 4/178 14017","node_only_ms":{"n":2000,"p50":0.0573,"p90":0.1021,"p99":0.5833,"max":8.109},"scenario_ms":{"n":2000,"p50":0.1239,"p90":0.2489,"p99":3.5119,"max":10.012},"chaos200":{"ms":652.6,"events":274339,"failed":0,"us_per_event":2.38}}
+load 2.61 2.29 2.42
+{"node":"v22.22.0","load":"2.61 2.29 2.42 1/179 18547","node_only_ms":{"n":2000,"p50":0.0679,"p90":0.1244,"p99":0.5358,"max":6.322},"scenario_ms":{"n":2000,"p50":0.1599,"p90":0.355,"p99":3.7708,"max":9.46},"chaos200":{"ms":750.5,"events":274339,"failed":0,"us_per_event":2.74}}

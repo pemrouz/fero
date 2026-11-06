@@ -1,0 +1,11 @@
+| variant | mode | histories | read committed valid | serializable valid | anomalies (histories with it: total cases) |
+|---|---|---|---|---|---|
+| saga | calm | 100 | 84 | 31 | G-nonadjacent 2: 2, G-single 69: 93, G0 16: 16 |
+| saga | faults | 100 | 81 | 40 | G-nonadjacent 4: 4, G-single 60: 84, G0 19: 19 |
+| saga | shuffle | 100 | 91 | 20 | G-nonadjacent 11: 11, G-single 80: 127, G0 9: 9 |
+| undo | calm | 100 | 12 | 3 | G-nonadjacent 71: 71, G-single 62: 63, G0 1: 1, G1a 44: 420, incompatible-order 87: 189 |
+| undo | faults | 100 | 18 | 8 | G-nonadjacent 66: 66, G-single 57: 57, G0 2: 2, G1a 38: 270, incompatible-order 80: 160 |
+| undo | shuffle | 100 | 9 | 3 | G-nonadjacent 56: 56, G-single 58: 62, G0 1: 1, G1a 73: 629, incompatible-order 85: 201 |
+| nolock | calm | 100 | 0 | 0 | G-nonadjacent 93: 112, G-single 100: 200, G0 95: 138, duplicate-elements 100: 571 |
+| nolock | faults | 100 | 0 | 0 | G-nonadjacent 93: 109, G-single 100: 186, G0 95: 131, duplicate-elements 100: 564 |
+| nolock | shuffle | 100 | 0 | 0 | G-nonadjacent 94: 104, G-single 100: 191, G0 92: 134, duplicate-elements 100: 557 |

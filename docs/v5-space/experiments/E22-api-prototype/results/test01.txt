@@ -1,0 +1,5 @@
+# TEST-01 bench, 3 runs under /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/bin/timing, 2026-11-06T11:57:59Z, node v22.22.0, data 63fea66, 4 vCPU, load 8.48 8.34 6.54
+{"node":"v22.22.0","load":"2.53 2.89 4.47 1/182 4823","node_only_ms":{"n":2000,"p50":0.0606,"p90":0.1063,"p99":0.7273,"max":8.37},"scenario_ms":{"n":2000,"p50":0.1474,"p90":0.2627,"p99":3.9436,"max":9.63},"chaos200":{"ms":397.2,"events":274339,"failed":0,"us_per_event":1.45}}
+{"node":"v22.22.0","load":"1.36 3.11 3.76 1/195 15094","node_only_ms":{"n":2000,"p50":0.0647,"p90":0.1258,"p99":0.5086,"max":5.55},"scenario_ms":{"n":2000,"p50":0.1397,"p90":0.2749,"p99":3.9522,"max":10.794},"chaos200":{"ms":380.2,"events":274339,"failed":0,"us_per_event":1.39}}
+# run 3, re-queued at 2026-11-06T13:00:10Z after the first job's one-hour limit ended while it waited for the lock
+{"node":"v22.22.0","load":"1.86 2.05 2.37 1/162 1843","node_only_ms":{"n":2000,"p50":0.0472,"p90":0.0952,"p99":0.5216,"max":5.529},"scenario_ms":{"n":2000,"p50":0.1468,"p90":0.3002,"p99":3.1555,"max":10.283},"chaos200":{"ms":367.3,"events":274339,"failed":0,"us_per_event":1.34}}

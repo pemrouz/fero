@@ -1,0 +1,8 @@
+E-23 async merger  groups=16 domain=int commits=100000 seed=1  rows at end 1821; moves 238 (12689 rows); deliveries checked 99885; merger lag in undelivered commits: mean 102.2, max 354; 508.2 s
+  ok   filter M=Q(cut)                      0 /   99885
+  ok   group M=Q(cut)                       0 /   99885
+  ok   sum (data) M=Q(cut)                  0 /   99885
+  ok   sumC M=Q(cut)                        0 /   99885
+  DIFF topk (data) M=Q(cut) order       99843 /   99885   first: step 4: ["p2643","p2078","p1239","p2275","p1165","p717","p1972"] vs ["p2643","p2078","p1239","p1165","p2275","p717","p1972"]
+  ok   topk (data) M=Q(cut) scores          0 /   99885
+  ok   topkC M=Q(cut) order                 0 /   99885

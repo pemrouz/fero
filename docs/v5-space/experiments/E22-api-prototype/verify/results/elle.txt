@@ -1,0 +1,14 @@
+| variant | mode | histories | read committed valid | serializable valid | anomalies (histories with it: total cases) |
+|---|---|---|---|---|---|
+| saga | calm | 100 | 84 | 29 | G-nonadjacent 2: 2, G-single 71: 96, G0 16: 16 |
+| saga | faults | 100 | 81 | 39 | G-nonadjacent 5: 5, G-single 61: 87, G0 19: 19 |
+| saga | shuffle | 100 | 90 | 20 | G-nonadjacent 10: 10, G-single 80: 128, G0 10: 10 |
+| owned | calm | 100 | 100 | 28 | G-nonadjacent 5: 5, G-single 72: 96 |
+| owned | faults | 100 | 100 | 34 | G-nonadjacent 4: 4, G-single 66: 93 |
+| owned | shuffle | 100 | 100 | 23 | G-nonadjacent 6: 6, G-single 77: 121 |
+| undo | calm | 100 | 12 | 3 | G-nonadjacent 72: 72, G-single 63: 64, G0 1: 1, G1a 46: 451, incompatible-order 87: 194 |
+| undo | faults | 100 | 19 | 8 | G-nonadjacent 65: 65, G-single 60: 60, G0 2: 2, G1a 39: 304, incompatible-order 79: 165 |
+| undo | shuffle | 100 | 8 | 4 | G-nonadjacent 54: 54, G-single 61: 66, G0 2: 2, G1a 72: 598, incompatible-order 86: 205 |
+| nolock | calm | 100 | 0 | 0 | G-nonadjacent 93: 112, G-single 100: 200, G0 95: 138, duplicate-elements 100: 571 |
+| nolock | faults | 100 | 0 | 0 | G-nonadjacent 93: 109, G-single 100: 186, G0 95: 131, duplicate-elements 100: 564 |
+| nolock | shuffle | 100 | 0 | 0 | G-nonadjacent 94: 104, G-single 100: 191, G0 92: 134, duplicate-elements 100: 557 |

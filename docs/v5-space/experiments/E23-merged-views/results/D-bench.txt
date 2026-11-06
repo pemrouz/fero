@@ -1,0 +1,102 @@
+loadavg before: 1.81 2.07 2.41 2/160 1005
+{"variant":"base","op":"all","commits":200000,"ms":222,"nsPerCommit":1110,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 2/166 1016","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.07 2.41 1/160 1017
+{"variant":"base","op":"all","commits":200000,"ms":244.7,"nsPerCommit":1223,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 5/166 1024","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.07 2.41 1/161 1030
+{"variant":"base","op":"all","commits":200000,"ms":242.3,"nsPerCommit":1212,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 4/170 1041","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.07 2.41 1/164 1042
+{"variant":"one","op":"filter","commits":200000,"ms":274,"nsPerCommit":1370,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 4/170 1049","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.07 2.41 1/164 1050
+{"variant":"one","op":"filter","commits":200000,"ms":300.1,"nsPerCommit":1501,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 2/170 1059","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.07 2.41 1/162 1061
+{"variant":"one","op":"filter","commits":200000,"ms":373.8,"nsPerCommit":1869,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.07 2.41 5/168 1068","sanity":"n/a","sink":1}
+loadavg before: 1.83 2.07 2.41 1/162 1069
+{"variant":"views","op":"filter","commits":200000,"ms":339.7,"nsPerCommit":1699,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 3/168 1076","sanity":"n/a","sink":1}
+loadavg before: 1.83 2.07 2.41 2/160 1123
+{"variant":"views","op":"filter","commits":200000,"ms":273.3,"nsPerCommit":1366,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 3/167 1135","sanity":"n/a","sink":1}
+loadavg before: 1.83 2.07 2.41 1/161 1139
+{"variant":"views","op":"filter","commits":200000,"ms":264.1,"nsPerCommit":1321,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 3/167 1146","sanity":"n/a","sink":1}
+loadavg before: 1.83 2.07 2.41 1/161 1147
+{"variant":"merge","op":"filter","commits":200000,"ms":547.6,"nsPerCommit":2738,"deltas":{"filter":126634,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 4/167 1154","sanity":"ok","sink":1}
+loadavg before: 1.83 2.07 2.41 1/161 1155
+{"variant":"merge","op":"filter","commits":200000,"ms":505.6,"nsPerCommit":2528,"deltas":{"filter":126634,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 5/167 1162","sanity":"ok","sink":1}
+loadavg before: 1.83 2.07 2.41 1/161 1164
+{"variant":"merge","op":"filter","commits":200000,"ms":539.4,"nsPerCommit":2697,"deltas":{"filter":126634,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.83 2.07 2.41 3/167 1171","sanity":"ok","sink":1}
+loadavg before: 1.84 2.07 2.40 1/160 1172
+{"variant":"one","op":"topk","commits":200000,"ms":913.4,"nsPerCommit":4567,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.84 2.07 2.40 3/166 1179","sanity":"n/a","sink":1}
+loadavg before: 1.84 2.07 2.40 1/160 1183
+{"variant":"one","op":"topk","commits":200000,"ms":912.6,"nsPerCommit":4563,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.84 2.07 2.40 2/166 1190","sanity":"n/a","sink":1}
+loadavg before: 1.84 2.07 2.40 1/157 1192
+{"variant":"one","op":"topk","commits":200000,"ms":971.7,"nsPerCommit":4858,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.84 2.07 2.40 5/163 1199","sanity":"n/a","sink":1}
+loadavg before: 1.84 2.07 2.40 1/157 1201
+{"variant":"views","op":"topk","commits":200000,"ms":698.1,"nsPerCommit":3490,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.84 2.07 2.40 2/163 1208","sanity":"n/a","sink":1}
+loadavg before: 2.01 2.10 2.41 1/157 1209
+{"variant":"views","op":"topk","commits":200000,"ms":783.4,"nsPerCommit":3917,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.01 2.10 2.41 2/162 1216","sanity":"n/a","sink":1}
+loadavg before: 2.01 2.10 2.41 1/154 1227
+{"variant":"views","op":"topk","commits":200000,"ms":801.9,"nsPerCommit":4010,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.01 2.10 2.41 2/160 1235","sanity":"n/a","sink":1}
+loadavg before: 2.01 2.10 2.41 1/154 1236
+{"variant":"merge","op":"topk","commits":200000,"ms":960,"nsPerCommit":4800,"deltas":{"filter":0,"topk":53356,"sum":0,"group":0},"rows":1719,"loadavg":"2.01 2.10 2.41 3/160 1244","sanity":"ok","sink":1}
+loadavg before: 2.25 2.15 2.43 1/154 1246
+{"variant":"merge","op":"topk","commits":200000,"ms":880.7,"nsPerCommit":4403,"deltas":{"filter":0,"topk":53356,"sum":0,"group":0},"rows":1719,"loadavg":"2.25 2.15 2.43 4/160 1253","sanity":"ok","sink":1}
+loadavg before: 2.25 2.15 2.43 1/154 1255
+{"variant":"merge","op":"topk","commits":200000,"ms":907.6,"nsPerCommit":4538,"deltas":{"filter":0,"topk":53356,"sum":0,"group":0},"rows":1719,"loadavg":"2.25 2.15 2.43 2/160 1262","sanity":"ok","sink":1}
+loadavg before: 2.25 2.15 2.43 1/157 1292
+{"variant":"one","op":"sum","commits":200000,"ms":285.4,"nsPerCommit":1427,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.25 2.15 2.43 4/163 1299","sanity":"n/a","sink":1}
+loadavg before: 2.25 2.15 2.43 1/157 1300
+{"variant":"one","op":"sum","commits":200000,"ms":294.2,"nsPerCommit":1471,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.25 2.15 2.43 2/163 1308","sanity":"n/a","sink":1}
+loadavg before: 2.25 2.15 2.43 1/157 1309
+{"variant":"one","op":"sum","commits":200000,"ms":290.2,"nsPerCommit":1451,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.25 2.15 2.43 3/163 1316","sanity":"n/a","sink":1}
+loadavg before: 2.15 2.13 2.42 1/157 1317
+{"variant":"views","op":"sum","commits":200000,"ms":286,"nsPerCommit":1430,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 3/163 1324","sanity":"n/a","sink":1}
+loadavg before: 2.15 2.13 2.42 1/157 1360
+{"variant":"views","op":"sum","commits":200000,"ms":285.8,"nsPerCommit":1429,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 3/163 1367","sanity":"n/a","sink":1}
+loadavg before: 2.15 2.13 2.42 1/160 1371
+{"variant":"views","op":"sum","commits":200000,"ms":266.8,"nsPerCommit":1334,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 3/166 1381","sanity":"n/a","sink":1}
+loadavg before: 2.15 2.13 2.42 1/160 1382
+{"variant":"merge","op":"sum","commits":200000,"ms":367.4,"nsPerCommit":1837,"deltas":{"filter":0,"topk":0,"sum":176915,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 3/166 1389","sanity":"ok","sink":1}
+loadavg before: 2.15 2.13 2.42 1/160 1390
+{"variant":"merge","op":"sum","commits":200000,"ms":338.6,"nsPerCommit":1693,"deltas":{"filter":0,"topk":0,"sum":176915,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 5/166 1397","sanity":"ok","sink":1}
+loadavg before: 2.15 2.13 2.42 1/160 1399
+{"variant":"merge","op":"sum","commits":200000,"ms":390,"nsPerCommit":1950,"deltas":{"filter":0,"topk":0,"sum":176915,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 6/166 1406","sanity":"ok","sink":1}
+loadavg before: 2.15 2.13 2.42 1/160 1407
+{"variant":"one","op":"group","commits":200000,"ms":3173.2,"nsPerCommit":15866,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.15 2.13 2.42 4/166 1414","sanity":"n/a","sink":1}
+loadavg before: 2.38 2.18 2.43 1/160 1419
+{"variant":"one","op":"group","commits":200000,"ms":3037.2,"nsPerCommit":15186,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.38 2.18 2.43 3/166 1427","sanity":"n/a","sink":1}
+loadavg before: 2.27 2.16 2.43 1/160 1433
+{"variant":"one","op":"group","commits":200000,"ms":2974.3,"nsPerCommit":14871,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.27 2.16 2.43 5/166 1440","sanity":"n/a","sink":1}
+loadavg before: 2.17 2.14 2.42 1/160 1442
+{"variant":"views","op":"group","commits":200000,"ms":1295.7,"nsPerCommit":6478,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.17 2.14 2.42 7/166 1449","sanity":"n/a","sink":1}
+loadavg before: 2.17 2.14 2.42 1/157 1453
+{"variant":"views","op":"group","commits":200000,"ms":1113.8,"nsPerCommit":5569,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.17 2.14 2.42 2/163 1460","sanity":"n/a","sink":1}
+loadavg before: 2.17 2.14 2.42 1/157 1462
+{"variant":"views","op":"group","commits":200000,"ms":1211.6,"nsPerCommit":6058,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"2.17 2.14 2.42 6/163 1469","sanity":"n/a","sink":1}
+loadavg before: 2.07 2.12 2.41 1/156 1505
+{"variant":"merge","op":"group","commits":200000,"ms":10165.8,"nsPerCommit":50829,"deltas":{"filter":0,"topk":0,"sum":0,"group":251954},"rows":1719,"loadavg":"2.07 2.12 2.41 6/163 1513","sanity":"ok","sink":1}
+loadavg before: 2.23 2.15 2.42 1/157 1539
+{"variant":"merge","op":"group","commits":200000,"ms":10495,"nsPerCommit":52475,"deltas":{"filter":0,"topk":0,"sum":0,"group":251954},"rows":1719,"loadavg":"2.23 2.15 2.42 3/163 1546","sanity":"ok","sink":1}
+loadavg before: 2.04 2.11 2.40 1/163 1613
+{"variant":"merge","op":"group","commits":200000,"ms":10471.3,"nsPerCommit":52356,"deltas":{"filter":0,"topk":0,"sum":0,"group":251954},"rows":1719,"loadavg":"2.04 2.11 2.40 3/169 1620","sanity":"ok","sink":1}
+loadavg before: 1.81 2.05 2.38 1/165 1646
+{"variant":"viewsC","op":"topk","commits":200000,"ms":731.5,"nsPerCommit":3657,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.05 2.38 2/171 1653","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.05 2.38 1/165 1657
+{"variant":"viewsC","op":"topk","commits":200000,"ms":718.6,"nsPerCommit":3593,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.05 2.38 2/171 1664","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.05 2.38 1/165 1675
+{"variant":"viewsC","op":"topk","commits":200000,"ms":664,"nsPerCommit":3320,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.05 2.38 3/171 1682","sanity":"n/a","sink":1}
+loadavg before: 1.81 2.05 2.38 1/165 1684
+{"variant":"mergeC","op":"topk","commits":200000,"ms":886.7,"nsPerCommit":4434,"deltas":{"filter":0,"topk":53741,"sum":0,"group":0},"rows":1719,"loadavg":"1.81 2.05 2.38 3/171 1691","sanity":"ok","sink":1}
+loadavg before: 1.74 2.04 2.37 1/165 1727
+{"variant":"mergeC","op":"topk","commits":200000,"ms":916.4,"nsPerCommit":4582,"deltas":{"filter":0,"topk":53741,"sum":0,"group":0},"rows":1719,"loadavg":"1.74 2.04 2.37 2/171 1734","sanity":"ok","sink":1}
+loadavg before: 1.74 2.04 2.37 1/165 1741
+{"variant":"mergeC","op":"topk","commits":200000,"ms":757.3,"nsPerCommit":3786,"deltas":{"filter":0,"topk":53741,"sum":0,"group":0},"rows":1719,"loadavg":"1.74 2.04 2.37 2/171 1748","sanity":"ok","sink":1}
+loadavg before: 1.74 2.04 2.37 1/164 1750
+{"variant":"viewsC","op":"sum","commits":200000,"ms":323.8,"nsPerCommit":1619,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.74 2.04 2.37 4/170 1757","sanity":"n/a","sink":1}
+loadavg before: 1.74 2.04 2.37 1/161 1758
+{"variant":"viewsC","op":"sum","commits":200000,"ms":317.2,"nsPerCommit":1586,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.74 2.04 2.37 2/167 1765","sanity":"n/a","sink":1}
+loadavg before: 1.92 2.07 2.38 1/161 1766
+{"variant":"viewsC","op":"sum","commits":200000,"ms":301.3,"nsPerCommit":1506,"deltas":{"filter":0,"topk":0,"sum":0,"group":0},"rows":1719,"loadavg":"1.92 2.07 2.38 3/167 1773","sanity":"n/a","sink":1}
+loadavg before: 1.92 2.07 2.38 1/161 1774
+{"variant":"mergeC","op":"sum","commits":200000,"ms":376.8,"nsPerCommit":1884,"deltas":{"filter":0,"topk":0,"sum":177633,"group":0},"rows":1719,"loadavg":"1.92 2.07 2.38 2/167 1781","sanity":"ok","sink":1}
+loadavg before: 1.92 2.07 2.38 1/161 1785
+{"variant":"mergeC","op":"sum","commits":200000,"ms":388.2,"nsPerCommit":1941,"deltas":{"filter":0,"topk":0,"sum":177633,"group":0},"rows":1719,"loadavg":"1.92 2.07 2.38 3/167 1792","sanity":"ok","sink":1}
+loadavg before: 1.92 2.07 2.38 1/164 1797
+{"variant":"mergeC","op":"sum","commits":200000,"ms":347.9,"nsPerCommit":1739,"deltas":{"filter":0,"topk":0,"sum":177633,"group":0},"rows":1719,"loadavg":"1.92 2.07 2.38 2/170 1804","sanity":"ok","sink":1}

@@ -1,0 +1,3 @@
+# tsc Version 6.0.2, 2026-11-06T12:09:33Z, node v22.22.0, data 63fea66, 4 vCPU, load 2.05 3.67 5.25
+ok: tsc --strict, exit 0
+ok: 2 examples type-check against API.md's fero.d.ts (p01-live-state.ts, p14-invariants.ts)
