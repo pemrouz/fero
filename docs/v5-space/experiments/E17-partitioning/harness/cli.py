@@ -13,6 +13,7 @@ digests that decide mutant equivalence are the same from run to run.
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -46,6 +47,7 @@ def main():
     ap.add_argument('--ablate', action='store_true')
     ap.add_argument('--no-mutants', action='store_true')
     ap.add_argument('--giveup', action='store_true', help='pin the option\'s give-up path (GIVEUP)')
+    ap.add_argument('--warm-from', help='start from another option\'s dropped rules (results/<it>-ablation.json)')
     ap.add_argument('--jobs', type=int, default=2)
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--cap', type=int, default=runner.CAP)
@@ -75,9 +77,12 @@ def main():
         if a.giveup and not pins:
             print(f'  {a.option} has no give-up path')
             return
+        warm = ()
+        if a.warm_from:
+            warm = json.load(open(os.path.join(out, f'{a.warm_from}-ablation.json')))['removed']
         try:
             res = runner.ablate(a.option, ck, jobs=a.jobs, budget=a.budget, mutate=not a.no_mutants,
-                                pinned=pins)
+                                pinned=pins, warm=warm)
         except runner.OutOfTime:
             print(f'  {tag}: out of time for this piece; run again to continue')
             sys.exit(3)

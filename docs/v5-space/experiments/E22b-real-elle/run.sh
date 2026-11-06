@@ -20,7 +20,7 @@ JARS="$SP/dl/elle-mvn/jars/*"
 # HEAVY wraps each JVM and Go step; run the whole script under one hold with HEAVY= (empty),
 # never nest the helper (an inner wait on the gate behind a timing run would deadlock).
 HEAVY="${HEAVY-$SP/bin/heavy}"
-JAVA="java -Xmx3g -XX:ActiveProcessorCount=2 -cp $JARS:$HERE/clj"
+JAVA="java -Djava.awt.headless=true -Xmx3g -XX:ActiveProcessorCount=2 -cp $JARS:$HERE/clj"
 K="${K:-20}"; MAXOPS="${MAXOPS:-120}"; LIMIT="${LIMIT:-60000}"
 STEPS="${*:-all}"
 mkdir -p "$W" "$R"

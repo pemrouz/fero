@@ -1,0 +1,50 @@
+# E-45 nats-1to16-1KB: 2026-11-06T21:13:33Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 6.19 4.37 4.98 8/270 17772
+# host: host.ts nats --listen 127.0.0.1:14290
+# tool: sh -c /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench sub e45.core --clients 16 --msgs 2000 --size 1KB --no-progress & sleep 1; /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench pub e45.core --clients 1 --msgs 2000 --size 1KB --no-progress; wait
+21:13:33 Starting Core NATS subscriber benchmark [clients=16, msg-size=1.0 KiB, msgs=2,000, multi-subject=false, subject=e45.core]
+21:13:33 [1] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [2] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [3] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [4] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [5] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [6] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [7] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [8] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [9] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [10] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [11] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [12] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [13] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [14] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [15] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:33 [16] Starting Core NATS subscriber, expecting 2,000 messages
+21:13:34 Starting Core NATS publisher benchmark [clients=1, msg-size=1.0 KiB, msgs=2,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, sleep=0s, subject=e45.core]
+21:13:34 [1] Starting Core NATS publisher, publishing 2,000 messages
+
+NATS Core NATS publisher stats: 42,263 msgs/sec ~ 41 MiB/sec ~ min: 0.07us ~ avg: 1.22us ~ max: 1,231.43us ~ P50: 0.11us ~ P90: 0.14us ~ P99: 8.51us ~ P99.9: 170.26us
+
+
+  [1] 2,710 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [2] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [3] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [4] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [5] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [6] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [7] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [8] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [9] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [10] 2,713 msgs/sec ~ 2.7 MiB/sec (2,000 msgs)
+  [11] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [12] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [13] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [14] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [15] 2,709 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+  [16] 2,713 msgs/sec ~ 2.6 MiB/sec (2,000 msgs)
+
+ NATS Core NATS subscriber aggregated stats: 43,354 msgs/sec ~ 42 MiB/sec
+ message rates min 2,709 | avg 2,712 | max 2,713 | stddev 1 msgs
+
+# tool exit code 0, wall 1.775998920 s
+# host log:
+ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false,"durability":"none"})
+summary (SIGTERM): [1.9 s real, 1.092 s virtual, 27098 events, 2000 verbs] conns=0 in=2093689B out=33507714B ops{SUB=16 PUB=2000 deliver=32000} errors{} cpu=1.14s rss=156MB

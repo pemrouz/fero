@@ -80,7 +80,7 @@ def lane_run(lane, budget, t0, log):
                    ([('fixed', 'three')] if ('fixed', 'three') in todo else [])
         if not todo:
             return
-        fit = [j for j in todo if first or est(lane, *j) < left]
+        fit = [j for j in todo if first or 1.6 * est(lane, *j) < left]
         if not fit:
             return
         v, b = fit[0]

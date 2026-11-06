@@ -1,0 +1,36 @@
+# E-45 nats-latency-16B: 2026-11-06T21:13:37Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 6.34 4.43 5.00 7/266 17892
+# host: host.ts nats --listen 127.0.0.1:14290
+# tool: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 latency --server-b nats://127.0.0.1:14290 --size 16 --rate 1000 --duration 5s
+21:13:38 ==============================
+21:13:38 Pub Server RTT : 219µs
+21:13:38 Sub Server RTT : 170µs
+21:13:38 Message Payload: 16B
+21:13:38 Target Duration: 5s
+21:13:38 Target Msgs/Sec: 1000
+21:13:38 Target Band/Sec: 31K
+21:13:38 ==============================
+21:13:43 HDR Percentiles:
+21:13:43 10:       185µs
+21:13:43 50:       349µs
+21:13:43 75:       443µs
+21:13:43 90:       1.055ms
+21:13:43 99:       19.317ms
+21:13:43 99.9:     85.055ms
+21:13:43 99.99:    89.434ms
+21:13:43 99.999:   90.568ms
+21:13:43 99.9999:  90.568ms
+21:13:43 99.99999: 90.568ms
+21:13:43 100:      90.568ms
+21:13:43 ==============================
+21:13:43 Actual Msgs/Sec: 1003
+21:13:43 Actual Band/Sec: 31K
+21:13:43 Minimum Latency: 65µs
+21:13:43 Median Latency : 349µs
+21:13:43 Maximum Latency: 90.567ms
+21:13:43 1st Sent Wall Time : 13.683ms
+21:13:43 Last Sent Wall Time: 4.983108s
+21:13:43 Last Recv Wall Time: 4.983111s
+# tool exit code 0, wall 5.030970905 s
+# host log:
+ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false,"durability":"none"})
+summary (SIGTERM): [5.1 s real, 4.457 s virtual, 59123 events, 5000 verbs] conns=0 in=325455B out=335442B ops{SUB=1 PUB=5000 deliver=5000} errors{} cpu=2.07s rss=150MB

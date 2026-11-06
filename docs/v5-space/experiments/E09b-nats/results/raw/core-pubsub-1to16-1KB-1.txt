@@ -1,0 +1,19 @@
+  [1] 89,747 msgs/sec ~ 88 MiB/sec (600,000 msgs)
+  [2] 89,747 msgs/sec ~ 88 MiB/sec (600,000 msgs)
+  [3] 89,673 msgs/sec ~ 88 MiB/sec (600,000 msgs)
+  [4] 89,541 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [5] 89,468 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [6] 89,435 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [7] 89,230 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [8] 89,211 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [9] 89,096 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [10] 89,031 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [11] 88,910 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [12] 88,885 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [13] 88,767 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [14] 88,732 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [15] 88,697 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+  [16] 88,633 msgs/sec ~ 87 MiB/sec (600,000 msgs)
+ NATS Core NATS subscriber aggregated stats: 1,418,104 msgs/sec ~ 1.4 GiB/sec
+ message rates min 88,633 | avg 89,175 | max 89,747 | stddev 375 msgs
+NATS Core NATS publisher stats: 89,742 msgs/sec ~ 88 MiB/sec ~ min: 0.07us ~ avg: 10.89us ~ max: 143,805.94us ~ P50: 0.10us ~ P90: 0.13us ~ P99: 5.28us ~ P99.9: 42.49us

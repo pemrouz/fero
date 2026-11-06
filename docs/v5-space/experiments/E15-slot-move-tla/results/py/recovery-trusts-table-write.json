@@ -1,0 +1,14 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [],
+ "kind": "mutant",
+ "live_nodes": 1725,
+ "live_starts": 392,
+ "live_stuck": 0,
+ "secs": 107.5,
+ "states": 1168836,
+ "steps": {},
+ "transitions": 3497545,
+ "variant": "recovery-trusts-table"
+}

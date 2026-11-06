@@ -186,13 +186,13 @@ class Work:
         self.ex.shutdown(wait=True)
 
 
-def ablate(name, path, jobs=2, bounds=SWEEP, budget=None, mutate=True, log=print, pinned=()):
+def ablate(name, path, jobs=2, bounds=SWEEP, budget=None, mutate=True, log=print, pinned=(), warm=()):
     """The whole procedure (see the module docstring). Raises OutOfTime when
     the budget runs out; call again to continue. Pinned rules are never
     dropped (the '+giveup' run pins the give-up path)."""
     wk = Work(name, path, jobs, budget, log)
     try:
-        return _ablate(wk, name, bounds, mutate, log, tuple(pinned))
+        return _ablate(wk, name, bounds, mutate, log, tuple(pinned), tuple(warm))
     finally:
         wk.close()
 
@@ -209,10 +209,14 @@ def _all(wk, mkey, bounds, full=False):
     return per
 
 
-def _ablate(wk, name, bounds, mutate, log, pinned=()):
+def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
+    """warm: rules to drop before pass 1 (a warm start from a sibling option's
+    result). Used only if the model holds every bound with them dropped; the
+    final pass still proves the set left is 1-minimal."""
     rl = rule_list(name)
     ids = [r.id for r in rl]
     assert all(p in ids for p in pinned), pinned
+    warm = [i for i in warm if i in ids and i not in pinned]
     out = {'option': name, 'bounds': list(bounds), 'pinned': list(pinned)}
     meta = {r.id: {'kind': 'guard' if hasattr(r, 'op') else 'update', 'role': r.role,
                    'note': r.note, 'cmp': getattr(r, 'op', None)} for r in rl}
@@ -221,15 +225,29 @@ def _ablate(wk, name, bounds, mutate, log, pinned=()):
     if any(base[b]['fail'] for b in bounds):
         out['error'] = 'the model as designed fails: ' + str({b: sorted(base[b]['fail']) for b in bounds})
         return out
-    # pass 1: each rule alone, bounds in order, stop at the first that fails
-    res1 = wk.run([(Mutation(drop=[i]).key(), tuple(bounds), False) for i in ids])
-    res1 = dict(zip(ids, res1))
-    nec1 = {i: first_fail(res1[i]) for i in ids}
-    log(f'  pass 1: {sum(1 for i in ids if nec1[i])} of {len(ids)} rules necessary alone')
     removed = []
     greedy = []
+    if warm:
+        wr = _all(wk, Mutation(drop=warm).key(), bounds)
+        if first_fail(wr) is None:
+            removed = list(warm)
+            greedy = [[i, 'dropped by the warm start'] for i in warm]
+            out['warm'] = list(warm)
+            log(f'  warm start: {len(warm)} rules dropped at once; every bound holds')
+        else:
+            out['warm_refused'] = first_fail(wr)
+            log(f'  warm start refused: {first_fail(wr)}')
+    # pass 1: each rule alone (on top of a warm start), bounds in order,
+    # stop at the first that fails
+    ids1 = [i for i in ids if i not in removed]
+    res1 = wk.run([(Mutation(drop=removed + [i]).key(), tuple(bounds), False) for i in ids1])
+    res1 = dict(zip(ids1, res1))
+    nec1 = {i: first_fail(res1[i]) for i in ids1}
+    for i in removed:
+        res1[i], nec1[i] = {}, None
+    log(f'  pass 1: {sum(1 for i in ids1 if nec1[i])} of {len(ids1)} rules necessary alone')
     for i in ids:
-        if nec1[i] or i in pinned:
+        if nec1[i] or i in pinned or i in removed:
             continue
         per = _all(wk, Mutation(drop=removed + [i]).key(), bounds)
         ff = first_fail(per)
