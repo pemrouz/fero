@@ -1,0 +1,125 @@
+# real Elle 0.2.8's explanation of undo-calm-seed14 at read committed (the port finds it valid), 2026-11-06T22:09:15Z, openjdk version "21.0.12.1" 2026-08-18, 4 vCPU, load 15.00 9.46 7.41
+{:type :ok, :value [[:r k4 []] [:r k3 []]], :process 101}
+{:type :ok, :value [[:r k5 []] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k2 []] [:r k1 []]], :process 100}
+{:type :ok, :value [[:r k2 []] [:r k3 []]], :process 100}
+{:type :ok, :value [[:r k2 []] [:r k0 []] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k4 []] [:r k3 []] [:r k5 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k5 []]], :process 102}
+{:type :ok, :value [[:r k1 []] [:r k5 []] [:r k3 []]], :process 100}
+{:type :ok, :value [[:r k2 [2]] [:r k0 []] [:r k1 []]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k2 [2]] [:r k3 []]], :process 100}
+{:type :ok, :value [[:r k0 []] [:r k5 [2]] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k4 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k4 []] [:r k2 [2]]], :process 101}
+{:type :ok, :value [[:r k3 []] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k4 []] [:r k2 [2]]], :process 100}
+{:type :ok, :value [[:r k0 []] [:r k5 [2]]], :process 100}
+{:type :ok, :value [[:r k2 [2]] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []]], :process 101}
+{:type :ok, :value [[:r k1 []] [:r k5 [2]] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k1 []] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k3 []] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k0 []]], :process 102}
+{:type :ok, :value [[:r k3 []] [:r k2 [2]] [:r k0 []]], :process 101}
+{:type :ok, :value [[:r k3 []] [:r k5 [2]]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k4 []] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k2 [2]] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k3 []] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k3 []] [:r k1 []] [:r k5 [2]]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k3 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k2 [2]] [:r k1 []]], :process 101}
+{:type :ok, :value [[:r k0 []] [:r k5 [2]]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []] [:r k0 []]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k2 [2]]], :process 101}
+{:type :ok, :value [[:r k2 [2]] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k4 []] [:r k2 [2]]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k1 []] [:r k2 [2]]], :process 100}
+{:type :ok, :value [[:r k4 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k1 []] [:r k4 []] [:r k2 [2]]], :process 101}
+{:type :ok, :value [[:r k3 []] [:r k1 []]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k2 [2]] [:r k1 []]], :process 100}
+{:type :ok, :value [[:r k3 []] [:r k4 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k3 []] [:r k2 [2]] [:r k0 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k3 []] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k0 []] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k4 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k3 []] [:r k0 []] [:r k1 []]], :process 101}
+{:type :ok, :value [[:r k2 [2]] [:r k0 []] [:r k5 [2]]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k2 [2]] [:r k4 []]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []] [:r k3 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k2 [2]] [:r k5 [2]]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k0 []] [:r k2 [2]]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k3 []] [:r k4 []]], :process 102}
+{:type :ok, :value [[:r k4 []] [:r k0 []] [:r k3 []]], :process 101}
+{:type :ok, :value [[:r k3 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k2 [2]] [:r k4 []]], :process 102}
+{:type :ok, :value [[:r k2 [2]] [:r k5 [2]] [:r k3 []]], :process 100}
+{:type :ok, :value [[:r k5 [2]] [:r k2 [2]] [:r k4 []]], :process 101}
+{:type :ok, :value [[:r k0 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k4 []] [:r k1 []]], :process 101}
+{:type :ok, :value [[:r k0 []] [:r k2 [2]] [:r k4 []]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k2 [2]] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k2 [2]]], :process 100}
+{:type :ok, :value [[:r k2 [2]] [:r k0 []]], :process 101}
+{:type :ok, :value [[:r k5 [2]] [:r k4 []]], :process 101}
+{:type :ok, :value [[:r k1 []] [:r k2 [2]]], :process 100}
+{:type :ok, :value [[:r k0 []] [:r k4 []] [:r k5 [2]]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k3 []] [:r k0 []]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k4 []]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k0 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k0 []] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k5 [2]] [:r k1 []]], :process 100}
+{:type :ok, :value [[:r k1 []] [:r k3 []] [:r k2 [2]]], :process 101}
+{:type :ok, :value [[:r k1 []] [:r k2 [2]]], :process 102}
+{:type :ok, :value [[:r k5 [2]] [:r k3 []]], :process 101}
+{:type :ok, :value [[:r k4 []] [:r k0 []]], :process 101}
+{:type :ok, :value [[:r k0 []] [:r k1 []]], :process 100}
+{:type :ok, :value [[:r k0 []] [:r k1 []] [:r k4 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k5 [2]] [:r k4 []]], :process 100}
+{:type :ok, :value [[:r k0 []] [:r k2 [2]] [:r k1 []]], :process 102}
+{:type :ok, :value [[:r k0 []] [:r k4 []] [:r k3 []]], :process 102}
+{:type :ok, :value [[:r k0 [5 10]] [:r k1 []] [:r k2 [2 11 1 10]] [:r k3 [4 7 11 5 10]] [:r k4 []] [:r k5 [2 7 8 11 1]]], :process 199}
+{:type :ok, :value [[:append k5 1] [:append k0 1] [:append k2 1]], :process 0}
+{:type :ok, :value [[:append k2 2] [:append k5 2]], :process 1}
+{:type :fail, :value [[:append k4 3] [:append k1 3] [:append k5 3]], :process 2}
+{:type :ok, :value [[:append k3 4] [:append k1 4]], :process 3}
+{:type :ok, :value [[:append k3 5] [:append k0 5] [:append k1 5]], :process 0}
+{:type :fail, :value [[:append k0 6] [:append k4 6]], :process 1}
+{:type :ok, :value [[:append k3 7] [:append k5 7]], :process 2}
+{:type :ok, :value [[:append k5 8] [:append k0 8]], :process 3}
+{:type :fail, :value [[:append k4 9] [:append k1 9] [:append k0 9]], :process 0}
+{:type :ok, :value [[:append k2 10] [:append k0 10] [:append k3 10]], :process 1}
+{:type :ok, :value [[:append k3 11] [:append k2 11] [:append k5 11]], :process 2}
+{:type :fail, :value [[:append k0 12] [:append k1 12]], :process 3}
+
+valid? false types (:G0)
+---- :G0
+
+cycle:
+  {:index 183, :type :ok, :process 0, :value [[:append k5 1] [:append k0 1] [:append k2 1]]}
+  {:index 201, :type :ok, :process 1, :value [[:append k2 10] [:append k0 10] [:append k3 10]]}
+  {:index 183, :type :ok, :process 0, :value [[:append k5 1] [:append k0 1] [:append k2 1]]}
+steps:
+({:type :ww,
+  :key k2,
+  :value 1,
+  :value' 10,
+  :a-mop-index 2,
+  :b-mop-index 0}
+ {:type :ww,
+  :key k0,
+  :value 10,
+  :value' 1,
+  :a-mop-index 1,
+  :b-mop-index 1})

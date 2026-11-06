@@ -292,5 +292,341 @@
   "tla_states": 16,
   "tla_steps": 15,
   "variant": "design"
+ },
+ "fence-without-ready-move-p7": {
+  "bound": "move",
+  "calm_states": 8,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 4,
+  "reached": true,
+  "secs": 2.4,
+  "variant": "fence-without-ready"
+ },
+ "fence-without-ready-write-p7": {
+  "bound": "write",
+  "calm_states": 8,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 4,
+  "reached": true,
+  "secs": 2.2,
+  "variant": "fence-without-ready"
+ },
+ "fixed-but-fence-ignores-incarnation-move-p1": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 23,
+  "secs": 3.1,
+  "tla_states": 24,
+  "tla_steps": 23,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-fence-ignores-incarnation-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 21,
+  "secs": 3.7,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-fence-ignores-incarnation-moves-p1": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 23,
+  "secs": 3.2,
+  "tla_states": 24,
+  "tla_steps": 23,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-fence-ignores-incarnation-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 21,
+  "secs": 3.2,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-fence-ignores-incarnation-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 23,
+  "secs": 3.1,
+  "tla_states": 24,
+  "tla_steps": 23,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-fence-ignores-incarnation-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 21,
+  "secs": 3.4,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "fixed-but-fence-ignores-incarnation"
+ },
+ "fixed-but-recovery-reads-table-only-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 3.2,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-recovery-reads-table-only"
+ },
+ "fixed-but-recovery-reads-table-only-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 2.8,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-recovery-reads-table-only"
+ },
+ "fixed-but-recovery-reads-table-only-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 2.3,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-recovery-reads-table-only"
+ },
+ "fixed-but-recovery-resumes-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 19,
+  "secs": 2.6,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-recovery-resumes"
+ },
+ "fixed-but-recovery-resumes-moves-p1": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 32,
+  "secs": 3.1,
+  "tla_states": 33,
+  "tla_steps": 32,
+  "variant": "fixed-but-recovery-resumes"
+ },
+ "fixed-but-recovery-resumes-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 19,
+  "secs": 3.0,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-recovery-resumes"
+ },
+ "fixed-but-recovery-resumes-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 19,
+  "secs": 2.5,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-recovery-resumes"
+ },
+ "fixed-but-table-by-writer-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 2.4,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "fixed-but-table-by-writer"
+ },
+ "fixed-but-table-by-writer-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 3.2,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "fixed-but-table-by-writer"
+ },
+ "fixed-but-table-by-writer-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 4.0,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "fixed-but-table-by-writer"
+ },
+ "fixed-but-table-unversioned-move-p1": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 19,
+  "secs": 4.4,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-table-unversioned"
+ },
+ "fixed-but-table-unversioned-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 2.7,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-table-unversioned"
+ },
+ "fixed-but-table-unversioned-moves-p1": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 19,
+  "secs": 3.9,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-table-unversioned"
+ },
+ "fixed-but-table-unversioned-moves-p9": {
+  "bound": "moves",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 3.4,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-table-unversioned"
+ },
+ "fixed-but-table-unversioned-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 19,
+  "secs": 3.7,
+  "tla_states": 20,
+  "tla_steps": 19,
+  "variant": "fixed-but-table-unversioned"
+ },
+ "fixed-but-table-unversioned-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 3.4,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "fixed-but-table-unversioned"
  }
 }

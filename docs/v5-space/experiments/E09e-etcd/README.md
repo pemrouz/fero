@@ -31,6 +31,7 @@ All measured here, medians of 3 runs, each run on a fresh three-member cluster. 
   - **Locks**: `stm --stm-locker=lock-client` wraps each conditional write in etcd's client lock (`concurrency.Mutex` on one name), with 1 client; and [lockbench/main.go](lockbench/main.go), our 120-line Go loop over `concurrency.Mutex` (as E-09e allows): each client holds one session (one lease) and loops Lock, Unlock for 20 s after 2 s of warm-up, with its own lock name (no contention: the "acquire ≤ C" case of P-10). 1 client, and 100 clients on 10 connections.
 - **Totals.** Each configuration's `--total` was sized by a short untimed calibration on a busy box ([results/calibrate.txt](results/calibrate.txt), [totals.json](totals.json)), so a run lasts 15-60 s. The six single-client read runs lasted 84-94 s each (the quiet box was faster than the calibration guessed), longer than the brief's 60 s; their timing hold took about 12 minutes, inside the 30-minute rule.
 - **Measured per run:** the tool's requests/s and latency percentiles; CPU seconds of each member (from `/proc/<pid>/stat`) and of the load generator (`os.times()` children); the box's busy cores, so "other cores" = load from processes outside this run; `/proc/loadavg` before the run (its 1-minute figure includes our own previous run). Raw lines: [results/runs.jsonl](results/runs.jsonl); the tool's text per run: [results/raw/](results/raw); the table: [results/tables.md](results/tables.md).
+- Cost: about 45 minutes of the box alone (10, 12 and 22 minutes for the three holds), plus about 10 minutes of untimed calibration under `$SP/bin/heavy`; the entry estimated 2 agent-hours. Wall time was about 1.5 hours, most of it waiting for the lock.
 - Everything timed ran under `$SP/bin/timing`, in three holds (`put`, `range`, `ops`): [run.sh](run.sh). Machine: E-01's ([env.txt](../E01-floors/results/env.txt)): 4-vCPU Firecracker VM, one virtio disk, ext4 without a journal; Go 1.24.7 for lockbench.
 
 ## Results
@@ -100,7 +101,7 @@ QUESTIONS.md's threshold, per row: if the competitor's matched median is better 
 - [bench.py](bench.py): the driver (`calibrate`, `run`, `smoke`, `table`). [run.sh](run.sh): `sh run.sh build`, then `sh run.sh all` (three timing holds) or one hold (`put`, `range`, `ops`).
 - [lockbench/](lockbench): the lock loop (`main.go`, `go.mod`, `go.sum`).
 - [fetch.sh](fetch.sh): etcd, its benchmark tool, lockbench's modules and the cited page, with checksums.
-- [results/](results): `runs.jsonl` (one line per run), `tables.md`, `calibrate.txt`, `raw/` (the tool's summary per run for the `ops` hold; see the note in the verdict).
+- [results/](results): `runs.jsonl` (one line per run), `tables.md`, `calibrate.txt`, `timing-log.txt` (each run's one-line result as it finished, and when each timing hold began and ended), `raw/` (the tool's summary per run for the `ops` hold; see the note in the verdict).
 
 ## Verdict
 
