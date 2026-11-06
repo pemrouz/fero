@@ -1,17 +1,17 @@
-# E-45 nats-1to1-16B-persisted: 2026-11-06T21:37:37Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 7.41 4.91 4.77 25/323 24549
+# E-45 nats-1to1-16B-persisted: 2026-11-06T22:07:29Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 11.54 6.96 6.45 16/344 20009
 # host: host.ts nats --listen 127.0.0.1:14290 --durability persisted
 # tool: sh -c /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench sub e45.core --clients 1 --msgs 3000 --size 16B --no-progress & sleep 1; /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench pub e45.core --clients 1 --msgs 3000 --size 16B --no-progress; wait
-21:37:38 Starting Core NATS subscriber benchmark [clients=1, msg-size=16 B, msgs=3,000, multi-subject=false, subject=e45.core]
-21:37:38 [1] Starting Core NATS subscriber, expecting 3,000 messages
-21:37:39 Starting Core NATS publisher benchmark [clients=1, msg-size=16 B, msgs=3,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, sleep=0s, subject=e45.core]
-21:37:39 [1] Starting Core NATS publisher, publishing 3,000 messages
+22:07:30 Starting Core NATS subscriber benchmark [clients=1, msg-size=16 B, msgs=3,000, multi-subject=false, subject=e45.core]
+22:07:30 [1] Starting Core NATS subscriber, expecting 3,000 messages
+22:07:31 Starting Core NATS publisher benchmark [clients=1, msg-size=16 B, msgs=3,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, sleep=0s, subject=e45.core]
+22:07:31 [1] Starting Core NATS publisher, publishing 3,000 messages
 
-NATS Core NATS publisher stats: 34,135 msgs/sec ~ 533 KiB/sec ~ min: 0.07us ~ avg: 0.14us ~ max: 57.79us ~ P50: 0.08us ~ P90: 0.08us ~ P99: 0.11us ~ P99.9: 22.72us
+NATS Core NATS publisher stats: 115,885 msgs/sec ~ 1.8 MiB/sec ~ min: 0.07us ~ avg: 0.16us ~ max: 53.14us ~ P50: 0.07us ~ P90: 0.10us ~ P99: 0.15us ~ P99.9: 31.79us
 
 
-NATS Core NATS subscriber stats: 4,359 msgs/sec ~ 68 KiB/sec
+NATS Core NATS subscriber stats: 6,772 msgs/sec ~ 106 KiB/sec
 
-# tool exit code 0, wall 1.880892823 s
+# tool exit code 0, wall 1.511560443 s
 # host log:
 ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false})
-summary (SIGTERM): [2.0 s real, 3.073 s virtual, 39213 events, 3000 verbs] conns=0 in=105419B out=111436B ops{SUB=1 PUB=3000 deliver=3000} errors{} cpu=1.03s rss=139MB
+summary (SIGTERM): [1.5 s real, 3.073 s virtual, 39213 events, 3000 verbs] conns=0 in=105419B out=111436B ops{SUB=1 PUB=3000 deliver=3000} errors{} cpu=0.79s rss=143MB
