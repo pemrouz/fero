@@ -138,5 +138,61 @@
   "tla_states": 17,
   "tla_steps": 16,
   "variant": "abort-keeps-table"
+ },
+ "abort-keeps-table-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 18,
+  "secs": 3.6,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "abort-keeps-table"
+ },
+ "abort-keeps-table-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 4.1,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "abort-keeps-table"
+ },
+ "design-move-p1": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 20,
+  "secs": 3.1,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "design"
+ },
+ "design-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 15,
+  "secs": 3.1,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "design"
  }
 }
