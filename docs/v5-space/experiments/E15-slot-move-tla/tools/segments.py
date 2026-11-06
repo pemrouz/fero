@@ -53,7 +53,7 @@ def segment(variant, bound, seconds, workers, cap):
                 f.write('CONSTRAINT CapOK\n')
     k = st['segments'] + 1
     cmd = ['java', '-XX:+UseParallelGC', '-Xmx3g', '-cp', tlcrun.JAR, 'tlc2.TLC',
-           '-workers', str(workers), '-nowarning', '-checkpoint', '3', '-metadir', 'st']
+           '-workers', str(workers), '-nowarning', '-fp', '7', '-checkpoint', '3', '-metadir', 'st']
     if k > 1:
         last = sorted(glob.glob(os.path.join(d, 'st', '*', 'vars.chkpt')))
         rec = os.path.dirname(max(last, key=os.path.getmtime))

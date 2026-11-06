@@ -14,7 +14,7 @@ dir="$RUNS/$name"
 rm -rf "$dir"; mkdir -p "$dir/pids"
 cd "$dir"
 nem=()
-[ "$nemesis" != none ] && nem=(--nemesis "$nemesis" --nemesis-interval 5)
+[ "$nemesis" != none ] && nem=(--nemesis "$nemesis" --nemesis-interval "${E46_NEMESIS_INTERVAL:-3}")
 # Server-to-server latency: exponential with this mean (ms), so messages on one link reorder.
 # Maelstrom keeps client-to-server latency at zero whatever this is.
 lat=(--latency "${E46_LATENCY:-5}" --latency-dist "${E46_LATENCY_DIST:-exponential}")

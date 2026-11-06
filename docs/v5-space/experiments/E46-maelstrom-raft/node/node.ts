@@ -109,7 +109,7 @@ const pendingReads = new Map<string, Client & { key: string }>()  // ReadIndex c
 let waitingApply: { index: number; c: Client; key: string }[] = []  // ReadState seen, waiting for apply
 const stats = { prop: 0, propDropped: 0, ri: 0, riNoLeader: 0, riServed: 0, logReads: 0, localReads: 0, snapSent: 0, snapApplied: 0, compactions: 0 }
 let lastRole = ''
-let mixRng = SEED
+let mixRng = SEED >>> 0
 
 const idx = (id: string) => nodeIds.indexOf(id) + 1
 const nameOf = (rid: number) => nodeIds[rid - 1]
@@ -174,7 +174,12 @@ function drain() {
     const rd = rn.Ready()
     if (rd.SoftState) {
       const role = `${stateTypeString(rd.SoftState.RaftState)} lead=${rd.SoftState.Lead}`
-      if (role !== lastRole) { lastRole = role; log(`ROLE term=${rn.raft.Term} ${role}`) }
+      if (role !== lastRole) {
+        lastRole = role
+        log(`ROLE term=${rn.raft.Term} ${role}`)
+        // For the pauser, which aims at the leader half of the time.
+        if (PIDDIR) writeFileSync(`${PIDDIR}/${nodeId}.role`, `${stateTypeString(rd.SoftState.RaftState)} ${rn.raft.Term}`)
+      }
     }
     // 1. persist (in memory; a real host fsyncs here before sending)
     if (!IsEmptyHardState(rd.HardState)) storage!.SetHardState(rd.HardState!)
@@ -264,7 +269,10 @@ function propose(c: Client, o: Omit<Op, 'id'>) {
 
 function onRead(c: Client, key: string) {
   let mode = READ
-  if (mode === 'mixed') mode = (mixRng = (mixRng * 1103515245 + 12345) & 0x7fffffff) % 2 === 0 ? 'readindex' : 'log'
+  if (mode === 'mixed') {
+    mixRng = (Math.imul(mixRng, 1103515245) + 12345) >>> 0
+    mode = ((mixRng >>> 16) & 1) === 0 ? 'readindex' : 'log'
+  }
   if (mode === 'buggy') {
     if (rn!.raft.state !== StateLeader) { stats.localReads++; answerRead(c, key); return }   // THE PLANTED BUG
     mode = 'readindex'

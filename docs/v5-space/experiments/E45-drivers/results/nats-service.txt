@@ -1,11 +1,11 @@
-# E-45 nats-service: 2026-11-06T21:13:43Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 6.55 4.51 5.02 12/295 18031
+# E-45 nats-service: 2026-11-06T21:37:46Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 10.43 5.64 5.00 24/413 24802
 # host: host.ts nats --listen 127.0.0.1:14290
-# tool: sh -c /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service serve e45.svc --clients 2 --msgs 1000 --no-progress & sleep 1; /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service request e45.svc --clients 1 --msgs 1000 --size 16B --no-progress; kill %1 2>/dev/null; wait
-21:13:44 Starting Core NATS service server benchmark [clients=2, msg-size=128 B, msgs=1,000, sleep=0s, subject=e45.svc]
-21:13:44 [1] Starting Core NATS service server, hit control-c to stop
-21:13:44 [2] Starting Core NATS service server, hit control-c to stop
-21:13:45 Starting Core NATS service requester benchmark [clients=1, msg-size=16 B, msgs=1,000, sleep=0s, subject=e45.svc]
-21:13:45 [1] Starting Core NATS service requester, requesting 1,000 messages
+# tool: sh -c /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service serve e45.svc --clients 2 --msgs 1000 --no-progress & srv=$!; sleep 1; /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service request e45.svc --clients 1 --msgs 1000 --size 16B --no-progress; kill -INT $srv; wait
+21:37:47 Starting Core NATS service server benchmark [clients=2, msg-size=128 B, msgs=1,000, sleep=0s, subject=e45.svc]
+21:37:47 [1] Starting Core NATS service server, hit control-c to stop
+21:37:47 [2] Starting Core NATS service server, hit control-c to stop
+21:37:48 Starting Core NATS service requester benchmark [clients=1, msg-size=16 B, msgs=1,000, sleep=0s, subject=e45.svc]
+21:37:48 [1] Starting Core NATS service requester, requesting 1,000 messages
 
-NATS Core NATS service requester stats: 1,489 msgs/sec ~ 23 KiB/sec ~ min: 178.59us ~ avg: 671.14us ~ max: 105,690.37us ~ P50: 377.19us ~ P90: 673.33us ~ P99: 4,094.37us ~ P99.9: 105,690.37us
+NATS Core NATS service requester stats: 1,570 msgs/sec ~ 25 KiB/sec ~ min: 134.77us ~ avg: 636.01us ~ max: 22,750.07us ~ P50: 367.22us ~ P90: 1,107.18us ~ P99: 4,719.23us ~ P99.9: 22,750.07us
 

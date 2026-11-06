@@ -7,7 +7,9 @@
 // Usage: node pauser.ts <piddir> <nodeCount> <seconds> <seed> <logfile> [meanGapMs] [minMs] [maxMs]
 // It waits until every node has written <piddir>/<node>.pid (written at init), then
 // for <seconds> pauses one node at a time: a random gap (exponential, mean meanGapMs),
-// then a random node is stopped for a uniform time in [minMs, maxMs]. At the end, or on
+// then a node is stopped for a uniform time in [minMs, maxMs]: half the time the node
+// whose <piddir>/<node>.role file says it leads (as Jepsen's "primaries" target), else
+// a random node. At the end, or on
 // SIGTERM, every node is continued.
 import { readdirSync, readFileSync, appendFileSync, existsSync } from 'node:fs'
 
@@ -41,11 +43,22 @@ async function main() {
     const gap = -Math.log(1 - rnd()) * GAP
     if (Date.now() + gap >= end) break
     await sleep(gap)
-    const n = names[Math.floor(rnd() * names.length)]
+    // Half the pauses hit the node that says it leads (highest term); the rest a random node.
+    let n = names[Math.floor(rnd() * names.length)]
+    let aim = 'random'
+    if (rnd() < 0.5) {
+      let best = -1
+      for (const m of names) {
+        try {
+          const [st, term] = readFileSync(`${piddir}/${m}.role`, 'utf8').split(' ')
+          if (st === 'StateLeader' && Number(term) > best) { best = Number(term); n = m; aim = 'leader' }
+        } catch {}
+      }
+    }
     const ms = Math.round(MIN + rnd() * (MAX - MIN))
     if (Date.now() + ms >= end) break
     try { process.kill(pids.get(n)!, 'SIGSTOP') } catch (e) { out(`stop ${n} failed: ${e}`); continue }
-    out(`pause ${n} ${ms}ms`)
+    out(`pause ${n} ${ms}ms ${aim}`)
     await sleep(ms)
     try { process.kill(pids.get(n)!, 'SIGCONT') } catch {}
     out(`resume ${n}`)

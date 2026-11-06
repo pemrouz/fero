@@ -1,5 +1,5 @@
 # batch name nodes read seed seconds nemesis pause compact
-# Every run: Maelstrom lin-kv, --rate 50, --concurrency 4n, server latency exponential mean 5 ms, --nemesis-interval 5.
+# Every run: Maelstrom lin-kv, --rate 50, --concurrency 4n, server latency exponential mean 5 ms, --nemesis-interval 3.
 # Clean runs: partitions and SIGSTOP pauses together.
 A c3-ri-s1 3 readindex 1 100 partition 1 0
 A c3-ri-s2 3 readindex 2 100 partition 1 0

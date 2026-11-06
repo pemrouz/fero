@@ -13,25 +13,26 @@
 ;;
 ;; For each file: two checks, as E-22 ran the port: {:consistency-models [:read-committed]} and
 ;; {:consistency-models [:serializable]}. One JSON line per file.
+;;
+;; E22B_RULE=port (an ablation, to test a root cause): Elle 0.2.8 places an append that no read
+;; ever saw just after the last element any read saw on that key, and draws ww and rw edges from
+;; that. The Go port (tipocket v1.0.0, list_append/utils.go previouslyAppendElement) draws no edge
+;; for such an append. With E22B_RULE=port this script swaps Elle's function for the port's rule:
+;; an unseen append has no known predecessor. Nothing else changes.
 (ns e22b.elle-check
   (:require [elle.list-append :as la]
             [jepsen.history :as h]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.data.json :as json]))
+            [clojure.data.json :as json]
+            [e22b.pairing :refer [read-ops paired]]))
 
-(defn read-ops [file]
-  (with-open [r (java.io.PushbackReader. (io/reader file))]
-    (doall (take-while some? (repeatedly #(edn/read {:eof nil} r))))))
-
-(defn invoke-of [op]
-  (assoc op :type :invoke
-         :value (mapv (fn [[f k v]] (if (= f :r) [f k nil] [f k v])) (:value op))))
-
-(defn paired
-  "Each completion becomes [invoke, completion], adjacent, in file order."
-  [ops]
-  (vec (mapcat (fn [op] [(assoc (invoke-of op) :f :txn) (assoc op :f :txn)]) ops)))
+(when (= "port" (System/getenv "E22B_RULE"))
+  (alter-var-root #'la/previously-appended-element
+                  (fn [orig]
+                    (fn [append-index write-index op [f k v :as mop]]
+                      (when (some? (get-in append-index [k :indices v]))
+                        (orig append-index write-index op mop))))))
 
 (defn summarize [r]
   (let [as (:anomalies r)]

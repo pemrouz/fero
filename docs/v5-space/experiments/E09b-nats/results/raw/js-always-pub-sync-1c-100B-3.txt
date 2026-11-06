@@ -1,0 +1,2 @@
+NATS JetStream synchronous publisher stats: 1,228 msgs/sec ~ 120 KiB/sec ~ min: 386.53us ~ avg: 813.30us ~ max: 22,943.27us ~ P50: 790.58us ~ P90: 970.08us ~ P99: 1,324.03us ~ P99.9: 2,755.20us
+21:36:08 Using stream: s1

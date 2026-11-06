@@ -40,7 +40,7 @@ nats)    # PERF-03: 1 -> 1 and 1 -> 16 subscribers, 16 B and 1 KB, the `none` ru
   $D nats-1to16-1KB nats "--listen 127.0.0.1:14290" sh -c "$NATS $S bench sub e45.core --clients 16 --msgs 2000 --size 1KB --no-progress & sleep 1; $NATS $S bench pub e45.core --clients 1 --msgs 2000 --size 1KB --no-progress; wait"
   $D nats-1to1-16B-persisted nats "--listen 127.0.0.1:14290 --durability persisted" sh -c "$NATS $S bench sub e45.core --clients 1 --msgs 3000 --size 16B --no-progress & sleep 1; $NATS $S bench pub e45.core --clients 1 --msgs 3000 --size 16B --no-progress; wait"
   $D nats-latency-16B nats "--listen 127.0.0.1:14290" $NATS $S latency --server-b nats://127.0.0.1:14290 --size 16 --rate 1000 --duration 5s
-  $D nats-service nats "--listen 127.0.0.1:14290" sh -c "$NATS $S bench service serve e45.svc --clients 2 --msgs 1000 --no-progress & sleep 1; $NATS $S bench service request e45.svc --clients 1 --msgs 1000 --size 16B --no-progress; kill %1 2>/dev/null; wait" ;;
+  $D nats-service nats "--listen 127.0.0.1:14290" sh -c "$NATS $S bench service serve e45.svc --clients 2 --msgs 1000 --no-progress & srv=\$!; sleep 1; $NATS $S bench service request e45.svc --clients 1 --msgs 1000 --size 16B --no-progress; kill -TERM \$srv; wait" ;;   # serve runs until stopped (a background job ignores SIGINT)
 js)      # PERF-04: JetStream, file storage, 3 replicas; publish with acks; a pull consumer; work-queue retention
   S="-s nats://127.0.0.1:14290"; JS="$NATS $S bench js"; C="--create --replicas 3 --storage file --maxbytes 1GB"
   $D js nats "--listen 127.0.0.1:14290" sh -c "

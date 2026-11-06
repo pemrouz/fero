@@ -1,0 +1,97 @@
+# E-45 js: 2026-11-06T21:18:44Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 3.73 4.36 4.87 5/180 18914
+# host: host.ts nats --listen 127.0.0.1:14290
+# tool: sh -c 
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream s1 --clients 1 --msgs 1000 --size 100B --no-progress pub sync e45.s1 --create --replicas 3 --storage file --maxbytes 1GB &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream s16 --clients 16 --msgs 2000 --size 100B --no-progress pub sync e45.s16 --create --replicas 3 --storage file --maxbytes 1GB &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream sa --clients 1 --msgs 5000 --size 100B --no-progress pub async e45.sa --batch 500 --create --replicas 3 --storage file --maxbytes 1GB &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream sa --clients 1 --msgs 5000 --no-progress fetch --batch 500 &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 stream add wq --subjects e45.wq --retention work --storage file --replicas 3 --max-bytes 1GB --defaults > /dev/null &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream wq --clients 1 --msgs 2000 --size 100B --no-progress pub async e45.wq --batch 500 &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench js --stream wq --clients 4 --msgs 2000 --no-progress fetch --batch 500 &&
+    /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 stream info wq | grep -E 'Messages|Subjects'
+21:18:44 Starting JetStream synchronous publisher benchmark [batch=0, clients=1, dedup-window=2m0s, deduplication=false, max-bytes=1,073,741,824, msg-size=100 B, msgs=1,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, purge=false, replicas=3, sleep=0s, storage=file, stream=s1, subject=e45.s1]
+21:18:44 Using stream: s1
+21:18:44 [1] Starting JetStream synchronous publisher, publishing 1,000 messages
+
+NATS JetStream synchronous publisher stats: 3,249 msgs/sec ~ 317 KiB/sec ~ min: 104.36us ~ avg: 307.30us ~ max: 6,367.18us ~ P50: 256.51us ~ P90: 410.32us ~ P99: 1,333.83us ~ P99.9: 6,367.18us
+
+21:18:45 Starting JetStream synchronous publisher benchmark [batch=0, clients=16, dedup-window=2m0s, deduplication=false, max-bytes=1,073,741,824, msg-size=100 B, msgs=2,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, purge=false, replicas=3, sleep=0s, storage=file, stream=s16, subject=e45.s16]
+21:18:45 Using stream: s16
+21:18:45 [1] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [2] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [3] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [4] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [5] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [6] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [7] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [8] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [9] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [10] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [11] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [12] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [13] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [14] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [15] Starting JetStream synchronous publisher, publishing 125 messages
+21:18:45 [16] Starting JetStream synchronous publisher, publishing 125 messages
+
+  [1] 419 msgs/sec ~ 41 KiB/sec ~ min: 481.68us ~ avg: 2,337.56us ~ max: 11,419.17us ~ P50: 1,612.15us ~ P90: 5,243.77us ~ P99: 10,141.65us ~ P99.9: 11,419.17us (125 msgs)
+  [2] 416 msgs/sec ~ 41 KiB/sec ~ min: 387.38us ~ avg: 2,338.24us ~ max: 11,149.57us ~ P50: 1,585.57us ~ P90: 5,398.05us ~ P99: 10,385.00us ~ P99.9: 11,149.57us (125 msgs)
+  [3] 409 msgs/sec ~ 40 KiB/sec ~ min: 417.93us ~ avg: 2,401.16us ~ max: 10,637.32us ~ P50: 1,585.35us ~ P90: 5,522.32us ~ P99: 10,021.03us ~ P99.9: 10,637.32us (125 msgs)
+  [4] 409 msgs/sec ~ 40 KiB/sec ~ min: 488.73us ~ avg: 2,403.19us ~ max: 10,522.04us ~ P50: 1,628.36us ~ P90: 5,322.49us ~ P99: 10,094.07us ~ P99.9: 10,522.04us (125 msgs)
+  [5] 409 msgs/sec ~ 40 KiB/sec ~ min: 499.60us ~ avg: 2,442.43us ~ max: 10,783.53us ~ P50: 1,627.91us ~ P90: 5,359.13us ~ P99: 10,368.73us ~ P99.9: 10,783.53us (125 msgs)
+  [6] 407 msgs/sec ~ 40 KiB/sec ~ min: 914.26us ~ avg: 2,454.63us ~ max: 10,776.92us ~ P50: 1,612.25us ~ P90: 5,371.70us ~ P99: 10,010.36us ~ P99.9: 10,776.92us (125 msgs)
+  [7] 407 msgs/sec ~ 40 KiB/sec ~ min: 297.09us ~ avg: 2,455.01us ~ max: 11,044.96us ~ P50: 1,622.13us ~ P90: 5,694.33us ~ P99: 10,021.59us ~ P99.9: 11,044.96us (125 msgs)
+  [8] 406 msgs/sec ~ 40 KiB/sec ~ min: 617.07us ~ avg: 2,458.67us ~ max: 10,885.01us ~ P50: 1,631.28us ~ P90: 5,748.21us ~ P99: 10,103.95us ~ P99.9: 10,885.01us (125 msgs)
+  [9] 406 msgs/sec ~ 40 KiB/sec ~ min: 449.29us ~ avg: 2,457.93us ~ max: 11,234.23us ~ P50: 1,621.84us ~ P90: 6,153.11us ~ P99: 9,928.90us ~ P99.9: 11,234.23us (125 msgs)
+  [10] 406 msgs/sec ~ 40 KiB/sec ~ min: 654.00us ~ avg: 2,458.70us ~ max: 10,808.55us ~ P50: 1,589.56us ~ P90: 5,519.35us ~ P99: 10,503.40us ~ P99.9: 10,808.55us (125 msgs)
+  [11] 404 msgs/sec ~ 40 KiB/sec ~ min: 606.81us ~ avg: 2,459.76us ~ max: 10,494.18us ~ P50: 1,593.39us ~ P90: 5,697.88us ~ P99: 10,065.35us ~ P99.9: 10,494.18us (125 msgs)
+  [12] 398 msgs/sec ~ 39 KiB/sec ~ min: 781.17us ~ avg: 2,508.27us ~ max: 10,647.37us ~ P50: 1,577.26us ~ P90: 5,772.37us ~ P99: 10,230.71us ~ P99.9: 10,647.37us (125 msgs)
+  [13] 398 msgs/sec ~ 39 KiB/sec ~ min: 636.05us ~ avg: 2,509.52us ~ max: 10,946.63us ~ P50: 1,614.30us ~ P90: 5,496.13us ~ P99: 10,089.93us ~ P99.9: 10,946.63us (125 msgs)
+  [14] 397 msgs/sec ~ 39 KiB/sec ~ min: 254.72us ~ avg: 2,512.13us ~ max: 10,697.72us ~ P50: 1,621.37us ~ P90: 5,342.05us ~ P99: 10,154.61us ~ P99.9: 10,697.72us (125 msgs)
+  [15] 397 msgs/sec ~ 39 KiB/sec ~ min: 194.79us ~ avg: 2,515.23us ~ max: 10,894.10us ~ P50: 1,602.83us ~ P90: 6,048.43us ~ P99: 10,281.66us ~ P99.9: 10,894.10us (125 msgs)
+  [16] 397 msgs/sec ~ 39 KiB/sec ~ min: 340.35us ~ avg: 2,515.96us ~ max: 11,012.31us ~ P50: 1,637.29us ~ P90: 6,148.84us ~ P99: 10,081.24us ~ P99.9: 11,012.31us (125 msgs)
+
+ NATS JetStream synchronous publisher aggregated stats: 6,352 msgs/sec ~ 620 KiB/sec
+ message rates min 397 | avg 405 | max 419 | stddev 6 msgs
+ latencies per operation min 194.79us | avg 2,451.77us | max 11,419.17us | stddev 3,300.44us | P50 1,607.31us | P90 5,535.49us | P99 10,230.71us | P99.9: 11,234.23us
+
+21:18:45 Starting JetStream asynchronous publisher benchmark [batch=500, clients=1, dedup-window=2m0s, deduplication=false, max-bytes=1,073,741,824, msg-size=100 B, msgs=5,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, purge=false, replicas=3, sleep=0s, storage=file, stream=sa, subject=e45.sa]
+21:18:45 Using stream: sa
+21:18:45 [1] Starting JetStream asynchronous publisher, publishing 5,000 messages
+
+NATS JetStream asynchronous publisher stats: 6,652 msgs/sec ~ 650 KiB/sec ~ min: 36,610.07us ~ avg: 75,131.56us ~ max: 126,173.90us ~ P50: 56,705.94us ~ P90: 111,935.56us ~ P99: 126,173.90us ~ P99.9: 126,173.90us
+
+21:18:46 Starting JetStream durable consumer (fetch) benchmark [acks=explicit, batch=500, clients=1, consumer=nats-bench, double-acked=false, msg-size=128 B, msgs=5,000, purge=false, sleep=0s, stream=sa]
+21:18:46 [1] Starting JetStream durable consumer (fetch), expecting 5,000 messages
+
+NATS JetStream durable consumer (fetch) stats: 39,670 msgs/sec ~ 4.8 MiB/sec ~ min: 24.86us ~ avg: 45.35us ~ max: 88.85us ~ P50: 29.72us ~ P90: 67.33us ~ P99: 88.85us ~ P99.9: 88.85us
+
+21:18:46 Starting JetStream asynchronous publisher benchmark [batch=500, clients=1, msg-size=100 B, msgs=2,000, multi-subject=false, multi-subject-max=100,000, multi-subject-randomize=false, purge=false, sleep=0s, stream=wq, subject=e45.wq]
+21:18:46 Using stream: wq
+21:18:46 [1] Starting JetStream asynchronous publisher, publishing 2,000 messages
+
+NATS JetStream asynchronous publisher stats: 4,920 msgs/sec ~ 481 KiB/sec ~ min: 75,931.50us ~ avg: 101,540.49us ~ max: 133,643.07us ~ P50: 82,177.19us ~ P90: 133,643.07us ~ P99: 133,643.07us ~ P99.9: 133,643.07us
+
+21:18:46 Starting JetStream durable consumer (fetch) benchmark [acks=explicit, batch=500, clients=4, consumer=nats-bench, double-acked=false, msg-size=128 B, msgs=2,000, purge=false, sleep=0s, stream=wq]
+21:18:46 [1] Starting JetStream durable consumer (fetch), expecting 500 messages
+21:18:46 [2] Starting JetStream durable consumer (fetch), expecting 500 messages
+21:18:46 [3] Starting JetStream durable consumer (fetch), expecting 500 messages
+21:18:46 [4] Starting JetStream durable consumer (fetch), expecting 500 messages
+
+  [1] 61,801 msgs/sec ~ 7.5 MiB/sec ~ min: 565.08us ~ avg: 565.08us ~ max: 565.08us ~ P50: 565.08us ~ P90: 565.08us ~ P99: 565.08us ~ P99.9: 565.08us (500 msgs)
+  [2] 144,336 msgs/sec ~ 18 MiB/sec ~ min: 47.96us ~ avg: 47.96us ~ max: 47.96us ~ P50: 47.96us ~ P90: 47.96us ~ P99: 47.96us ~ P99.9: 47.96us (500 msgs)
+  [3] 127,273 msgs/sec ~ 16 MiB/sec ~ min: 55.35us ~ avg: 55.35us ~ max: 55.35us ~ P50: 55.35us ~ P90: 55.35us ~ P99: 55.35us ~ P99.9: 55.35us (500 msgs)
+  [4] 108,668 msgs/sec ~ 13 MiB/sec ~ min: 57.67us ~ avg: 57.67us ~ max: 57.67us ~ P50: 57.67us ~ P90: 57.67us ~ P99: 57.67us ~ P99.9: 57.67us (500 msgs)
+
+ NATS JetStream durable consumer (fetch) aggregated stats: 8,999 msgs/sec ~ 1.1 MiB/sec
+ message rates min 61,801 | avg 110,519 | max 144,336 | stddev 30,826 msgs
+ latencies per operation min 47.96us | avg 181.51us | max 565.08us | stddev 286.24us | P50 55.35us | P90 565.08us | P99 565.08us | P99.9: 565.08us
+
+                     Subjects: e45.wq
+             Maximum Messages: unlimited
+                     Messages: 0
+           Number of Subjects: 1
+# tool exit code 0, wall 2.679709362 s
+# host log:
+ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false,"durability":"none"})
+summary (SIGTERM): [2.8 s real, 9.754 s virtual, 122744 events, 12015 verbs] conns=0 in=1953759B out=1919409B ops{SUB=46 HPUB=3 js-api=36 js-stream-create=4 deliver=17022 PUB=17033 js-pub=10000 js-consumer-create=2 js-deliver=7000 js-ack=7000} errors{} cpu=2.58s rss=205MB
