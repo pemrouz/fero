@@ -1,8 +1,8 @@
 **etcd**
 ```
+# trimmed: the etcd client gRPC logger lines (INFO and their JSON) were removed; the full output is kept outside the repo
 # E-45 etcd: 2026-11-06T21:18:47Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 3.73 4.36 4.87 5/182 19017
 # host: host.ts etcd --listen 127.0.0.1:12390
-# tool: sh -c 
 ## put-1c
   Requests/sec:	919.528271367042
   99% in 0.005730123 secs.

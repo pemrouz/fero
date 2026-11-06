@@ -1,0 +1,69 @@
+=== 20:42:15 start E09b-nats core (load 3.07 2.75 2.93)
+core:pubsub-1to1-16B run 1: pub_msgs_s=2224202.0 sub_msgs_s=2224342.0 pub_p50=7.000000000000001e-05 pub_p99=0.00014000000000000001 server_cores=1.06 client_cores=1.64 wall_s=19.94 rc=0 killed=False load=2.18
+core:pubsub-1to16-16B run 1: pub_msgs_s=259298.0 sub_msgs_s=4138383.0 pub_p50=7.000000000000001e-05 pub_p99=0.00014000000000000001 server_cores=1.61 client_cores=1.81 wall_s=11.67 rc=0 killed=False load=2.81
+core:pubsub-1to1-1KB run 1: pub_msgs_s=670728.0 sub_msgs_s=669077.0 pub_p50=0.00011 pub_p99=0.00549 server_cores=0.75 client_cores=1.91 wall_s=12.43 rc=0 killed=False load=3.52
+core:pubsub-1to16-1KB run 1: pub_msgs_s=89742.0 sub_msgs_s=1418104.0 pub_p50=0.0001 pub_p99=0.00528 server_cores=1.2 client_cores=2.11 wall_s=6.79 rc=0 killed=False load=3.83
+core:latency-16B run 1: msgs_s=9998.0 p50=0.09 p99=0.273 p999=0.662 server_cores=0.5 client_cores=0.62 wall_s=20.07 rc=0 killed=False load=4.25
+core:latency-1KB run 1: msgs_s=10002.0 p50=0.092 p99=0.342 p999=1.109 server_cores=0.5 client_cores=0.64 wall_s=20.06 rc=0 killed=False load=3.89
+core:pubsub-1to1-16B run 2: pub_msgs_s=2246998.0 sub_msgs_s=2246536.0 pub_p50=7.000000000000001e-05 pub_p99=0.00014000000000000001 server_cores=1.06 client_cores=1.6 wall_s=19.54 rc=0 killed=False load=2.67
+core:pubsub-1to16-16B run 2: pub_msgs_s=255000.0 sub_msgs_s=4076210.0 pub_p50=7.000000000000001e-05 pub_p99=0.00014000000000000001 server_cores=1.64 client_cores=1.8 wall_s=11.87 rc=0 killed=False load=3.38
+core:pubsub-1to1-1KB run 2: pub_msgs_s=693675.0 sub_msgs_s=691080.0 pub_p50=0.0001 pub_p99=0.0054800000000000005 server_cores=0.74 client_cores=1.89 wall_s=12.0 rc=0 killed=False load=3.85
+core:pubsub-1to16-1KB run 2: pub_msgs_s=88360.0 sub_msgs_s=1392060.0 pub_p50=0.00011 pub_p99=0.00558 server_cores=1.24 client_cores=2.1 wall_s=6.93 rc=0 killed=False load=4.25
+core:latency-16B run 2: msgs_s=10001.0 p50=0.091 p99=0.297 p999=0.789 server_cores=0.5 client_cores=0.62 wall_s=20.05 rc=0 killed=False load=4.55
+core:latency-1KB run 2: msgs_s=9999.0 p50=0.095 p99=0.41400000000000003 p999=1.407 server_cores=0.48 client_cores=0.61 wall_s=20.07 rc=0 killed=False load=4.23
+core:pubsub-1to1-16B run 3: pub_msgs_s=2259842.0 sub_msgs_s=2259864.0 pub_p50=7.000000000000001e-05 pub_p99=0.00013000000000000002 server_cores=1.07 client_cores=1.6 wall_s=19.32 rc=0 killed=False load=3.24
+core:pubsub-1to16-16B run 3: pub_msgs_s=258372.0 sub_msgs_s=4126431.0 pub_p50=7.000000000000001e-05 pub_p99=0.00014000000000000001 server_cores=1.7 client_cores=1.8 wall_s=11.71 rc=0 killed=False load=3.45
+core:pubsub-1to1-1KB run 3: pub_msgs_s=723607.0 sub_msgs_s=721436.0 pub_p50=0.00011 pub_p99=0.00518 server_cores=0.77 client_cores=1.93 wall_s=11.58 rc=0 killed=False load=4.44
+core:pubsub-1to16-1KB run 3: pub_msgs_s=92970.0 sub_msgs_s=1458802.0 pub_p50=0.0001 pub_p99=0.00543 server_cores=1.25 client_cores=2.14 wall_s=6.61 rc=0 killed=False load=4.32
+core:latency-16B run 3: msgs_s=10002.0 p50=0.09 p99=0.27 p999=0.785 server_cores=0.49 client_cores=0.61 wall_s=20.05 rc=0 killed=False load=4.21
+core:latency-1KB run 3: msgs_s=10000.0 p50=0.09 p99=0.312 p999=0.808 server_cores=0.49 client_cores=0.63 wall_s=20.06 rc=0 killed=False load=3.24
+core-route:latency-route-16B run 1: msgs_s=9999.0 p50=0.15 p99=0.509 p999=1.34 server_cores=0.85 client_cores=0.55 wall_s=20.06 rc=0 killed=False load=2.84
+core-route:latency-route-16B run 2: msgs_s=10000.0 p50=0.155 p99=0.558 p999=2.412 server_cores=0.87 client_cores=0.55 wall_s=20.08 rc=0 killed=False load=2.25
+core-route:latency-route-16B run 3: msgs_s=10001.0 p50=0.155 p99=0.482 p999=2.073 server_cores=0.88 client_cores=0.56 wall_s=20.07 rc=0 killed=False load=2.27
+=== 21:13:03 end E09b-nats core
+=== 21:13:03 start E09b-nats always (load 2.21 3.51 4.73)
+js-always:pub-sync-1c-100B run 1: pub_msgs_s=1436.0 pub_p50=0.67162 pub_p99=1.17526 server_cores=1.53 client_cores=0.19 wall_s=21.57 rc=0 killed=False load=2.63
+js-always:pub-sync-16c-100B run 1: pub_msgs_s=3275.0 pub_p50=4.748520000000001 pub_p99=8.840700000000002 server_cores=1.91 client_cores=0.14 wall_s=12.42 rc=0 killed=False load=2.97
+js-always:pub-async-100B run 1: pub_msgs_s=3627.0 pub_p50=137.10757999999998 pub_p99=173.17732 server_cores=1.14 client_cores=0.28 wall_s=14.45 rc=0 killed=False load=4.03
+js-always:fetch-100B run 1: sub_msgs_s=111236.0 server_cores=1.31 client_cores=0.24 wall_s=0.91 rc=0 killed=False load=4.09
+js-always:pub-async-1KB run 1: pub_msgs_s=3221.0 pub_p50=154.9205 pub_p99=178.25817 server_cores=0.97 client_cores=0.26 wall_s=13.17 rc=0 killed=False load=4.09
+js-always:wq-pub-100B run 1: pub_msgs_s=3525.0 pub_p50=139.35892 pub_p99=177.69109 server_cores=1.21 client_cores=0.29 wall_s=14.2 rc=0 killed=False load=4.30
+js-always:wq-fetch-4c-100B run 1: sub_msgs_s=107878.0 server_cores=1.88 client_cores=0.37 wall_s=0.64 rc=0 killed=False load=4.33
+js-always:pub-sync-1c-100B run 2: pub_msgs_s=1204.0 pub_p50=0.80968 pub_p99=1.30705 server_cores=1.49 client_cores=0.16 wall_s=25.56 rc=0 killed=False load=3.67
+js-always:pub-sync-16c-100B run 2: pub_msgs_s=3056.0 pub_p50=5.0368 pub_p99=10.43463 server_cores=1.89 client_cores=0.14 wall_s=13.43 rc=0 killed=False load=3.60
+js-always:pub-async-100B run 2: pub_msgs_s=3668.0 pub_p50=133.78663 pub_p99=166.01020000000003 server_cores=1.2 client_cores=0.28 wall_s=14.19 rc=0 killed=False load=4.05
+js-always:fetch-100B run 2: sub_msgs_s=105257.0 server_cores=1.28 client_cores=0.22 wall_s=1.0 rc=0 killed=False load=4.37
+js-always:pub-async-1KB run 2: pub_msgs_s=3194.0 pub_p50=154.87989000000002 pub_p99=192.78028 server_cores=1.17 client_cores=0.24 wall_s=13.29 rc=0 killed=False load=4.90
+js-always:wq-pub-100B run 2: pub_msgs_s=3568.0 pub_p50=137.4613 pub_p99=165.54056 server_cores=1.2 client_cores=0.28 wall_s=14.03 rc=0 killed=False load=4.69
+js-always:wq-fetch-4c-100B run 2: sub_msgs_s=127476.0 server_cores=1.71 client_cores=0.5 wall_s=0.56 rc=0 killed=False load=4.75
+js-always:pub-sync-1c-100B run 3: pub_msgs_s=1228.0 pub_p50=0.7905800000000001 pub_p99=1.32403 server_cores=1.52 client_cores=0.16 wall_s=24.78 rc=0 killed=False load=4.37
+js-always:pub-sync-16c-100B run 3: pub_msgs_s=3306.0 pub_p50=4.66073 pub_p99=9.16038 server_cores=1.89 client_cores=0.15 wall_s=12.39 rc=0 killed=False load=4.68
+js-always:pub-async-100B run 3: pub_msgs_s=3843.0 pub_p50=128.6411 pub_p99=149.16622 server_cores=0.91 client_cores=0.3 wall_s=13.83 rc=0 killed=False load=5.20
+js-always:fetch-100B run 3: sub_msgs_s=148371.0 server_cores=1.01 client_cores=0.27 wall_s=0.84 rc=0 killed=False load=5.09
+js-always:pub-async-1KB run 3: pub_msgs_s=3162.0 pub_p50=157.39562 pub_p99=191.52926000000002 server_cores=1.14 client_cores=0.25 wall_s=13.39 rc=0 killed=False load=4.69
+js-always:wq-pub-100B run 3: pub_msgs_s=3704.0 pub_p50=132.98398 pub_p99=167.44557 server_cores=0.98 client_cores=0.31 wall_s=13.52 rc=0 killed=False load=4.51
+js-always:wq-fetch-4c-100B run 3: sub_msgs_s=124460.0 server_cores=0.93 client_cores=0.26 wall_s=1.06 rc=0 killed=False load=4.47
+=== 21:37:28 end E09b-nats always
+=== 21:37:28 start E09b-nats default (load 4.47 4.27 4.56)
+js-default:pub-sync-1c-100B run 1: pub_msgs_s=3280.0 pub_p50=0.29493 pub_p99=0.54971 server_cores=2.04 client_cores=0.31 wall_s=24.95 rc=0 killed=False load=2.59
+js-default:pub-sync-16c-100B run 1: pub_msgs_s=22173.0 pub_p50=0.62451 pub_p99=2.48301 server_cores=2.33 client_cores=0.6 wall_s=14.03 rc=0 killed=False load=3.17
+js-default:pub-async-100B run 1: pub_msgs_s=98159.0 pub_p50=4.69101 pub_p99=12.7721 server_cores=2.3 client_cores=0.36 wall_s=12.59 rc=0 killed=False load=4.92
+js-default:fetch-100B run 1: sub_msgs_s=121465.0 server_cores=2.47 client_cores=0.37 wall_s=10.45 rc=0 killed=False load=4.77
+js-default:pub-async-1KB run 1: pub_msgs_s=58797.0 pub_p50=7.81375 pub_p99=21.4955 server_cores=2.47 client_cores=0.24 wall_s=10.85 rc=0 killed=False load=5.10
+js-default:wq-pub-100B run 1: pub_msgs_s=119459.0 pub_p50=3.57102 pub_p99=10.96308 server_cores=2.4 client_cores=0.44 wall_s=10.07 rc=0 killed=False load=5.17
+js-default:wq-fetch-4c-100B run 1: sub_msgs_s=108645.0 server_cores=2.72 client_cores=0.36 wall_s=11.53 rc=0 killed=False load=5.96
+js-default:pub-sync-1c-100B run 2: pub_msgs_s=3342.0 pub_p50=0.28916000000000003 pub_p99=0.53591 server_cores=2.04 client_cores=0.31 wall_s=24.41 rc=0 killed=False load=6.12
+js-default:pub-sync-16c-100B run 2: pub_msgs_s=20241.0 pub_p50=0.7036100000000001 pub_p99=2.8495500000000002 server_cores=2.32 client_cores=0.53 wall_s=15.54 rc=0 killed=False load=5.38
+js-default:pub-async-100B run 2: pub_msgs_s=94043.0 pub_p50=4.730770000000001 pub_p99=13.53791 server_cores=2.26 client_cores=0.35 wall_s=13.44 rc=0 killed=False load=6.54
+js-default:fetch-100B run 2: sub_msgs_s=119080.0 server_cores=2.54 client_cores=0.38 wall_s=10.29 rc=0 killed=False load=6.10
+js-default:pub-async-1KB run 2: pub_msgs_s=68303.0 pub_p50=6.779050000000001 pub_p99=16.191940000000002 server_cores=2.53 client_cores=0.28 wall_s=9.22 rc=0 killed=False load=5.70
+js-default:wq-pub-100B run 2: pub_msgs_s=93255.0 pub_p50=4.70212 pub_p99=14.72683 server_cores=2.39 client_cores=0.36 wall_s=12.89 rc=0 killed=False load=5.58
+js-default:wq-fetch-4c-100B run 2: sub_msgs_s=111076.0 server_cores=2.66 client_cores=0.35 wall_s=11.54 rc=0 killed=False load=5.71
+js-default:pub-sync-1c-100B run 3: pub_msgs_s=2287.0 pub_p50=0.42289 pub_p99=0.78335 server_cores=1.91 client_cores=0.25 wall_s=35.34 rc=0 killed=False load=5.48
+js-default:pub-sync-16c-100B run 3: pub_msgs_s=22541.0 pub_p50=0.6106900000000001 pub_p99=3.04734 server_cores=2.36 client_cores=0.58 wall_s=13.85 rc=0 killed=False load=5.17
+js-default:pub-async-100B run 3: pub_msgs_s=126029.0 pub_p50=3.4721900000000003 pub_p99=10.13033 server_cores=2.24 client_cores=0.44 wall_s=10.09 rc=0 killed=False load=6.61
+js-default:fetch-100B run 3: sub_msgs_s=122348.0 server_cores=2.53 client_cores=0.39 wall_s=9.97 rc=0 killed=False load=6.58
+js-default:pub-async-1KB run 3: pub_msgs_s=68167.0 pub_p50=6.835979999999999 pub_p99=15.9743 server_cores=2.48 client_cores=0.28 wall_s=9.48 rc=0 killed=False load=6.49
+js-default:wq-pub-100B run 3: pub_msgs_s=95674.0 pub_p50=4.70851 pub_p99=11.85411 server_cores=2.41 client_cores=0.37 wall_s=12.56 rc=0 killed=False load=6.57
+js-default:wq-fetch-4c-100B run 3: sub_msgs_s=112388.0 server_cores=2.66 client_cores=0.36 wall_s=11.45 rc=0 killed=False load=6.40
+=== 22:07:07 end E09b-nats default
