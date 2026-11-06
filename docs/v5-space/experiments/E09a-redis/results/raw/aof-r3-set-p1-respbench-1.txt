@@ -1,0 +1,1 @@
+{"clients":200,"error_replies":0,"max":86.482692,"op":"set","ops_s":88650.95,"p50":2.046978,"p95":3.37692,"p99":5.00341,"p999":22.558329,"pipeline":1,"requests":1773019,"seconds":20,"size":100,"wait":0}
