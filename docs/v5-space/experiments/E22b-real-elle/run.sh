@@ -7,7 +7,6 @@
 #   ./run.sh knossos   Porcupine per partition, then Knossos, on: every lin-kv partition (3 modes), the
 #                      known-bad histories (E-22's mutants, the lin-kv history from before fix G1), and a
 #                      seeded sample of every other history file (K per file, at most MAXOPS ops)
-#   ./run.sh report    results/*.md from the raw results
 #   ./run.sh           all of the above, in that order
 # Every JVM and Go step runs under $SP/bin/heavy (one hold per step, each well under 30 minutes).
 # Inputs: E-22's histories in $SP/e22v (edn/, hist/, lin-kv-calm-before.jsonl), its Go build in
