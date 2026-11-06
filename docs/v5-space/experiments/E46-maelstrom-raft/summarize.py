@@ -53,7 +53,9 @@ top_valid = m[-1] if m else None
 
 # Op counts from the history (one op per line): completions only.
 ops = defaultdict(int)
-partitions = 0
+partitions = partitions_all = 0
+kinds = defaultdict(int)
+prev_kind = '?'
 pause_ops_in_history = 0
 for line in history.splitlines():
     t = re.search(r':type :(\w+)', line)
@@ -64,7 +66,13 @@ for line in history.splitlines():
     if f in ('read', 'write', 'cas') and t in ('ok', 'fail', 'info'):
         ops[f'{f}_{t}'] += 1
     if f == 'start-partition' and t == 'info' and ':process :nemesis' in line and ':value :' not in line:
-        partitions += 1
+        partitions_all += 1
+        # A grudge that cuts at least one link (on 3 nodes :minority-third cuts none).
+        if re.search(r'#\{[^}]+\}', line):
+            partitions += 1
+            kinds[prev_kind] += 1
+    if f == 'start-partition' and ':value :' in line and t == 'info':
+        prev_kind = re.search(r':value :([\w-]+)', line).group(1)
     if f == 'pause':
         pause_ops_in_history += 1
 
@@ -106,7 +114,9 @@ mismatch = [i for i, v in hashes.items() if len(set(v.values())) > 1]
 crashes = len(re.findall(r'(?i)RaftPanic|E46: |Error:|Unhandled', ' '.join(
     read(os.path.join(logdir, f)) for f in (os.listdir(logdir) if logdir and os.path.isdir(logdir) else []))))
 
-pauses = re.findall(r' pause (n\d+) (\d+)ms', read(os.path.join(run_dir, 'pauses.log')))
+plog = read(os.path.join(run_dir, 'pauses.log'))
+pauses = re.findall(r' pause (n\d+) (\d+)ms', plog)
+pauses_leader = len(re.findall(r' pause n\d+ \d+ms leader', plog))
 agg = defaultdict(int)
 for s in stats_last.values():
     for k, v in s.items():
@@ -120,8 +130,9 @@ print(json.dumps({
     'verdict': verdict, 'valid_top': top_valid, 'lin_valid': lin_valid, 'bad_keys': len(bad_keys),
     'ops': dict(sorted(ops.items())),
     'elections': len(terms_led), 'max_term': max_term,
-    'partitions': partitions, 'pause_ops_in_history': pause_ops_in_history,
-    'pauses': len(pauses), 'paused_ms': sum(int(ms) for _, ms in pauses),
+    'partitions': partitions, 'partitions_noop': partitions_all - partitions, 'partition_kinds': dict(kinds),
+    'pause_ops_in_history': pause_ops_in_history,
+    'pauses': len(pauses), 'pauses_on_leader': pauses_leader, 'paused_ms': sum(int(ms) for _, ms in pauses),
     'hash_points_compared': compared, 'hash_mismatches': len(mismatch),
     'snap_sent': snap_sent, 'snap_applied': snap_applied, 'node_errors': crashes,
     'node_stats': dict(agg), 'store': sdir,

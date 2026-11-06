@@ -7,9 +7,10 @@
       E-22's 18 Porcupine self-test cases (dumped by `e22b dumpself`) as jobs.
   prep.py all <jobs.jsonl> <hist.jsonl>...
       every partition of every seed of the given history files.
-  prep.py sample <jobs.jsonl> <k> <max-ops> <hist.jsonl>...
+  prep.py sample <jobs.jsonl> <k> <min-ops> <max-ops> <hist.jsonl>...
       per file, k partitions drawn at random (seeded by the file name, so it replays) from the
-      partitions with at most max-ops operations; the cut and the draw are written to stderr.
+      partitions with min-ops to max-ops operations (k = 0: all of them); the cut and the draw
+      are written to stderr.
 
 A job line is E-22's partition object ({res, p, vals, ops}) plus where it came from
 (file, check, mode, mutant, seed, idx), so a result joins back to Porcupine's line for it.
@@ -57,17 +58,17 @@ def main():
         print(f"all: {n} partitions from {len(sys.argv) - 3} files", file=sys.stderr)
         return
     if cmd == "sample":
-        k, maxops = int(sys.argv[3]), int(sys.argv[4])
+        k, minops, maxops = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
         with open(out, "a") as w:
-            for path in sys.argv[5:]:
+            for path in sys.argv[6:]:
                 ps = list(parts_of(path))
-                small = [p for p in ps if len(p["ops"]) <= maxops]
+                band = [p for p in ps if minops <= len(p["ops"]) <= maxops]
                 rng = random.Random(os.path.basename(path))
-                pick = sorted(rng.sample(range(len(small)), min(k, len(small))))
+                pick = range(len(band)) if k <= 0 else sorted(rng.sample(range(len(band)), min(k, len(band))))
                 for i in pick:
-                    w.write(json.dumps(small[i]) + "\n")
-                print(f"sample {os.path.basename(path)}: {len(ps)} partitions, {len(small)} with <= {maxops} ops, "
-                      f"drew {len(pick)}", file=sys.stderr)
+                    w.write(json.dumps(band[i]) + "\n")
+                print(f"sample {os.path.basename(path)}: {len(ps)} partitions, {len(band)} with {minops} to {maxops} ops, "
+                      f"took {len(pick)}", file=sys.stderr)
         return
     raise SystemExit("usage: prep.py self|all|sample ...")
 

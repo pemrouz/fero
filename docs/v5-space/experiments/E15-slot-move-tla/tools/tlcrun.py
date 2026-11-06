@@ -97,7 +97,7 @@ def tlc(d, module='MC', workers=2, heavy=True, timeout=None, extra=()):
     tla_dir = os.path.join(ROOT, 'tla')
     env = dict(os.environ)
     cmd = ['java', '-XX:+UseParallelGC', '-Xmx3g', f'-DTLA-Library={tla_dir}',
-           '-cp', JAR, 'tlc2.TLC', '-workers', str(workers), '-nowarning',
+           '-cp', JAR, 'tlc2.TLC', '-workers', str(workers), '-nowarning', '-fp', '7',
            '-metadir', os.path.join(d, 'states'), '-cleanup', *extra, f'{module}.tla']
     if heavy:
         cmd = [HEAVY] + cmd
