@@ -33,3 +33,8 @@ D bug5-s2 5 buggy 2 100 partition 1 0
 D bug5-s3 5 buggy 3 100 partition 1 0
 D bug3-nofault-s1 3 buggy 1 60 none 0 0
 D bug5-nofault-s1 5 buggy 1 60 none 0 0
+# The second planted bug: a node that believes it leads answers reads from its own state (no ReadIndex, no lease).
+E stale3-s1 3 leaderlocal 1 100 partition 1 0
+E stale3-s2 3 leaderlocal 2 100 partition 1 0
+E stale5-s1 5 leaderlocal 1 100 partition 1 0
+E stale5-s2 5 leaderlocal 2 100 partition 1 0

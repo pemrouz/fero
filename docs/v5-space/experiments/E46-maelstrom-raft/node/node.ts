@@ -9,6 +9,10 @@
 //   E46_READ   readindex | log | mixed | buggy   (default readindex)
 //              buggy = the planted bug: a follower answers reads from its own
 //              state at once, with no ReadIndex; the leader still uses ReadIndex.
+//              leaderlocal = a second, subtler planted bug: a node that believes it
+//              leads answers reads from its own state with no ReadIndex (no lease
+//              either); followers use ReadIndex. Wrong only while a deposed leader
+//              has not yet noticed.
 //   E46_SEED   seed for the election jitter (each node adds its own index)
 //   E46_TICK   ms per raft tick (default 50); ElectionTick 10, HeartbeatTick 1
 //   E46_COMPACT  0 = never compact (default); n = snapshot + compact the log
@@ -22,7 +26,7 @@ import {
   discardLogger, globalRand, stateTypeString, SnapshotFinish, pb,
 } from '../../E10-raft-port/port/src/index.ts'
 
-const READ = (process.env.E46_READ ?? 'readindex') as 'readindex' | 'log' | 'mixed' | 'buggy'
+const READ = (process.env.E46_READ ?? 'readindex') as 'readindex' | 'log' | 'mixed' | 'buggy' | 'leaderlocal'
 const SEED = Number(process.env.E46_SEED ?? 1)
 const TICK_MS = Number(process.env.E46_TICK ?? 50)
 const COMPACT = Number(process.env.E46_COMPACT ?? 0)
@@ -275,6 +279,10 @@ function onRead(c: Client, key: string) {
   }
   if (mode === 'buggy') {
     if (rn!.raft.state !== StateLeader) { stats.localReads++; answerRead(c, key); return }   // THE PLANTED BUG
+    mode = 'readindex'
+  }
+  if (mode === 'leaderlocal') {
+    if (rn!.raft.state === StateLeader) { stats.localReads++; answerRead(c, key); return }   // PLANTED BUG 2
     mode = 'readindex'
   }
   if (mode === 'log') { stats.logReads++; propose(c, { op: 'read', key }); return }

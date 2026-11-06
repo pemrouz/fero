@@ -1,0 +1,7 @@
+  [1] 28,088 msgs/sec ~ 3.4 MiB/sec ~ min: 4.90us ~ avg: 87.10us ~ max: 7,903.11us ~ P50: 22.15us ~ P90: 51.03us ~ P99: 1,626.98us ~ P99.9: 7,903.11us (300,000 msgs)
+  [2] 28,061 msgs/sec ~ 3.4 MiB/sec ~ min: 4.80us ~ avg: 54.79us ~ max: 10,671.24us ~ P50: 21.68us ~ P90: 43.80us ~ P99: 463.50us ~ P99.9: 10,671.24us (300,000 msgs)
+  [3] 27,828 msgs/sec ~ 3.4 MiB/sec ~ min: 5.27us ~ avg: 39.88us ~ max: 2,732.11us ~ P50: 20.81us ~ P90: 49.46us ~ P99: 427.29us ~ P99.9: 2,732.11us (300,000 msgs)
+  [4] 27,770 msgs/sec ~ 3.4 MiB/sec ~ min: 5.23us ~ avg: 56.85us ~ max: 13,123.93us ~ P50: 21.57us ~ P90: 51.37us ~ P99: 422.84us ~ P99.9: 13,123.93us (300,000 msgs)
+ NATS JetStream durable consumer (fetch) aggregated stats: 111,076 msgs/sec ~ 14 MiB/sec
+ message rates min 27,770 | avg 27,936 | max 28,088 | stddev 139 msgs
+ latencies per operation min 4.80us | avg 59.66us | max 13,123.93us | stddev 446.70us | P50 21.62us | P90 48.20us | P99 591.01us | P99.9: 7,903.11us

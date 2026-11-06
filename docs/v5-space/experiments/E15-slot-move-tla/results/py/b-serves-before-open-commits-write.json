@@ -1,0 +1,14 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [],
+ "kind": "mutant",
+ "live_nodes": 1728,
+ "live_starts": 393,
+ "live_stuck": 0,
+ "secs": 138.4,
+ "states": 1114166,
+ "steps": {},
+ "transitions": 3301449,
+ "variant": "b-serves-before-open-commits"
+}

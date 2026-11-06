@@ -1,0 +1,58 @@
+{
+ "a-unfences-alone-move-p1": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 17,
+  "secs": 4.7,
+  "tla_states": 18,
+  "tla_steps": 17,
+  "variant": "a-unfences-alone"
+ },
+ "a-unfences-alone-move-p9": {
+  "bound": "move",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 3.7,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "a-unfences-alone"
+ },
+ "a-unfences-alone-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 17,
+  "secs": 4.3,
+  "tla_states": 18,
+  "tla_steps": 17,
+  "variant": "a-unfences-alone"
+ },
+ "a-unfences-alone-write-p2": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 24,
+  "secs": 5.8,
+  "tla_states": 25,
+  "tla_steps": 24,
+  "variant": "a-unfences-alone"
+ }
+}

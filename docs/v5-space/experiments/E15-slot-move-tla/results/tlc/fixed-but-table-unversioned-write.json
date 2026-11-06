@@ -1,0 +1,23 @@
+{
+ "bound": "write",
+ "calm_states": 1564,
+ "complete": true,
+ "distinct_total": 747936,
+ "errors": [],
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "reading",
+ "live_edges": 2307,
+ "live_stuck": 0,
+ "secs": 278.3,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 746372,
+ "steps": {
+  "1": 19,
+  "9": 15
+ },
+ "variant": "fixed-but-table-unversioned",
+ "workers": 2
+}

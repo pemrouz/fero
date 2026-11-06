@@ -1,0 +1,1 @@
+NATS JetStream durable consumer (fetch) stats: 121,465 msgs/sec ~ 15 MiB/sec ~ min: 12.60us ~ avg: 46.27us ~ max: 3,934.41us ~ P50: 24.16us ~ P90: 68.14us ~ P99: 421.81us ~ P99.9: 1,378.52us

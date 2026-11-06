@@ -1,0 +1,14 @@
+{
+ "bound": "deep",
+ "capped": false,
+ "failed": [],
+ "kind": "design",
+ "live_nodes": 16923,
+ "live_starts": 2759,
+ "live_stuck": 0,
+ "secs": 26.5,
+ "states": 308274,
+ "steps": {},
+ "transitions": 1218225,
+ "variant": "fixed"
+}
