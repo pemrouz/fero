@@ -25,7 +25,8 @@ until grep -q '^ready' "$log" 2>/dev/null; do
   sleep 0.1
 done
 start=$(date +%s.%N)
-"$@" >> "$out" 2>&1
+# a tool that hangs must not hold the study's lock: 5 minutes at most per tool run
+timeout -k 10 300 "$@" >> "$out" 2>&1
 rc=$?
 end=$(date +%s.%N)
 kill -TERM $hpid 2>/dev/null; wait $hpid 2>/dev/null
