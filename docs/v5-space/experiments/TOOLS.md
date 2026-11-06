@@ -7,7 +7,13 @@ Written 2026-11-06 by the toolsmith. Box: Ubuntu 24.04, kernel 6.18.44-fc (a Fir
 ## In short
 
 - **Ready (20):** fio, perf, redis-server with redis-benchmark, nats-server, the nats CLI, etcd, etcd's `benchmark`, Kafka, MinIO, mc, Node 26, a C N-API addon, a napi-rs addon, rquickjs, deno_core, raft-rs, a FUSE mount, crane, Chromium and iptables.
-- **Not usable yet (3): memtier_benchmark, Redpanda and LazyFS.** Each was downloaded, but building or running it was held back at first, because it builds or runs code from outside sources (a cloned repository, or a binary unpacked from a package or an image). The section "Needs permission" gives the exact commands and the best alternative at the time.
+- **Usable since 2026-11-06:** Redpanda, memtier_benchmark and LazyFS are fetched, built and run on the study box, and any other tool the study needs may be fetched, built or run the same way. Use these paths:
+  - **memtier_benchmark 2.5.2:** `$SP/opt/memtier/bin/memtier_benchmark` (Redis's official image binary; `--version` works). Use it as E-09a's main Redis driver; redis-benchmark is the second tool.
+  - **Redpanda 26.2.6 with rpk:** `/opt/redpanda/bin/redpanda` and `/opt/redpanda/bin/rpk` (`/opt/redpanda` is a link to `$SP/dl/redpanda-deb/root/opt/redpanda`, so the broker's fixed loader path works). Start one broker with `redpanda --redpanda-cfg <yaml> --smp 1 --memory 2G --overprovisioned`; a working yaml and script are in `$SP/rp-smoke/`. Kafka's perf tools drive it.
+  - **LazyFS 0.3.1:** built by `ALLOW_GATED=1 tools-fetch.sh lazyfs`; see the LazyFS row below for its state.
+  - **Real Elle 0.2.8 and Knossos 0.3.16** (Jepsen's checkers, Clojure): jars in `$SP/dl/elle-mvn/jars/`, fetched from Clojars with Maven (`$SP/dl/elle-mvn/pom.xml`, `settings.xml` gives Maven the proxy). Run `java -cp "$SP/dl/elle-mvn/jars/*" clojure.main <script.clj>`; `$SP/dl/elle-mvn/smoke.clj` is an example. `repo.clojars.org` is reachable from the box.
+  - **Maelstrom 0.2.4** (Jepsen's workbench for toy distributed systems, with Elle and Knossos inside): `$SP/dl/maelstrom/maelstrom/`. **elle-cli 0.1.8:** `$SP/dl/elle-cli/`.
+- **Earlier state, kept for the record. Not usable at first (3): memtier_benchmark, Redpanda and LazyFS.** Each was downloaded, but building or running it was held back at first, because it builds or runs code from outside sources (a cloned repository, or a binary unpacked from a package or an image). The section "Needs permission" gives the exact commands and the best alternative at the time.
 - **To rebuild everything:** `docs/v5-space/experiments/tools-fetch.sh`. It checks every download against a checksum, skips work already done, and runs the three blocked steps only with `ALLOW_GATED=1`.
 - **To check everything:** `$SP/bin/heavy docs/v5-space/experiments/tools/smoke.sh`. It runs in about 25 s. The last output is in [tools/results/smoke.txt](tools/results/smoke.txt).
 

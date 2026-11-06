@@ -36,7 +36,8 @@ On 2026-11-06 the owner asked for a study that starts from a base case and draws
   - etcd v3.5.17: `$SP/dl/etcd/etcd-v3.5.17-linux-amd64/`;
   - nats-server v2.10.22: `$SP/dl/nats/nats-server-v2.10.22-linux-amd64/`;
   - etcd's raft source with its TLA+ spec: `$SP/dl/raftsrc/raft/` (`tla/etcdraft.tla`).
-- **Not available yet:**
+- **Tools that may be fetched (2026-11-06):** Redpanda, memtier_benchmark, LazyFS, and any other tool an experiment needs. Fetch, build or run each from its official source, with a checksum where one exists. [experiments/TOOLS.md](experiments/TOOLS.md) lists what is now ready (memtier_benchmark, Redpanda, LazyFS, real Elle and Knossos, Maelstrom).
+- **Not available at the start:**
   - The Docker daemon is not running.
   - `archive.apache.org` reset once, so try `dlcdn.apache.org` or Maven Central for Kafka.
   - Libraries and tools may be downloaded.
