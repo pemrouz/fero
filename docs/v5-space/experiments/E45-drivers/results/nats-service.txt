@@ -1,3 +1,15 @@
 # E-45 nats-service: 2026-11-06T22:07:37Z, node v22.22.0, data 63fea66, 4 vCPU, loadavg 12.30 7.28 6.56 18/319 20291
 # host: host.ts nats --listen 127.0.0.1:14290
 # tool: sh -c /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service serve e45.svc --clients 2 --msgs 1000 --no-progress & srv=$!; sleep 1; /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/natscli/unz/nats-0.5.1-linux-amd64/nats -s nats://127.0.0.1:14290 bench service request e45.svc --clients 1 --msgs 1000 --size 16B --no-progress; kill -TERM $srv; wait
+22:07:38 Starting Core NATS service server benchmark [clients=2, msg-size=128 B, msgs=1,000, sleep=0s, subject=e45.svc]
+22:07:38 [1] Starting Core NATS service server, hit control-c to stop
+22:07:38 [2] Starting Core NATS service server, hit control-c to stop
+22:07:39 Starting Core NATS service requester benchmark [clients=1, msg-size=16 B, msgs=1,000, sleep=0s, subject=e45.svc]
+22:07:39 [1] Starting Core NATS service requester, requesting 1,000 messages
+
+NATS Core NATS service requester stats: 1,045 msgs/sec ~ 16 KiB/sec ~ min: 239.47us ~ avg: 953.49us ~ max: 46,415.86us ~ P50: 637.62us ~ P90: 1,374.54us ~ P99: 6,248.37us ~ P99.9: 46,415.86us
+
+# tool exit code 0, wall 2.033819516 s
+# host log:
+ready nats 127.0.0.1:14290 (gateway in s1; seed 1; resources nats {"rows":false,"durability":"none"})
+summary (SIGTERM): [2.2 s real, 0.971 s virtual, 21125 events, 2000 verbs] conns=0 in=124375B out=127654B ops{SUB=21 PUB=2000 deliver=2000} errors{} cpu=1.19s rss=136MB
