@@ -1,0 +1,18 @@
+{
+ "bound": "quick",
+ "calm_states": 205,
+ "complete": false,
+ "distinct_total": 18275,
+ "errors": [
+  "Model checking completed. No error has been found."
+ ],
+ "failed": [],
+ "kind": "design",
+ "live_edges": 262,
+ "live_stuck": 0,
+ "secs": 10.8,
+ "states": 18070,
+ "steps": {},
+ "variant": "fixed",
+ "workers": 1
+}

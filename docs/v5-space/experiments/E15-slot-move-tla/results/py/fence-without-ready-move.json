@@ -1,0 +1,18 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  7
+ ],
+ "kind": "mutant",
+ "live_nodes": 249,
+ "live_starts": 90,
+ "live_stuck": 3,
+ "secs": 8.9,
+ "states": 79020,
+ "steps": {
+  "7": 4
+ },
+ "transitions": 214501,
+ "variant": "fence-without-ready"
+}

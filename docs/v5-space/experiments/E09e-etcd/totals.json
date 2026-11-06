@@ -1,0 +1,19 @@
+{
+ "lease-keepalive-1000c": 580000,
+ "lock-100c": 20,
+ "lock-1c": 20,
+ "put-1000c": 380000,
+ "put-1000c-all": 380000,
+ "put-1000c-nofsync": 480000,
+ "put-1c": 40000,
+ "put-1c-nofsync": 100000,
+ "range-l-1000c": 1200000,
+ "range-l-1c": 190000,
+ "range-s-1000c": 1300000,
+ "range-s-1c": 480000,
+ "stm-1000c": 300000,
+ "stm-1c": 30000,
+ "stm-lock-1c": 12000,
+ "txn-put-1000c": 520000,
+ "txn-put-1c": 42000
+}

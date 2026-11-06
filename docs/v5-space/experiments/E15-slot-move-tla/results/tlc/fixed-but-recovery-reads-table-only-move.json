@@ -1,0 +1,21 @@
+{
+ "bound": "move",
+ "calm_states": 205,
+ "complete": true,
+ "distinct_total": 49186,
+ "errors": [],
+ "failed": [
+  9
+ ],
+ "kind": "reading",
+ "live_edges": 262,
+ "live_stuck": 0,
+ "secs": 13.7,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 48981,
+ "steps": {
+  "9": 15
+ },
+ "variant": "fixed-but-recovery-reads-table-only",
+ "workers": 2
+}

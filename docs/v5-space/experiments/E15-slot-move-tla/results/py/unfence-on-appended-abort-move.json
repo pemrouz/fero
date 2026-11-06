@@ -1,0 +1,22 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  1,
+  7,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 340,
+ "live_starts": 98,
+ "live_stuck": 3,
+ "secs": 9.9,
+ "states": 70462,
+ "steps": {
+  "1": 17,
+  "7": 13,
+  "9": 16
+ },
+ "transitions": 216933,
+ "variant": "unfence-on-appended-abort"
+}

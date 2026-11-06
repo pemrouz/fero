@@ -1,0 +1,113 @@
+# E-45: driving fero with each competitor's own tool
+
+**Question (Q-45).** How is fero driven by each competitor's own tool? For each row of PERF-02 to PERF-07, which driver: a gateway (a front that speaks the tool's protocol), a ported load loop, or a driver plugin? Build the cheapest on E-22's prototype and run each once to show it drives. ([QUESTIONS.md](../../QUESTIONS.md) Q-45, [REQUIREMENTS.md](../../REQUIREMENTS.md) PERF-01.)
+
+**Words.** A *gateway* is a server that speaks a competitor's wire protocol and turns each request into fero verbs (`set`, `get`, `read`, `claim`, `touch`, `batch`). A *ported load loop* is the tool's own loop rewritten against fero's API, with the same clients, sizes and pipeline depth. *The prototype* is E-22's: API.md's surface over a five-operation kernel, all inside one simulated world (one Node process, a virtual clock, three simulated servers). A *rung* is a durability level (`persisted`, `none`). *L5* is the library layer: code built only from the public verbs.
+
+**This is not a timing experiment.** Every number a tool prints below measures the E-22 simulator behind a gateway in one Node process, never a fero kernel. They are shown only to prove the tool ran to the end and what it reports. The runs used the study's heavy lock, not the timing lock.
+
+## In short
+
+- **Every row of PERF-02 to PERF-07 now has a named driver, and every competitor tool that runs on this box drove the prototype end to end** (measured here, results below): redis-benchmark through a RESP gateway; `nats bench` (pub, sub, service), `nats latency` and `nats bench js` (sync and async publish, a pull consumer, a work queue) through one NATS gateway with a JetStream subset; Kafka's producer, consumer and end-to-end latency tools through a Kafka gateway; etcd's `benchmark` (put, range both ways, txn-put, stm, lease keep-alive) through an etcd v3 gRPC gateway. The lock row is etcd's lock loop ported to fero's `lock()`, as PERF-07 itself asks ("vs the locks library").
+- **The four gateways are about 1,300 lines of TypeScript** (code lines, no comments: RESP 131, NATS 190 + JetStream 221, Kafka 325 + a 182-line codec, etcd 195, shared 66). Each is L5: it imports only `fero()` and the verbs. So they fit every candidate that keeps API.md's L4 (reasoned).
+- **OpenMessaging Benchmark needs no fero driver of its own.** Its Kafka driver speaks the Kafka protocol, so the Kafka gateway is the driver: the "OMB driver of about 300 lines" becomes 0 lines (reasoned; OMB itself cannot be built here, [TOOLS.md](../TOOLS.md)). The same gateway is fero's side of PERF-06 (Redpanda).
+- **The Kafka gateway was cheap because it reads Kafka's own message specs.** The JSON specs inside `kafka-clients-4.4.0.jar` drive one generic encoder, so every version a client picks, flexible ones included, works. The producer tool ran on the first try (measured here).
+- **Building them found eleven things the API lacks or must decide** (F1 to F10 and F1b, below). Five are API changes: versions need a documented number form (F1); a read must be able to start at a version (F1b); values must allow bytes (F3); pipelined writes from one process to one partition are not kept in order across a leader change (F4: measured in 1 of 20 seeds so far, full run below); a caller must be able to give a write its idempotency key (F10, which confirms E-22's D3). F2 confirms E-22's D2 (a client must be able to create a declarative resource). F7 makes Q-A9 concrete: at Redis's and Kafka's defaults, fero's rows have no matching rung.
+- **Rows that stay "not comparable"** (no faithful driver): memtier_benchmark and OMB runs (the tools cannot run on this box; the gateway would serve them), Redpanda (cannot run here), Kafka share groups (not built), etcd's own lock recipe and multi-key transactions through the gateway (no fero form, F8), and JetStream redelivery and dedup by message id (F6, F10).
+
+## What was built
+
+All in this folder. The host ([host.ts](host.ts)) makes one world with three servers `s1`, `s2`, `s3`, opens the gateway's resources on all three (so each group has three voters), and starts the gateway inside `s1`: a fero server process that also speaks the tool's protocol, as Redis or etcd do.
+
+| Gateway | File | Speaks | Maps to |
+|---|---|---|---|
+| RESP | [lib/resp.ts](lib/resp.ts) | RESP2: GET, SET, INCR, INCRBY, DECR, DECRBY, DEL, EXISTS, MGET, PING, ECHO, SELECT 0, CONFIG GET, INFO, HELLO 2, QUIT | resource `kv`; GET → `get(k)` (a held-row read at the gateway; `--get fresh` → `get(k, { fresh: true })`); SET → `set(k, v)`; INCR → `set(k, op.incr(1))`, answering `Ack.value`. A canonical integer string is kept as a number, as Redis does, so INCR works on it. Replies leave in request order; a command waits for the previous one on the same key from the same connection |
+| NATS | [lib/nats.ts](lib/nats.ts) | CONNECT, PING/PONG, PUB, HPUB, SUB (with queue groups), UNSUB, MSG, HMSG, no-responders (503) | resource `nats`, `rows: false`, `durability: 'none'` (PERF-03's rung; `--durability persisted` beside it). Subject = partition. PUB → `set(subject, { d, r, h })`; SUB → `read({ partitions: [subject], from: 'latest' })`, a wildcard → `read({ prefix })` filtered by NATS's match rule; a queue group shares one reader per gateway and deals messages in turn |
+| JetStream | [lib/jetstream.ts](lib/jetstream.ts) | `$JS.API.INFO`, `STREAM.CREATE/UPDATE/INFO/NAMES`, publish with PubAck, `CONSUMER.CREATE/DURABLE.CREATE/INFO/DELETE`, `CONSUMER.MSG.NEXT` (pull, with 408 and heartbeats), `$JS.ACK` | a limits stream → resource `js.<name>`, `rows: false`, `history: max_bytes`; a pull consumer = its own log reader, its cursor kept in a row of `js.$consumers`. A work-queue stream → rows `subject/<id>`; a pull = `claim({ n: batch, lease: ack_wait })`; an ack = `remove(key, { if: { version: token } })` (P-09's mapping) |
+| Kafka | [lib/kafka.ts](lib/kafka.ts), [lib/kafka-codec.ts](lib/kafka-codec.ts) | ApiVersions, Metadata, CreateTopics, InitProducerId, Produce, Fetch, ListOffsets, FindCoordinator, JoinGroup, SyncGroup, Heartbeat, LeaveGroup, OffsetCommit, OffsetFetch; every version up to the last one without topic ids | topic → resource `kafka.<topic>`, `rows: false`, `history: 'all'`; partition i → fero partition `p<i>`. Each record batch → one `set('p<i>', { b })` of its bytes verbatim (CRC untouched), chained per connection and partition. Offsets are made from the version (F1). A fetch answers from an index that one log reader per partition fills (F1b). Groups: the gateway is the coordinator; committed offsets are rows of `kafka.$offsets` |
+| etcd v3 | [lib/etcd.ts](lib/etcd.ts), [proto/etcd-subset.proto](proto/etcd-subset.proto) | KV Range, Put, DeleteRange, Txn, Compact; Lease Grant, KeepAlive, Revoke, TimeToLive; Maintenance Status; Cluster MemberList (gRPC, @grpc/grpc-js) | resource `etcd`, `partition: { before: '/' }`. Put → `set`; Range → `get` (serializable) or `get(k, { fresh: true })` (linearizable); Txn on one partition → one `batch()` with the compares as conditions: `mod = r` → `if: { version }`, `mod = 0`, `create = 0` or `version = 0` → `if: { absent }`, `value = x` → `if: { equals }`; a refused batch = `succeeded: false`, then the else-branch reads. A lease → a row with `ttl`; keep-alive → `touch` |
+| lock loop | [ports/lockloop.ts](ports/lockloop.ts) | — | E-09e's [lockbench](../E09e-etcd/lockbench/main.go) rewritten against fero's `lock()` (E-22's L5 library): same clients, one lock per client, Lock then Unlock, warm-up not measured; HdrHistogram, raw and corrected for coordinated omission (expected interval = the mean cycle). Virtual time |
+
+The etcd proto is etcd's own, trimmed by [proto/trim.py](proto/trim.py) to the services above (same package, names and field numbers). [checks/order.check.ts](checks/order.check.ts) is F4's evidence.
+
+## Each row and its driver
+
+"Driven here" means the tool ran to the end against the prototype in this folder's run (results file named). "Gateway" means the competitor's own tool talks to fero unchanged.
+
+| Row | Competitor tool and workload | fero's driver | Here | Result file | Comparable? |
+|---|---|---|---|---|---|
+| PERF-02 | memtier_benchmark GET, SET, INCR, 100 B, 4 threads × 50 clients, pipeline 1 and 16 | RESP gateway | not run: memtier cannot run on this box (TOOLS.md, needs the user's permission); it speaks the same RESP commands | — | yes, once memtier runs |
+| PERF-02 | redis-benchmark, same workload (the cross-check) | RESP gateway | **driven**: SET, GET, INCR at `-P 1` and `-P 16`; GET with `fresh` | [resp-p1](results/resp-p1.txt), [resp-p16](results/resp-p16.txt), [resp-p1-fresh](results/resp-p1-fresh.txt) | yes, matched (`appendfsync always` vs `persisted`); at Redis's default only against `persisted` (F7) |
+| PERF-02 | "an in-process read of a held row must beat a Redis GET round trip" | a pin, `f.snapshot[k]` in process | no tool needed | — | yes, by design (a pin, not a tool row) |
+| PERF-03 | `nats bench pub/sub`, 1 → 1 and 1 → 16, 16 B and 1 KB | NATS gateway, `none` rung; `persisted` beside | **driven**: 1 → 1 16 B, 1 → 16 1 KB, 1 → 1 16 B persisted | [nats-1to1-16B](results/nats-1to1-16B.txt), [nats-1to16-1KB](results/nats-1to16-1KB.txt), [nats-1to1-16B-persisted](results/nats-1to1-16B-persisted.txt) | yes |
+| PERF-03 | `nats latency` | NATS gateway | **driven** | [nats-latency-16B](results/nats-latency-16B.txt) | yes |
+| PERF-03, P-21 | `nats bench service` request and reply, queue group | NATS gateway | **driven** (2 servers in a queue group) | [nats-service](results/nats-service.txt) | yes, on one gateway (F5 across gateways) |
+| PERF-04 | `nats bench js pub sync` (1 and 16 clients), `pub async --batch 500`, `fetch --batch 500`, a work-queue stream with 4 pull clients | NATS gateway + JetStream subset | **driven**, all five | [js](results/js.txt) | yes for publish with acks, the pull consumer and the work queue; not for redelivery after `ack_wait` on a limits stream or dedup by `Nats-Msg-Id` (F6, F10) |
+| PERF-05 | OpenMessaging Benchmark, Kafka driver | Kafka gateway (OMB's Kafka driver talks to it unchanged) | not run: OMB cannot be built here (TOOLS.md) | — | yes, once OMB runs; no fero OMB driver is needed |
+| PERF-05 | `kafka-producer-perf-test` (1 KB, 16 partitions, replication 3, `acks=all`), `kafka-consumer-perf-test`, `kafka-e2e-latency` | Kafka gateway | **driven**, all three | [kafka](results/kafka.txt) | yes at matched (`flush.messages=1` vs `persisted`); at Kafka's default fero has no `memory` rung (F7); the producer's sequence numbers are not used to drop resends (F10) |
+| PERF-05 (E-09c) | `kafka-share-consumer-perf-test` (share groups, Kafka's queues) | would be the Kafka gateway with ShareFetch and ShareAcknowledge on `claim` | not built | — | not comparable until built (it maps as the JetStream work queue does) |
+| PERF-06 | OMB or Kafka's tools against Redpanda | the same Kafka gateway (fero's side is PERF-05's) | Redpanda cannot run here (TOOLS.md); fero's side is the PERF-05 run | [kafka](results/kafka.txt) | fero's side yes; the Redpanda side is cited only |
+| PERF-07 | etcd `benchmark put` (1 client; 1,000 clients on 100 connections), `range` linearizable and serializable, `txn-put`, `stm`, `lease-keepalive` | etcd v3 gRPC gateway | **driven**, all of them | [etcd](results/etcd.txt) | yes; keep-alive compares a committed `touch` with etcd's leader-only renew (F9) |
+| PERF-07 | lock (E-09e's lockbench over etcd's `concurrency.Mutex`) | ported loop over fero's `lock()` (PERF-07: "vs the locks library") | **driven**, 1 and 100 clients | [lock](results/lock.txt) | yes; etcd's own lock recipe *through the gateway* is not comparable (F8) |
+
+## What the runs showed
+
+Every run: `./run.sh <block>`, each block under `$SP/bin/heavy`. The tool's own last lines are copied here; the full output, the gateway's counters and the fero side's CPU (gateway, three servers and the simulator together) are in each results file. Again: these numbers are the simulator's, not fero's.
+
+RESULTS-PLACEHOLDER
+
+## Findings
+
+Each is labelled: measured here (with the file), or reasoned.
+
+**F1. A version needs a documented number form.** (measured here: every gateway needed it) Every protocol carries positions as integers: etcd's `mod_revision`, `create_revision` and header `revision` (int64), Kafka's offsets (int64, and a batch takes a run of them), JetStream's stream sequence (uint64). API.md keeps `Version` opaque, and Q-A14 says offsets never appear in answers. The gateways had to parse the prototype's internal `epoch:index` string ([lib/jetstream.ts](lib/jetstream.ts) `verNum`, [lib/etcd.ts](lib/etcd.ts) `verNum`/`numVer`, [lib/kafka.ts](lib/kafka.ts) `baseOf`). Proposed: API.md states that a version of one partition maps to and from a non-negative 63-bit integer that keeps that partition's order (for example `fero.version.toNumber(v)` and `fromNumber(n)`), with room below it for a record's place inside a batch (the Kafka gateway used 16 bits). Q-A14 stands for apps; this is a number for gateways.
+
+**F1b. A read cannot start at a version.** (measured here: the Kafka gateway) `read({ from })` takes a cursor, `'earliest'` or `'latest'`. Kafka's Fetch and ListOffsets seek by offset, JetStream's consumers can start at a sequence, etcd's Watch starts at a revision. The Kafka gateway keeps an index of every batch of every partition in its own memory, fed by a reader from `'earliest'`, to answer a fetch at an offset: memory grows with the log, and a restarted gateway must re-read the whole log. Proposed: `read({ partitions: [p], from: Version })` for a one-partition read, or a `cursorAt(version)`.
+
+**F2. A gateway creates resources at run time.** (measured here: JetStream's `STREAM.CREATE`, Kafka's `CreateTopics` and auto-create) Today only a server creates a resource (Q-A1), and every server must open it to serve it. The gateways ran inside a server and called the host's `ensure`, which opened the resource on all three servers: the job v5's placement does by default (API.md §4: "by default every server"). This confirms E-22's D2: a client may create a resource whose keys are all declarative. A gateway's resources (streams, topics) are all declarative.
+
+**F3. Values must allow bytes.** (measured here) Every protocol carries bytes. API.md refuses binary values (`unencodable`), but data allows them as opaque leaves (data's SCHEDULE clause 11: a codec must preserve them or refuse loudly). The gateways store each byte as one latin1 character, which round-trips in memory but would cost up to 2 bytes per byte above 0x7f on a UTF-8 wire (random payloads), or a third more as base64 (reasoned). Proposed: `Uint8Array` values allowed, as data allows them, and the record codec keeps them as bytes (DATA-03).
+
+**F4. Writes in flight from one process to one partition can commit out of order.** (measured here: [results/order.txt](results/order.txt)) API.md promises order per partition in the log, not the order of a process's own unawaited writes. A Kafka producer (5 requests in flight), a NATS publisher and JetStream's async publish all expect the server to keep their send order. The check sends 40 writes to one row without waiting, with a leader change inside the burst: ORDER-PLACEHOLDER. The cause: a write that lost its first send to the leader change is resent after later ones landed. The gateways therefore chain writes per connection and partition (each waits for the previous answer), which caps a pipelined publisher at one commit per round trip per partition. Proposed: fero keeps issue order per (process, partition) for writes in flight, as Kafka's idempotent producer does with sequence numbers, or a pipelined-append verb does.
+
+**F5. Shared consumption across gateways is not mapped.** (reasoned) NATS queue groups and Kafka's classic consumer groups are coordinated in one gateway's memory here. With several gateways, NATS queue groups need `read({ share })` or claims, and Kafka groups need a coordinator whose generations fence commits (P-08's `group()`); in Kafka's classic protocol the client leader computes the assignment, so the gateway must keep the generation in a fero row. Not an API change; a gateway design rule.
+
+**F6. Parts of JetStream have no mapping yet.** (reasoned) Redelivery after `ack_wait` on a limits stream (a log reader has no per-message ack; `claim` works on rows), `max_ack_pending`, push consumers, mirrors and sources, direct get. The work-queue stream maps fully (P-09's claim, lease and conditional ack). A JetStream row that uses any of the unmapped parts is not comparable.
+
+**F7. At the competitors' defaults, fero's rows have no matching rung.** (reasoned from API.md §3 and the runs) Redis as shipped (no fsync), Kafka's default (`acks=all` with no flush: the ISR's memory), Kafka's `acks=1` (the leader alone) and JetStream's memory storage all sit between fero's two rungs. `durability: 'none'` needs `rows: false` and is best effort (no replication), and a Kafka topic is `rows: false`, so for streams `none` is weaker than Kafka's default while `persisted` is stronger. The drivers send these rows at `persisted`. This is Q-A9 and conflict X1: PERF-01 says "at the competitor's default, fero's matching rung must win", and for these rows the matching rung would be `memory`.
+
+**F8. Some etcd semantics have no fero form.** (reasoned, while building the etcd gateway) One revision order across all keys (fero has none across partitions, by design); compares other than equality (`<` and `>` on revisions); a linearizable range over many partitions at one revision; a Txn across partitions (P-15's saga is not atomic in visibility); Watch from a revision (F1b). The PERF-07 rows do not use them: `stm` with one key per transaction compares `mod_revision = r` or `= 0`, which maps exactly (a missing key answers revision 0, so `= 0` becomes `if: { absent }`), and `txn-put` with one op is one write. A row with more keys per transaction, or etcd's own lock recipe (it orders waiters by create revision across keys and waits by Watch), is not comparable through the gateway; PERF-07's lock row is the ported loop instead.
+
+**F9. A lease keep-alive commits in fero, not in etcd.** (reasoned from the mapping; etcd's side is E-09e's note that etcd does not replicate keep-alives, [E09e README](../E09e-etcd/README.md)) etcd answers keep-alives on its leader without a log write. The gateway's keep-alive is a `touch` that commits, plus one `touch` per key attached to the lease, because a fero row's `ttl` is its own and `while: 'session'` binds rows to a process's session, not to a client's named lease. So PERF-07's keep-alive row compares a replicated renewal with a leader-local one, and the README of that row must say so. Proposed (S): rows bound to a named lease (`while: { lease: id }`), the general form of `while: 'session'`.
+
+**F10. A caller cannot give a write its idempotency key.** (reasoned; confirms E-22's D3, which measured it) A Kafka producer's resend carries the same producer id and sequence, and a JetStream publish can carry `Nats-Msg-Id`. Through the gateway, a resent Produce is a new fero attempt and would commit twice. D3's `WriteOpts.id` (an idempotency key on a write) lets the gateway pass `kafka:<producer>:<partition>:<sequence>` or the message id, and fero's own dedup does the rest within its horizon.
+
+## What this means for the requirements
+
+**The gateways become requirements with their command lists** (the threshold of Q-45). Proposed rows, for REQUIREMENTS.md's owner:
+
+| Proposed id | Gateway | Commands (the minimum the PERF rows use) | Lines here |
+|---|---|---|---|
+| GW-RESP | RESP2 | GET, SET (no options), INCR, INCRBY, DECR, DEL, EXISTS, MGET, PING, CONFIG GET, INFO, SELECT 0, QUIT | 131 |
+| GW-NATS | NATS client protocol | CONNECT, PING/PONG, PUB, HPUB, SUB (with queue), UNSUB, MSG, HMSG, no-responders | 190 |
+| GW-JS | JetStream subset | `$JS.API.INFO`, STREAM.CREATE/INFO/UPDATE, publish with PubAck, CONSUMER.CREATE/INFO/DELETE, CONSUMER.MSG.NEXT, `$JS.ACK`, retention limits and workqueue | 221 |
+| GW-KAFKA | Kafka protocol | ApiVersions, Metadata, CreateTopics, InitProducerId, Produce, Fetch, ListOffsets, FindCoordinator, JoinGroup, SyncGroup, Heartbeat, LeaveGroup, OffsetCommit, OffsetFetch (+ ShareFetch, ShareAcknowledge for share groups) | 325 + 182 codec |
+| GW-ETCD | etcd v3 gRPC | KV Range, Put, DeleteRange, Txn (one partition, equality compares), Lease Grant, KeepAlive, Revoke, TimeToLive, Maintenance Status, Cluster MemberList | 195 + a trimmed proto |
+
+**Phase.** The gateways are L5 and can be built when a phase first claims a PERF row (reasoned). But F1, F1b, F3, F4 and F10 change formats that phase 1 fixes: the record's value encoding (bytes, DATA-03), the version's form (DEV-09), the writer's attempt table (caller keys) and its ordering of a session's writes. So they are phase-1 decisions even though the gateways come later. GW-RESP is also P-19's "other languages reach fero through the RESP gateway", which is a MUST.
+
+## What this box cannot show
+
+- **No speed at all.** The prototype is a simulator in one process; a gateway's real cost (parse, encode, a socket write per message) is in the host's `cpu=` counter only together with the simulator's. E-08, E-09 and the real kernel decide speed.
+- **memtier_benchmark, OMB and Redpanda do not run here** (TOOLS.md "Needs permission" and "Not fetched"). Their rows are named, not driven.
+- **One gateway.** F5's multi-gateway coordination is reasoned, not run.
+- **No faults during the drives.** The simulator can inject leader changes and moves, but these runs show the protocols drive; E-22 owns the fault runs. F4's check is the one exception.
+
+## Reproduce
+
+- Machine: 4 vCPU, 15 GB, Node 22.22.0, data at the commit each results header names; the tools as [TOOLS.md](../TOOLS.md) lists them (redis-benchmark 7.0.15, nats CLI 0.5.1, etcd benchmark v3.5.17, Kafka 4.4.0).
+- `sh fetch.sh` (npm packages pinned by [npm/package-lock.json](npm/package-lock.json); Kafka's message specs from the Kafka jar, sha256 checked; etcd's protos re-derived and compared), then `./run.sh` (every block, each under the heavy lock) or `./run.sh resp|nats|js|etcd|kafka|lock|order|types`.
+- One gateway by hand: `node --experimental-strip-types --no-warnings host.ts resp --listen 127.0.0.1:16390`, then point the tool at it. `E45_DEBUG=1` prints each Kafka request and NATS's unknown operations.
+- `./run.sh types`: `tsc --strict` over every file here ([results/typecheck.txt](results/typecheck.txt)).
+
+VERDICT-PLACEHOLDER

@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "es2022", "module": "nodenext", "moduleResolution": "nodenext",
+    "strict": true, "noImplicitAny": false, "noEmit": true, "allowImportingTsExtensions": true, "skipLibCheck": true,
+    "types": ["node"], "typeRoots": ["/opt/node-tools/node_modules/@types"]
+  },
+  "include": ["host.ts", "lib/*.ts", "ports/*.ts", "checks/*.ts"]
+}

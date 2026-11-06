@@ -1,0 +1,20 @@
+{
+ "bound": "moves",
+ "capped": false,
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "design",
+ "live_nodes": 2354,
+ "live_starts": 642,
+ "live_stuck": 0,
+ "secs": 88.8,
+ "states": 530385,
+ "steps": {
+  "1": 20,
+  "9": 15
+ },
+ "transitions": 1328486,
+ "variant": "design"
+}

@@ -1,0 +1,16 @@
+{
+ "core:pubsub-1to1-16B": 40000000,
+ "core:pubsub-1to1-1KB": 8000000,
+ "core:pubsub-1to16-16B": 3000000,
+ "core:pubsub-1to16-1KB": 600000,
+ "js-always:pub-async-100B": 50000,
+ "js-always:pub-async-1KB": 40000,
+ "js-always:pub-sync-16c-100B": 40000,
+ "js-always:pub-sync-1c-100B": 30000,
+ "js-always:wq-pub-100B": 50000,
+ "js-default:pub-async-100B": 1200000,
+ "js-default:pub-async-1KB": 600000,
+ "js-default:pub-sync-16c-100B": 300000,
+ "js-default:pub-sync-1c-100B": 80000,
+ "js-default:wq-pub-100B": 1200000
+}

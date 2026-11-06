@@ -1,0 +1,18 @@
+{
+ "default-set-p1": 2500000,
+ "default-get-p1": 3000000,
+ "default-incr-p1": 3000000,
+ "default-set-p16": 12000000,
+ "default-get-p16": 15000000,
+ "default-incr-p16": 15000000,
+ "aof-set-p1": 800000,
+ "aof-incr-p1": 800000,
+ "aof-get-p1": 3000000,
+ "aof-set-p16": 4000000,
+ "aof-incr-p16": 4000000,
+ "aof-get-p16": 15000000,
+ "aof-r3-set-p1": 700000,
+ "aof-r3-incr-p1": 700000,
+ "aof-r3-set-p16": 3000000,
+ "aof-r3-incr-p16": 3000000
+}

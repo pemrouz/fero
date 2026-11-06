@@ -1,0 +1,20 @@
+{
+ "bound": "move",
+ "capped": false,
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "reading",
+ "live_nodes": 205,
+ "live_starts": 69,
+ "live_stuck": 0,
+ "secs": 7.4,
+ "states": 55197,
+ "steps": {
+  "1": 23,
+  "9": 21
+ },
+ "transitions": 142190,
+ "variant": "fixed-but-fence-ignores-incarnation"
+}
