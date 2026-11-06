@@ -41,7 +41,11 @@ __FLOORS__
 
 ## What this box cannot show
 
-__CANNOT__
+- **Separate machines for servers and clients.** The three servers, the publisher and up to 16 subscribers share 4 vCPUs. Core NATS fan-out (1 → 16) is limited here by the subscribers' and the server's share of those cores, not by NATS alone; NATS's own published numbers come from bigger machines and are not cited as results.
+- **Independent disks.** The three JetStream servers fsync (with `sync_interval: always`) on the one virtual disk (E-01), so each message's three fsyncs queue behind each other's.
+- **Real round trips.** Loopback only; between machines every replicated ack also pays a network round trip.
+- **What the default `sync_interval` risks.** With the 2-minute default, an acked message can be lost if a majority of servers lose power within that window; this experiment measures speed, not that loss.
+- **Newer servers.** 2.10.22 is the version this study names; 2.11 and 2.12 add batch publishing and other changes (the CLI 0.5.1 lists `js pub atomic` and `js pub fast`, not used here).
 
 ## Files
 

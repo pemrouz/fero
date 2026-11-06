@@ -15,6 +15,9 @@ rm -rf "$dir"; mkdir -p "$dir/pids"
 cd "$dir"
 nem=()
 [ "$nemesis" != none ] && nem=(--nemesis "$nemesis" --nemesis-interval 5)
+# Server-to-server latency: exponential with this mean (ms), so messages on one link reorder.
+# Maelstrom keeps client-to-server latency at zero whatever this is.
+lat=(--latency "${E46_LATENCY:-5}" --latency-dist "${E46_LATENCY_DIST:-exponential}")
 
 pauser_pid=""
 if [ "$pause" = 1 ]; then
@@ -28,11 +31,11 @@ set +e
 E46_READ="$read" E46_SEED="$seed" E46_PIDDIR="$dir/pids" E46_COMPACT="$compact" \
   java -Xmx3g -Djava.awt.headless=true -jar "$MAELSTROM_JAR" test -w lin-kv \
   --bin "$HERE/node/run-node.sh" --node-count "$nodes" --time-limit "$secs" \
-  --concurrency "$conc" --rate "$rate" "${nem[@]}" > maelstrom.out 2>&1
+  --concurrency "$conc" --rate "$rate" "${lat[@]}" "${nem[@]}" > maelstrom.out 2>&1
 code=$?
 set -e
 end=$(date +%s)
 [ -n "$pauser_pid" ] && { kill "$pauser_pid" 2>/dev/null || true; wait "$pauser_pid" 2>/dev/null || true; }
 
-python3 -I "$HERE/summarize.py" "$dir" "$name" "$nodes" "$read" "$seed" "$secs" "$nemesis" "$pause" "$compact" "$rate" "$conc" "$code" "$((end - start))" >> "$RUNS/summary.jsonl"
+E46_LAT="${E46_LATENCY:-5}/${E46_LATENCY_DIST:-exponential}" python3 -I "$HERE/summarize.py" "$dir" "$name" "$nodes" "$read" "$seed" "$secs" "$nemesis" "$pause" "$compact" "$rate" "$conc" "$code" "$((end - start))" >> "$RUNS/summary.jsonl"
 tail -1 "$RUNS/summary.jsonl"

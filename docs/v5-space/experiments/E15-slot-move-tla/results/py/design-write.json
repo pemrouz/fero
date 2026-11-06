@@ -1,0 +1,22 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  1,
+  6,
+  9
+ ],
+ "kind": "design",
+ "live_nodes": 1484,
+ "live_starts": 347,
+ "live_stuck": 0,
+ "secs": 182.1,
+ "states": 1251562,
+ "steps": {
+  "1": 20,
+  "6": 26,
+  "9": 15
+ },
+ "transitions": 3381402,
+ "variant": "design"
+}
