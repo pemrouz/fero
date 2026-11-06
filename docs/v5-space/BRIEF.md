@@ -47,11 +47,14 @@ Every agent in this study reads this first. It says what the study is for, what 
 - **Write only inside your own output folder,** named in your task. Never edit DESIGN-V5.md, the backtest, CLAUDE.md, STATUS.md or another agent's folder. Never commit or push; the coordinator does that.
 - **Downloads go in `$SP/dl/<name>/`,** each in its own empty folder, never in the repo. Your folder gets a `fetch.sh` that downloads what you used, by URL and checksum, so anyone can re-run it.
 - **Every experiment is reproducible.** It needs a `run.sh`, or one exact command in your README, the raw output saved in a `results/` file, and the machine and versions noted.
-- **Timing needs a quiet machine.** Other agents may run at the same time, so use the CPU lock:
-  - wrap every timing benchmark in `flock -x $SP/cpu.lock <command>`;
-  - wrap every heavy job that is not a timing run (TLC, model checks, long simulations) in `flock -s $SP/cpu.lock <command>`;
-  - run timings at least 3 times and report the median and the spread;
+- **Timing needs a quiet machine.** Other agents may run at the same time, so use the two lock helpers:
+  - run every timing benchmark as `$SP/bin/timing <command>`. It waits until no heavy job runs, and holds new ones off meanwhile;
+  - run every heavy job that is not a timing run (TLC, model checks, long simulations, big compiles) as `$SP/bin/heavy <command>`. Several heavy jobs may share the box. Hold the lock for at most about 30 minutes at a time, so a timing run is never kept waiting long; split longer work into pieces. Give TLC `-workers 2` at most;
+  - before each timing run, record the load average (`cat /proc/loadavg`) in the results;
+  - keep each timed run short (about 60 s), run it at least 3 times, and report the median and the spread;
   - say plainly what the 4-vCPU, one-disk box cannot show.
+- **Tools registry.** What is already fetched or built, and where, is listed in `docs/v5-space/experiments/TOOLS.md` (benchmarks) and `TOOLS-models.md` (model checkers and libraries). Read them first; add to the one your task owns.
+- **Each experiment's README ends with one line:** "Q-nn: the answer. Moves: candidate, up or down, on requirement ids." The candidate reports and the verdict cite those lines.
 - **Evidence over opinion.** Every claim in a report is one of: measured here (with the file), model-checked here (with the file), cited (with a link to a paper or doc), or reasoned (say so). Never present a target as a measurement.
 - **Large outputs** (binaries, data dirs, big logs) stay in `$SP`, not in the repo. Keep committed files small: code, scripts, summaries and trimmed results.
 - **Blocked?** If a download, permission or tool blocks you, say exactly what and why in your report, and do the best honest alternative. Never fake a result.
