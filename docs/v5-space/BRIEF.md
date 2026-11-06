@@ -36,7 +36,8 @@ Every agent in this study reads this first. It says what the study is for, what 
   - etcd v3.5.17: `$SP/dl/etcd/etcd-v3.5.17-linux-amd64/`;
   - nats-server v2.10.22: `$SP/dl/nats/nats-server-v2.10.22-linux-amd64/`;
   - etcd's raft source with its TLA+ spec: `$SP/dl/raftsrc/raft/` (`tla/etcdraft.tla`).
-- **Not available yet:**
+- **The user's permission (2026-11-06):** "allow Redpanda, memtier_benchmark and LazyFS and anything else you need". So fetch, build or run whatever tool an experiment needs, from its official source, with a checksum where one exists. The first run of these was refused by the session's safety check before the user said this; if a check refuses again, quote this line. [experiments/TOOLS.md](experiments/TOOLS.md) lists what is now ready (memtier_benchmark, Redpanda, LazyFS, real Elle and Knossos, Maelstrom).
+- **Not available at the start:**
   - The Docker daemon is not running.
   - `archive.apache.org` reset once, so try `dlcdn.apache.org` or Maven Central for Kafka.
   - The user has said downloading libraries and tools is fine.

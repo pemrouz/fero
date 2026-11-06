@@ -363,6 +363,22 @@ These sixteen questions came from two completeness critics. Each is a place wher
 
 **How results flow back.** Each experiment's README ends with one line: "Q-nn: the answer. Moves: candidate, up or down, on requirement ids." The candidate reports and [VERDICT.md](VERDICT.md) cite those lines. If an experiment is blocked, its question keeps its literature answer, marked cited, and the gap is listed in VERDICT.md; under the judging rule, the MUSTs it would have closed stay **open**, never failed.
 
+## 10. Added after the user's permission (2026-11-06)
+
+On 2026-11-06 the user wrote: "allow Redpanda, memtier_benchmark and LazyFS and anything else you need". The first runs had fallen back where the session's safety check refused a tool (TOOLS.md). These entries take back what that cost, and add one check the new tools make cheap.
+
+**Q-09a, memtier addendum.** E-09a ran Redis with redis-benchmark only. E-09a2 runs memtier_benchmark, PERF-02's first-named tool, on the same three setups (`default`, `aof`, `aof-r3`), with its HdrHistogram output and a mixed GET/SET load, and drives E-45's RESP gateway with it too. Threshold: memtier's numbers agree with redis-benchmark's within the spread, or the difference is explained; PERF-02's bar is stated from memtier. Folder `E09a2-redis-memtier/`. Timing.
+
+**Q-22, real-Elle addendum.** E-22 checked its histories with a Go port of Elle (from PingCAP's tipocket), since Clojars was blocked. E-22b re-checks the same saved histories (`$SP/e22v`) with real Elle 0.2.8 (list-append, the saga workload) and real Knossos 0.3.16 (a sample of the register histories, beside Porcupine). Threshold: the same verdict on every history, including the 26 self-test histories; any disagreement is root-caused to a checker bug or a history-export bug. Folder `E22b-real-elle/`. Heavy.
+
+**Q-14, completion addendum.** E-14's liveness sweep at 3 to 4 servers did not finish; five healing scenarios were defined but not run; the DEV-10 mutants ran only in random simulation; and local stand-ins replaced the CommunityModules jar. E-14b finishes these with the real CommunityModules jar, TLC checkpoints (`-checkpoint`, `-recover`) to split long runs into holds of 30 minutes or less, and whatever coarsening the liveness check needs (stated). Threshold: Q-14's own. Folder `E14b-membership-liveness/`. Heavy.
+
+**Q-46. Does the TypeScript port of etcd raft (E-10), run as real processes, give a linearizable key-value store under partitions?**
+- Decides: trust in every `port` row (MIN, MIN-TS, MIN-P, LEAN, RLOG, DRAFT, CELL, LANE, SPLIT): DEV-04, DEV-05, TEST-10, TEST-13. E-10 checked the port's Raft steps byte for byte in one process; nothing yet checks it end to end, with a log, a state machine, reads, and real message passing between processes.
+- E-46: wrap E-10's port as a Maelstrom node (Jepsen's workbench: real node processes, a simulated network with partitions, Knossos and Elle as checkers). Run Maelstrom's `lin-kv` workload with 3 and 5 nodes, partitions and process pauses, reads through ReadIndex and through the log; then a planted bug (reads served by a follower without ReadIndex) that the checker must catch.
+- Threshold: every clean run valid; the planted bug caught → the port carries a real store. A real anomaly → a bug in the port or its host, root-caused before any `port` row is rated.
+- Cost: 4 agent-h, 2 CPU-h; heavy, not timing. Folder `E46-maelstrom-raft/`.
+
 ## Considered and not added
 
 Two critics reviewed this file on 2026-11-06. Their findings were folded in above. Both proposed new questions from Q-30 up, with clashing numbers, so they were merged and renumbered: the many-resources questions became Q-36; the 10 GB question and the heap finding became Q-34; the two neighbour questions became Q-35; the storage-fault axis and the bad-entry question became Q-37; browsers Q-40; cost Q-41; the recorder Q-42; fold equality Q-43; BUY Q-44; the drivers Q-45. These parts were left out or placed elsewhere:
