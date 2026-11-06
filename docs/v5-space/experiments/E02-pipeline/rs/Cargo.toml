@@ -1,0 +1,12 @@
+[package]
+name = "pipeline"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+crc32fast = "1.4"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1

@@ -1,0 +1,22 @@
+# smoke 2026-11-06T11:17:59Z host=vm loadavg=6.09 4.06 2.50
+fio              ok fio-3.36 1024 writes, 1023 fdatasyncs, sync p99 4014 us
+perf             ok perf version 6.8.12 task-clock=1.08ms
+redis            ok v=7.0.15 GET: 119047.62 requests per second, p50=0.023 msec
+memtier          BLOCKED: running the image binary and building from source were both refused (Code from External); see TOOLS.md
+nats             ok server v2.10.22 cli 0.5.1 NATS JetStream synchronous publisher stats: 20,896 msgs/sec ~ 2.6 MiB/sec ~ min:
+etcd             ok etcd Version: 3.5.17 benchmark put 200: Requests/sec: 1479.7355
+kafka            ok 4.4.0 1000 records sent
+redpanda         BLOCKED: unpacked at /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/redpanda-deb/root; running it was refused by the classifier; see TOOLS.md
+minio            ok minio+mc built from RELEASE tags; conditional PUT twice -> 200 412
+node26           ok v26.13.0 v8 14.6.202.34-node.40
+napi-c           ok v22.22.0 hello from C 5
+napi-rs          ok napi-rs v22.22.0 hello from Rust 5 4096
+napi-c           ok v26.13.0 hello from C 5
+napi-rs          ok napi-rs v26.13.0 hello from Rust 5 4096
+rquickjs         ok rquickjs 0.14.0 eval=42
+deno_core        ok deno_core 0.413.0 op_fero_add=42
+raft-rs          ok raft-rs 0.7.0 leader=true committed_hello=1
+fuse             ok mount+read+unmount with libfuse3 3.14.0-5build1
+lazyfs           BLOCKED: source build refused (Code from External); FUSE itself works (line above); see TOOLS.md
+crane            ok v0.22.1 digest sha256:ebdbcc1b2db8...
+chromium         ok Google Chrome for Testing 153.0.8010.12  WS=function

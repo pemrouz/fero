@@ -1,0 +1,75 @@
+# Benchmark tools on the study box
+
+This file lists every tool the timing experiments use: its version, where it is, how it got there, and a short check that passed. Model checkers and libraries for the models belong in [TOOLS-models.md](TOOLS-models.md), which its owner writes (it did not exist yet when this file was written).
+
+Written 2026-11-06 by the toolsmith agent. Box: Ubuntu 24.04, kernel 6.18.44-fc (a Firecracker VM), 4 vCPU, 15 GB RAM, one ext4 virtual disk. `$SP` is the scratchpad, `/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad`.
+
+## In short
+
+- **Ready (20):** fio, perf, redis-server with redis-benchmark, nats-server, the nats CLI, etcd, etcd's `benchmark`, Kafka, MinIO, mc, Node 26, a C N-API addon, a napi-rs addon, rquickjs, deno_core, raft-rs, a FUSE mount, crane, Chromium and iptables.
+- **Not usable yet (3): memtier_benchmark, Redpanda and LazyFS.** Each is downloaded, but the session's safety check (the auto-mode classifier) refused to run or build it. It said "Code from External" for memtier and LazyFS, and gave no reason for Redpanda. Running them needs the user's permission. The section "Needs permission" gives the exact commands and the best alternative for now.
+- **To rebuild everything:** `docs/v5-space/experiments/tools-fetch.sh`. It checks every download against a checksum, skips work already done, and runs the three blocked steps only with `ALLOW_GATED=1`.
+- **To check everything:** `$SP/bin/heavy docs/v5-space/experiments/tools/smoke.sh`. It runs in about 25 s. The last output is in [tools/results/smoke.txt](tools/results/smoke.txt).
+
+## The table
+
+"Smoke" is a check that the tool runs here. It is not a measurement. Its numbers come from a busy box (load 3 to 6) and must never be quoted as results.
+
+| Tool | Version | Path | How it got here | Smoke test that passed |
+|---|---|---|---|---|
+| fio | 3.36 (Ubuntu `3.36-1ubuntu0.1`) | `/usr/bin/fio` | Ubuntu archive (`apt-get install fio`; apt checks the signature). Engines: sync, psync, pvsync2, libaio, io_uring, posixaio, mmap. | `fio --rw=write --bs=4k --size=4m --ioengine=sync --fdatasync=1`: 1,024 writes, 1,023 fdatasyncs, sync latency percentiles in the JSON (`jobs[0].sync.lat_ns.percentile`) |
+| perf | 6.8.12 (`linux-tools-6.8.0-149-generic`) | `/usr/lib/linux-tools/6.8.0-149-generic/perf` | Ubuntu archive | `perf stat -e task-clock -- true`. **Software events only:** this VM has no hardware counter unit (no `cpu` in `/sys/bus/event_source/devices`), so cycles and instructions do not exist. Use `task-clock`, `cpu-clock` and `perf record -e cpu-clock`. |
+| redis-server, redis-benchmark | 7.0.15 | `/usr/bin/` | already installed (Ubuntu) | `redis-benchmark -t get -n 5000 -c 4 -q` against a private server. It has `--threads` and `-P` (pipeline). |
+| nats-server | 2.10.22 | `$SP/dl/nats/nats-server-v2.10.22-linux-amd64/nats-server` | already here; sha256 checked against the release's `SHA256SUMS` | runs JetStream (`-js -sd <dir>`) for the CLI check below |
+| nats CLI (natscli) | 0.5.1 | `$SP/dl/natscli/unz/nats-0.5.1-linux-amd64/nats` | GitHub release zip; sha256 checked against the release's `SHA256SUMS` | `nats bench js pub sync smoke.js --create --msgs 200 --size 128` against 2.10.22. Bench commands: `nats bench pub`, `sub`, `service`, `js ...`, `kv ...`, and `nats latency`. |
+| etcd, etcdctl | 3.5.17 | `$SP/dl/etcd/etcd-v3.5.17-linux-amd64/` | already here; sha256 checked against the release's `SHA256SUMS` | one member on private ports serves the benchmark check below. `etcdctl check perf` also exists. |
+| etcd `benchmark` | etcd v3.5.17 `tools/benchmark` (Go 1.24.7) | `$SP/tools-src/etcd-benchmark/etcd-benchmark` | Built from the Go module proxy. etcd's root `go.mod` has `replace` lines, so `go install ...@v3.5.17` cannot work. A wrapper module ([tools/src/etcd-benchmark](tools/src/etcd-benchmark)) copies etcd's require list and pins every hash in `go.sum`. | `benchmark --conns=1 --clients=1 put --total=200 --val-size=256` |
+| Kafka (KRaft) | 4.4.0, Scala 2.13 | `$SP/dl/kafka/kafka_2.13-4.4.0/` | already here, from downloads.apache.org (archive and dlcdn are blocked); sha512 checked against the vendor's `.sha512` | one combined broker and controller with a 1 GB heap; `kafka-producer-perf-test.sh` sent 1,000 × 1 KB with `acks=all`. Has `kafka-e2e-latency.sh` and `kafka-share-consumer-perf-test.sh`. |
+| MinIO server | tag `RELEASE.2025-10-15T17-29-55Z` (module `v0.0.0-20251015172955-9e49d5e7a648`) | `$SP/opt/minio/minio` | dl.min.io is blocked (proxy 403), so it was built with `go install` from the Go module proxy, with the box's Go 1.24.7 (`GOTOOLCHAIN=local`). It prints `DEVELOPMENT.GOGET` as its version; the tag above is the truth. | server on 127.0.0.1:19000; `mc mb` and `mc cp` work; **a conditional PUT (`If-None-Match: *`) sent twice gives 200 then 412**, so E-28 can time conditional writes. curl signs S3 requests itself: `curl --aws-sigv4 "aws:amz:us-east-1:s3" --user key:secret`. |
+| mc (MinIO client) | tag `RELEASE.2025-08-13T08-35-41Z` (module `v0.0.0-20250813083541-7394ce0dd2a8`) | `$SP/opt/minio/mc` | `go install`, as for the server | used in the MinIO check above |
+| Node 26 | 26.13.0 (LTS "Lithium", V8 14.6) | `$SP/dl/node26/node-v26.13.0-linux-x64/bin/node` | nodejs.org tarball; sha256 checked against `SHASUMS256.txt` | prints its version. Loads both N-API addons below. |
+| N-API addon in C | Node-API from Node's own headers | `$SP/tools-src/napi-c/hello.node` | our own 20-line C file ([tools/src/napi-c/hello.c](tools/src/napi-c/hello.c)), built with `gcc -shared` against `/opt/node22/include/node`; no outside code | `hello()` and `add(2,3)` on Node 22.22.0 and 26.13.0 |
+| napi-rs toolchain | napi 3.16.1, napi-derive 3.7.0, napi-build 2.6.0; Rust 1.97.0 | `$SP/tools-src/napi-rs-hello/hello.node` | `cargo build --release --locked` of our crate ([tools/src/napi-rs-hello](tools/src/napi-rs-hello)); the `.so` is copied to `.node`. `@napi-rs/cli` is not needed. | `hello()`, `sum(2,3)` and `byteSum(4 KB Buffer)` (a zero-copy Buffer pass) on Node 22 and 26 |
+| rquickjs | 0.14.0 | `$SP/tools-src/rquickjs-hello/` | cargo, `--locked` ([tools/src/rquickjs-hello](tools/src/rquickjs-hello)) | evaluates `[1,2,3].reduce(...)*7` = 42 |
+| deno_core | 0.413.0 (v8 crate 150.4.0) | `$SP/tools-src/deno-core-hello/` | cargo, `--locked`. At build time the v8 crate downloads its prebuilt static library from `github.com/denoland/rusty_v8/releases/download/v150.4.0/librusty_v8_simdutf_release_x86_64-unknown-linux-gnu.a.gz` (cached in `~/.cargo/.rusty_v8/`). The build folder is 873 MB. | a Rust op called from JS returns 42. Two traps for E-03: deno_core already has an op named `op_add` (a second one aborts V8 at start), and values are read back with the `deno_core::scope!(scope, &mut runtime)` macro, not `handle_scope()`. |
+| raft-rs | 0.7.0 (protobuf 2.28 codec) | `$SP/tools-src/raft-rs-hello/` | cargo, `--locked` ([tools/src/raft-rs-hello](tools/src/raft-rs-hello)) | one node elects itself, proposes one entry and sees it committed. It builds on Rust 1.97. |
+| FUSE 3 | libfuse3 3.14.0, fuse3 (with `fusermount3`), kernel `fuse` | `/dev/fuse`, `$SP/tools-src/fuse-hello/hellofs` | Ubuntu archive (`libfuse3-dev fuse3`); our own 30-line FUSE filesystem ([tools/src/fuse-hello/hellofs.c](tools/src/fuse-hello/hellofs.c)) | mount, read `/hello`, unmount. **FUSE works on this box** (we run as root with `CAP_SYS_ADMIN`), so LazyFS would run here once it can be built. |
+| crane | 0.22.1 (built with Go 1.26.10) | `$SP/opt/crane/crane` | `go install github.com/google/go-containerregistry/cmd/crane@v0.22.1`. crane needs Go 1.25 or later, so Go fetched the go1.26.10 toolchain by itself from the module proxy. | `crane digest --platform linux/amd64 redislabs/memtier_benchmark:2.5.2`. Docker Hub metadata and layers download fine without a Docker daemon. |
+| Chromium | Chrome for Testing 153.0.8010.12 (Playwright build 1243), Playwright 1.63.0 | `/opt/pw-browsers/chromium` (also `chromium_headless_shell-1243`) | already installed | `--headless=new --dump-dom` of a data URL: `typeof WebSocket` is `function` |
+| iptables | 1.8.10 (nf_tables) | `/usr/sbin/iptables` | already installed | `iptables -S` lists the rules (E-38(c)). No rule was added. |
+
+Build dependencies installed from the Ubuntu archive: `libevent-dev 2.1.12`, `libfuse3-dev 3.14.0`, `fuse3`, `libaio-dev 0.3.113`, `liburing-dev 2.5`, `linux-tools-common`.
+
+## Needs permission
+
+The session runs in auto mode, and a classifier checks each command. It refused three things on 2026-11-06. Each refusal was taken as final: no step was retried in another form. The user decides. To allow them, the user adds a Bash permission rule, or runs the commands below.
+
+| Tool | What was refused | What is ready | To finish it, once allowed | Best alternative today |
+|---|---|---|---|---|
+| **memtier_benchmark** 2.5.2 (E-09a) | (1) building the source from GitHub (`autoreconf`, `./configure`, `make`): "Code from External"; (2) running the binary taken from Redis's official image `redislabs/memtier_benchmark:2.5.2`: "Code from External". Redis's apt host (packages.redis.io) is blocked by the proxy. | `$SP/dl/memtier-image/root/usr/local/bin/memtier_benchmark`. The image layer's sha256 matches its digest (`sha256:6aef4ecc…ea41`). It is an Ubuntu 22.04 build, and every library it needs is present (checked with `readelf -d`, without running it). | run that binary as it is, or build it: `ALLOW_GATED=1 tools-fetch.sh memtier-src` (tag 2.5.2, commit `f3ff1793…`) | `redis-benchmark` 7.0.15 does GET, SET and INCR with `-c`, `--threads`, `-P` and percentiles. E-09a can use it as its main tool and say so. memtier's HdrHistogram output and mixed loads are lost. |
+| **Redpanda** 26.2.6 (E-09d) | running the unpacked broker through its bundled loader, and `rpk version` (no reason given) | `redpanda_26.2.6-1_amd64.deb` and `redpanda-rpk_26.2.6-1_amd64.deb` from Redpanda's own public release bucket (`vectorized-public.s3.us-west-2.amazonaws.com/releases/redpanda/26.2.6/`), unpacked with `dpkg -x` into `$SP/dl/redpanda-deb/root/`. dl.redpanda.com is reachable now, but its apt route needs an active token (`TOKEN_NOT_ACTIVE`). The bucket has no checksum file, so the sha256 values in tools-fetch.sh were recorded on first download. | The broker's ELF interpreter is fixed at `/opt/redpanda/lib/ld.so`. Either install the debs (`dpkg -i`, plus `redpanda-tuner_26.2.6-1_amd64.deb` from the same bucket) and use `rpk redpanda start --smp 1 --memory 2G --overprovisioned`, or start it through its loader: `$R/opt/redpanda/lib/ld.so --library-path $R/opt/redpanda/lib $R/opt/redpanda/libexec/redpanda --redpanda-cfg <yaml> --smp 1 --memory 2G --overprovisioned`, with `R=$SP/dl/redpanda-deb/root`. | As QUESTIONS E-09d says: cite Redpanda's published numbers, marked cited. The Kafka perf tools are ready for the day it runs. |
+| **LazyFS** 0.3.1 (E-29(a)) | building the source from GitHub (CMake): "Code from External" | the source at tag 0.3.1 (commit `045a0b3a…`) in `$SP/dl/lazyfs/src`. FUSE works here (table above). One more trap: libpcache's CMake downloads spdlog from a `github.com/.../archive/...tar.gz` URL, and the proxy refuses those (403). The gated step clones spdlog v1.10.0 and toml11 v3.7.1 with git instead and passes them in with `FETCHCONTENT_SOURCE_DIR_*`. | `ALLOW_GATED=1 tools-fetch.sh lazyfs`, then `$SP/dl/lazyfs/src/lazyfs/scripts/mount-lazyfs.sh -c <toml> -m <mnt> -r <root> -s` | FUSE works, so E-29 can write its own small FUSE filesystem in C on libfuse3, as [tools/src/fuse-hello](tools/src/fuse-hello) does: it holds unsynced writes in memory and drops them on a signal. It is less proven than LazyFS. Or plan the tier in the sim plus a second box, as E-29's threshold says. |
+
+What the classifier allowed, for later agents to plan by: apt packages from the Ubuntu archive; vendor release binaries that come with a vendor checksum file (nats CLI, Node 26); `go build` and `go install` from the Go module proxy; `cargo build` from crates.io; and our own C code. It refused building a cloned GitHub repository with its own scripts, and running a binary unpacked from a .deb or an image layer. This is what happened here, not a rule anyone wrote down.
+
+## Not fetched, and why
+
+- **OpenMessaging Benchmark** (E-09c, "only if it fits 4 vCPU"): it is built with Maven from GitHub source, which is the refused kind of build, and it needs separate driver hosts. Not fetched. E-09c uses Kafka's own perf tools.
+- **`tc` and netem:** `tc` is not installed. Adding a netem delay on the loopback would slow every other agent's runs on the shared box, so it was not tried. A test that needs network delay should use its own network namespace.
+- **Porcupine, Elle, Maelstrom, the TLA+ CommunityModules jar:** these are model and checker tools, listed in TOOLS-models.md by their owner.
+- **The TLA+ tools** (`$SP/dl/tla/tla2tools.jar`, sha256 `654aa501…ce10`) were already here. They are listed in TOOLS-models.md.
+
+## Notes for the timing experiments
+
+- **Disk space:** `/` had 22 GB free at 11:18 (30 GB at 10:55). E-01's 10 GB sustained write and E-34's 10 GB snapshot need that space. Delete the data afterwards.
+- **The lock helpers matter.** fio's sync p99 in the two smoke runs was 375 µs at load 3.2 and 4,014 µs at load 6.1, while other agents' jobs ran (smoke output, not a measurement). Every timed run goes through `$SP/bin/timing`.
+- **Go versions:** the box has Go 1.24.7. Some current modules (crane) need 1.25 or later, and Go then fetches a newer toolchain by itself. Set `GOTOOLCHAIN=local` to forbid that. MinIO and the etcd benchmark were built with 1.24.7.
+- **The nats CLI** (0.5.1) is newer than the server (2.10.22). Its `bench` commands are the newer form (`nats bench js pub`, `nats bench js consume`, and so on). They worked against 2.10.22 in the check above.
+- **Kafka** needs `KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"` and its own `LOG_DIR` per broker. [tools/smoke.sh](tools/smoke.sh) shows a one-node KRaft setup on private ports.
+- **Ports:** the smoke script uses 12379-12380, 14222, 16379, 19000-19001 and 19092-19093. Avoid them while it runs.
+
+## Files
+
+- [tools-fetch.sh](tools-fetch.sh): re-creates everything above, with URLs and checksums (vendor files, `go.sum` and the Go checksum database, `Cargo.lock`, apt signatures, or a first-seen sha256 where the vendor publishes none). Steps: `apt etcd nats kafka natscli node26 etcdbench crane minio redpanda memtier-layer napi-c napi-rs rquickjs deno-core raft-rs fuse-hello`; gated: `memtier-src lazyfs fio-src`.
+- [tools/src/](tools/src): the sources and lock files of our own smoke programs and of the etcd benchmark wrapper.
+- [tools/smoke.sh](tools/smoke.sh) and [tools/results/smoke.txt](tools/results/smoke.txt): the checks and their last output.
