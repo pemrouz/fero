@@ -51,18 +51,26 @@ lin_valid = m.group(1) if m else None
 m = re.findall(r':valid\?\s*(true|false|:unknown)', results)
 top_valid = m[-1] if m else None
 
-# Op counts from the history: completions only.
+# Op counts from the history (one op per line): completions only.
 ops = defaultdict(int)
-for t, f in re.findall(r':type :(ok|fail|info),\s*:f :(read|write|cas)', history):
-    ops[f'{f}_{t}'] += 1
-if not ops:  # Jepsen may print :f before :type
-    for f, t in re.findall(r':f :(read|write|cas),[^}]*?:type :(ok|fail|info)', history):
+partitions = 0
+pause_ops_in_history = 0
+for line in history.splitlines():
+    t = re.search(r':type :(\w+)', line)
+    f = re.search(r':f :([\w-]+)', line)
+    if not t or not f:
+        continue
+    t, f = t.group(1), f.group(1)
+    if f in ('read', 'write', 'cas') and t in ('ok', 'fail', 'info'):
         ops[f'{f}_{t}'] += 1
-partitions = len(re.findall(r':f :start-partition', history)) // 2  # :invoke and :info
-pause_ops_in_history = len(re.findall(r':f :pause', history))
+    if f == 'start-partition' and t == 'info' and ':process :nemesis' in line and ':value :' not in line:
+        partitions += 1
+    if f == 'pause':
+        pause_ops_in_history += 1
 
-# Linearizability failures: the keys whose checker said false.
-bad_keys = re.findall(r'(\d+)\s*\{:valid\?\s*false', results)
+# Linearizability failures: the keys the checker lists as failed.
+m = re.search(r':failures\s*\[([^\]]*)\]', results)
+bad_keys = m.group(1).split() if m else []
 
 # Node logs: elections and the applied-prefix hash.
 terms_led = set()
