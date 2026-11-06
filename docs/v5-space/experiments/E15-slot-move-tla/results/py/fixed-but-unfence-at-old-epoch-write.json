@@ -1,0 +1,18 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  6
+ ],
+ "kind": "reading",
+ "live_nodes": 1725,
+ "live_starts": 392,
+ "live_stuck": 0,
+ "secs": 101.2,
+ "states": 1069440,
+ "steps": {
+  "6": 25
+ },
+ "transitions": 3229815,
+ "variant": "fixed-but-unfence-at-old-epoch"
+}

@@ -1,0 +1,25 @@
+{
+ "bound": "write",
+ "calm_states": 1484,
+ "complete": true,
+ "distinct_total": 1253046,
+ "errors": [],
+ "failed": [
+  1,
+  6,
+  9
+ ],
+ "kind": "design",
+ "live_edges": 2046,
+ "live_stuck": 0,
+ "secs": 301.1,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1251562,
+ "steps": {
+  "1": 20,
+  "6": 26,
+  "9": 15
+ },
+ "variant": "design",
+ "workers": 2
+}

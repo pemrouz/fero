@@ -116,7 +116,7 @@ for s in stats_last.values():
 print(json.dumps({
     'name': name, 'nodes': int(nodes), 'read': read_mode, 'seed': int(seed), 'secs': int(secs),
     'nemesis': nemesis, 'pause': int(pause), 'compact': int(compact), 'rate': rate, 'conc': conc,
-    'exit': int(code), 'wall_s': int(wall),
+    'latency': os.environ.get('E46_LAT', ''), 'exit': int(code), 'wall_s': int(wall),
     'verdict': verdict, 'valid_top': top_valid, 'lin_valid': lin_valid, 'bad_keys': len(bad_keys),
     'ops': dict(sorted(ops.items())),
     'elections': len(terms_led), 'max_term': max_term,

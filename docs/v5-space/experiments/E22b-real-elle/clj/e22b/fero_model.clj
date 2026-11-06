@@ -230,7 +230,7 @@
 
 ;; ── the Knossos model: the set of states the partition may be in ────────────────────────────────
 (defrecord FeroPartition [states]
-  m/Model
+  knossos.model.Model
   (step [this op]
     (let [{:strs [kind in out vals]} (:value op)
           nxt (into #{} (mapcat #(step1 % kind in out (true? vals))) states)]
