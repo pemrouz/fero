@@ -1,0 +1,17 @@
+{
+ "bound": "moves",
+ "calm_states": 3694,
+ "complete": true,
+ "distinct_total": 902006,
+ "errors": [],
+ "failed": [],
+ "kind": "design",
+ "live_edges": 5868,
+ "live_stuck": 0,
+ "secs": 262.4,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 898312,
+ "steps": {},
+ "variant": "fixed",
+ "workers": 2
+}
