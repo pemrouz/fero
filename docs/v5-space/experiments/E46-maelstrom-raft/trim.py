@@ -28,8 +28,8 @@ for name in sorted(os.listdir(runs)):
     i = res.find(' :timeline {:valid?')
     keep = res[i:] if i >= 0 else res
     lines = keep.splitlines()
-    if len(lines) > 400:
-        lines = lines[:400] + [f';; ... cut by trim.py: {len(lines) - 400} more lines in the full store']
+    if len(lines) > 200:
+        lines = lines[:200] + [f";; ... cut by trim.py: {len(lines) - 200} more lines in the full store"]
     with open(os.path.join(odir, 'results-verdict.edn'), 'w') as f:
         f.write('\n'.join(lines) + '\n')
     with open(os.path.join(odir, 'nemesis.edn'), 'w') as f:
