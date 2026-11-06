@@ -1,0 +1,6 @@
+numbers only                     8.9 s  first phantom at write     -1  phantom rows shown: top-10       0, full         0  index over live rows (max) 0
+numbers + null/NaN/missing       5.4 s  first phantom at write     -1  phantom rows shown: top-10       0, full         0  index over live rows (max) 0
+strings only                     6.0 s  first phantom at write     -1  phantom rows shown: top-10       0, full         0  index over live rows (max) 0
+numbers + 1% numeric strings   156.2 s  first phantom at write    494  phantom rows shown: top-10       0, full  24361146  index over live rows (max) 12317
+numbers + 1% "x"                69.2 s  first phantom at write    493  phantom rows shown: top-10   11781, full  22781648  index over live rows (max) 11551
+numbers + 0.1% "x"              81.4 s  first phantom at write   2006  phantom rows shown: top-10    5473, full  23125593  index over live rows (max) 11922

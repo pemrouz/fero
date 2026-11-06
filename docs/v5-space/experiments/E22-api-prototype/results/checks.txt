@@ -1,0 +1,10 @@
+# checks, 2026-11-06T13:32:23Z, node v22.22.0, data 63fea66, 4 vCPU, load 5.87 4.40 3.31
+ok core-determinism (30 seeds run twice: traces and histories identical; 30 distinct traces)
+ok core-exactly-once (200 seeds, 527227 events, 2.48 s; faults hit: 400 elections, 204 tail entries lost, 200/200 moves done, 86 retries answered by dedup (1 from the tail))
+ok core-features (20 seeds, 113068 events, 1.12 s; faults hit: 0 elections, 0 tail entries lost, 0/0 moves done, 0 retries answered by dedup (0 from the tail))
+ok core-reader (100 seeds, 354935 events, 2.12 s; faults hit: 200 elections, 25 tail entries lost, 100/100 moves done, 6 retries answered by dedup (0 from the tail))
+ok p01-live-state (50 seeds, 68603 events, 0.54 s; faults hit: 100 elections, 58 tail entries lost, 50/50 moves done, 12 retries answered by dedup (0 from the tail))
+ok p14-invariants (99 seeds, 134217 events, 1.38 s; faults hit: 99 elections, 16 tail entries lost, 99/99 moves done, 4 retries answered by dedup (0 from the tail))
+  naive check-then-set, writer+writer: both callers sold the last item in 33 of 33 races
+  naive check-then-set, writer+other: both callers sold the last item in 33 of 33 races
+  naive check-then-set, other+other: both callers sold the last item in 33 of 33 races

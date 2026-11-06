@@ -1,0 +1,103 @@
+E-23 interleave  groups=4 domain=int commits=100000 seed=1 keys=3000  rows at end 1938  207.3 s
+  ok   avg                    interleave bytes        0 /   501
+  ok   avg                    interleave values       0 /   501
+  ok   avg                    rebuilt bytes           0 /    51
+  ok   avg                    rebuilt values          0 /    51
+  ok   avg                    snapshot bytes          0 /    51
+  ok   avg                    snapshot values         0 /    51
+  DIFF az(points) full order  interleave bytes      497 /   501   first: step 200: byte order differs
+  DIFF az(points) full order  interleave values     497 /   501   first: step 200: "p2319"={"id":"p2319","points":0,"room":"r39"};"p2386"={"id":"p2386","points":0,"room":"r19"};"p1954"={"id":"p1954","poi | "p2319"={"id":"p2319","points":0,"room":"r39"};"p2386"={"id":"p2386","points":0,"room":"r19"};"p1954"={"id":"p1954","poi
+  ok   az(points) full order  rebuilt bytes           0 /    51
+  ok   az(points) full order  rebuilt values          0 /    51
+  DIFF az(points) full order  snapshot bytes         51 /    51   first: step 2000: byte order differs
+  DIFF az(points) full order  snapshot values        51 /    51   first: step 2000: "p1890"={"id":"p1890","points":0,"room":"r44"};"p185"={"id":"p185","points":0,"room":"r11"};"p2143"={"id":"p2143","point | "p185"={"id":"p185","points":0,"room":"r11"};"p1890"={"id":"p1890","points":0,"room":"r44"};"p2143"={"id":"p2143","point
+  DIFF distinct(room)         interleave bytes      501 /   501   first: step 200: byte order differs
+  ok   distinct(room)         interleave values       0 /   501
+  DIFF distinct(room)         rebuilt bytes          51 /    51   first: step 2000: byte order differs
+  ok   distinct(room)         rebuilt values          0 /    51
+  DIFF distinct(room)         snapshot bytes         51 /    51   first: step 2000: byte order differs
+  ok   distinct(room)         snapshot values         0 /    51
+  ok   every                  interleave bytes        0 /   501
+  ok   every                  interleave values       0 /   501
+  ok   every                  rebuilt bytes           0 /    51
+  ok   every                  rebuilt values          0 /    51
+  ok   every                  snapshot bytes          0 /    51
+  ok   every                  snapshot values         0 /    51
+  DIFF filter                 interleave bytes      501 /   501   first: step 200: byte order differs
+  ok   filter                 interleave values       0 /   501
+  DIFF filter                 rebuilt bytes          51 /    51   first: step 2000: byte order differs
+  ok   filter                 rebuilt values          0 /    51
+  DIFF filter                 snapshot bytes         51 /    51   first: step 2000: byte order differs
+  ok   filter                 snapshot values         0 /    51
+  DIFF group(room)            interleave bytes      501 /   501   first: step 200: byte order differs
+  ok   group(room)            interleave values       0 /   501
+  DIFF group(room)            rebuilt bytes          51 /    51   first: step 2000: byte order differs
+  ok   group(room)            rebuilt values          0 /    51
+  DIFF group(room)            snapshot bytes         51 /    51   first: step 2000: byte order differs
+  ok   group(room)            snapshot values         0 /    51
+  ok   length                 interleave bytes        0 /   501
+  ok   length                 interleave values       0 /   501
+  ok   length                 rebuilt bytes           0 /    51
+  ok   length                 rebuilt values          0 /    51
+  ok   length                 snapshot bytes          0 /    51
+  ok   length                 snapshot values         0 /    51
+  DIFF length(room) counts    interleave bytes      501 /   501   first: step 200: byte order differs
+  ok   length(room) counts    interleave values       0 /   501
+  DIFF length(room) counts    rebuilt bytes          51 /    51   first: step 2000: byte order differs
+  ok   length(room) counts    rebuilt values          0 /    51
+  DIFF length(room) counts    snapshot bytes         51 /    51   first: step 2000: byte order differs
+  ok   length(room) counts    snapshot values         0 /    51
+  DIFF limit(10)              interleave bytes       39 /   501   first: step 200: byte order differs
+  DIFF limit(10)              interleave values      39 /   501   first: step 200: "p1729"={"id":"p1729","points":21,"room":"r2"};"p715"={"id":"p715","points":67,"room":"r20"};"p281"={"id":"p281","points | "p1729"={"id":"p1729","points":21,"room":"r2"};"p715"={"id":"p715","points":67,"room":"r20"};"p936"={"id":"p936","points
+  ok   limit(10)              rebuilt bytes           0 /    51
+  ok   limit(10)              rebuilt values          0 /    51
+  DIFF limit(10)              snapshot bytes         51 /    51   first: step 2000: byte order differs
+  DIFF limit(10)              snapshot values        51 /    51   first: step 2000: "p1729"={"id":"p1729","points":74,"room":"r11"};"p281"={"id":"p281","points":70,"room":"r40"};"p2137"={"id":"p2137","poi | "p100"={"id":"p100","points":58,"room":"r15"};"p1000"={"id":"p1000","points":63,"room":"r11"};"p1005"={"id":"p1005","poi
+  ok   max                    interleave bytes        0 /   501
+  ok   max                    interleave values       0 /   501
+  ok   max                    rebuilt bytes           0 /    51
+  ok   max                    rebuilt values          0 /    51
+  ok   max                    snapshot bytes          0 /    51
+  ok   max                    snapshot values         0 /    51
+  ok   maxC (numbers only)    interleave bytes        0 /   501
+  ok   maxC (numbers only)    interleave values       0 /   501
+  ok   maxC (numbers only)    rebuilt bytes           0 /    51
+  ok   maxC (numbers only)    rebuilt values          0 /    51
+  ok   maxC (numbers only)    snapshot bytes          0 /    51
+  ok   maxC (numbers only)    snapshot values         0 /    51
+  ok   median                 interleave bytes        0 /   501
+  ok   median                 interleave values       0 /   501
+  ok   median                 rebuilt bytes           0 /    51
+  ok   median                 rebuilt values          0 /    51
+  ok   median                 snapshot bytes          0 /    51
+  ok   median                 snapshot values         0 /    51
+  ok   min                    interleave bytes        0 /   501
+  ok   min                    interleave values       0 /   501
+  ok   min                    rebuilt bytes           0 /    51
+  ok   min                    rebuilt values          0 /    51
+  ok   min                    snapshot bytes          0 /    51
+  ok   min                    snapshot values         0 /    51
+  ok   some                   interleave bytes        0 /   501
+  ok   some                   interleave values       0 /   501
+  ok   some                   rebuilt bytes           0 /    51
+  ok   some                   rebuilt values          0 /    51
+  ok   some                   snapshot bytes          0 /    51
+  ok   some                   snapshot values         0 /    51
+  ok   sum                    interleave bytes        0 /   501
+  ok   sum                    interleave values       0 /   501
+  ok   sum                    rebuilt bytes           0 /    51
+  ok   sum                    rebuilt values          0 /    51
+  ok   sum                    snapshot bytes          0 /    51
+  ok   sum                    snapshot values         0 /    51
+  DIFF topk za(points,10)     interleave bytes        2 /   501   first: step 200: byte order differs
+  DIFF topk za(points,10)     interleave values       2 /   501   first: step 200: "p1201"={"id":"p1201","points":100,"room":"r34"};"p1195"={"id":"p1195","points":99,"room":"r42"};"p1157"={"id":"p1157"," | "p1201"={"id":"p1201","points":100,"room":"r34"};"p1195"={"id":"p1195","points":99,"room":"r42"};"p1157"={"id":"p1157","
+  ok   topk za(points,10)     rebuilt bytes           0 /    51
+  ok   topk za(points,10)     rebuilt values          0 /    51
+  DIFF topk za(points,10)     snapshot bytes         51 /    51   first: step 2000: byte order differs
+  DIFF topk za(points,10)     snapshot values        51 /    51   first: step 2000: "p2864"={"id":"p2864","points":100,"room":"r18"};"p116"={"id":"p116","points":100,"room":"r4"};"p2486"={"id":"p2486","po | "p1050"={"id":"p1050","points":100,"room":"r21"};"p1130"={"id":"p1130","points":100,"room":"r18"};"p116"={"id":"p116","p
+  ok   topkC az(cmpTotal,10)  interleave bytes        0 /   501
+  ok   topkC az(cmpTotal,10)  interleave values       0 /   501
+  ok   topkC az(cmpTotal,10)  rebuilt bytes           0 /    51
+  ok   topkC az(cmpTotal,10)  rebuilt values          0 /    51
+  ok   topkC az(cmpTotal,10)  snapshot bytes          0 /    51
+  ok   topkC az(cmpTotal,10)  snapshot values         0 /    51

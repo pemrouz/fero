@@ -1,0 +1,103 @@
+E-23 interleave  groups=4 domain=dirty commits=20000 seed=1 keys=3000  rows at end 2006  201.9 s
+  ok   avg                    interleave bytes        0 /   101
+  ok   avg                    interleave values       0 /   101
+  ok   avg                    rebuilt bytes           0 /    11
+  ok   avg                    rebuilt values          0 /    11
+  ok   avg                    snapshot bytes          0 /    11
+  ok   avg                    snapshot values         0 /    11
+  DIFF az(points) full order  interleave bytes      101 /   101   first: step 200: byte order differs
+  DIFF az(points) full order  interleave values     101 /   101   first: step 200: "p1981"={"id":"p1981","points":2.54,"room":"r41"};"p545"={"id":"p545","points":10,"room":"r34"};"p1668"={"id":"p1668","p | "p1981"={"id":"p1981","points":2.54,"room":"r41"};"p545"={"id":"p545","points":10,"room":"r34"};"p1668"={"id":"p1668","p
+  DIFF az(points) full order  rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  DIFF az(points) full order  rebuilt values         11 /    11   first: step 2000: "p2237"={"id":"p2237","points":-Infinity,"room":"r36"};"p1842"={"id":"p1842","points":0,"room":"r7"};"p2287"={"id":"p228 | "p2237"={"id":"p2237","points":-Infinity,"room":"r36"};"p1842"={"id":"p1842","points":0,"room":"r7"};"p2287"={"id":"p228
+  DIFF az(points) full order  snapshot bytes         11 /    11   first: step 2000: byte order differs
+  DIFF az(points) full order  snapshot values        11 /    11   first: step 2000: "p2237"={"id":"p2237","points":-Infinity,"room":"r36"};"p1842"={"id":"p1842","points":0,"room":"r7"};"p2287"={"id":"p228 | "p2391"={"id":"p2391","points":1.61,"room":"1"};"p1050"={"id":"p1050","points":2,"room":"r18"};"p1017"={"id":"p1017","po
+  DIFF distinct(room)         interleave bytes      101 /   101   first: step 200: byte order differs
+  ok   distinct(room)         interleave values       0 /   101
+  DIFF distinct(room)         rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  ok   distinct(room)         rebuilt values          0 /    11
+  DIFF distinct(room)         snapshot bytes         11 /    11   first: step 2000: byte order differs
+  DIFF distinct(room)         snapshot values        10 /    11   first: step 2000: "1"=1;"2"="2";"3"="3";"4"=4;"5"="5";"r0"="r0";"r1"="r1";"r10"="r10";"r11"="r11";"r12"="r12";"r13"="r13";"r14"="r14";"r15 | "1"=1;"2"=2;"3"=3;"4"="4";"5"=5;"r0"="r0";"r1"="r1";"r10"="r10";"r11"="r11";"r12"="r12";"r13"="r13";"r14"="r14";"r15"="r
+  ok   every                  interleave bytes        0 /   101
+  ok   every                  interleave values       0 /   101
+  ok   every                  rebuilt bytes           0 /    11
+  ok   every                  rebuilt values          0 /    11
+  ok   every                  snapshot bytes          0 /    11
+  ok   every                  snapshot values         0 /    11
+  DIFF filter                 interleave bytes      101 /   101   first: step 200: byte order differs
+  ok   filter                 interleave values       0 /   101
+  DIFF filter                 rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  ok   filter                 rebuilt values          0 /    11
+  DIFF filter                 snapshot bytes         11 /    11   first: step 2000: byte order differs
+  ok   filter                 snapshot values         0 /    11
+  DIFF group(room)            interleave bytes      101 /   101   first: step 200: byte order differs
+  ok   group(room)            interleave values       0 /   101
+  DIFF group(room)            rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  ok   group(room)            rebuilt values          0 /    11
+  DIFF group(room)            snapshot bytes         11 /    11   first: step 2000: byte order differs
+  ok   group(room)            snapshot values         0 /    11
+  ok   length                 interleave bytes        0 /   101
+  ok   length                 interleave values       0 /   101
+  ok   length                 rebuilt bytes           0 /    11
+  ok   length                 rebuilt values          0 /    11
+  ok   length                 snapshot bytes          0 /    11
+  ok   length                 snapshot values         0 /    11
+  DIFF length(room) counts    interleave bytes      101 /   101   first: step 200: byte order differs
+  ok   length(room) counts    interleave values       0 /   101
+  DIFF length(room) counts    rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  ok   length(room) counts    rebuilt values          0 /    11
+  DIFF length(room) counts    snapshot bytes         11 /    11   first: step 2000: byte order differs
+  ok   length(room) counts    snapshot values         0 /    11
+  DIFF limit(10)              interleave bytes       48 /   101   first: step 200: byte order differs
+  DIFF limit(10)              interleave values      48 /   101   first: step 200: "p8"={"id":"p8","points":"31","room":3};"p578"={"id":"p578","points":26,"room":"r33"};"p747"={"id":"p747","points":79,"r | "p8"={"id":"p8","points":"31","room":3};"p578"={"id":"p578","points":26,"room":"r33"};"p747"={"id":"p747","points":79,"r
+  ok   limit(10)              rebuilt bytes           0 /    11
+  ok   limit(10)              rebuilt values          0 /    11
+  DIFF limit(10)              snapshot bytes         11 /    11   first: step 2000: byte order differs
+  DIFF limit(10)              snapshot values        11 /    11   first: step 2000: "p456"={"id":"p456","points":"31","room":"3"};"p2862"={"id":"p2862","points":94,"room":"r34"};"p2022"={"id":"p2022","poi | "p0"={"id":"p0","points":70,"room":"r2"};"p1"={"id":"p1","points":48,"room":"r24"};"p1005"={"id":"p1005","room":5};"p100
+  DIFF max                    interleave bytes        1 /   101   first: step 13200: byte order differs
+  DIFF max                    interleave values       1 /   101   first: step 13200: Infinity | "x"
+  DIFF max                    rebuilt bytes           2 /    11   first: step 14000: byte order differs
+  DIFF max                    rebuilt values          2 /    11   first: step 14000: "x" | Infinity
+  DIFF max                    snapshot bytes          4 /    11   first: step 14000: byte order differs
+  DIFF max                    snapshot values         4 /    11   first: step 14000: "x" | Infinity
+  ok   maxC (numbers only)    interleave bytes        0 /   101
+  ok   maxC (numbers only)    interleave values       0 /   101
+  ok   maxC (numbers only)    rebuilt bytes           0 /    11
+  ok   maxC (numbers only)    rebuilt values          0 /    11
+  ok   maxC (numbers only)    snapshot bytes          0 /    11
+  ok   maxC (numbers only)    snapshot values         0 /    11
+  ok   median                 interleave bytes        0 /   101
+  ok   median                 interleave values       0 /   101
+  ok   median                 rebuilt bytes           0 /    11
+  ok   median                 rebuilt values          0 /    11
+  ok   median                 snapshot bytes          0 /    11
+  ok   median                 snapshot values         0 /    11
+  ok   min                    interleave bytes        0 /   101
+  ok   min                    interleave values       0 /   101
+  ok   min                    rebuilt bytes           0 /    11
+  ok   min                    rebuilt values          0 /    11
+  ok   min                    snapshot bytes          0 /    11
+  ok   min                    snapshot values         0 /    11
+  ok   some                   interleave bytes        0 /   101
+  ok   some                   interleave values       0 /   101
+  ok   some                   rebuilt bytes           0 /    11
+  ok   some                   rebuilt values          0 /    11
+  ok   some                   snapshot bytes          0 /    11
+  ok   some                   snapshot values         0 /    11
+  ok   sum                    interleave bytes        0 /   101
+  ok   sum                    interleave values       0 /   101
+  ok   sum                    rebuilt bytes           0 /    11
+  ok   sum                    rebuilt values          0 /    11
+  ok   sum                    snapshot bytes          0 /    11
+  ok   sum                    snapshot values         0 /    11
+  DIFF topk za(points,10)     interleave bytes       99 /   101   first: step 200: byte order differs
+  DIFF topk za(points,10)     interleave values      99 /   101   first: step 200: "p1882"={"id":"p1882","points":58,"room":"r6"};"p515"={"id":"p515","points":98,"room":"r16"};"p261"={"id":"p261","points | "p515"={"id":"p515","points":98,"room":"r16"};"p261"={"id":"p261","points":98,"room":"r31"};"p399"={"id":"p399","points"
+  DIFF topk za(points,10)     rebuilt bytes          11 /    11   first: step 2000: byte order differs
+  DIFF topk za(points,10)     rebuilt values         11 /    11   first: step 2000: "p334"={"id":"p334","points":Infinity,"room":"r13"};"p1580"={"id":"p1580","points":Infinity,"room":"r2"};"p1556"={"id":" | "p1556"={"id":"p1556","points":100,"room":1};"p1774"={"id":"p1774","points":98,"room":"r42"};"p2167"={"id":"p2167","poin
+  DIFF topk za(points,10)     snapshot bytes         11 /    11   first: step 2000: byte order differs
+  DIFF topk za(points,10)     snapshot values        11 /    11   first: step 2000: "p334"={"id":"p334","points":Infinity,"room":"r13"};"p1580"={"id":"p1580","points":Infinity,"room":"r2"};"p1556"={"id":" | "p1142"={"id":"p1142","points":97,"room":"r46"};"p1126"={"id":"p1126","points":96,"room":"4"};"p107"={"id":"p107","point
+  ok   topkC az(cmpTotal,10)  interleave bytes        0 /   101
+  ok   topkC az(cmpTotal,10)  interleave values       0 /   101
+  ok   topkC az(cmpTotal,10)  rebuilt bytes           0 /    11
+  ok   topkC az(cmpTotal,10)  rebuilt values          0 /    11
+  ok   topkC az(cmpTotal,10)  snapshot bytes          0 /    11
+  ok   topkC az(cmpTotal,10)  snapshot values         0 /    11

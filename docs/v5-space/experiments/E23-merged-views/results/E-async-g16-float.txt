@@ -1,0 +1,8 @@
+E-23 async merger  groups=16 domain=float commits=100000 seed=1  rows at end 1864; moves 265 (18547 rows); deliveries checked 99863; merger lag in undelivered commits: mean 98.0, max 340; 432.5 s
+  ok   filter M=Q(cut)                      0 /   99863
+  ok   group M=Q(cut)                       0 /   99863
+  DIFF sum (data) M=Q(cut)              97405 /   99863   first: step 5: 452784.0695334603 vs 452784.06953346025
+  ok   sumC M=Q(cut)                        0 /   99863
+  ok   topk (data) M=Q(cut) order           0 /   99863
+  ok   topk (data) M=Q(cut) scores          0 /   99863
+  ok   topkC M=Q(cut) order                 0 /   99863

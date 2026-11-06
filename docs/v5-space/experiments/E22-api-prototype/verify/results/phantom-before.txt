@@ -1,0 +1,18 @@
+# phantom-conflict before the fix (proto/l2.ts as step 2 left it), 2026-11-06T17:37:26Z, node v22.22.0, load 14.31 11.60 7.55
+FAIL phantom-conflict seed 13: B was refused 'conflict' on version 0000:000000000003, and the row is still at 0000:000000000003: a refusal answered from a write that never committed
+  faults: 11.428 leader-change kv/g0 -> s2 (lost 1)
+  replay: node --experimental-strip-types --no-warnings verify/phantom.check.ts --seed 13 --trace
+FAIL phantom-conflict seed 15: B was refused 'conflict' on version 0000:000000000003, and the row is still at 0000:000000000003: a refusal answered from a write that never committed
+  faults: 11.452 leader-change kv/g0 -> s2 (lost 1)
+  replay: node --experimental-strip-types --no-warnings verify/phantom.check.ts --seed 15 --trace
+FAIL phantom-conflict seed 17: B was refused 'conflict' on version 0000:000000000003, and the row is still at 0000:000000000003: a refusal answered from a write that never committed
+  faults: 11.835 leader-change kv/g0 -> s2 (lost 1)
+  replay: node --experimental-strip-types --no-warnings verify/phantom.check.ts --seed 17 --trace
+FAIL phantom-conflict seed 21: B was refused 'conflict' on version 0000:000000000003, and the row is still at 0000:000000000003: a refusal answered from a write that never committed
+  faults: 11.428 leader-change kv/g0 -> s3 (lost 1)
+  replay: node --experimental-strip-types --no-warnings verify/phantom.check.ts --seed 21 --trace
+FAIL phantom-conflict seed 23: B was refused 'conflict' on version 0000:000000000003, and the row is still at 0000:000000000003: a refusal answered from a write that never committed
+  faults: 12.185 leader-change kv/g0 -> s3 (lost 1)
+  replay: node --experimental-strip-types --no-warnings verify/phantom.check.ts --seed 23 --trace
+FAILED phantom-conflict: 10 of 100 seeds
+  {"races":100,"phantom":10,"conflict":85,"ok":15}

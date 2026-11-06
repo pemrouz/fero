@@ -1,0 +1,108 @@
+# mutants: nodedup (writers forget attempts) and lostcommit (an election loses the newest committed write), 2026-11-06T17:38:25Z, node v22.22.0, data 63fea66, 4 vCPU, load 16.79 12.78 8.21
+ok lin-kv (100 seeds); shuffle mutant nodedup; 100 worlds; LC in flight 100/100, move in flight 100/100; 201 elections, 20 lost, 200/200 moves, forced 100/100, 22 dedup, 2 mutant hits; direct {"once":35,"refusal":30,"acked":0,"kept":0,"fence-log":0,"fence-rt":0,"session":0}; 4.6 s
+  seed 1: once: kv d:24nrqg:2 committed 2 times
+  seed 1: once: kv a:8ozpjn:4 committed 2 times
+  seed 1: refusal: kv b:6xd6rb:5 refused 'conflict' but committed at 33.113
+  seed 2: once: kv b:5kb8wt:1 committed 2 times
+  seed 3: once: kv s1:x5gpf:9 committed 2 times
+  seed 3: refusal: kv e:12u2qw:1 refused 'conflict' but committed at 20.060
+  seed 4: refusal: kv s1:ent2qh:8 refused 'conflict' but committed at 22.541
+  seed 6: refusal: kv e:ciz0iu:1 refused 'conflict' but committed at 20.930
+  seed 7: once: kv d:2v9owf:1 committed 2 times
+  seed 8: once: kv d:ein0x1:2 committed 2 times
+FAILED core-exactly-once: 28 of 100 seeds; shuffle mutant nodedup; 100 worlds; LC in flight 100/100, move in flight 100/100; 200 elections, 115 lost, 200/200 moves, forced 100/100, 18 dedup, 0 mutant hits; direct {"once":34,"refusal":0,"acked":0,"kept":0,"fence-log":0,"fence-rt":0,"session":0}; 3.4 s
+  seed 7: page:/: final count equals acknowledged incrs: 18 != 17 [faults: 5.923 drop 0.05 | 9.077 leader-change views/g0 -> s2 (lost 1) | 17.921 move views slot 789 g1->g0 | 26.779 leader-change views/g1 -> s1 (lost 0) | 31.850 leader-change no group with a leader | 34.705 leader-change no group with a leader | 35.899 move views slot 16 g0->g1 | 35.923 drop 0]
+  seed 11: page:/a: final count equals acknowledged incrs: 16 != 15 [faults: 5.211 drop 0.05 | 7.040 leader-change views/g1 -> s1 (lost 0) | 9.198 leader-change views/g0 -> s3 (lost 1) | 25.254 move views slot 16 g0->g1 | 27.148 leader-change no group with a leader | 27.715 move views slot 433 g0->g1 | 29.982 leader-change no group with a leader | 35.211 drop 0]
+  seed 12: page:/b: final count equals acknowledged incrs: 15 != 14 [faults: 6.699 drop 0.05 | 11.805 leader-change views/g1 -> s3 (lost 0) | 14.248 move views slot 201 g0->g1 | 15.537 leader-change views/g0 -> s2 (lost 0) | 18.782 leader-change no group with a leader | 21.082 move views slot 822 g1->g0 | 35.824 leader-change no group with a leader | 36.699 drop 0]
+  seed 15: page:/: final count equals acknowledged incrs: 18 != 17 [faults: 7.276 drop 0.05 | 9.856 leader-change views/g1 -> s3 (lost 0) | 10.100 move views slot 465 g0->g1 | 12.690 leader-change views/g0 -> s3 (lost 1) | 13.596 leader-change no group with a leader | 21.838 leader-change no group with a leader | 36.721 move views slot 457 g0->g1 | 37.276 drop 0]
+  seed 16: page:/: final count equals acknowledged incrs: 18 != 17 [faults: 5.464 drop 0.05 | 11.949 leader-change views/g0 -> s2 (lost 0) | 18.334 leader-change views/g1 -> s1 (lost 0) | 24.009 move views slot 465 g0->g1 | 27.954 leader-change no group with a leader | 30.558 move views slot 509 g0->g1 | 33.952 leader-change no group with a leader | 35.464 drop 0]
+  seed 17: page:/a: final count equals acknowledged incrs: 16 != 15 [faults: 7.477 drop 0.05 | 13.340 leader-change views/g0 -> s2 (lost 0) | 17.153 move views slot 539 g1->g0 | 18.229 move views slot 201 g0->g1 | 20.916 leader-change views/g1 -> s3 (lost 0) | 35.676 leader-change no group with a leader | 35.731 leader-change no group with a leader | 37.477 drop 0]
+  seed 21: page:/a: final count equals acknowledged incrs: 16 != 15 [faults: 10.000 drop 0.05 | 14.336 leader-change views/g0 -> s3 (lost 0) | 18.299 leader-change views/g1 -> s1 (lost 0) | 20.192 move views slot 233 g0->g1 | 21.325 move views slot 16 g0->g1 | 25.187 leader-change no group with a leader | 32.410 leader-change no group with a leader | 40.000 drop 0]
+  seed 22: page:/b: final count equals acknowledged incrs: 15 != 14 [faults: 6.437 drop 0.05 | 14.399 leader-change views/g0 -> s2 (lost 0) | 17.111 leader-change views/g1 -> s1 (lost 0) | 18.342 move views slot 39 g0->g1 | 22.806 move views slot 16 g0->g1 | 29.021 leader-change no group with a leader | 35.845 leader-change no group with a leader | 36.437 drop 0]
+  seed 7: once: views b:354m90:1 committed 2 times
+  seed 11: once: views s1:fy039v:2 committed 2 times
+  seed 12: once: views b:8mvtit:3 committed 2 times
+  seed 15: once: views b:bjv7i:1 committed 2 times
+  seed 16: once: views a:crykbb:1 committed 2 times
+  seed 17: once: views b:ccvzmq:2 committed 2 times
+  seed 21: once: views s1:9szecp:2 committed 2 times
+  seed 22: once: views a:ezdjl3:3 committed 2 times
+  seed 24: once: views b:ee3wae:2 committed 2 times
+  seed 25: once: views b:d8arcs:1 committed 2 times
+FAILED p11-counters: 21 of 100 seeds; shuffle mutant nodedup; 100 worlds; LC in flight 100/100, move in flight 100/100; 299 elections, 78 lost, 200/200 moves, forced 100/100, 16 dedup, 11 mutant hits; direct {"once":21,"refusal":0,"acked":0,"kept":0,"fence-log":0,"fence-rt":0,"session":0}; 2.0 s
+  seed 2: the limiter counted each take [faults: 5.000 drop 0.05 | 5.912 move api slot 463 g0->g1 | 6.129 leader-change views/g0 -> s3 (lost 0) | 6.280 move views slot 465 g0->g1 | 9.711 leader-change api5/g1 -> s3 (lost 0) | 10.388 leader-change api/g1 -> s1 (lost 0) | 2005.000 drop 0]
+  seed 12: the limiter counted each take [faults: 5.000 drop 0.05 | 6.021 move views slot 465 g0->g1 | 6.768 leader-change api5/g1 -> s1 (lost 0) | 7.417 leader-change views/g0 -> s3 (lost 0) | 7.877 move views slot 465 g0->g1 | 10.825 leader-change views/g1 -> s1 (lost 0) | 2005.000 drop 0]
+  seed 20: a refused take appends nothing: 6 != 5 [faults: 5.000 drop 0.05 | 5.565 leader-change views/g1 -> s3 (lost 0) | 5.642 move views slot 465 g0->g1 | 8.539 move api slot 354 g0->g1 | 9.630 leader-change api/g1 -> s1 (lost 0) | 2005.000 drop 0 | 61000.567 leader-change api5/g1 -> s1 (lost 5)]
+  seed 33: three acknowledged incrs, counted once each: 4 != 3 [faults: 5.000 drop 0.05 | 6.810 leader-change api/g0 -> s3 (lost 0) | 7.731 move api slot 537 g1->g0 | 8.263 move views slot 465 g0->g1 | 10.505 leader-change api5/g0 -> s3 (lost 0) | 10.894 leader-change api/g1 -> s1 (lost 0) | 2005.000 drop 0]
+  seed 41: the limiter counted each take [faults: 5.000 drop 0.05 | 5.154 move api slot 442 g0->g1 | 5.197 move views slot 465 g0->g1 | 7.207 leader-change views/g0 -> s2 (lost 0) | 7.333 leader-change api5/g0 -> s2 (lost 0) | 9.836 leader-change api/g1 -> s1 (lost 0) | 2005.000 drop 0]
+  seed 42: the limiter counted each take [faults: 5.000 drop 0.05 | 6.599 leader-change api/g1 -> s1 (lost 0) | 6.781 move views slot 465 g0->g1 | 7.010 leader-change views/g0 -> s2 (lost 1) | 8.916 leader-change api5/g0 -> s2 (lost 0) | 9.196 move views slot 850 g1->g0 | 2005.000 drop 0]
+  seed 45: three acknowledged incrs, counted once each: 4 != 3 [faults: 5.000 drop 0.05 | 6.239 move views slot 465 g0->g1 | 7.184 leader-change views/g0 -> s3 (lost 1) | 8.033 leader-change api5/g0 -> s3 (lost 0) | 9.763 leader-change api/g0 -> s2 (lost 0) | 10.937 move api5 slot 506 g0->g1 | 2005.000 drop 0]
+  seed 47: three acknowledged incrs, counted once each: 4 != 3 [faults: 5.000 drop 0.05 | 6.923 leader-change api5/g1 -> s3 (lost 0) | 7.067 leader-change api/g0 -> s3 (lost 0) | 7.724 move views slot 465 g0->g1 | 8.233 move api slot 398 g0->g1 | 9.138 leader-change api/g1 -> s3 (lost 0) | 2005.000 drop 0]
+  seed 2: once: api a:edmip0:2 committed 2 times
+  seed 12: once: api b:8mvtit:2 committed 2 times
+  seed 33: once: views b:47vqa1:1 committed 2 times
+  seed 41: once: api c:96789e:2 committed 2 times
+  seed 42: once: api a:f63yxh:2 committed 2 times
+  seed 45: once: views b:djriya:1 committed 2 times
+  seed 47: once: views b:1ddmqn:1 committed 2 times
+  seed 50: once: api c:2ze4q7:2 committed 2 times
+  seed 52: once: api c:bm6g46:2 committed 2 times
+  seed 57: once: views c:c2e8sn:1 committed 2 times
+ok p14-invariants (100 seeds); shuffle mutant nodedup; 100 worlds; LC in flight 100/100, move in flight 100/100; 200 elections, 80 lost, 200/200 moves, forced 100/100, 3 dedup, 1 mutant hits; direct {"once":1,"refusal":0,"acked":0,"kept":0,"fence-log":0,"fence-rt":0,"session":0}; 3.1 s
+  seed 60: once: stock s2:2x0lar:1 committed 2 times
+HUNG lin-kv.check.ts: seed 7 never finished (its world went idle with a client promise pending); shuffle mutant lostcommit; 6 worlds; LC in flight 6/6, move in flight 6/6; 12 elections, 1 lost, 12/12 moves, forced 6/6, 8 dedup, 12 mutant hits; direct {"once":0,"refusal":0,"acked":0,"kept":17,"fence-log":0,"fence-rt":0,"session":0}; 2.6 s
+  seed 7: hung
+  seed 1: kept: kv/g1 index 19 (w s1:8u8ask:16) committed at 40.154, gone later
+  seed 1: kept: kv/g0 index 18 (w s1:8u8ask:19) committed at 47.232, gone later
+  seed 1: kept: kv/g1 index 20 (out ) committed at 59.521, gone later
+  seed 2: kept: kv/g0 index 15 (w d:6hx8ea:3) committed at 25.551, gone later
+  seed 2: kept: kv/g0 index 16 (out ) committed at 27.931, gone later
+  seed 2: kept: kv/g1 index 17 (w e:awdt23:9) committed at 36.789, gone later
+  seed 3: kept: kv/g0 index 8 (w d:91phdz:2) committed at 22.562, gone later
+  seed 3: kept: kv/g1 index 14 (w a:3j2fy:3) committed at 25.786, gone later
+  seed 3: kept: kv/g1 index 15 (out ) committed at 42.619, gone later
+  seed 4: kept: kv/g0 index 8 (w a:1awsei:1) committed at 20.886, gone later
+exit 1
+HUNG core-exactly-once.check.ts: seed 1 never finished (its world went idle with a client promise pending); shuffle mutant lostcommit; 0 worlds; LC in flight 0/0, move in flight 0/0; 0 elections, 0 lost, 0/0 moves, forced 0/0, 0 dedup, 0 mutant hits; direct {}; 0.1 s
+  seed 1: hung
+exit 1
+HUNG p11.check.ts: seed 30 never finished (its world went idle with a client promise pending); shuffle mutant lostcommit; 29 worlds; LC in flight 29/29, move in flight 29/29; 87 elections, 25 lost, 58/58 moves, forced 29/29, 7 dedup, 18 mutant hits; direct {"once":1,"refusal":0,"acked":0,"kept":22,"fence-log":0,"fence-rt":0,"session":0}; 1.0 s
+  seed 30: hung
+  seed 1: kept: api/g0 index 3 (w a:8ozpjn:2) committed at 7.541, gone later
+  seed 2: kept: views/g0 index 5 (w c:6hx8ea:1) committed at 5.974, gone later
+  seed 4: kept: views/g0 index 3 (w a:1awsei:1) committed at 5.504, gone later
+  seed 7: kept: api/g0 index 4 (w a:eeeugk:2) committed at 8.799, gone later
+  seed 8: kept: api/g0 index 3 (w b:9f7fv5:2) committed at 7.668, gone later
+  seed 8: kept: api/g0 index 4 (out ) committed at 8.215, gone later
+  seed 10: once: api b:69iy8:2 committed 2 times
+  seed 10: kept: views/g0 index 5 (w b:69iy8:1) committed at 6.639, gone later
+  seed 10: kept: api/g0 index 3 (w b:69iy8:2) committed at 9.019, gone later
+  seed 12: kept: views/g0 index 5 (w c:316f8g:1) committed at 6.627, gone later
+exit 1
+FAILED p14-invariants: 92 of 100 seeds; shuffle mutant lostcommit; 100 worlds; LC in flight 100/100, move in flight 98/100; 200 elections, 80 lost, 198/198 moves, forced 98/100, 0 dedup, 105 mutant hits; direct {"once":0,"refusal":0,"acked":0,"kept":217,"fence-log":0,"fence-rt":0,"session":0}; 2.1 s
+  seed 1: a replica differs from the fold of the committed log: s1/stock: {"b":{"left":1,"price":7},"d":{"left":1,"price":5},"a":{"left":0,"price":5},"c":{"left":0,"price":5}} != {"a":{"left":0,"price":5},"b":{"left":1,"price":5},"c":{"left":0,"price":5},"d":{"left":1,"price":5}} [faults: 8.221 move stock slot 300 g0->g1 | 9.103 move stock slot 115 g0->g1 | 10.360 leader-change stock/g0 -> s3 (lost 0) | 10.588 leader-change stock/g1 -> s3 (lost 0)]
+  seed 2: other+other: exactly one sell of the last item: 0 != 1 [faults: 7.796 leader-change stock/g0 -> s2 (lost 1) | 7.897 move stock slot 300 g0->g1 | 10.184 move stock slot 1001 g1->g0 | 10.636 leader-change stock/g1 -> s3 (lost 0)]
+  seed 3: a replica differs from the fold of the committed log: s1/stock: {"b":{"left":1,"price":7},"c":{"left":0,"price":5},"a":{"left":0,"price":5},"d":{"left":1,"price":5}} != {"a":{"left":0,"price":5},"b":{"left":1,"price":5},"c":{"left":0,"price":5},"d":{"left":1,"price":5}} [faults: 7.017 move stock slot 82 g0->g1 | 8.888 move stock slot 485 g0->g1 | 10.063 leader-change stock/g0 -> s2 (lost 0) | 10.182 leader-change stock/g1 -> s3 (lost 0)]
+  seed 5: other+other: exactly one sell of the last item: 0 != 1 [faults: 7.050 leader-change stock/g0 -> s3 (lost 0) | 8.158 leader-change stock/g1 -> s1 (lost 0) | 8.983 move stock slot 300 g0->g1 | 9.374 move stock slot 109 g0->g1]
+  seed 6: a replica differs from the fold of the committed log: s1/stock: {"a":{"left":0,"price":5},"b":{"left":1,"price":7},"d":{"left":1,"price":5},"c":{"left":0,"price":5}} != {"a":{"left":1,"price":5},"b":{"left":1,"price":7},"c":{"left":0,"price":5},"d":{"left":1,"price":5}} [faults: 6.898 move stock slot 82 g0->g1 | 7.897 leader-change stock/g0 -> s3 (lost 1) | 8.732 leader-change stock/g1 -> s1 (lost 0) | 10.090 move stock slot 485 g0->g1]
+  seed 7: a replica differs from the fold of the committed log: s1/stock: {"b":{"left":1,"price":7},"a":{"left":0,"price":5},"d":{"left":1,"price":5},"c":{"left":0,"price":5}} != {"a":{"left":0,"price":5},"b":{"left":1,"price":5},"c":{"left":0,"price":5},"d":{"left":1,"price":5}} [faults: 9.240 leader-change stock/g0 -> s2 (lost 0) | 9.916 leader-change stock/g1 -> s1 (lost 0) | 10.297 move stock slot 789 g1->g0 | 2328.304 move stock slot 82 g0->g1]
+  seed 8: a replica differs from the fold of the committed log: s1/stock: {"a":{"left":0,"price":5},"b":{"left":1,"price":9},"d":{"left":1,"price":5},"c":{"left":0,"price":5}} != {"a":{"left":1,"price":5},"b":{"left":1,"price":9},"c":{"left":0,"price":5},"d":{"left":1,"price":5}} [faults: 8.539 move stock slot 485 g0->g1 | 9.640 leader-change stock/g0 -> s3 (lost 0) | 9.672 move stock slot 583 g1->g0 | 10.722 leader-change stock/g1 -> s1 (lost 0)]
+  seed 9: writer+writer: exactly one sell of the last item: 0 != 1 [faults: 7.231 leader-change stock/g0 -> s2 (lost 1) | 8.365 move stock slot 946 g1->g0 | 8.876 leader-change stock/g1 -> s1 (lost 1) | 10.592 move stock slot 300 g0->g1]
+  seed 1: kept: stock/g0 index 9 (w s1:8u8ask:6) committed at 9.668, gone later
+  seed 1: kept: stock/g0 index 10 (out ) committed at 10.198, gone later
+  seed 2: kept: stock/g0 index 4 (w s1:fsz4uq:4) committed at 0.279, gone later
+  seed 2: kept: stock/g0 index 5 (cfg ) committed at 2.629, gone later
+  seed 2: kept: stock/g0 index 6 (cfg ) committed at 2.629, gone later
+  seed 3: kept: stock/g0 index 9 (w s1:x5gpf:7) committed at 9.393, gone later
+  seed 3: kept: stock/g0 index 10 (out ) committed at 10.017, gone later
+  seed 4: kept: stock/g0 index 7 (w s1:ent2qh:5) committed at 6.844, gone later
+  seed 4: kept: stock/g0 index 8 (out ) committed at 7.112, gone later
+  seed 5: kept: stock/g0 index 4 (w s1:90yj4a:4) committed at 0.238, gone later
+{"file":"mut-lostcommit-core-exactly-once.jsonl","check":"","mode":"","seeds":0,"parts":0,"ops":0,"opsByKind":{},"ok":0,"illegal":0,"unknown":0,"badSeeds":[],"examples":[],"maxPartOps":0,"ms":0}
+{"file":"mut-lostcommit-lin-kv.jsonl","check":"lin-kv.check.ts","mode":"shuffle","mutant":"lostcommit","seeds":6,"parts":36,"ops":1534,"opsByKind":{"r":569,"w":965},"ok":29,"illegal":7,"unknown":0,"badSeeds":[1,3,4,5,6],"examples":["seed 1 kv/r4: 43 ops not linearizable","seed 3 kv/r4: 43 ops not linearizable","seed 3 kv/r5: 37 ops not linearizable","seed 4 kv/r1: 30 ops not linearizable"],"maxPartOps":59,"ms":51}
+{"file":"mut-lostcommit-p11.jsonl","check":"p11.check.ts","mode":"shuffle","mutant":"lostcommit","seeds":29,"parts":84,"ops":487,"opsByKind":{"e":1,"w":486},"ok":74,"illegal":10,"unknown":0,"badSeeds":[1,4,7,8,15,19,23,25,28,29],"examples":["seed 1 api/user:42@0: 3 ops not linearizable","seed 4 views/page:/: 3 ops not linearizable","seed 7 api/user:42@0: 3 ops not linearizable","seed 8 api/user:42@0: 3 ops not linearizable"],"maxPartOps":12,"ms":6}
+{"file":"mut-lostcommit-p14.jsonl","check":"p14.check.ts","mode":"shuffle","mutant":"lostcommit","seeds":100,"parts":400,"ops":944,"opsByKind":{"e":41,"r":66,"w":837},"ok":393,"illegal":7,"unknown":0,"badSeeds":[13,15,32,43,63,85,97],"examples":["seed 13 stock/a: 3 ops not linearizable","seed 15 stock/b: 4 ops not linearizable","seed 32 stock/b: 4 ops not linearizable","seed 43 stock/a: 3 ops not linearizable"],"maxPartOps":4,"ms":16}
+{"file":"mut-nodedup-core-exactly-once.jsonl","check":"core-exactly-once.check.ts","mode":"shuffle","mutant":"nodedup","seeds":100,"parts":400,"ops":6000,"opsByKind":{"w":6000},"ok":367,"illegal":33,"unknown":0,"badSeeds":[7,11,12,15,16,17,21,22,24,25,30,32,33,36,55,56,61,69,72,73,74,81,83,88,95,96,97,99],"examples":["seed 7 views/page:/: 17 ops not linearizable","seed 11 views/page:/a: 15 ops not linearizable","seed 12 views/page:/b: 14 ops not linearizable","seed 15 views/page:/: 17 ops not linearizable"],"maxPartOps":17,"ms":137}
+{"file":"mut-nodedup-lin-kv.jsonl","check":"lin-kv.check.ts","mode":"shuffle","mutant":"nodedup","seeds":100,"parts":600,"ops":25297,"opsByKind":{"e":30,"r":9825,"w":15442},"ok":574,"illegal":26,"unknown":0,"badSeeds":[1,2,3,7,14,21,32,33,40,41,43,52,59,60,61,64,74,76,83,91,97,98],"examples":["seed 1 kv/r0: 40 ops not linearizable","seed 1 kv/r4: 43 ops not linearizable","seed 2 kv/r1: 42 ops not linearizable","seed 3 kv/r0: 51 ops not linearizable"],"maxPartOps":68,"ms":1416}
+{"file":"mut-nodedup-p11.jsonl","check":"p11.check.ts","mode":"shuffle","mutant":"nodedup","seeds":100,"parts":280,"ops":1560,"opsByKind":{"w":1560},"ok":260,"illegal":20,"unknown":0,"badSeeds":[2,12,33,41,42,45,47,50,52,57,61,62,64,65,70,73,76,79,92,98],"examples":["seed 2 api/user:42@0: 3 ops not linearizable","seed 12 api/user:42@0: 3 ops not linearizable","seed 33 views/page:/: 3 ops not linearizable","seed 41 api/user:42@0: 3 ops not linearizable"],"maxPartOps":12,"ms":128}
+{"file":"mut-nodedup-p14.jsonl","check":"p14.check.ts","mode":"shuffle","mutant":"nodedup","seeds":100,"parts":400,"ops":1100,"opsByKind":{"r":100,"w":1000},"ok":400,"illegal":0,"unknown":0,"badSeeds":[],"examples":[],"maxPartOps":4,"ms":35}

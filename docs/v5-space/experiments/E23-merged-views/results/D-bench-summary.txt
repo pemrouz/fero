@@ -1,0 +1,27 @@
+16 groups, int domain, 200,000 timed commits per run, 3 runs per row (median, spread = max - min)
+op       variant  runs  ns/commit  spread  sanity  1-min load at start of each run (inside the lock)
+all      base        3       1212     113  n/a     1.81 1.81 1.81
+filter   one         3       1501     499  n/a     1.81 1.81 1.81
+filter   views       3       1366     378  n/a     1.83 1.83 1.83
+filter   merge       3       2697     210  ok      1.83 1.83 1.83
+topk     one         3       4567     295  n/a     1.84 1.84 1.84
+topk     views       3       3917     520  n/a     1.84 2.01 2.01
+topk     merge       3       4538     397  ok      2.01 2.25 2.25
+topk     viewsC      3       3593     337  n/a     1.81 1.81 1.81
+topk     mergeC      3       4434     796  ok      1.81 1.74 1.74
+sum      one         3       1451      44  n/a     2.25 2.25 2.25
+sum      views       3       1429      96  n/a     2.15 2.15 2.15
+sum      merge       3       1837     257  ok      2.15 2.15 2.15
+sum      viewsC      3       1586     113  n/a     1.74 1.74 1.92
+sum      mergeC      3       1884     202  ok      1.92 1.92 1.92
+group    one         3      15186     995  n/a     2.15 2.38 2.27
+group    views       3       6058     909  n/a     2.17 2.17 2.17
+group    merge       3      52356    1646  ok      2.07 2.23 2.04
+
+merge layer cost (merge - views, medians), per commit and per partial delta it consumed:
+filter  merge     1331 ns/commit; 0.63 partial deltas/commit;   2102 ns per delta; the partials (views) 1366 ns/commit vs one group 1501 ns/commit
+topk    merge      621 ns/commit; 0.27 partial deltas/commit;   2328 ns per delta; the partials (views) 3917 ns/commit vs one group 4567 ns/commit
+topk    mergeC     841 ns/commit; 0.27 partial deltas/commit;   3130 ns per delta; the partials (views) 3593 ns/commit vs one group 4567 ns/commit
+sum     merge      408 ns/commit; 0.88 partial deltas/commit;    461 ns per delta; the partials (views) 1429 ns/commit vs one group 1451 ns/commit
+sum     mergeC     298 ns/commit; 0.89 partial deltas/commit;    336 ns per delta; the partials (views) 1586 ns/commit vs one group 1451 ns/commit
+group   merge    46298 ns/commit; 1.26 partial deltas/commit;  36751 ns per delta; the partials (views) 6058 ns/commit vs one group 15186 ns/commit

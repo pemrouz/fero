@@ -1,0 +1,30 @@
+# selftest: Porcupine v1.3.1 and Elle's Go port (tipocket v1.0.0), 2026-11-06T16:21:58Z, node v22.22.0, data 63fea66, 4 vCPU, load 4.40 5.78 5.97
+# Porcupine v1.3.1 on known histories (the fero partition model)
+ok    want Ok      got Ok       good: two overlapping writes, a later read sees the second by version
+ok    want Ok      got Ok       good: a read overlapping a write may see the old value
+ok    want Illegal got Illegal  bad: a stale read after a newer write was acknowledged
+ok    want Illegal got Illegal  bad: an acknowledged write lost (a later read finds no row)
+ok    want Illegal got Illegal  bad: a read with the right version but another value
+ok    want Illegal got Illegal  bad: one incr applied twice (answers 1 then 3)
+ok    want Ok      got Ok       good: two concurrent incrs answer 1 and 2 in either order
+ok    want Illegal got Illegal  bad: one version given to two writes
+ok    want Illegal got Illegal  bad: versions out of real-time order
+ok    want Illegal got Illegal  bad: an if-version write refused although the version matched
+ok    want Ok      got Ok       good: an if-version write refused after another write moved the version
+ok    want Illegal got Illegal  bad: an if-version write passed on a stale version
+ok    want Illegal got Illegal  bad: incr below min 0 acknowledged (stock 0 sold)
+ok    want Ok      got Ok       good: incr below min 0 refused
+ok    want Illegal got Illegal  bad: incr refused though the bound held
+ok    want Illegal got Illegal  bad: if-absent write passed on a row that exists
+ok    want Ok      got Ok       good: a writer-made ttl removal, then a read finds no row
+ok    want Ok      got Ok       good: a write whose client died, found in the log, seen by a later read
+# Elle list-append (tipocket v1.0.0 Go port) on known histories
+ok    read-committed true  serializable true  anomalies []  good: serial appends and reads
+ok    read-committed false serializable false anomalies [G0]  bad G0: two units write x and y in opposite orders
+ok    read-committed false serializable false anomalies [G1c]  bad G1c: each unit reads the other's append
+ok    read-committed false serializable false anomalies [G1a empty-transaction-graph]  bad G1a: a read sees a failed unit's append
+ok    read-committed true  serializable false anomalies [G-single]  bad G-single: a fractured read (half a unit)
+ok    read-committed true  serializable false anomalies [G2-item]  bad G2-item: write skew
+ok    read-committed false serializable false anomalies [incompatible-order]  bad: a list that loses an element (incompatible order)
+ok    read-committed false serializable false anomalies [duplicate-elements]  bad: an element appended once, read twice
+ok selftest: every known-bad history is flagged and every known-good one passes

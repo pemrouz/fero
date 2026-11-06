@@ -1,0 +1,2 @@
+history and merge: 0 mismatches in 4000 (2000 add-then-remove in shuffled orders, 2000 merges of 4 partials)
+fsum cross-check: 2000 cases, 0 mismatches

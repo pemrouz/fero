@@ -1,0 +1,3 @@
+# tsc Version 6.0.2, 2026-11-06T14:57:29Z, node v22.22.0, data 63fea66, 4 vCPU, load 1.85 1.95 2.43
+ok: tsc --strict over patterns/, exit 0
+ok: 20 examples type-check against API.md's fero.d.ts
