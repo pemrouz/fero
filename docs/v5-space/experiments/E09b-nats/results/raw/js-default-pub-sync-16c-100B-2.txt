@@ -1,0 +1,20 @@
+  [1] 1,271 msgs/sec ~ 124 KiB/sec ~ min: 144.10us ~ avg: 786.09us ~ max: 23,221.86us ~ P50: 701.90us ~ P90: 1,095.30us ~ P99: 2,818.51us ~ P99.9: 5,545.42us (18,750 msgs)
+  [2] 1,270 msgs/sec ~ 124 KiB/sec ~ min: 165.81us ~ avg: 786.94us ~ max: 23,279.74us ~ P50: 702.22us ~ P90: 1,095.96us ~ P99: 2,846.34us ~ P99.9: 6,030.56us (18,750 msgs)
+  [3] 1,269 msgs/sec ~ 124 KiB/sec ~ min: 124.10us ~ avg: 787.19us ~ max: 23,253.61us ~ P50: 702.61us ~ P90: 1,091.54us ~ P99: 2,858.64us ~ P99.9: 5,824.22us (18,750 msgs)
+  [4] 1,268 msgs/sec ~ 124 KiB/sec ~ min: 134.83us ~ avg: 788.26us ~ max: 23,135.03us ~ P50: 703.23us ~ P90: 1,089.89us ~ P99: 2,866.67us ~ P99.9: 5,842.47us (18,750 msgs)
+  [5] 1,267 msgs/sec ~ 124 KiB/sec ~ min: 136.93us ~ avg: 788.67us ~ max: 23,115.50us ~ P50: 701.41us ~ P90: 1,101.34us ~ P99: 2,857.81us ~ P99.9: 5,547.03us (18,750 msgs)
+  [6] 1,267 msgs/sec ~ 124 KiB/sec ~ min: 161.29us ~ avg: 788.59us ~ max: 22,813.36us ~ P50: 702.91us ~ P90: 1,098.81us ~ P99: 2,889.49us ~ P99.9: 5,577.96us (18,750 msgs)
+  [7] 1,267 msgs/sec ~ 124 KiB/sec ~ min: 156.82us ~ avg: 788.92us ~ max: 23,212.33us ~ P50: 704.43us ~ P90: 1,094.64us ~ P99: 2,826.54us ~ P99.9: 5,862.95us (18,750 msgs)
+  [8] 1,267 msgs/sec ~ 124 KiB/sec ~ min: 136.01us ~ avg: 788.88us ~ max: 22,888.34us ~ P50: 704.83us ~ P90: 1,092.77us ~ P99: 2,862.79us ~ P99.9: 6,273.04us (18,750 msgs)
+  [9] 1,266 msgs/sec ~ 124 KiB/sec ~ min: 138.80us ~ avg: 789.15us ~ max: 22,904.73us ~ P50: 704.35us ~ P90: 1,094.55us ~ P99: 2,800.43us ~ P99.9: 6,107.18us (18,750 msgs)
+  [10] 1,266 msgs/sec ~ 124 KiB/sec ~ min: 144.80us ~ avg: 789.25us ~ max: 23,217.02us ~ P50: 704.95us ~ P90: 1,092.56us ~ P99: 2,787.84us ~ P99.9: 5,841.35us (18,750 msgs)
+  [11] 1,266 msgs/sec ~ 124 KiB/sec ~ min: 150.07us ~ avg: 789.46us ~ max: 23,124.59us ~ P50: 703.67us ~ P90: 1,093.26us ~ P99: 2,859.61us ~ P99.9: 6,170.07us (18,750 msgs)
+  [12] 1,266 msgs/sec ~ 124 KiB/sec ~ min: 136.03us ~ avg: 789.43us ~ max: 23,212.94us ~ P50: 702.91us ~ P90: 1,096.25us ~ P99: 2,871.95us ~ P99.9: 6,277.33us (18,750 msgs)
+  [13] 1,266 msgs/sec ~ 124 KiB/sec ~ min: 149.20us ~ avg: 789.58us ~ max: 23,248.21us ~ P50: 703.50us ~ P90: 1,098.02us ~ P99: 2,845.25us ~ P99.9: 5,794.84us (18,750 msgs)
+  [14] 1,265 msgs/sec ~ 124 KiB/sec ~ min: 121.74us ~ avg: 789.70us ~ max: 23,293.76us ~ P50: 704.44us ~ P90: 1,105.17us ~ P99: 2,856.39us ~ P99.9: 5,518.99us (18,750 msgs)
+  [15] 1,265 msgs/sec ~ 124 KiB/sec ~ min: 164.33us ~ avg: 789.95us ~ max: 23,288.46us ~ P50: 705.89us ~ P90: 1,097.85us ~ P99: 2,837.60us ~ P99.9: 5,577.88us (18,750 msgs)
+  [16] 1,265 msgs/sec ~ 124 KiB/sec ~ min: 151.14us ~ avg: 790.09us ~ max: 23,292.29us ~ P50: 704.99us ~ P90: 1,099.66us ~ P99: 2,881.30us ~ P99.9: 5,780.19us (18,750 msgs)
+ NATS JetStream synchronous publisher aggregated stats: 20,241 msgs/sec ~ 1.9 MiB/sec
+ message rates min 1,265 | avg 1,266 | max 1,271 | stddev 1 msgs
+ latencies per operation min 121.74us | avg 788.76us | max 23,293.76us | stddev 935.83us | P50 703.61us | P90 1,095.87us | P99 2,849.55us | P99.9: 5,824.22us
+22:04:05 Using stream: s16

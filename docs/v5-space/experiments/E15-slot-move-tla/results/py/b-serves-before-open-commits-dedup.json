@@ -1,0 +1,14 @@
+{
+ "bound": "dedup",
+ "capped": false,
+ "failed": [],
+ "kind": "mutant",
+ "live_nodes": 5697,
+ "live_starts": 1258,
+ "live_stuck": 0,
+ "secs": 34.8,
+ "states": 355204,
+ "steps": {},
+ "transitions": 1639008,
+ "variant": "b-serves-before-open-commits"
+}

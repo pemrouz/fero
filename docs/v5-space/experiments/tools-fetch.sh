@@ -191,7 +191,7 @@ step_lazyfs() {
   (cd "$d/src/libs/libpcache" && mkdir -p build && cd build && \
     $HEAVY sh -c "cmake -DFETCHCONTENT_SOURCE_DIR_TOML=$d/toml11 -DFETCHCONTENT_SOURCE_DIR_SPDLOG=$d/spdlog .. && cmake --build . -j3")
   (cd "$d/src/lazyfs" && mkdir -p build && cd build && \
-    $HEAVY sh -c "cmake -DLAZYFS_BUILD_TESTS=OFF -DFETCHCONTENT_SOURCE_DIR_TOML=$d/toml11 -DFETCHCONTENT_SOURCE_DIR_SPDLOG=$d/spdlog .. && cmake --build . -j3")
+    $HEAVY sh -c "cmake -DLAZYFS_BUILD_TESTS=OFF -DCMAKE_CXX_FLAGS='-I$d/spdlog/include -I$d/toml11' .. && cmake --build . -j3")
   # mount: $d/src/lazyfs/scripts/mount-lazyfs.sh -c <config.toml> -m <mnt> -r <root> -s   (FUSE works on this box: see fuse-hello)
 }
 step_fio_src() {

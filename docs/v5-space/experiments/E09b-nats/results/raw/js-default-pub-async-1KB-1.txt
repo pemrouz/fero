@@ -1,0 +1,2 @@
+NATS JetStream asynchronous publisher stats: 58,797 msgs/sec ~ 57 MiB/sec ~ min: 3,773.33us ~ avg: 8,499.79us ~ max: 37,368.19us ~ P50: 7,813.75us ~ P90: 11,781.30us ~ P99: 21,495.50us ~ P99.9: 31,449.58us
+22:03:02 Using stream: sk

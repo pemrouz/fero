@@ -1,0 +1,32 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 6289,
+ "live_starts": 1038,
+ "live_stuck": 165,
+ "secs": 461.1,
+ "states": 2795712,
+ "steps": {
+  "1": 14,
+  "2": 21,
+  "3": 18,
+  "4": 17,
+  "5": 21,
+  "6": 21,
+  "7": 12,
+  "9": 12
+ },
+ "transitions": 9049476,
+ "variant": "stream-before-fence-commits"
+}
