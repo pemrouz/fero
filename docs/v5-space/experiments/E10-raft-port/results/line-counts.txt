@@ -1,0 +1,142 @@
+## etcd raft c51f010, non-test Go (physical, non-blank, code)
+### .
+     82      72      35  ./bootstrap.go
+    399     398       1  ./doc.go
+    576     521     356  ./log.go
+    240     219     134  ./log_unstable.go
+    142     113      99  ./logger.go
+    616     553     352  ./node.go
+   2165    1979    1211  ./raft.go
+    557     513     293  ./rawnode.go
+    101      88      57  ./read_only.go
+    339     294     278  ./state_trace.go
+     50      33      19  ./state_trace_nop.go
+    105      89      69  ./status.go
+    326     285     178  ./storage.go
+    106      97      40  ./types.go
+    343     309     264  ./util.go
+   6147    5563    3386  TOTAL (physical, non-blank, code)
+### quorum
+     75      67      39  quorum/joint.go
+    198     178     129  quorum/majority.go
+     58      49      26  quorum/quorum.go
+     26      20      17  quorum/voteresult_string.go
+    357     314     211  TOTAL (physical, non-blank, code)
+### tracker
+    143     127      84  tracker/inflights.go
+    314     289     140  tracker/progress.go
+     42      37      13  tracker/state.go
+    289     263     173  tracker/tracker.go
+    788     716     410  TOTAL (physical, non-blank, code)
+### confchange
+    419     385     262  confchange/confchange.go
+    155     143      72  confchange/restore.go
+    574     528     334  TOTAL (physical, non-blank, code)
+### rafttest
+     16      15       1  rafttest/doc.go
+    107      92      66  rafttest/interaction_env.go
+    241     234      95  rafttest/interaction_env_handler.go
+    167     156     126  rafttest/interaction_env_handler_add_nodes.go
+     31      26      12  rafttest/interaction_env_handler_campaign.go
+     40      35      20  rafttest/interaction_env_handler_compact.go
+    104      96      77  rafttest/interaction_env_handler_deliver_msgs.go
+     32      27      13  rafttest/interaction_env_handler_forget_leader.go
+     36      31      18  rafttest/interaction_env_handler_log_level.go
+    100      91      74  rafttest/interaction_env_handler_process_append_thread.go
+    112     102      84  rafttest/interaction_env_handler_process_apply_thread.go
+     82      73      58  rafttest/interaction_env_handler_process_ready.go
+     34      29      15  rafttest/interaction_env_handler_propose.go
+     83      75      61  rafttest/interaction_env_handler_propose_conf_change.go
+     55      49      33  rafttest/interaction_env_handler_raft_log.go
+     49      44      28  rafttest/interaction_env_handler_raftstate.go
+     30      27      14  rafttest/interaction_env_handler_report_unreachable.go
+     51      45      31  rafttest/interaction_env_handler_send_snapshot.go
+     34      29      16  rafttest/interaction_env_handler_set_randomized_election_timeout.go
+    132     123     102  rafttest/interaction_env_handler_stabilize.go
+     43      37      21  rafttest/interaction_env_handler_status.go
+     39      33      19  rafttest/interaction_env_handler_tick.go
+     41      36      22  rafttest/interaction_env_handler_transfer_leadership.go
+    138     112      95  rafttest/interaction_env_logger.go
+    167     140     123  rafttest/network.go
+    158     144     117  rafttest/node.go
+   2122    1901    1341  TOTAL (physical, non-blank, code)
+### raftpb (hand-written)
+     55      50      37  raftpb/alias.go
+    177     164     116  raftpb/confchange.go
+     52      44      28  raftpb/confstate.go
+     67      62      36  raftpb/util.go
+    351     320     217  TOTAL (physical, non-blank, code)
+### raftpb generated + schema
+   1233    1089     977  raftpb/raft.pb.go
+    205     190     103  raftpb/raft.proto
+   1438    1279    1080  TOTAL (physical, non-blank, code)
+### Go tests (not ported)
+    110     103      80  confchange/datadriven_test.go
+    177     158     132  confchange/quick_test.go
+    139     120      89  confchange/restore_test.go
+     67      62      46  diff_test.go
+     47      40      24  example_test.go
+     38      33      17  interaction_test.go
+   1049     972     884  log_test.go
+    581     551     520  log_unstable_test.go
+     51      44      30  node_bench_test.go
+   1061     943     823  node_test.go
+    110      94      77  node_util_test.go
+     40      36      22  quorum/bench_test.go
+    247     235     166  quorum/datadriven_test.go
+    110     104      91  quorum/majority_test.go
+    122     104      82  quorum/quick_test.go
+    138     118      78  raft_flow_control_test.go
+    829     752     609  raft_paper_test.go
+    122      97      76  raft_snap_test.go
+   4332    3620    3048  raft_test.go
+    130     124     107  raftpb/confchange_test.go
+     59      53      35  raftpb/confstate_test.go
+     60      47      31  raftpb/raft_test.go
+     71      60      45  rafttest/network_test.go
+     52      43      29  rafttest/node_bench_test.go
+    171     137     124  rafttest/node_test.go
+   1068     951     795  rawnode_test.go
+    277     247     227  storage_test.go
+    256     225     195  tracker/inflights_test.go
+    211     197     169  tracker/progress_test.go
+     94      86      66  types_test.go
+    152     140     121  util_test.go
+  11971   10496    8838  TOTAL (physical, non-blank, code)
+## TS port
+### port/src
+    239     215     211  port/src/confchange.ts
+    174     164     156  port/src/gofmt.ts
+     13      13      12  port/src/index.ts
+    292     258     256  port/src/log.ts
+    127     113     111  port/src/log_unstable.ts
+     47      42      41  port/src/logger.ts
+     61      52      49  port/src/node.ts
+    136     118     115  port/src/quorum.ts
+   1074    1010     999  port/src/raft.ts
+    480     441     428  port/src/raftpb.ts
+    238     204     202  port/src/rawnode.ts
+     56      51      50  port/src/read_only.ts
+     72      66      65  port/src/status.ts
+    135     118     116  port/src/storage.ts
+    329     315     305  port/src/tracker.ts
+     40      37      36  port/src/types.ts
+    183     162     160  port/src/util.ts
+   3696    3379    3312  TOTAL (physical, non-blank, code)
+### port/rafttest
+     59      58      57  port/rafttest/confchange_dd.ts
+    197     189     182  port/rafttest/datadriven.ts
+    715     667     643  port/rafttest/interaction_env.ts
+    151     149     147  port/rafttest/quorum_dd.ts
+   1122    1063    1029  TOTAL (physical, non-blank, code)
+### port/test
+    102      96      88  port/test/cluster_smoke.ts
+     60      57      54  port/test/run_datadriven.ts
+    162     153     142  TOTAL (physical, non-blank, code)
+### diff and mutation tools
+     95      93      83  diff/gen_scripts.ts
+    176     170     153  diff/mutate.ts
+     63      61      55  diff/run_ts.ts
+    134     127     121  diff/zz_e10_diff_test.go
+     29      29      29  diff/classify_swaps.py
+    497     480     441  TOTAL (physical, non-blank, code)

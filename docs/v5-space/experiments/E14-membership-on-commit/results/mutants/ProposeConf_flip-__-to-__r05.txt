@@ -1,0 +1,18 @@
+ProposeConf:flip-<=-to-<:r05
+/\ pendingConfChangeIndex[i] <= commitIndex[i]      \* [g]
+-> /\ pendingConfChangeIndex[i] < commitIndex[i]      \* [g]
+
+== two: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 3801] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:52:25)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:52:25.
+Progress: 613595 states checked, 1064 traces generated (trace length: mean=70, var(x)=105, sd=10)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 4226] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:54:25)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:54:25.
+Progress: 457063 states checked, 703 traces generated (trace length: mean=70, var(x)=107, sd=10)

@@ -1,0 +1,4 @@
+3.36 4.34 4.80 4/161 26600
+== seed 5, 1000 scripts with read-index
+wrote 1000 scripts to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e10diff/seed5/in
+fuzz: 1000/1000 scripts match the Go reference byte for byte; 70083 directives compared; Go panicked in 0 scripts, TS threw at the same directive in 0

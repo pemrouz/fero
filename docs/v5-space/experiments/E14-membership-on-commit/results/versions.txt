@@ -1,0 +1,16 @@
+# machine and versions for E-14 (2026-11-06)
+Linux 6.18.44-fc-v242 x86_64
+4
+               total        used        free      shared  buff/cache   available
+Mem:              15           1           8           0           5          14
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Error: Error: unrecognized option: -version
+654aa50197faa48fa0136b41257270de6469d29ef323e7822ead59d2be43ce10  $SP/dl/tla/tla2tools.jar
+15c445684529c59a59877951c7fb7df9a40da250aaa445f056ef48f56bb27044  $SP/dl/raftsrc/raft/tla/etcdraft.tla
+3b206581c4d1e8795b543f6bec1c293ea69241183acbdec6537c0265234a72b6  $SP/dl/raftsrc/raft/tla/MCetcdraft.tla
+5cc769549deb7acdf280a8b2600d87c88810c299f5102b15f5176f64a9ae04a9  $SP/dl/raftsrc/raft/tla/MCetcdraft.cfg
+etcd raft commit: c51f010c851edd0dada5af41bafbf68e54617767
+Python 3.13.17

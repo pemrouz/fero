@@ -1,0 +1,16 @@
+# run shipped-asis: MCetcdraft.tla with MCetcdraft.cfg, 600 s wall, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 55 and seed 8994763065898634226 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 24545] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-06 17:31:44)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:31:45.
+Progress(7) at 2026-11-06 17:31:48: 2,393 states generated (2,393 s/min), 602 distinct states found (602 ds/min), 446 states left on queue.
+Progress(10) at 2026-11-06 17:32:48: 339,576 states generated (337,183 s/min), 73,596 distinct states found (72,994 ds/min), 53,485 states left on queue.
+Progress(11) at 2026-11-06 17:33:48: 750,440 states generated (410,864 s/min), 158,667 distinct states found (85,071 ds/min), 114,733 states left on queue.
+Progress(11) at 2026-11-06 17:34:48: 1,185,090 states generated (434,650 s/min), 249,160 distinct states found (90,493 ds/min), 180,170 states left on queue.
+Progress(11) at 2026-11-06 17:35:48: 1,624,100 states generated (439,010 s/min), 338,134 distinct states found (88,974 ds/min), 243,110 states left on queue.
+Progress(12) at 2026-11-06 17:36:48: 2,065,838 states generated (441,738 s/min), 429,528 distinct states found (91,394 ds/min), 308,843 states left on queue.
+Progress(12) at 2026-11-06 17:37:48: 2,488,557 states generated (422,719 s/min), 511,038 distinct states found (81,510 ds/min), 367,831 states left on queue.
+Progress(12) at 2026-11-06 17:38:48: 2,907,633 states generated (419,076 s/min), 595,527 distinct states found (84,489 ds/min), 428,599 states left on queue.
+Progress(12) at 2026-11-06 17:39:48: 3,400,398 states generated (492,765 s/min), 696,027 distinct states found (100,500 ds/min), 501,841 states left on queue.
+Progress(12) at 2026-11-06 17:40:48: 3,933,126 states generated (532,728 s/min), 804,566 distinct states found (108,539 ds/min), 580,133 states left on queue.

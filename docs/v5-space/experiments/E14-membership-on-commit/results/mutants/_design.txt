@@ -1,0 +1,14 @@
+two {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 27682] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:11:34)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:11:35.
+Progress: 252160 states checked, 432 traces generated (trace length: mean=70, var(x)=111, sd=11)
+three+spare {'Plan': 'all', 'ReconfigurationLimit': 2, 'FaultLimit': 1, 'AllowLoseDisk': True, 'AllowDrop': False, 'AllowStepDown': True, 'LeaderLease': False, 'MaxTermLimit': 5}: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 27993] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:13:34)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:13:35.
+Progress: 210856 states checked, 318 traces generated (trace length: mean=70, var(x)=115, sd=11)

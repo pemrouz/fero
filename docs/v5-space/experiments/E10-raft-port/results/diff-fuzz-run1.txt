@@ -1,0 +1,7 @@
+4.15 2.89 1.84 3/136 1921
+== seed 2, 1000 scripts
+wrote 1000 scripts to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e10diff/seed2/in
+fuzz: 1000/1000 scripts match the Go reference byte for byte; 69770 directives compared; Go panicked in 0 scripts, TS threw at the same directive in 0
+== seed 3, 1000 scripts
+wrote 1000 scripts to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e10diff/seed3/in
+fuzz: 1000/1000 scripts match the Go reference byte for byte; 70576 directives compared; Go panicked in 0 scripts, TS threw at the same directive in 0

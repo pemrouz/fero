@@ -1,0 +1,18 @@
+FeroApplyConf:drop-guard:r15
+/\ LastConfIdx(log[i], commitIndex[i]) > 0      \* [g]
+-> /\ TRUE      \* mutant: guard dropped
+
+== two: violated None, ? states, 121 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 25836] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:36:10)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:36:11.
+Progress: 122117 states checked, 209 traces generated (trace length: mean=70, var(x)=123, sd=11)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 26431] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:38:11)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:38:11.
+Progress: 135204 states checked, 207 traces generated (trace length: mean=70, var(x)=123, sd=11)

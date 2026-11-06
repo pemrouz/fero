@@ -1,0 +1,688 @@
+# run r21-script: MCr21script.tla with r21-script.cfg, 1724 s wall, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 2 and seed -6591049734271205596 with 1 worker on 4 cores with 5461MB heap and 64MB offheap memory [pid: 23039] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-06 17:27:59)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:28:00.
+Error: Invariant NotGoal is violated.
+Error: The behavior up to this point is (trimmed: step, state, currentTerm, commitIndex, config, votesGranted, up; the last state in full):
+State 1: <Initial predicate>
+  step = 0
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 2: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 1
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 3: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 2
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 4: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 3
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 5: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 4
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 6: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 5
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 2 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 7: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 6
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 8: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 7
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 9: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 8
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 2)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 10: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 9
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 11: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 10
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 12: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 11
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 13: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 12
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 14: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 13
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 15: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 14
+  state = (s1 :> "Follower" @@ s2 :> "Candidate" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 16: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 15
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 17: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 16
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 18: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 17
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 19: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 18
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 20: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 19
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 21: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 20
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 22: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 21
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 23: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 22
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 24: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 23
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 25: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 24
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 26: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 25
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 27: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 26
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 28: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 27
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 29: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 28
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 30: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 29
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 31: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 30
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 32: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 31
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 33: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 32
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 34: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 33
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 35: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 34
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 36: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 35
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 37: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 36
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 38: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 37
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 39: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 38
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 40: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 39
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 41: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 40
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 42: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 41
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 43: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 42
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 44: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 43
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 2 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 45: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 44
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 46: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 45
+  state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 47: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 46
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 48: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 47
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 49: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 48
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 50: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 49
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 51: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 50
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 52: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 51
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 3)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 53: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 52
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 54: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 53
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 55: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 54
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 56: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 55
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 57: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 56
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 58: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 57
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 59: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 58
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 60: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 59
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 61: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 60
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 62: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 61
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 63: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 62
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 64: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 63
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 65: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 64
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 66: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 65
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 67: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 66
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 68: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 67
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 69: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 68
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 2)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 70: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 69
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 71: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 70
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 72: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+  step = 71
+  state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+  currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+  commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 4)
+  config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@ s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@ s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+  votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+  up = {s2, s3, s4}
+State 73: <ScrNext line 75, col 12 to line 79, col 58 of module MCr21script>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@
+  s3 :> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}] @@
+  s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 0
+/\ step = 72
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 4)
+/\ goalv = TRUE
+/\ votedFor = (s1 :> s1 @@ s2 :> s2 @@ s3 :> s3 @@ s4 :> s3)
+/\ pendingMessages = <<>>
+/\ dead = {s1}
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2) @@
+  s2 :> (s1 :> 0 @@ s2 :> 4 @@ s3 :> 4 @@ s4 :> 4) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 5 @@ s4 :> 5) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 4 @@ s3 :> 5 @@ s4 :> 4)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 1 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s2 :>
+      [ log |-> 4,
+        commitIndex |-> 4,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 3,
+        votedFor |-> s2 ] @@
+  s3 :>
+      [ log |-> 5,
+        commitIndex |-> 4,
+        config |-> [jointConfig |-> <<{s1, s3, s4}, {}>>, learners |-> {s2}],
+        currentTerm |-> 4,
+        votedFor |-> s3 ] @@
+  s4 :>
+      [ log |-> 5,
+        commitIndex |-> 4,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 4,
+        votedFor |-> s3 ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Leader" @@ s4 :> "Follower")
+/\ up = {s2, s3, s4}
+/\ messages = ( [ mdest |-> s2,
+    msource |-> s3,
+    mtype |-> "AppendEntriesResponse",
+    mterm |-> 3,
+    msubtype |-> "app",
+    msuccess |-> TRUE,
+    mmatchIndex |-> 4 ] :>
+      1 )
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {s2, s3, s4} @@ s3 :> {s3, s4} @@ s4 :> {})
+140 states generated, 79 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 73.
+Finished in 05s at (2026-11-06 17:28:03)
+Trace exploration spec path: ./MCr21script_TTrace_1793986077.tla

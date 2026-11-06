@@ -1,0 +1,14 @@
+# run stale2: MCstale2.tla with stale2.cfg, 1708 s wall, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 90 and seed -6495865992898034697 with 1 worker on 4 cores with 5461MB heap and 64MB offheap memory [pid: 23042] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-06 17:27:59)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:28:01.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.2E-16
+94 states generated, 51 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 34.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 2 and the 95th percentile is 2).
+Finished in 04s at (2026-11-06 17:28:02)

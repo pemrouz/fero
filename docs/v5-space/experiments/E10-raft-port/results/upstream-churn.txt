@@ -1,0 +1,93 @@
+## etcd raft, up to c51f010 (2026-10-23)
+since 2023-11-06: 82 non-merge commits touching non-test Go (generated pb and rafttest excluded); 2077 added, 1260 deleted
+since 2024-11-06: 51 non-merge commits touching non-test Go (generated pb and rafttest excluded); 1103 added, 933 deleted
+since 2025-11-06: 50 non-merge commits touching non-test Go (generated pb and rafttest excluded); 1100 added, 931 deleted
+### core commits since 2023-11-06, mechanical protobuf/pointer/lint commits filtered out
+3009105 2026-10-19 raft: fix stale read index at a leader that removed itself
+b8a3280 2026-10-18 raft: fix stale read index at a new single-voter leader
+1c41d93 2026-07-04 Remove unnecessary log shrinking
+4d8eae0 2026-05-13 Use GetAutoLeave to read AutoLeave
+3f870c5 2026-05-06 Add helper functions to convert between []Message and []*Message
+cd4280b 2026-05-05 Add helper function to convert between []Entry and []*Entry
+295d4bb 2026-05-02 Deep copy the provided ConfState When creating snapshot
+a3d86dc 2026-05-01 Ensure snapshot.Metadata and SnapshotMetadata's fields are not nil
+d1b9221 2026-04-13 Read Entry's field using GetIndex, GetTerm, GetType and GetData methods
+a29b225 2026-04-15 Align formatting of node ID in MajorityConfig
+7cf09fa 2026-03-26 Replace all NodeID with NodeId
+63903dd 2026-03-05 raft: use unique index as heartbeat ctxes for read-only operations;
+e6f9110 2026-01-15 Allow users to pass in a snapshot with only the ConfState initialized during bootstrap
+c3c7ca1 2025-12-15 makes sure that equal index => equal bar
+065fbde 2024-10-02 replace sort.Slice with slices.Sort, slices.SortFunc
+195edd6 2024-04-18 etcd Raft TLA+ Trace Validation
+ddfe109 2024-03-21 replace t.error/fatal with assert/request (/quorum)
+285c54f 2024-03-18 replace t.error/fatal with assert/request (/confchange)
+0f9fe52 2024-01-29 tracker: use a simpler SentEntires method name
+6e9aba7 2024-01-29 tracker: track in-flight commit index
+7929e3d 2024-03-06 tracker: canonicalize Next in StateSnapshot
+1f9cb53 2024-02-27 tracker,quorum: use native Sort
+457bb8e 2024-02-14 tracker: clean-up MaybeUpdate
+79a64f4 2024-02-14 raft: remove unneeded MaybeUpdate call
+53007f4 2024-02-07 tracker: maintain Match < Next invariant
+38da3a3 2024-02-01 log: remove the unnecessary nil check
+96e0a05 2024-02-01 log: consolidate raftLog initialization
+6439482 2024-02-06 raft: next index shall be larger than match index
+bd5b421 2024-01-30 log: use logSlice in raftLog.maybeAppend
+a52b6af 2024-01-31 log: use entryID in raftLog.maybeCommit
+cdcc0da 2024-01-30 log: use entryID in raftLog.stableTo
+2d23acc 2024-01-30 log: use entryID in raftLog.isUpToDate
+27e0d1b 2024-01-30 log: replace raftLog.lastTerm with lastEntryID
+f4eb8e9 2024-01-30 log: use entryID in raftLog.matchTerm
+5336523 2024-02-04 log: use entryID in raftLog.maybeAppend
+c55352f 2024-01-26 tracker: remove unused OptimisticUpdate method
+40a19f1 2024-01-25 raft: exit maybeSendAppend early if term is not found
+ee08961 2024-01-25 tracker: make UpdateOnEntrieSend errorless
+50b6d04 2024-01-25 tracker: remove redundant argument
+de5c136 2024-01-25 raft: factor out maybeSendSnapshot method
+c6025da 2024-01-25 remove unused min and max funcs
+d87942f 2023-11-17 Accept any snapshot that allows replication
+4fcf99f 2023-12-03 chore: Rename prs to trk
+## raft-rs: last commit ad13f3d 2026-05-13; tags: v0.5.0 v0.6.0 v0.7.0 
+non-merge commits after v0.7.0 (2023-03-06): 29
+ad13f3d 2026-05-13 try to shrink unstable entries buffer to avoid memory leak (#589)
+53cf7a5 2026-04-14 fix: bump rand to 0.9.3 for default builds (#586)
+aafb07c 2026-03-18 Avoid cloning byte arrays in public methods (#574)
+b02c962 2026-03-02 remove protobuf dependency with `prost-codec` feature (#579)
+deb3ba3 2026-02-26 fix clippy warnings (#580)
+1fd05e0 2025-10-29 Add logs for dropping read index msg (#569)
+5c932ef 2025-08-21 proto: try to fix CI (#565)
+0d01b20 2025-02-28 reset max_apply_unpersisted_log_limit in become_follower (#561)
+2fbeee5 2024-12-06 raft: next index shall be larger than match index (#557)
+63aec46 2024-10-21 feat: add disable_proposal_forwarding config params (#552)
+dfe2239 2024-10-20 fix: fix clippy (#553)
+2aefbf6 2024-05-15 Fix typos in code comments (#545)
+1ccd1f3 2024-05-14 include leader_id or current role info in vote log (#546)
+25b6676 2024-05-13 remove deprecated feature cargo-clippy (#547)
+668bed2 2024-04-14 Rollback impl AssertSend (#542)
+a76fb6e 2024-04-03 fix applied upper bound (#543)
+3cfa667 2024-03-28 allow raft apply committed logs before they are persisted (#537)
+4126862 2024-03-28 chore: Update Build Status in README (#541)
+91cd291 2024-03-28 Fix clippy violations (#540)
+65a0062 2023-12-07 Update LICENSE file to contain boilerplate project owner (#533)
+f60fb9e 2023-10-17 raft: paginate the unapplied config changes scan (#530)
+a541303 2023-10-09 docs: Point etcd link to the correct repository (#529)
+9c9190f 2023-09-19 docs: fix wrong index in log rejection (#528)
+cd621e4 2023-08-19 remove useless conversion and vec to get rid of clippy warnings (#523)
+53c2338 2023-08-04 chore: cfg test does not work for integration tests (#521)
+eb55032 2023-08-04 chore: readability for take read state (#520)
+9d360a3 2023-07-19 build: upgrade protobuf-build to 0.15.1 (#510)
+82d704c 2023-06-15 turn on failpoints tests (#505)
+93c91fc 2023-06-14 Fix typos (#503)
+### raft-rs test data files at HEAD
+src/confchange/testdata/joint_autoleave.txt
+src/confchange/testdata/joint_idempotency.txt
+src/confchange/testdata/joint_learners_next.txt
+src/confchange/testdata/joint_safety.txt
+src/confchange/testdata/simple_idempotency.txt
+src/confchange/testdata/simple_promote_demote.txt
+src/confchange/testdata/simple_safety.txt
+src/confchange/testdata/zero.txt
+src/quorum/testdata/joint_commit.txt
+src/quorum/testdata/joint_group_commit.txt
+src/quorum/testdata/joint_vote.txt
+src/quorum/testdata/majority_commit.txt
+src/quorum/testdata/majority_vote.txt

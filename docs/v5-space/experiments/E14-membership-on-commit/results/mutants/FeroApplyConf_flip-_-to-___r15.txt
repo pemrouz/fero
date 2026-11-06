@@ -1,0 +1,18 @@
+FeroApplyConf:flip->-to->=:r15
+/\ LastConfIdx(log[i], commitIndex[i]) > 0      \* [g]
+-> /\ LastConfIdx(log[i], commitIndex[i]) >= 0      \* [g]
+
+== two: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 30105] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:26:46)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:26:46.
+Progress: 590483 states checked, 1002 traces generated (trace length: mean=70, var(x)=105, sd=10)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 30424] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 15:28:46)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 15:28:46.
+Progress: 397588 states checked, 594 traces generated (trace length: mean=70, var(x)=108, sd=10)

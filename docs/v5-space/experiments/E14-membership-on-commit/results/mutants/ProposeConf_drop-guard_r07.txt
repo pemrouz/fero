@@ -1,0 +1,18 @@
+ProposeConf:drop-guard:r07
+/\ newVoters # {}      \* [g]
+-> /\ TRUE      \* mutant: guard dropped
+
+== two: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 23289] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:28:07)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:28:09.
+Progress: 177933 states checked, 307 traces generated (trace length: mean=70, var(x)=116, sd=11)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 24024] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:30:08)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:30:09.
+Progress: 147485 states checked, 227 traces generated (trace length: mean=70, var(x)=121, sd=11)

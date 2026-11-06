@@ -1,0 +1,5 @@
+Linux 6.18.44-fc-v242 x86_64
+v22.22.0
+go version go1.26.10 linux/amd64
+nproc 4
+MemTotal:       16472088 kB

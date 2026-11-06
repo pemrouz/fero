@@ -1,0 +1,18 @@
+AddVoterF:drop-guard:r11
+/\ j \notin GetConfig(i) \cup GetLearners(i)      \* [g]
+-> /\ TRUE      \* mutant: guard dropped
+
+== two: violated None, ? states, 121 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 24672] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:32:09)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:32:09.
+Progress: 134354 states checked, 226 traces generated (trace length: mean=70, var(x)=121, sd=11)
+== three+spare: violated None, ? states, 120 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running Random Simulation with seed 1 with 2 workers on 4 cores with 5461MB heap and 64MB offheap memory [pid: 25270] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit).
+Starting... (2026-11-06 17:34:10)
+Computed 1 initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 17:34:10.
+Progress: 122352 states checked, 183 traces generated (trace length: mean=70, var(x)=126, sd=11)

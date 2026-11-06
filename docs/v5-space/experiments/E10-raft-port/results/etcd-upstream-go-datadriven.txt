@@ -1,0 +1,53 @@
+# go test -count=1 -v -run 'TestInteraction|TestDataDriven|TestConfChangeDataDriven' ./ ./quorum ./confchange
+# etcd raft c51f010, go1.26.10, run under $SP/bin/heavy; load average before: 0.42 0.16 0.05 1/107 5066
+# trimmed to the result lines; the full log is /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/e10-go/upstream_test.txt
+--- PASS: TestInteraction (0.04s)
+    --- PASS: TestInteraction/async_storage_writes (0.01s)
+    --- PASS: TestInteraction/async_storage_writes_append_aba_race (0.00s)
+    --- PASS: TestInteraction/campaign (0.00s)
+    --- PASS: TestInteraction/campaign_learner_must_vote (0.00s)
+    --- PASS: TestInteraction/checkquorum (0.00s)
+    --- PASS: TestInteraction/confchange_disable_validation (0.00s)
+    --- PASS: TestInteraction/confchange_v1_add_single (0.00s)
+    --- PASS: TestInteraction/confchange_v1_remove_leader (0.00s)
+    --- PASS: TestInteraction/confchange_v1_remove_leader_stepdown (0.00s)
+    --- PASS: TestInteraction/confchange_v2_add_double_auto (0.00s)
+    --- PASS: TestInteraction/confchange_v2_add_double_implicit (0.00s)
+    --- PASS: TestInteraction/confchange_v2_add_single_auto (0.00s)
+    --- PASS: TestInteraction/confchange_v2_add_single_explicit (0.00s)
+    --- PASS: TestInteraction/confchange_v2_replace_leader (0.00s)
+    --- PASS: TestInteraction/confchange_v2_replace_leader_stepdown (0.00s)
+    --- PASS: TestInteraction/forget_leader (0.00s)
+    --- PASS: TestInteraction/forget_leader_prevote_checkquorum (0.00s)
+    --- PASS: TestInteraction/forget_leader_read_only_lease_based (0.00s)
+    --- PASS: TestInteraction/heartbeat_resp_recovers_from_probing (0.00s)
+    --- PASS: TestInteraction/lagging_commit (0.00s)
+    --- PASS: TestInteraction/prevote (0.00s)
+    --- PASS: TestInteraction/prevote_checkquorum (0.00s)
+    --- PASS: TestInteraction/probe_and_replicate (0.01s)
+    --- PASS: TestInteraction/replicate_pause (0.00s)
+    --- PASS: TestInteraction/single_node (0.00s)
+    --- PASS: TestInteraction/slow_follower_after_compaction (0.00s)
+    --- PASS: TestInteraction/snapshot_succeed_via_app_resp (0.00s)
+    --- PASS: TestInteraction/snapshot_succeed_via_app_resp_behind (0.00s)
+PASS
+ok  	go.etcd.io/raft/v3	0.049s
+--- PASS: TestDataDriven (0.00s)
+    --- PASS: TestDataDriven/joint_commit (0.00s)
+    --- PASS: TestDataDriven/joint_vote (0.00s)
+    --- PASS: TestDataDriven/majority_commit (0.00s)
+    --- PASS: TestDataDriven/majority_vote (0.00s)
+PASS
+ok  	go.etcd.io/raft/v3/quorum	0.006s
+--- PASS: TestConfChangeDataDriven (0.00s)
+    --- PASS: TestConfChangeDataDriven/joint_autoleave (0.00s)
+    --- PASS: TestConfChangeDataDriven/joint_idempotency (0.00s)
+    --- PASS: TestConfChangeDataDriven/joint_learners_next (0.00s)
+    --- PASS: TestConfChangeDataDriven/joint_safety (0.00s)
+    --- PASS: TestConfChangeDataDriven/simple_idempotency (0.00s)
+    --- PASS: TestConfChangeDataDriven/simple_promote_demote (0.00s)
+    --- PASS: TestConfChangeDataDriven/simple_safety (0.00s)
+    --- PASS: TestConfChangeDataDriven/update (0.00s)
+    --- PASS: TestConfChangeDataDriven/zero (0.00s)
+PASS
+ok  	go.etcd.io/raft/v3/confchange	0.006s

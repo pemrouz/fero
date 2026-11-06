@@ -1,0 +1,8 @@
+2.35 2.83 4.41 3/178 5090
+== seed 7, 1000 scripts with read-index and restart
+wrote 1000 scripts to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e10diff/seed7/in
+fuzz: 1000/1000 scripts match the Go reference byte for byte; 70073 directives compared; Go panicked in 2 scripts, TS threw at the same directive in 2
+   2393 read-index
+   1730 restart
+directive 80 (stabilize): can't leave a non-joint config
+directive 69 (stabilize 2 3): can't leave a non-joint config

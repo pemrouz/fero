@@ -1,0 +1,404 @@
+1.38 2.95 3.69 3/185 15365
+Fri Nov  6 12:40:53 UTC 2026
+re-running 365 survivors of /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e10-mutation-run2.txt (of 365 listed)
+file op: total, killed by datadriven, killed only by fuzz, survived
+confchange.ts swap: 3, 0, 0, 3
+confchange.ts drop: 1, 0, 0, 1
+confchange.ts guard: 1, 0, 0, 1
+log_unstable.ts guard: 6, 0, 0, 6
+log_unstable.ts swap: 13, 0, 0, 13
+log_unstable.ts drop: 10, 0, 0, 10
+log_unstable.ts rel: 2, 0, 0, 2
+log.ts rel: 14, 0, 0, 14
+log.ts swap: 9, 0, 0, 9
+log.ts guard: 10, 0, 0, 10
+log.ts eq: 5, 0, 0, 5
+log.ts drop: 2, 0, 0, 2
+quorum.ts guard: 2, 0, 0, 2
+quorum.ts rel: 3, 0, 0, 3
+raft.ts swap: 56, 0, 0, 56
+raft.ts guard: 26, 0, 2, 24
+raft.ts eq: 4, 0, 0, 4
+raft.ts drop: 42, 0, 3, 39
+raft.ts rel: 18, 0, 2, 16
+rawnode.ts guard: 12, 0, 0, 12
+rawnode.ts swap: 9, 0, 0, 9
+rawnode.ts drop: 3, 0, 0, 3
+rawnode.ts eq: 3, 0, 0, 3
+read_only.ts guard: 2, 0, 0, 2
+read_only.ts rel: 2, 0, 0, 2
+read_only.ts swap: 1, 0, 0, 1
+storage.ts guard: 6, 0, 0, 6
+storage.ts rel: 8, 0, 0, 8
+storage.ts drop: 13, 0, 1, 12
+storage.ts swap: 5, 0, 0, 5
+storage.ts eq: 1, 0, 0, 1
+tracker.ts guard: 5, 0, 1, 4
+tracker.ts swap: 31, 0, 0, 31
+tracker.ts eq: 4, 0, 0, 4
+tracker.ts drop: 26, 0, 0, 26
+tracker.ts rel: 7, 0, 1, 6
+op rel: 54 mutants; datadriven kills 0 (0.0%); with fuzz 3 (5.6%)
+op guard: 70 mutants; datadriven kills 0 (0.0%); with fuzz 3 (4.3%)
+op drop: 97 mutants; datadriven kills 0 (0.0%); with fuzz 4 (4.1%)
+op swap: 127 mutants; datadriven kills 0 (0.0%); with fuzz 0 (0.0%)
+op eq: 17 mutants; datadriven kills 0 (0.0%); with fuzz 0 (0.0%)
+op ALL: 365 mutants; datadriven kills 0 (0.0%); with fuzz 10 (2.7%)
+
+survivors:
+  confchange.ts:116 swap: cfg.AutoLeave = false
+  confchange.ts:117 drop: /* dropped */
+  confchange.ts:221 swap: chg.Tracker.Progress = trk!
+  confchange.ts:39 guard: if (true) continue
+  confchange.ts:74 swap: this.LastIndex = lastIndex
+  log_unstable.ts:104 guard: } else if (true) {
+  log_unstable.ts:106 swap: this.offset = fromIndex
+  log_unstable.ts:10 drop: /* dropped */
+  log_unstable.ts:10 swap: snapshotInProgress = false
+  log_unstable.ts:112 drop: /* dropped */
+  log_unstable.ts:112 swap: this.offsetInProgress = Math.min(this.offsetInProgress, fromIndex)
+  log_unstable.ts:113 drop: /* dropped */
+  log_unstable.ts:11 drop: /* dropped */
+  log_unstable.ts:11 swap: offsetInProgress = 0
+  log_unstable.ts:123 rel: if (lo >= hi) this.logger.Panicf('invalid unstable.slice %d > %d', lo, hi)
+  log_unstable.ts:123 rel: if (lo > hi) this.logger.Panicf('invalid unstable.slice %d >= %d', lo, hi)
+  log_unstable.ts:12 drop: /* dropped */
+  log_unstable.ts:15 swap: this.offsetInProgress = offset
+  log_unstable.ts:16 swap: this.logger = logger
+  log_unstable.ts:27 guard: if (true) return [this.offset + l - 1, true]
+  log_unstable.ts:34 guard: if (this.snapshot) return [this.snapshot.Metadata!.GetTerm(), true]
+  log_unstable.ts:56 guard: if (true) this.snapshotInProgress = true
+  log_unstable.ts:75 swap: this.offset = id.index + 1
+  log_unstable.ts:76 swap: this.offsetInProgress = Math.max(this.offsetInProgress, this.offset)
+  log_unstable.ts:77 drop: /* dropped */
+  log_unstable.ts:86 guard: if (this.snapshot.Metadata!.GetIndex() === i) {
+  log_unstable.ts:86 guard: if (this.snapshot) {
+  log_unstable.ts:87 swap: this.snapshotInProgress = false
+  log_unstable.ts:88 drop: /* dropped */
+  log_unstable.ts:93 swap: this.offsetInProgress = this.offset
+  log_unstable.ts:94 drop: /* dropped */
+  log_unstable.ts:94 swap: this.entries = []
+  log_unstable.ts:95 drop: /* dropped */
+  log_unstable.ts:95 swap: this.snapshot = cloneSnapshot(s)
+  log_unstable.ts:96 swap: this.snapshotInProgress = false
+  log_unstable.ts:97 drop: /* dropped */
+  log.ts:101 rel: if (maxSize < 0) {
+  log.ts:149 rel: if (this.committed <= tocommit) {
+  log.ts:161 swap: this.applying = Math.max(this.applying, i)
+  log.ts:163 guard: if (true) this.applyingEntsSize -= size
+  log.ts:163 rel: if (this.applyingEntsSize >= size) this.applyingEntsSize -= size
+  log.ts:165 rel: this.applyingEntsPaused = this.applyingEntsSize > this.maxApplyingEntsSize
+  log.ts:172 swap: this.applyingEntsSize += size
+  log.ts:174 rel: this.applyingEntsPaused = this.applyingEntsSize > this.maxApplyingEntsSize || i < this.maxAppliableIndex(allowUnstable)
+  log.ts:194 guard: if (true) return [t2, null]
+  log.ts:195 eq: if (err !== ErrCompacted || err === ErrUnavailable) return [0, err]
+  log.ts:195 eq: if (err === ErrCompacted || err !== ErrUnavailable) return [0, err]
+  log.ts:195 guard: if (true) return [0, err]
+  log.ts:206 guard: if (true) return ents
+  log.ts:207 eq: if (err !== ErrCompacted) return this.allEntries()
+  log.ts:207 guard: if (true) return this.allEntries()
+  log.ts:20 drop: /* dropped */
+  log.ts:20 swap: applyingEntsPaused = false
+  log.ts:21 drop: /* dropped */
+  log.ts:223 guard: if (at.index > this.committed && this.matchTerm(at)) {
+  log.ts:223 guard: if (at.term !== 0 && at.index > this.committed) {
+  log.ts:261 rel: if (hi < this.unstable.offset) return [ents, null]
+  log.ts:264 rel: if (size > maxSize) return [ents, null]
+  log.ts:266 eq: if (unst.length !== 1 && size + entsSize(unst) > maxSize) return [ents, null]
+  log.ts:266 guard: if (size + entsSize(unst) > maxSize) return [ents, null]
+  log.ts:266 rel: if (unst.length === 1 && size + entsSize(unst) >= maxSize) return [ents, null]
+  log.ts:271 rel: if (lo >= hi) this.logger.Panicf('invalid slice %d > %d', lo, hi)
+  log.ts:271 rel: if (lo > hi) this.logger.Panicf('invalid slice %d >= %d', lo, hi)
+  log.ts:280 guard: if (true) return t
+  log.ts:281 eq: if (err !== ErrCompacted || err === ErrUnavailable) return 0
+  log.ts:281 guard: if (true) return 0
+  log.ts:28 swap: this.unstable = new unstable(lastIndex + 1, logger)
+  log.ts:29 swap: this.maxApplyingEntsSize = maxApplyingEntsSize
+  log.ts:30 swap: this.committed = firstIndex - 1
+  log.ts:31 swap: this.applying = firstIndex - 1
+  log.ts:32 swap: this.applied = firstIndex - 1
+  log.ts:33 swap: this.logger = logger
+  log.ts:48 rel: } else if (ci < this.committed) {
+  log.ts:52 rel: if (ci - offset >= a.entries.length) this.logger.Panicf('index, %d, is out of range [%d]', ci - offset, a.entries.length)
+  log.ts:82 rel: for (; index >= 0; index--) {
+  log.ts:99 rel: if (lo > hi) return []
+  quorum.ts:110 guard: if (c[1]) return majorityString(c[0]) + '&&' + majorityString(c[1])
+  quorum.ts:110 rel: if (c[1] && c[1].size >= 0) return majorityString(c[0]) + '&&' + majorityString(c[1])
+  quorum.ts:127 rel: return idx0 <= idx1 ? idx0 : idx1
+  quorum.ts:52 rel: info.sort((a, b) => (a.idx !== b.idx ? (a.idx <= b.idx ? -1 : 1) : a.id - b.id))
+  quorum.ts:79 guard: if (true) {
+  raft.ts:102 swap: Vote = 0
+  raft.ts:1052 guard: if (r.trk.IsSingleton()) {
+  raft.ts:1054 eq: if (resp.GetTo() === None) r.send(resp)
+  raft.ts:1054 guard: if (true) r.send(resp)
+  raft.ts:110 drop: /* dropped */
+  raft.ts:113 drop: /* dropped */
+  raft.ts:113 swap: leadTransferee = None
+  raft.ts:114 drop: /* dropped */
+  raft.ts:114 swap: pendingConfIndex = 0
+  raft.ts:115 drop: /* dropped */
+  raft.ts:117 drop: /* dropped */
+  raft.ts:119 drop: /* dropped */
+  raft.ts:119 swap: heartbeatElapsed = 0
+  raft.ts:120 drop: /* dropped */
+  raft.ts:125 drop: /* dropped */
+  raft.ts:139 swap: this.raftLog = raftlog
+  raft.ts:140 swap: this.maxMsgSize = c.MaxSizePerMsg
+  raft.ts:141 drop: /* dropped */
+  raft.ts:141 swap: this.maxUncommittedSize = c.MaxUncommittedEntriesSize
+  raft.ts:142 drop: /* dropped */
+  raft.ts:142 swap: this.trk = new ProgressTracker(c.MaxInflightMsgs, c.MaxInflightBytes)
+  raft.ts:143 swap: this.electionTimeout = c.ElectionTick
+  raft.ts:144 swap: this.heartbeatTimeout = c.HeartbeatTick
+  raft.ts:145 swap: this.logger = c.Logger!
+  raft.ts:146 swap: this.checkQuorum = c.CheckQuorum
+  raft.ts:147 swap: this.preVote = c.PreVote
+  raft.ts:148 swap: this.readOnly = new readOnly(c.ReadOnlyOption)
+  raft.ts:149 swap: this.disableProposalForwarding = c.DisableProposalForwarding
+  raft.ts:150 drop: /* dropped */
+  raft.ts:150 swap: this.disableConfChangeValidation = c.DisableConfChangeValidation
+  raft.ts:151 swap: this.stepDownOnRemoval = c.StepDownOnRemoval
+  raft.ts:159 guard: if (true) raftlog.appliedTo(c.Applied, 0)
+  raft.ts:159 rel: if (c.Applied >= 0) raftlog.appliedTo(c.Applied, 0)
+  raft.ts:166 eq: hasLeader(): boolean { return this.lead === None }
+  raft.ts:221 eq: if (err !== ErrSnapshotTemporarilyUnavailable) {
+  raft.ts:221 guard: if (true) {
+  raft.ts:290 swap: this.Vote = None
+  raft.ts:293 swap: this.electionElapsed = 0
+  raft.ts:294 swap: this.heartbeatElapsed = 0
+  raft.ts:295 drop: /* dropped */
+  raft.ts:310 drop: /* dropped */
+  raft.ts:310 swap: this.uncommittedSize = 0
+  raft.ts:311 drop: /* dropped */
+  raft.ts:311 swap: this.readOnly = new readOnly(this.readOnly.option)
+  raft.ts:319 swap: c.Index = li + 1 + i
+  raft.ts:342 swap: this.electionElapsed++
+  raft.ts:350 guard: if (this.leadTransferee !== None) this.abortLeaderTransfer()
+  raft.ts:350 guard: if (this.state === StateLeader) this.abortLeaderTransfer()
+  raft.ts:353 guard: if (true) {
+  raft.ts:354 drop: /* dropped */
+  raft.ts:363 swap: this.lead = lead
+  raft.ts:364 swap: this.state = StateFollower
+  raft.ts:373 drop: /* dropped */
+  raft.ts:373 swap: this.Vote = this.id
+  raft.ts:374 swap: this.state = StateCandidate
+  raft.ts:383 drop: /* dropped */
+  raft.ts:383 swap: this.lead = None
+  raft.ts:384 swap: this.state = StatePreCandidate
+  raft.ts:393 swap: this.lead = this.id
+  raft.ts:394 swap: this.state = StateLeader
+  raft.ts:398 drop: /* dropped */
+  raft.ts:398 swap: this.pendingConfIndex = this.raftLog.lastIndex()
+  raft.ts:423 rel: if (this.raftLog.applied > this.raftLog.committed) return false
+  raft.ts:448 swap: term = this.Term + 1
+  raft.ts:452 swap: term = this.Term
+  raft.ts:465 guard: if (true) ctx = utf8(t)
+  raft.ts:484 rel: const inLease = this.checkQuorum && this.lead !== None && this.electionElapsed <= this.electionTimeout
+  raft.ts:514 guard: if (true) {
+  raft.ts:536 guard: if (true) {
+  raft.ts:536 rel: if (m.GetEntries().length >= 0) {
+  raft.ts:555 swap: this.Vote = m.GetFrom()
+  raft.ts:567 guard: if (true) return err
+  raft.ts:56 drop: /* dropped */
+  raft.ts:56 swap: ElectionTick = 0
+  raft.ts:57 drop: /* dropped */
+  raft.ts:57 swap: HeartbeatTick = 0
+  raft.ts:58 drop: /* dropped */
+  raft.ts:60 drop: /* dropped */
+  raft.ts:60 swap: AsyncStorageWrites = false
+  raft.ts:613 rel: if ((s.Metadata?.GetIndex() ?? 0) < this.raftLog.committed) return false
+  raft.ts:61 drop: /* dropped */
+  raft.ts:61 swap: MaxSizePerMsg = 0
+  raft.ts:622 guard: if (true) {
+  raft.ts:62 drop: /* dropped */
+  raft.ts:62 swap: MaxCommittedSizePerReady = 0
+  raft.ts:63 drop: /* dropped */
+  raft.ts:63 swap: MaxUncommittedEntriesSize = 0
+  raft.ts:640 drop: /* dropped */
+  raft.ts:64 drop: /* dropped */
+  raft.ts:64 swap: MaxInflightMsgs = 0
+  raft.ts:65 drop: /* dropped */
+  raft.ts:65 swap: MaxInflightBytes = 0
+  raft.ts:66 drop: /* dropped */
+  raft.ts:66 swap: CheckQuorum = false
+  raft.ts:670 swap: this.trk.Progress = trk
+  raft.ts:67 drop: /* dropped */
+  raft.ts:67 swap: PreVote = false
+  raft.ts:68 drop: /* dropped */
+  raft.ts:691 guard: if (!tOK) this.abortLeaderTransfer()
+  raft.ts:696 rel: if (state.GetCommit() <= this.raftLog.committed || state.GetCommit() > this.raftLog.lastIndex()) {
+  raft.ts:699 swap: this.Term = state.GetTerm()
+  raft.ts:700 swap: this.Vote = state.GetVote()
+  raft.ts:71 drop: /* dropped */
+  raft.ts:71 swap: DisableConfChangeValidation = false
+  raft.ts:72 drop: /* dropped */
+  raft.ts:72 swap: StepDownOnRemoval = false
+  raft.ts:734 guard: if (s > 0 && this.uncommittedSize + s > this.maxUncommittedSize) return false
+  raft.ts:734 guard: if (this.uncommittedSize > 0 && this.uncommittedSize + s > this.maxUncommittedSize) return false
+  raft.ts:734 rel: if (this.uncommittedSize >= 0 && s > 0 && this.uncommittedSize + s > this.maxUncommittedSize) return false
+  raft.ts:734 rel: if (this.uncommittedSize > 0 && s >= 0 && this.uncommittedSize + s > this.maxUncommittedSize) return false
+  raft.ts:734 rel: if (this.uncommittedSize > 0 && s > 0 && this.uncommittedSize + s >= this.maxUncommittedSize) return false
+  raft.ts:735 drop: /* dropped */
+  raft.ts:73 drop: /* dropped */
+  raft.ts:740 guard: if (true) this.uncommittedSize = 0
+  raft.ts:740 rel: if (s >= this.uncommittedSize) this.uncommittedSize = 0
+  raft.ts:748 rel: for (let i = 0; i <= x.length; i++) if (x[i] !== b[i]) return false
+  raft.ts:75 guard: if (true) Object.assign(this, init)
+  raft.ts:82 rel: if (this.HeartbeatTick < 0) return new Error('heartbeat tick must be greater than 0')
+  raft.ts:830 guard: if (true) nextProbeIdx = r.raftLog.findConflictByTerm(m.GetRejectHint(), m.GetLogTerm())[0]
+  raft.ts:830 rel: if (m.GetLogTerm() >= 0) nextProbeIdx = r.raftLog.findConflictByTerm(m.GetRejectHint(), m.GetLogTerm())[0]
+  raft.ts:83 rel: if (this.ElectionTick < this.HeartbeatTick) return new Error('election tick must be greater than heartbeat tick')
+  raft.ts:840 guard: } else if (pr.State === StateSnapshot) {
+  raft.ts:844 guard: } else if (true) {
+  raft.ts:85 guard: if (true) this.MaxUncommittedEntriesSize = noLimit
+  raft.ts:864 swap: pr.MsgAppFlowPaused = false
+  raft.ts:877 eq: if (pr.State === StateSnapshot) return null
+  raft.ts:877 guard: if (true) return null
+  raft.ts:878 guard: if (true) {
+  raft.ts:87 rel: if (this.MaxInflightMsgs < 0) return new Error('max inflight messages must be greater than 0')
+  raft.ts:882 drop: /* dropped */
+  raft.ts:886 drop: /* dropped */
+  raft.ts:88 guard: if (true) this.MaxInflightBytes = noLimit
+  raft.ts:89 rel: else if (this.MaxInflightBytes < this.MaxSizePerMsg) return new Error('max inflight bytes must be > max message size')
+  raft.ts:913 swap: r.leadTransferee = leadTransferee
+  raft.ts:981 swap: r.lead = m.GetFrom()
+  raft.ts:986 swap: r.lead = m.GetFrom()
+  raft.ts:991 drop: /* dropped */
+  raft.ts:991 swap: r.lead = m.GetFrom()
+  raft.ts:992 drop: /* dropped */
+  rawnode.ts:100 guard: if (true) this.stepsOnAdvance.push(newStorageApplyRespMsg(this.raft, rd.CommittedEntries))
+  rawnode.ts:102 swap: this.raft.msgsAfterAppend = []
+  rawnode.ts:118 guard: if (!isHardStateEqual(hardSt, this.prevHardSt)) return true
+  rawnode.ts:140 drop: /* dropped */
+  rawnode.ts:150 eq: const rej = status !== SnapshotFailure
+  rawnode.ts:168 eq: if (peers.length !== 0) return new Error('must provide at least one peer to Bootstrap')
+  rawnode.ts:168 guard: if (true) return new Error('must provide at least one peer to Bootstrap')
+  rawnode.ts:170 guard: if (true) return err
+  rawnode.ts:171 eq: if (lastIndex === 0) return new Error("can't bootstrap a nonempty Storage")
+  rawnode.ts:171 guard: if (true) return new Error("can't bootstrap a nonempty Storage")
+  rawnode.ts:172 drop: /* dropped */
+  rawnode.ts:179 drop: /* dropped */
+  rawnode.ts:203 guard: if (true) {
+  rawnode.ts:204 swap: m.Vote = rd.GetVote()
+  rawnode.ts:205 swap: m.Commit = rd.GetCommit()
+  rawnode.ts:208 guard: if (true) m.Snapshot = rd.Snapshot!
+  rawnode.ts:218 swap: m.LogTerm = last.term
+  rawnode.ts:221 guard: if (true) m.Snapshot = rd.Snapshot!
+  rawnode.ts:31 swap: this.asyncStorageWrites = config.AsyncStorageWrites
+  rawnode.ts:32 swap: this.prevSoftSt = r.softState()
+  rawnode.ts:33 swap: this.prevHardSt = r.hardState()
+  rawnode.ts:73 swap: rd.CommittedEntries = r.raftLog.nextCommittedEnts(this.applyUnstableEntries())
+  rawnode.ts:74 swap: rd.Messages = r.msgs.slice()
+  rawnode.ts:80 guard: if (true) rd.Snapshot = r.raftLog.nextUnstableSnapshot()
+  rawnode.ts:81 guard: if (true) rd.ReadStates = r.readStates
+  rawnode.ts:95 guard: if (true) this.raft.readStates = []
+  rawnode.ts:99 guard: if (true) this.stepsOnAdvance.push(newStorageAppendRespMsg(this.raft, rd))
+  read_only.ts:31 guard: if (ctx.length !== 0) this.acks.set(from, Math.max(this.acks.get(from) ?? 0, readU64LE(ctx)))
+  read_only.ts:31 guard: if (ctx) this.acks.set(from, Math.max(this.acks.get(from) ?? 0, readU64LE(ctx)))
+  read_only.ts:39 rel: if (newConfirmedReads < this.confirmedReads) return []
+  read_only.ts:42 swap: this.confirmedReads = newConfirmedReads
+  read_only.ts:50 rel: for (let i = 0; i <= 8; i++) {
+  storage.ts:100 guard: if (true) getLogger().Panicf('snapshot %d is out of bound lastindex(%d)', i, this.lastIndex())
+  storage.ts:100 rel: if (i >= this.lastIndex()) getLogger().Panicf('snapshot %d is out of bound lastindex(%d)', i, this.lastIndex())
+  storage.ts:101 drop: /* dropped */
+  storage.ts:101 swap: this.snapshot.Metadata!.Index = i
+  storage.ts:102 drop: /* dropped */
+  storage.ts:102 swap: this.snapshot.Metadata!.Term = this.ents[i - offset].GetTerm()
+  storage.ts:103 drop: /* dropped */
+  storage.ts:104 guard: if (true) this.snapshot.Metadata!.ConfState = cloneConfState(cs)
+  storage.ts:105 drop: /* dropped */
+  storage.ts:111 rel: if (compactIndex < offset) return ErrCompacted
+  storage.ts:124 rel: if (first >= entries[0].GetIndex()) entries = entries.slice(first - entries[0].GetIndex())
+  storage.ts:126 guard: if (true) {
+  storage.ts:126 rel: if (this.ents.length >= offset) {
+  storage.ts:128 guard: } else if (true) {
+  storage.ts:30 swap: this.snapshot = EnsureSnapshot(undefined)
+  storage.ts:35 drop: /* dropped */
+  storage.ts:46 drop: /* dropped */
+  storage.ts:48 rel: if (lo < offset) return [[], ErrCompacted]
+  storage.ts:56 drop: /* dropped */
+  storage.ts:59 rel: if (i - offset > this.ents.length) return [0, ErrUnavailable]
+  storage.ts:64 drop: /* dropped */
+  storage.ts:73 drop: /* dropped */
+  storage.ts:82 drop: /* dropped */
+  storage.ts:82 swap: this.snapshot = EnsureSnapshot(this.snapshot)
+  storage.ts:83 drop: /* dropped */
+  storage.ts:88 drop: /* dropped */
+  storage.ts:91 eq: if (msIndex === 0 && msIndex >= snapIndex) return ErrSnapOutOfDate
+  storage.ts:91 guard: if (msIndex >= snapIndex) return ErrSnapOutOfDate
+  storage.ts:91 rel: if (msIndex !== 0 && msIndex > snapIndex) return ErrSnapOutOfDate
+  storage.ts:92 swap: this.ents = [new Entry({ Term: snap.Metadata!.GetTerm(), Index: snap.Metadata!.GetIndex() })]
+  storage.ts:98 guard: if (true) return [null, ErrSnapOutOfDate]
+  storage.ts:98 rel: if (i < (this.snapshot.Metadata?.GetIndex() ?? 0)) return [null, ErrSnapOutOfDate]
+  tracker.ts:100 guard: if (true) Object.assign(this, init)
+  tracker.ts:109 swap: this.PendingSnapshot = 0
+  tracker.ts:110 swap: this.State = state
+  tracker.ts:115 eq: if (this.State !== StateSnapshot) {
+  tracker.ts:115 guard: if (true) {
+  tracker.ts:118 drop: /* dropped */
+  tracker.ts:123 drop: /* dropped */
+  tracker.ts:131 swap: this.Next = snapshoti + 1
+  tracker.ts:132 swap: this.sentCommit = snapshoti
+  tracker.ts:152 rel: return index > this.sentCommit && this.sentCommit <= this.Next - 1
+  tracker.ts:159 swap: this.Next = Math.max(this.Next, n + 1)
+  tracker.ts:15 drop: /* dropped */
+  tracker.ts:15 swap: count = 0
+  tracker.ts:160 swap: this.MsgAppFlowPaused = false
+  tracker.ts:166 rel: if (rejected < this.Match) return false
+  tracker.ts:167 swap: this.sentCommit = Math.min(this.sentCommit, this.Next - 1)
+  tracker.ts:168 drop: /* dropped */
+  tracker.ts:16 drop: /* dropped */
+  tracker.ts:16 swap: bytes = 0
+  tracker.ts:172 swap: this.sentCommit = Math.min(this.sentCommit, this.Next - 1)
+  tracker.ts:173 drop: /* dropped */
+  tracker.ts:173 swap: this.MsgAppFlowPaused = false
+  tracker.ts:17 drop: /* dropped */
+  tracker.ts:213 drop: /* dropped */
+  tracker.ts:217 guard: if (true) Object.assign(this, init)
+  tracker.ts:22 swap: this.maxBytes = maxBytes
+  tracker.ts:23 drop: /* dropped */
+  tracker.ts:256 swap: this.MaxInflightBytes = maxBytes
+  tracker.ts:257 drop: /* dropped */
+  tracker.ts:257 swap: this.Config = new Config({ Voters: [new Set(), null], Learners: null, LearnersNext: null })
+  tracker.ts:258 swap: this.Votes = new Map()
+  tracker.ts:259 drop: /* dropped */
+  tracker.ts:259 swap: this.Progress = new Map()
+  tracker.ts:264 swap: p.Progress = this.Progress
+  tracker.ts:265 swap: p.Votes = this.Votes
+  tracker.ts:266 drop: /* dropped */
+  tracker.ts:27 drop: /* dropped */
+  tracker.ts:27 swap: ins.count = this.count
+  tracker.ts:284 eq: return (this.Voters[0]?.size ?? 0) === 1 && (this.Voters[1]?.size ?? 0) !== 0
+  tracker.ts:28 swap: ins.bytes = this.bytes
+  tracker.ts:29 drop: /* dropped */
+  tracker.ts:29 swap: ins.buffer = this.buffer.map(x => ({ ...x }))
+  tracker.ts:308 eq: if (!this.Learners || this.Learners.size !== 0) return null
+  tracker.ts:308 guard: if (true) return null
+  tracker.ts:30 drop: /* dropped */
+  tracker.ts:38 rel: if (next > this.buffer.length) this.grow()
+  tracker.ts:39 swap: this.count++
+  tracker.ts:40 swap: this.bytes += bytes
+  tracker.ts:41 drop: /* dropped */
+  tracker.ts:46 rel: else if (newSize >= this.size) newSize = this.size
+  tracker.ts:48 rel: for (let i = 0; i <= newSize; i++) nb[i] = this.buffer[i] ?? { index: 0, bytes: 0 }
+  tracker.ts:49 drop: /* dropped */
+  tracker.ts:58 drop: /* dropped */
+  tracker.ts:62 swap: this.bytes -= bytes
+  tracker.ts:63 drop: /* dropped */
+  tracker.ts:63 swap: this.start = idx
+  tracker.ts:68 eq: return this.count === this.size || (this.maxBytes === 0 && this.bytes >= this.maxBytes)
+  tracker.ts:68 rel: return this.count === this.size || (this.maxBytes !== 0 && this.bytes > this.maxBytes)
+  tracker.ts:72 drop: /* dropped */
+  tracker.ts:72 swap: this.count = 0
+  tracker.ts:73 swap: this.bytes = 0
+  tracker.ts:74 drop: /* dropped */
+  tracker.ts:90 drop: /* dropped */
+  tracker.ts:90 swap: Next = 0
+  tracker.ts:91 drop: /* dropped */
+  tracker.ts:91 swap: sentCommit = 0
+  tracker.ts:92 drop: /* dropped */
+  tracker.ts:94 drop: /* dropped */
+  tracker.ts:94 swap: RecentActive = false
+  tracker.ts:95 swap: MsgAppFlowPaused = false
+  tracker.ts:98 drop: /* dropped */
+Fri Nov  6 13:18:47 UTC 2026
