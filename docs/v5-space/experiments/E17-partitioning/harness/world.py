@@ -56,6 +56,9 @@ PROPS = {
            'complete',
     'L7': 'every attempt can get an answer (applied or refused) once faults '
           'and timers stop',
+    'L5g': 'a give-up gives the partition back: once a move or re-key is given '
+           'up (cancel, abort, abandon committed), calm steps can reach a state '
+           'where its source, and only its source, holds the partition open',
 }
 
 
@@ -141,6 +144,12 @@ class Option:
     def cursor0(self):
         """The reader's first cursor (before any record of p)."""
         raise NotImplementedError
+
+    def given_up(self, w, st):
+        """[(partition, group)]: for the latest change if it was given up
+        (committed cancel, abort or abandon), the source group that must hold
+        the partition again. L5g asks that this stays reachable."""
+        return []
 
     def done_all(self, w, st):
         """Every planned change (the bound's layouts) has completed. L5b asks
@@ -319,13 +328,14 @@ class World:
         return b[1][:len(a[1])] != a[1]
 
     def goals(self, st):
-        """(settled, answered, caught up): the three liveness goals."""
+        """(settled, answered, caught up, given back): the liveness goals."""
         settled = self.opt.settled(self, st)
         done = {x[0] for h in st[1] for x in h} | st[2]
         answered = all(a in done for a in self.aids)
         reader = st[3]
         caught = reader is None or reader[1] == self.hist_aids(st, 'p')
-        return settled, answered, caught
+        back = all(self.opt.owners(self, st, part) == [g] for part, g in self.opt.given_up(self, st))
+        return settled, answered, caught, back
 
 
 def _cmp(lhs, f, rhs):

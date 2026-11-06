@@ -156,6 +156,19 @@ class Slot(Option):
                 return False
         return True
 
+    def given_up(self, w, st):
+        """A move given up (cancel committed at A, or abort committed at B)
+        must leave its slot open at A, the source."""
+        out = []
+        for a in range(w.K):
+            for i, e in enumerate(w.com(st, a)):
+                if e[0] != 'exp':
+                    continue
+                name = (a, i, e[2])
+                if has(w.com(st, a), 'can', name) or has(w.com(st, e[2]), 'abort', name):
+                    out.extend((p, a) for p in PARTS_OF[e[1]])
+        return out
+
     def done_all(self, w, st):
         """Every planned move has opened at its target (each completed move
         commits exactly one open)."""
@@ -409,13 +422,15 @@ class Slot(Option):
             Update('append', lambda w, st, b, d: d.append(b['g'], ('abort', b['name'], b['s'])), role='move'),
         ], label=lambda b: (b['name'],))
 
-        def b_imps(w, st):
-            for g in range(w.K):
-                for e in w.log(st, g):
-                    if e[0] == 'imp':
-                        yield {'name': e[1], 's': e[2], 'g': g}
+        def b_moves(w, st):
+            for a in range(w.K):
+                for i, e in enumerate(w.log(st, a)):
+                    if e[0] == 'exp':
+                        yield {'name': (a, i, e[2]), 's': e[1], 'g': e[2]}
 
-        abort = Action('abort', 'tick', b_imps, [
+        abort = Action('abort', 'tick', b_moves, [
+            Guard('imp', lambda w, st, b: has(w.log(st, b['g']), 'imp', b['name']), role='move',
+                  note='B gives up only a move it is importing'),
             Guard('noopen', lambda w, st, b: not has(w.log(st, b['g']), 'open', b['name']), role='move',
                   note='B aborts only while its log has no open'),
             Guard('once', lambda w, st, b: not has(w.log(st, b['g']), 'abort', b['name']), role='idem'),

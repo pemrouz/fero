@@ -138,7 +138,7 @@ def _liveness(w, r, states, parent, calm, calm_at, capped):
             fill[b] += 1
     del fill
     goals = [w.goals(s) for s in states]
-    names = ('L5', 'L7', 'L4')
+    names = ('L5', 'L7', 'L4', 'L5g')
     for k, name in enumerate(names):
         reach = bytearray(n)
         q = deque()

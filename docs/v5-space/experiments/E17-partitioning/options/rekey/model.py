@@ -171,6 +171,23 @@ class Rekey(Option):
                     return False
         return True
 
+    def given_up(self, w, st):
+        """If the latest re-key was abandoned (committed), the generation it
+        copied from must hold every partition again."""
+        cat = w.com(st, C)
+        rks = [e for e in cat if e[0] == 'rk']
+        if not rks:
+            return []
+        G, src = max(rks)[1], max(rks)[2]
+        if not has(cat, 'abandon', G):
+            return []
+        out = []
+        for part in HASH:
+            for g in self.cells[src]:
+                if self.holds(g, part):
+                    out.append((part, g))
+        return out
+
     def done_all(self, w, st):
         """The last planned generation has flipped."""
         return has(w.com(st, C), 'flip', max(self.n))
