@@ -1,0 +1,10 @@
+[package]
+name = "e03_quickjs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rquickjs = "=0.14.0"
+
+[profile.release]
+lto = true

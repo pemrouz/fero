@@ -1,0 +1,36 @@
+{"run":1,"loadavg":"1.56 3.38 5.27 1/147 17307"}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 16","batch":16,"ns":88.04,"min":73.07,"max":97.16,"nodeCpuNsPerRec":90.17,"daemonCpuNsPerRec":69.64,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 256","batch":256,"ns":44.98,"min":37.18,"max":54.67,"nodeCpuNsPerRec":47.7,"daemonCpuNsPerRec":20.22,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 4096","batch":4096,"ns":70.74,"min":66.4,"max":74.96,"nodeCpuNsPerRec":71.78,"daemonCpuNsPerRec":12.48,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 1","batch":1,"ns":31231.12,"min":28523.5,"max":35270.87,"nodeCpuNsPerRec":21084.95,"daemonCpuNsPerRec":11706.55,"rttUs":31.23,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 16","batch":16,"ns":2368.64,"min":2220.88,"max":2744.74,"nodeCpuNsPerRec":1674.1,"daemonCpuNsPerRec":842.11,"rttUs":37.9,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 256","batch":256,"ns":227.62,"min":222.65,"max":248.9,"nodeCpuNsPerRec":156.58,"daemonCpuNsPerRec":73.91,"rttUs":58.27,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 16","batch":16,"ns":15.72,"min":14.72,"max":18.42,"nodeCpuNsPerRec":15.66,"daemonCpuNsPerRec":15.71,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 256","batch":256,"ns":15.3,"min":14.52,"max":16.41,"nodeCpuNsPerRec":14.9,"daemonCpuNsPerRec":15.28,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 4096","batch":4096,"ns":17.2,"min":16.32,"max":17.93,"nodeCpuNsPerRec":16.99,"daemonCpuNsPerRec":17.2,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 256","batch":256,"ns":17.01,"min":16.12,"max":18.34,"nodeCpuNsPerRec":16.97,"daemonCpuNsPerRec":16.97,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 4096","batch":4096,"ns":18.07,"min":17.75,"max":23.84,"nodeCpuNsPerRec":18.02,"daemonCpuNsPerRec":17.8,"reps":5}
+{"run":2,"loadavg":"1.48 4.83 7.08 1/155 30577"}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 16","batch":16,"ns":82.87,"min":80.04,"max":86.78,"nodeCpuNsPerRec":84.66,"daemonCpuNsPerRec":71.25,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 256","batch":256,"ns":41.57,"min":35.23,"max":46.83,"nodeCpuNsPerRec":43.39,"daemonCpuNsPerRec":16.03,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 4096","batch":4096,"ns":65.83,"min":57.33,"max":71.06,"nodeCpuNsPerRec":67.24,"daemonCpuNsPerRec":15.8,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 1","batch":1,"ns":34156.67,"min":33033.83,"max":35533.92,"nodeCpuNsPerRec":23272.35,"daemonCpuNsPerRec":12818.15,"rttUs":34.16,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 16","batch":16,"ns":2275.51,"min":2149.34,"max":2322.84,"nodeCpuNsPerRec":1523.91,"daemonCpuNsPerRec":821.53,"rttUs":36.41,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 256","batch":256,"ns":204.3,"min":197.2,"max":205.88,"nodeCpuNsPerRec":133.82,"daemonCpuNsPerRec":70.25,"rttUs":52.3,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 16","batch":16,"ns":13.82,"min":13.09,"max":14.82,"nodeCpuNsPerRec":13.84,"daemonCpuNsPerRec":13.61,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 256","batch":256,"ns":15.17,"min":13.78,"max":18.45,"nodeCpuNsPerRec":14.58,"daemonCpuNsPerRec":15.16,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 4096","batch":4096,"ns":16.95,"min":14.57,"max":19.07,"nodeCpuNsPerRec":16.53,"daemonCpuNsPerRec":16.91,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 256","batch":256,"ns":17.93,"min":17.28,"max":18.91,"nodeCpuNsPerRec":18.55,"daemonCpuNsPerRec":17.93,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 4096","batch":4096,"ns":17.45,"min":16.41,"max":18.74,"nodeCpuNsPerRec":17.26,"daemonCpuNsPerRec":17.43,"reps":5}
+{"run":3,"loadavg":"1.38 3.39 6.82 1/148 14213"}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 16","batch":16,"ns":93.42,"min":84.61,"max":96.64,"nodeCpuNsPerRec":94.51,"daemonCpuNsPerRec":72.35,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 256","batch":256,"ns":44.21,"min":43.3,"max":47.86,"nodeCpuNsPerRec":45.66,"daemonCpuNsPerRec":19.28,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds stream, batch 4096","batch":4096,"ns":71.53,"min":67.36,"max":75.31,"nodeCpuNsPerRec":71.33,"daemonCpuNsPerRec":17.7,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 1","batch":1,"ns":32684.6,"min":29007.44,"max":33112.48,"nodeCpuNsPerRec":20990.35,"daemonCpuNsPerRec":12289.8,"rttUs":32.68,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 16","batch":16,"ns":2129.63,"min":2005.84,"max":2443.66,"nodeCpuNsPerRec":1382.48,"daemonCpuNsPerRec":819.39,"rttUs":34.07,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"uds request/reply, batch 256","batch":256,"ns":199.79,"min":191.08,"max":203.8,"nodeCpuNsPerRec":134.44,"daemonCpuNsPerRec":64.47,"rttUs":51.15,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 16","batch":16,"ns":14.45,"min":13.17,"max":17.35,"nodeCpuNsPerRec":14.12,"daemonCpuNsPerRec":14.12,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 256","batch":256,"ns":15.28,"min":14.27,"max":15.81,"nodeCpuNsPerRec":15.27,"daemonCpuNsPerRec":14.97,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring, batch 4096","batch":4096,"ns":14.65,"min":13.4,"max":16.03,"nodeCpuNsPerRec":14.57,"daemonCpuNsPerRec":14.64,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 256","batch":256,"ns":15.38,"min":15.04,"max":17.72,"nodeCpuNsPerRec":15.38,"daemonCpuNsPerRec":15.37,"reps":5}
+{"node":"v22.22.0","recBytes":100,"measure":"shm ring (bulk copy out), batch 4096","batch":4096,"ns":14.98,"min":14.55,"max":18.06,"nodeCpuNsPerRec":14.97,"daemonCpuNsPerRec":14.95,"reps":5}

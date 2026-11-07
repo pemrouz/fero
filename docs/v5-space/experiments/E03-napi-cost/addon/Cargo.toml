@@ -1,0 +1,18 @@
+[package]
+name = "e03_addon"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "=3.16.1", default-features = false, features = ["napi4"] }
+napi-derive = "=3.7.0"
+
+[build-dependencies]
+napi-build = "=2.6.0"
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,0 +1,10 @@
+[package]
+name = "e03_denocore"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deno_core = "=0.413.0"
+
+[profile.release]
+codegen-units = 4
