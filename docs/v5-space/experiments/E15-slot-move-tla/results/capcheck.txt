@@ -1,0 +1,4 @@
+tools/mutants.py's state cap checked on the fixed protocol (SlotMoveFixed, bound move, 47,457 states),
+by tools/checks/capcheck.py under the heavy lock, 2026-11-07 04:30 UTC. Columns: cap, classify() result, seconds.
+20000 {'verdict': 'unbounded', 'prop': 'more than 20,000 states', 'distinct': 20000} 11.4
+474570 {'verdict': 'holds', 'distinct': 47457} 14.4

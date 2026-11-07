@@ -297,7 +297,7 @@ def knsum(por_specs, kn_specs):
             return "1 register workload (lin-kv), every partition"
         if f.startswith("mut-") or "before" in f:
             return "2 known-bad: 7 mutant runs, lin-kv before fix G1"
-        return "3 every other check, at most 120 ops" if ops <= 120 else "4 every other check, 681 to 902 ops"
+        return "3 every other check, at most 120 ops" if ops <= 120 else "4 every other check, 677 to 902 ops"
     rows = defaultdict(Counter)
     for p in all_por:
         f = p["file"]

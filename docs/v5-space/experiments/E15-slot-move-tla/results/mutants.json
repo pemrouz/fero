@@ -1,0 +1,1534 @@
+{
+ "m001": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(sh.com, x = 0)",
+  "id": 1,
+  "kind": "G",
+  "line": 64,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m002": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(FG(sh), x = 0)",
+  "id": 2,
+  "kind": "G",
+  "line": 65,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.6,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m003": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: a \\in DOMAIN d.out",
+  "id": 3,
+  "kind": "G",
+  "line": 77,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.0,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m004": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: a > fl",
+  "id": 4,
+  "kind": "G",
+  "line": 78,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m005": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: WSlot(b) = \"s\"",
+  "id": 5,
+  "kind": "G",
+  "line": 88,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.1,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m006": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: b > fl",
+  "id": 6,
+  "kind": "G",
+  "line": 89,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.0,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m007": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~mv[n].open",
+  "id": 7,
+  "kind": "G",
+  "line": 94,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.4,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m008": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 45252
+  },
+  "desc": "drop guard: ~mv[n].ab",
+  "id": 8,
+  "kind": "G",
+  "line": 95,
+  "runs": {
+   "move": {
+    "distinct": 45252,
+    "secs": 12.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.3,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m009": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~mv[n].can",
+  "id": 9,
+  "kind": "G",
+  "line": 99,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m010": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: mv[n].unf = <<>>",
+  "id": 10,
+  "kind": "G",
+  "line": 100,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m011": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47016
+  },
+  "desc": "drop guard: ~mv[k].can",
+  "id": 11,
+  "kind": "G",
+  "line": 105,
+  "runs": {
+   "move": {
+    "distinct": 47016,
+    "secs": 13.1,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 188,
+    "errors": [],
+    "secs": 16.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m012": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47205
+  },
+  "desc": "drop guard: mv[k].unf = <<>>",
+  "id": 12,
+  "kind": "G",
+  "line": 106,
+  "runs": {
+   "move": {
+    "distinct": 47205,
+    "secs": 11.5,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 202,
+    "errors": [],
+    "secs": 17.0,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m013": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~mv[k].set",
+  "id": 13,
+  "kind": "G",
+  "line": 107,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m014": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.open",
+  "id": 14,
+  "kind": "G",
+  "line": 112,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.6,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m015": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47169
+  },
+  "desc": "drop guard: ~m.ab",
+  "id": 15,
+  "kind": "G",
+  "line": 113,
+  "runs": {
+   "move": {
+    "distinct": 47169,
+    "secs": 11.1,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 210,
+    "errors": [],
+    "secs": 16.6,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m016": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47637
+  },
+  "desc": "drop guard: m.end = <<>>",
+  "id": 16,
+  "kind": "G",
+  "line": 114,
+  "runs": {
+   "move": {
+    "distinct": 47637,
+    "secs": 11.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.0,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m017": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.open",
+  "id": 17,
+  "kind": "G",
+  "line": 117,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.5,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.1,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m018": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 49932
+  },
+  "desc": "drop guard: ~m.ab",
+  "id": 18,
+  "kind": "G",
+  "line": 118,
+  "runs": {
+   "move": {
+    "distinct": 49932,
+    "secs": 12.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 209,
+    "errors": [],
+    "secs": 18.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m019": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47790
+  },
+  "desc": "drop guard: m.end = <<>>",
+  "id": 19,
+  "kind": "G",
+  "line": 119,
+  "runs": {
+   "move": {
+    "distinct": 47790,
+    "secs": 10.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 219,
+    "errors": [],
+    "secs": 17.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m020": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 63333
+  },
+  "desc": "drop guard: m.seen",
+  "id": 20,
+  "kind": "G",
+  "line": 120,
+  "runs": {
+   "move": {
+    "distinct": 63333,
+    "secs": 15.3,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 326,
+    "errors": [],
+    "secs": 22.3,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m021": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.open",
+  "id": 21,
+  "kind": "G",
+  "line": 123,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.0,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 204,
+    "errors": [],
+    "secs": 17.6,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m022": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.ab",
+  "id": 22,
+  "kind": "G",
+  "line": 124,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 197,
+    "errors": [],
+    "secs": 16.4,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m023": {
+  "by": "move: Inv9",
+  "desc": "drop guard: m.end # <<>>",
+  "id": 23,
+  "kind": "G",
+  "line": 125,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 1.9,
+    "steps": 5,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m024": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.open",
+  "id": 24,
+  "kind": "G",
+  "line": 128,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.9,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m025": {
+  "by": "move: Inv9",
+  "desc": "drop guard: m.ab",
+  "id": 25,
+  "kind": "G",
+  "line": 129,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 6.9,
+    "steps": 16,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m026": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~m.open",
+  "id": 26,
+  "kind": "G",
+  "line": 132,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m027": {
+  "by": "move: Inv9",
+  "desc": "drop guard: m.ab",
+  "id": 27,
+  "kind": "G",
+  "line": 133,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 9.2,
+    "steps": 21,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m028": {
+  "by": "move: Inv9",
+  "desc": "drop guard: <<\"tack\", 0, vr, x>> \\in nt",
+  "id": 28,
+  "kind": "G",
+  "line": 134,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 5.9,
+    "steps": 16,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m029": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: \\/ WSlot(a) = \"t\"         \\/ Serving(sh, d)",
+  "id": 29,
+  "kind": "G",
+  "line": 172,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m030": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(FG(A), TRUE)",
+  "id": 30,
+  "kind": "G",
+  "line": 182,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.9,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m031": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(A.com, TRUE)",
+  "id": 31,
+  "kind": "G",
+  "line": 183,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.9,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.0,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m032": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~UnderWay(FG(A))",
+  "id": 32,
+  "kind": "G",
+  "line": 184,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.7,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m033": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~LiveImport(fg)",
+  "id": 33,
+  "kind": "G",
+  "line": 193,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.1,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m034": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~IsOpen(fg, FALSE)",
+  "id": 34,
+  "kind": "G",
+  "line": 194,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.3,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m035": {
+  "by": "move: Inv9",
+  "desc": "drop guard: n \\notin DOMAIN TMoves(fg)",
+  "id": 35,
+  "kind": "G",
+  "line": 195,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 150.8,
+    "steps": 19,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m036": {
+  "by": "move: None",
+  "desc": "drop guard: n \\in DOMAIN mv",
+  "id": 36,
+  "kind": "G",
+  "line": 204,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 2.4,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m037": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: mv[n].tgt = tgt",
+  "id": 37,
+  "kind": "G",
+  "line": 205,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m038": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: mv[n].N = <<>>",
+  "id": 38,
+  "kind": "G",
+  "line": 206,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.3,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m039": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47916
+  },
+  "desc": "drop guard: ~mv[n].can",
+  "id": 39,
+  "kind": "G",
+  "line": 207,
+  "runs": {
+   "move": {
+    "distinct": 47916,
+    "secs": 11.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 215,
+    "errors": [],
+    "secs": 16.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m040": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: mv[n].unf = <<>>",
+  "id": 40,
+  "kind": "G",
+  "line": 208,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m041": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(A.com, TRUE)",
+  "id": 41,
+  "kind": "G",
+  "line": 209,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.5,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m042": {
+  "by": "move: None",
+  "desc": "drop guard: n \\in DOMAIN cmv",
+  "id": 42,
+  "kind": "G",
+  "line": 224,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 2.9,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m043": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: cmv[n].tgt = tgt",
+  "id": 43,
+  "kind": "G",
+  "line": 225,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.1,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m044": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47808
+  },
+  "desc": "drop guard: lm.N = <<>>",
+  "id": 44,
+  "kind": "G",
+  "line": 226,
+  "runs": {
+   "move": {
+    "distinct": 47808,
+    "secs": 12.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m045": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 65442
+  },
+  "desc": "drop guard: ~lm.can",
+  "id": 45,
+  "kind": "G",
+  "line": 227,
+  "runs": {
+   "move": {
+    "distinct": 65442,
+    "secs": 13.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 247,
+    "errors": [],
+    "secs": 21.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m046": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: lm.unf = <<>>",
+  "id": 46,
+  "kind": "G",
+  "line": 228,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 9.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 15.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m047": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(fg, TRUE)",
+  "id": 47,
+  "kind": "G",
+  "line": 229,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 10.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m048": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: IsOpen(A.com, TRUE)",
+  "id": 48,
+  "kind": "G",
+  "line": 230,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.7,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m049": {
+  "by": "move: None",
+  "desc": "drop guard: n \\in DOMAIN mv",
+  "id": 49,
+  "kind": "G",
+  "line": 235,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 3.0,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m050": {
+  "by": "move: None",
+  "desc": "drop guard: mv[n].N # <<>>",
+  "id": 50,
+  "kind": "G",
+  "line": 236,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 2.9,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m051": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47709
+  },
+  "desc": "drop guard: mv[n].unf = <<>>",
+  "id": 51,
+  "kind": "G",
+  "line": 237,
+  "runs": {
+   "move": {
+    "distinct": 47709,
+    "secs": 12.0,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m052": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~mv[n].can",
+  "id": 52,
+  "kind": "G",
+  "line": 238,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m053": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~mv[n].set",
+  "id": 53,
+  "kind": "G",
+  "line": 239,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.1,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m054": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: PLt(p, w[2])",
+  "id": 54,
+  "kind": "G",
+  "line": 248,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.6,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m055": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: PLe(w[2], F[1])",
+  "id": 55,
+  "kind": "G",
+  "line": 249,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.9,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 19.1,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m056": {
+  "by": "move: None",
+  "desc": "drop guard: F # <<>>",
+  "id": 56,
+  "kind": "G",
+  "line": 251,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 3.0,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m057": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: F[2] = tgt",
+  "id": 57,
+  "kind": "G",
+  "line": 252,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m058": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~PLt(F[1], p)",
+  "id": 58,
+  "kind": "G",
+  "line": 253,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.4,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m059": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 49221
+  },
+  "desc": "drop guard: n \\in DOMAIN cm",
+  "id": 59,
+  "kind": "G",
+  "line": 272,
+  "runs": {
+   "move": {
+    "distinct": 49221,
+    "secs": 11.9,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.3,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m060": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: n \\in DOMAIN lmv",
+  "id": 60,
+  "kind": "G",
+  "line": 273,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 16.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m061": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~lmv[n].open",
+  "id": 61,
+  "kind": "G",
+  "line": 274,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.5,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 17.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m062": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 63139
+  },
+  "desc": "drop guard: ~lmv[n].ab",
+  "id": 62,
+  "kind": "G",
+  "line": 275,
+  "runs": {
+   "move": {
+    "distinct": 63139,
+    "secs": 14.7,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 293,
+    "errors": [],
+    "secs": 21.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ }
+}

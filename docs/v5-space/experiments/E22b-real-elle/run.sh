@@ -12,8 +12,10 @@
 #   ./run.sh small    jobs: every partition of 120 ops or fewer in every other file, cut in 3 chunks
 #                     (chunks 2 and 3 shuffled, so a cut at 25 min leaves a random sample)
 #   ./run.sh small1 | small2 | small3    Knossos on one chunk (each one heavy hold, cut at 25 min)
-#   ./run.sh big      Knossos on KBIG partitions per file drawn from the 600 with more than 120 ops
-#                     (p09, p22), LIMITBIG ms each, the hold cut at 25 min
+#   ./run.sh overlap  how many operations overlap in the 600 partitions with more than 120 ops
+#   ./run.sh big      Knossos on the 600 partitions with more than 120 ops (p09, p22; KBIG per file
+#                     if KBIG > 0), in a seeded random order, LIMITBIG ms each, the hold cut at 25 min:
+#                     what is checked when the cut comes is a random sample, sized by time
 #   ./run.sh report   results/knossos-small.md from the three chunks, and results/knossos-summary.md
 #   ./run.sh          all of the above, in that order. Several steps may be named: ./run.sh build self
 # Every JVM and Go step runs under $SP/bin/heavy, one hold per step, each under 30 minutes.
@@ -29,10 +31,11 @@ JARS="$SP/dl/elle-mvn/jars/*"
 # helper with HEAVY= (empty); never nest the helper (an inner wait on the gate behind a waiting
 # timing run would deadlock).
 HEAVY="${HEAVY-$SP/bin/heavy}"
-JAVA="java -Djava.awt.headless=true -Xmx3g -XX:ActiveProcessorCount=2 -cp $HERE/clj:$JARS"
-LIMIT="${LIMIT:-60000}"; KBIG="${KBIG:-5}"; LIMITBIG="${LIMITBIG:-120000}"
+# dom-top (an Elle dependency) writes the classes it makes at run time to clojure.compile.path
+JAVA="java -Djava.awt.headless=true -Dclojure.compile.path=$W/classes -Xmx3g -XX:ActiveProcessorCount=2 -cp $HERE/clj:$JARS"
+LIMIT="${LIMIT:-60000}"; KBIG="${KBIG:-0}"; LIMITBIG="${LIMITBIG:-120000}"
 STEPS="${*:-all}"
-mkdir -p "$W" "$R"
+mkdir -p "$W" "$W/classes" "$R"
 want() { for s in $STEPS; do [ "$s" = all ] || [ "$s" = "$1" ] && return 0; done; return 1; }
 head() { echo "# $1, $(date -u +%FT%TZ), $(java -version 2>&1 | grep -m1 version), $(nproc) vCPU, load $(cut -d' ' -f1-3 /proc/loadavg)"; }
 KN="clojure.main $HERE/clj/knossos_check.clj"
@@ -68,14 +71,14 @@ fi
 if want elle; then
   { head "real Elle 0.2.8 list-append on E-22's 1,200 EDN histories"
     $HEAVY sh -c "$JAVA clojure.main $HERE/clj/elle_check.clj $W/elle-real.jsonl $V/edn/*.edn"
-    python3 -I "$HERE/compare.py" elle "$V/elle-raw.jsonl" "$W/elle-real.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/elle.md"
+    python3 -I "$HERE/compare.py" elle "$V/elle-raw.jsonl" "$W/elle-real.jsonl"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/elle.md"
   { head "ablation: real Elle 0.2.8 with the Go port's rule for never-read appends (E22B_RULE=port)"
     $HEAVY sh -c "E22B_RULE=port $JAVA clojure.main $HERE/clj/elle_check.clj $W/elle-portrule.jsonl $V/edn/*.edn"
-    python3 -I "$HERE/compare.py" elle "$V/elle-raw.jsonl" "$W/elle-portrule.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/elle-portrule.md"
+    python3 -I "$HERE/compare.py" elle "$V/elle-raw.jsonl" "$W/elle-portrule.jsonl"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/elle-portrule.md"
   python3 -I "$HERE/compare.py" elletsv "$V/elle-raw.jsonl" "$W/elle-real.jsonl" "$W/elle-portrule.jsonl" > "$R/elle-verdicts.tsv"
   { head "real Elle 0.2.8's explanation of undo-calm-seed14 at read committed (the port finds it valid)"
     cat "$V/edn/undo-calm-seed14.edn"; echo
-    $HEAVY sh -c "$JAVA clojure.main $HERE/clj/elle_explain.clj read-committed $V/edn/undo-calm-seed14.edn"; } 2>&1 | grep -v JAVA_TOOL > "$R/elle-explain-undo-calm-seed14.txt"
+    $HEAVY sh -c "$JAVA clojure.main $HERE/clj/elle_explain.clj read-committed $V/edn/undo-calm-seed14.edn"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/elle-explain-undo-calm-seed14.txt"
   sed -n '1,25p' "$R/elle.md"; sed -n '1,25p' "$R/elle-portrule.md"
 fi
 
@@ -83,14 +86,14 @@ if want pilot; then
   : > "$W/jobs-pilot.jsonl"; python3 -I "$HERE/prep.py" all "$W/jobs-pilot.jsonl" $LINKV
   { head "pilot: Knossos (competition) on every lin-kv partition, time limit $LIMIT ms"
     $HEAVY sh -c "$B/e22b parts $W/por-pilot.jsonl $LINKV && $JAVA $KN $W/jobs-pilot.jsonl $W/knossos-pilot.jsonl $LIMIT"
-    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-pilot.jsonl=$W/jobs-pilot.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-linkv.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-pilot.jsonl=$W/jobs-pilot.jsonl"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/knossos-linkv.md"
 fi
 
 if want bad; then
   : > "$W/jobs-bad.jsonl"; python3 -I "$HERE/prep.py" all "$W/jobs-bad.jsonl" $BAD
   { head "Knossos (competition) on the known-bad histories, time limit $LIMIT ms"
     $HEAVY sh -c "$B/e22b parts $W/por-bad.jsonl $BAD && $JAVA $KN $W/jobs-bad.jsonl $W/knossos-bad.jsonl $LIMIT"
-    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-bad.jsonl=$W/jobs-bad.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-bad.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-bad.jsonl=$W/jobs-bad.jsonl"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/knossos-bad.md"
 fi
 
 if want por; then $HEAVY "$B/e22b" parts "$W/por-other.jsonl" $OTHER; fi
@@ -108,12 +111,18 @@ for i in 0 1 2; do
   fi
 done
 
+if want overlap; then
+  { echo "# overlap: the most operations open at once, per partition of more than 120 ops (sizes the big step)"
+    python3 -I "$HERE/overlap.py" 121 $(ls $OTHER | grep -e /p09- -e /p22-); } > "$R/overlap-big.md"
+fi
+
 if want big; then
   : > "$W/jobs-big.jsonl"; python3 -I "$HERE/prep.py" sample "$W/jobs-big.jsonl" "$KBIG" 121 1000000 $OTHER 2> "$W/big-draw.txt"
-  { head "Knossos (competition) on $KBIG partitions per file of more than 120 ops, $LIMITBIG ms each, the hold cut at 25 min"
+  python3 -I "$HERE/prep.py" shuffle "$W/jobs-big.jsonl" 2214
+  { head "Knossos (competition) on the partitions of more than 120 ops (KBIG=$KBIG per file, 0 = all), seeded random order, $LIMITBIG ms each, the hold cut at 25 min"
     grep -v " 0 with" "$W/big-draw.txt"
     $HEAVY sh -c "timeout 1500 $JAVA $KN $W/jobs-big.jsonl $W/knossos-big.jsonl $LIMITBIG" || echo "stopped: exit $?"
-    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-big.jsonl=$W/jobs-big.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-big.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-big.jsonl=$W/jobs-big.jsonl"; } 2>&1 | grep -v -e JAVA_TOOL -e knossos.model.memo > "$R/knossos-big.md"
 fi
 
 if want report; then

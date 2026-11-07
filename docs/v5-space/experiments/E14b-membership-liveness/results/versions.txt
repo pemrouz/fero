@@ -1,0 +1,15 @@
+Linux 6.18.44-fc-v300 x86_64
+4
+               total        used        free      shared  buff/cache   available
+Mem:              15           3           9           0           2          11
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Python 3.13.17
+numpy 2.5.3
+CommunityModules release 202611060952
+a3b27c40f1fb5085f30c6ead37e918457f8cfc62c1e50a1dc668ef592ad2b5fb  $SP/dl/communitymodules/CommunityModules-deps.jar
+f9ceeef40e8fa7a7944329802256ecedc18c81658fb4e55768b093e0bc617e28  $SP/dl/communitymodules/CommunityModules.jar
+654aa50197faa48fa0136b41257270de6469d29ef323e7822ead59d2be43ce10  $SP/dl/tla/tla2tools.jar
+15c445684529c59a59877951c7fb7df9a40da250aaa445f056ef48f56bb27044  $SP/dl/raftsrc/raft/tla/etcdraft.tla

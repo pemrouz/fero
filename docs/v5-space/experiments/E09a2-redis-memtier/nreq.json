@@ -1,0 +1,21 @@
+{
+ "_note": "redis-benchmark -n per control run. Every Redis row's value is E-09a's (../E09a-redis/nreq.json), so the command is identical to E-09a's; the two proto rows are sized from a smoke run to last about 20 s.",
+ "default-set-p1-rb": 2500000,
+ "default-set-p16-rb": 12000000,
+ "aof-set-p1-rb": 800000,
+ "aof-set-p16-rb": 4000000,
+ "aof-r3-set-p1-rb": 700000,
+ "aof-r3-set-p16-rb": 3000000,
+ "proto-set-p1-rb": 70000,
+ "proto-set-p16-rb": 110000,
+ "default-get-p1-rb": 3000000,
+ "default-incr-p1-rb": 3000000,
+ "default-get-p16-rb": 15000000,
+ "default-incr-p16-rb": 15000000,
+ "aof-incr-p1-rb": 800000,
+ "aof-get-p1-rb": 3000000,
+ "aof-incr-p16-rb": 4000000,
+ "aof-get-p16-rb": 15000000,
+ "aof-r3-incr-p1-rb": 700000,
+ "aof-r3-incr-p16-rb": 3000000
+}

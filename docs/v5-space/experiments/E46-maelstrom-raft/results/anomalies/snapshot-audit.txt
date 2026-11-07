@@ -1,0 +1,45 @@
+# Snapshots in the four compaction runs (batch C): every MsgSnap accounted for.
+# Why the question: the summary showed more snapshots sent than restored (e.g. k5-mix-s1: 53 sent, 38 restored).
+# Made by: tools/journal_snaps.clj (snapshots-<run>.txt), tools/journal_snapcheck.clj (snapcheck-<run>.txt), tools/snap_audit.py.
+#   restored = first receipt of that (follower, index), and the follower logged SNAP_APPLIED for it
+#   repeat   = the same (follower, index) arrived again; raft ignores it (commit already >= index)
+#   behind   = the follower already held that index through appends; raft ignores it
+# Every receipt is followed by the follower's accepted MsgAppResp with Index >= the snapshot index.
+k3-mix-s1: sent 23 (node logs 23), dropped by the partition 0, received 23: restored 15, repeat 8, behind 0; SNAP_APPLIED 15; receipts without an accepted MsgAppResp >= index: 0; applied but never received: 0; applied twice: 0
+k3-mix-s2: sent 24 (node logs 24), dropped by the partition 1, received 23: restored 15, repeat 8, behind 0; SNAP_APPLIED 15; receipts without an accepted MsgAppResp >= index: 0; applied but never received: 0; applied twice: 0
+k5-mix-s1: sent 53 (node logs 53), dropped by the partition 0, received 53: restored 38, repeat 15, behind 0; SNAP_APPLIED 38; receipts without an accepted MsgAppResp >= index: 0; applied but never received: 0; applied twice: 0
+k5-mix-s2: sent 43 (node logs 43), dropped by the partition 0, received 43: restored 31, repeat 11, behind 1; SNAP_APPLIED 31; receipts without an accepted MsgAppResp >= index: 0; applied but never received: 0; applied twice: 0
+
+# The one 'behind' case (k5-mix-s2, n0 -> n2 idx 201): n2 restored snapshot 181 at 7221 ms, then applied
+# entries 182..200 by append (its log: 'APPLIED idx=200' at 7228 ms); the leader's 201 snapshot, sent 19 ms after
+# the 181 one, arrived when n2's log already matched index 201, so raft only moved its commit (answer: resp 201).
+7221 SNAP_APPLIED idx=181 term=2 keys=2 h=5638640d
+7228 APPLIED idx=200 term=2 h=d67f84e6
+
+# Why the leader repeats a snapshot (tools/journal_snaprepeat.clj, journal_window.clj). The node reports each
+# snapshot finished when it sends it (Maelstrom gives no delivery report), so raft moves the follower to probe
+# at snapshot+1 at once. A follower that is behind (here n3, just continued after a pause, with a backlog) keeps
+# answering earlier appends with rejects (hint 761, below the leader's first index). A reject at the probe index
+# sends the leader back below its first index, so it sends the snapshot again. Raft ignores the extra copies.
+# k5-mix-s1, leader n2, follower n3, snapshot 865: the rejects the leader received just before the first send:
+[48030101075039 :recv 21491 "n3" "n2" 4 3 "idx" 859 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101082685 :recv 21492 "n3" "n2" 4 3 "idx" 860 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101090402 :recv 21501 "n3" "n2" 4 3 "idx" 863 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101098113 :recv 21502 "n3" "n2" 4 3 "idx" 865 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101105838 :recv 21505 "n3" "n2" 4 3 "idx" 866 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101113091 :recv 21506 "n3" "n2" 4 3 "idx" 866 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101121460 :recv 21513 "n3" "n2" 4 3 "idx" 870 "lt" 3 "commit" nil "rej" true "hint" 761 "n" 0 "snap" nil]
+[48030101260079 :send 21541 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+# ... and the four further sends of the same snapshot within 10 ms, each after more rejects from n3's backlog:
+[48030101260079 :send 21541 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+[48030102479880 :send 21545 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+[48030103445404 :send 21555 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+[48030105753080 :send 21563 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+[48030110983402 :send 21588 "n2" "n3" 7 3 "idx" nil "lt" nil "commit" nil "rej" nil "hint" nil "n" 0 "snap" 865]
+# n3 had just been continued after a pause: the pauser log (its clock starts before the nodes; its 'start' line
+# is written within 100 ms after the last node wrote its pid at init; n3 wrote INIT at 113 ms node time, so node ms ~ pauser ms - 11467, +-0.1 s):
+2026-11-06T23:09:12.938Z +11580ms start: n0=832 n1=825 n2=831 n3=834 n4=833 seconds=95 gap=4000 pause=[200,3000]
+2026-11-06T23:09:37.790Z +36431ms pause n3 2587ms random
+2026-11-06T23:09:40.378Z +39019ms resume n3
+# n3 restored the snapshot about 0.5 s after it was continued (node time 28067 ~ pauser time 39534):
+28067 SNAP_APPLIED idx=865 term=3 keys=5 h=4614d292

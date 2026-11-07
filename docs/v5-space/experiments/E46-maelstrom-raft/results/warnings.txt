@@ -1,0 +1,41 @@
+bug3-nofault-s1: none
+bug3-s1: none
+bug3-s2: none
+bug3-s3: none
+bug5-nofault-s1: none
+bug5-s1: none
+bug5-s2: none
+bug5-s3: none
+c3-log-s1: none
+c3-log-s2: none
+c3-log-s3: none
+c3-mix-s1: none
+c3-mix-s2: none
+c3-mix-s3: none
+c3-ri-s1: none
+c3-ri-s2: 1 x reply to a client Maelstrom already closed (Invalid dest)
+    e.g. java.lang.AssertionError: Assert failed: Invalid dest for message #maelstrom.net.message.Message{:id 46167, :src "n0", :dest "c11", :body {:type "error", :code 22, :text "from does not match", :in_reply_to 751, :msg_id 2644}}
+c3-ri-s3: none
+c5-log-s1: none
+c5-log-s2: none
+c5-log-s3: none
+c5-mix-s1: none
+c5-mix-s2: none
+c5-mix-s3: none
+c5-ri-s1: none
+c5-ri-s2: none
+c5-ri-s3: none
+k3-mix-s1: none
+k3-mix-s2: none
+k5-mix-s1: none
+k5-mix-s2: none
+r3-mix-s4: none
+r3-mix-s5: none
+r5-mix-s4: none
+r5-mix-s5: none
+stale3-s1: none
+stale3-s2: none
+stale5-s1: none
+stale5-s2: none
+
+All runs: 1 x reply to a client Maelstrom already closed (Invalid dest)

@@ -23,7 +23,9 @@ for name in sorted(os.listdir(runs)):
     sdir = os.path.join(store, ts[-1])
     odir = os.path.join(out, name)
     os.makedirs(odir, exist_ok=True)
-    res = open(os.path.join(sdir, 'results.edn'), encoding='utf-8', errors='replace').read()
+    rpath = os.path.join(sdir, 'results.edn')
+    # A run whose checker was stopped (see README) has a history but no results.edn.
+    res = open(rpath, encoding='utf-8', errors='replace').read() if os.path.exists(rpath) else ';; no results.edn: the checker was stopped before it finished\n'
     # Drop the :perf section (gnuplot graphs and their stack traces); keep the rest.
     i = res.find(' :timeline {:valid?')
     keep = res[i:] if i >= 0 else res

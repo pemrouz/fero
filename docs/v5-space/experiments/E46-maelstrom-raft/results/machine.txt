@@ -11,3 +11,9 @@ gnuplot 6.0 patchlevel 0
 Maelstrom tarball: v0.2.4 release (sha256 in fetch.sh); jar pom.properties says maelstrom 0.2.5-SNAPSHOT, jepsen 0.3.7, knossos 0.3.10, elle 0.2.2
 Linearizability checker: jepsen.checker/linearizable with Knossos's default competition algorithm (linear and wgl raced), model cas-register, per key (jepsen.independent)
 Python 3.13.17
+
+Added 2026-11-07 (batches D-F, second checker):
+6.18.44-fc-v300
+go version go1.24.7 linux/amd64
+Porcupine v1.3.1 (github.com/anishathalye/porcupine, from Go's module proxy, go.sum in tools/porcupine)
+Knossos as bundled in the Maelstrom jar (see above)

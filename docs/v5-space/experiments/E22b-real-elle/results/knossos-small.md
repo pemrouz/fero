@@ -1,12 +1,12 @@
-# Knossos (competition) on every partition of 120 ops or fewer in every other history file, time limit 60000 ms, 2026-11-06T22:35:26Z, openjdk version "21.0.12.1" 2026-08-18, 4 vCPU, load 16.24 14.66 12.79
-# jobs: 180759 partitions; checked: 83500
-# Knossos 0.3.16 vs Porcupine v1.3.1, per partition (83500 partitions checked, 0 with no Porcupine line)
+# Knossos (competition) on the partitions of 120 ops or fewer in every other history file, time limit 60000 ms
+# jobs: 180759 partitions; checked: 180759
+# Knossos 0.3.16 vs Porcupine v1.3.1, per partition (180759 partitions checked, 0 with no Porcupine line)
 
 | history file | partitions | ops (max per partition) | both linearizable | both not | Porcupine only not | Knossos only not | Knossos unknown | Knossos ms: median / max / total | Porcupine ms total |
 |---|---|---|---|---|---|---|---|---|---|
-| core-determinism-calm.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 11 / 290 / 8.5 s | 44 |
-| core-determinism-faults.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 8 / 56 / 5.4 s | 47 |
-| core-determinism-shuffle.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 7 / 47 / 4.7 s | 57 |
+| core-determinism-calm.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 11 / 290 / 8.5 s | 45 |
+| core-determinism-faults.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 8 / 56 / 5.4 s | 48 |
+| core-determinism-shuffle.jsonl | 600 | 4400 (10) | 600 | 0 | 0 | 0 | 0 | 7 / 47 / 4.7 s | 44 |
 | core-exactly-once-calm.jsonl | 400 | 6000 (17) | 400 | 0 | 0 | 0 | 0 | 40 / 260 / 17.8 s | 43 |
 | core-exactly-once-faults.jsonl | 400 | 6000 (17) | 400 | 0 | 0 | 0 | 0 | 40 / 164 / 17.1 s | 46 |
 | core-exactly-once-shuffle.jsonl | 400 | 6000 (17) | 400 | 0 | 0 | 0 | 0 | 43 / 272 / 19.3 s | 56 |
@@ -38,7 +38,50 @@
 | p05-faults.jsonl | 300 | 2400 (8) | 300 | 0 | 0 | 0 | 0 | 284 / 970 / 90.0 s | 243 |
 | p05-shuffle.jsonl | 300 | 2400 (8) | 300 | 0 | 0 | 0 | 0 | 206 / 692 / 62.8 s | 303 |
 | p08-calm.jsonl | 17000 | 116667 (36) | 17000 | 0 | 0 | 0 | 0 | 4 / 1121 / 608.7 s | 2147 |
-| p08-faults.jsonl | 5000 | 35604 (36) | 5000 | 0 | 0 | 0 | 0 | 3 / 1510 / 215.4 s | 996 |
-| **total** | 83500 | 307159 | 83500 | 0 | 0 | 0 | 0 | total 1382.7 s | 8588 |
+| p08-faults.jsonl | 17000 | 118989 (37) | 17000 | 0 | 0 | 0 | 0 | 4 / 1510 / 598.7 s | 2425 |
+| p08-shuffle.jsonl | 17000 | 119476 (36) | 17000 | 0 | 0 | 0 | 0 | 5 / 1000 / 567.3 s | 2630 |
+| p09-calm.jsonl | 100 | 100 (1) | 100 | 0 | 0 | 0 | 0 | 4 / 34 / 0.4 s | 63 |
+| p09-faults.jsonl | 100 | 100 (1) | 100 | 0 | 0 | 0 | 0 | 4 / 48 / 0.5 s | 17 |
+| p09-shuffle.jsonl | 100 | 100 (1) | 100 | 0 | 0 | 0 | 0 | 4 / 19 / 0.5 s | 18 |
+| p10-calm.jsonl | 300 | 2518 (29) | 300 | 0 | 0 | 0 | 0 | 8 / 110 / 3.3 s | 30 |
+| p10-faults.jsonl | 299 | 2545 (29) | 299 | 0 | 0 | 0 | 0 | 8 / 203 / 3.7 s | 24 |
+| p10-shuffle.jsonl | 298 | 2608 (20) | 298 | 0 | 0 | 0 | 0 | 7 / 45 / 2.6 s | 37 |
+| p11-calm.jsonl | 300 | 1800 (12) | 300 | 0 | 0 | 0 | 0 | 5 / 28 / 1.7 s | 21 |
+| p11-faults.jsonl | 300 | 1800 (12) | 300 | 0 | 0 | 0 | 0 | 5 / 48 / 1.7 s | 18 |
+| p11-shuffle.jsonl | 300 | 1800 (12) | 300 | 0 | 0 | 0 | 0 | 4 / 112 / 1.8 s | 21 |
+| p12-calm.jsonl | 3000 | 7200 (3) | 3000 | 0 | 0 | 0 | 0 | 4 / 129 / 14.7 s | 307 |
+| p12-faults.jsonl | 3000 | 7200 (3) | 3000 | 0 | 0 | 0 | 0 | 4 / 57 / 13.8 s | 403 |
+| p12-shuffle.jsonl | 3000 | 7200 (3) | 3000 | 0 | 0 | 0 | 0 | 4 / 193 / 14.7 s | 165 |
+| p13-calm.jsonl | 700 | 2155 (7) | 700 | 0 | 0 | 0 | 0 | 4 / 184 / 3.8 s | 34 |
+| p13-faults.jsonl | 700 | 2496 (20) | 700 | 0 | 0 | 0 | 0 | 4 / 30 / 3.5 s | 53 |
+| p13-shuffle.jsonl | 700 | 2495 (13) | 700 | 0 | 0 | 0 | 0 | 4 / 67 / 3.7 s | 37 |
+| p14-calm.jsonl | 400 | 1100 (4) | 400 | 0 | 0 | 0 | 0 | 4 / 56 / 2.0 s | 34 |
+| p14-faults.jsonl | 400 | 1100 (4) | 400 | 0 | 0 | 0 | 0 | 4 / 95 / 1.9 s | 69 |
+| p14-shuffle.jsonl | 400 | 1100 (4) | 400 | 0 | 0 | 0 | 0 | 4 / 44 / 1.8 s | 99 |
+| p15-calm.jsonl | 1000 | 5970 (15) | 1000 | 0 | 0 | 0 | 0 | 5 / 64 / 6.4 s | 241 |
+| p15-faults.jsonl | 1000 | 6022 (15) | 1000 | 0 | 0 | 0 | 0 | 5 / 40 / 6.1 s | 130 |
+| p15-shuffle.jsonl | 1000 | 6188 (16) | 1000 | 0 | 0 | 0 | 0 | 5 / 47 / 6.3 s | 116 |
+| p17-calm.jsonl | 12000 | 107810 (33) | 12000 | 0 | 0 | 0 | 0 | 7 / 944 / 437.9 s | 2274 |
+| p17-faults.jsonl | 12000 | 109266 (33) | 12000 | 0 | 0 | 0 | 0 | 7 / 891 / 415.1 s | 2522 |
+| p17-shuffle.jsonl | 12000 | 109833 (33) | 12000 | 0 | 0 | 0 | 0 | 7 / 684 / 418.4 s | 1555 |
+| p18-calm.jsonl | 500 | 1400 (10) | 500 | 0 | 0 | 0 | 0 | 4 / 145 / 8.2 s | 28 |
+| p18-faults.jsonl | 500 | 1400 (10) | 500 | 0 | 0 | 0 | 0 | 4 / 273 / 8.8 s | 28 |
+| p18-shuffle.jsonl | 500 | 1400 (10) | 500 | 0 | 0 | 0 | 0 | 4 / 299 / 8.3 s | 31 |
+| p19-calm.jsonl | 500 | 1100 (4) | 500 | 0 | 0 | 0 | 0 | 4 / 38 / 2.1 s | 25 |
+| p19-faults.jsonl | 500 | 1100 (4) | 500 | 0 | 0 | 0 | 0 | 4 / 76 / 2.3 s | 12 |
+| p19-shuffle.jsonl | 500 | 1100 (4) | 500 | 0 | 0 | 0 | 0 | 4 / 32 / 2.1 s | 17 |
+| p20-calm.jsonl | 2100 | 4450 (5) | 2100 | 0 | 0 | 0 | 0 | 4 / 112 / 9.5 s | 115 |
+| p20-faults.jsonl | 2100 | 4450 (5) | 2100 | 0 | 0 | 0 | 0 | 4 / 172 / 10.0 s | 187 |
+| p20-shuffle.jsonl | 2100 | 4450 (5) | 2100 | 0 | 0 | 0 | 0 | 4 / 177 / 9.3 s | 135 |
+| p21-calm.jsonl | 1554 | 9208 (51) | 1554 | 0 | 0 | 0 | 0 | 4 / 365 / 23.7 s | 140 |
+| p21-faults.jsonl | 1555 | 9568 (60) | 1555 | 0 | 0 | 0 | 0 | 4 / 434 / 24.0 s | 352 |
+| p21-shuffle.jsonl | 1553 | 9940 (55) | 1553 | 0 | 0 | 0 | 0 | 4 / 417 / 25.2 s | 216 |
+| p22-calm.jsonl | 200 | 1100 (8) | 200 | 0 | 0 | 0 | 0 | 4 / 92 / 1.0 s | 35 |
+| p22-faults.jsonl | 200 | 1063 (8) | 200 | 0 | 0 | 0 | 0 | 3 / 171 / 1.1 s | 28 |
+| p22-shuffle.jsonl | 200 | 1085 (8) | 200 | 0 | 0 | 0 | 0 | 4 / 24 / 1.0 s | 68 |
+| phantom-calm.jsonl | 100 | 476 (5) | 100 | 0 | 0 | 0 | 0 | 4 / 16 / 0.5 s | 4 |
+| phantom-faults.jsonl | 100 | 476 (5) | 100 | 0 | 0 | 0 | 0 | 4 / 60 / 0.5 s | 9 |
+| phantom-shuffle.jsonl | 100 | 476 (5) | 100 | 0 | 0 | 0 | 0 | 3 / 28 / 0.4 s | 7 |
+| **total** | 180759 | 954768 | 180759 | 0 | 0 | 0 | 0 | total 3837.8 s | 22362 |
 
 ## Disagreements and unknowns (0)

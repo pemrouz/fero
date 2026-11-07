@@ -1,0 +1,1 @@
+share groups: not supported by this server (see apicheck.txt)

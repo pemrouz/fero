@@ -5,3 +5,8 @@ bda279ff0b13ed319f536687343d042a3f624d6e7f188791fe9e2edd251508bb  node/run-node.
 5fa6e58136ac650f4f10c1b5f700724d070a812d6f32cfb4bf8122a0c90c2d83  batch.sh
 f68c4acccc141a3b1090b7b24124de8411c1858a3944fd58a2e47e2e81074b9f  matrix.txt
 174f928ff258e0a3076f4e66458cdc96ab8fcff71fcc7e287d51e017f4b9fef4  summarize.py
+
+# Batch F (2026-11-07) ran with these files (batch G is listed in this matrix.txt but was not run); node/*, summarize.py unchanged:
+4f3fc9f8b679a28b961c6ec49a87c1cbb5e94f5e15242a742d7c0a3d12f319a6  run-one.sh
+ceae40d8cee1533f2b999e903d1f089018b565aa5cd38409368444e5221a94e9  batch.sh
+77a4aa901d14e1d28c0301f85e07273c205d0c6d3cf518efaeeb787dc4656bb0  matrix.txt

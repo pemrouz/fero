@@ -1,0 +1,402 @@
+# staleconfig-stubs: MCstaleconfig.tla with staleconfig.cfg, E-14 stand-ins, 4 s wall (cap 900 s)
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 34 and seed 8971582945794768023 with 1 worker on 4 cores with 3641MB heap and 64MB offheap memory [pid: 4215] (Linux 6.18.44-fc-v300 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 04:30:47)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 04:30:48.
+Error: Invariant MoreThanOneLeaderInv is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ config = ( s1 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s2 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s3 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s4 :> [learners |-> {}, jointConfig |-> <<{}, {}>>] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ reconfigCount = 0
+/\ step = 0
+/\ currentTerm = (s1 :> 1 @@ s2 :> 1 @@ s3 :> 1 @@ s4 :> 0)
+/\ votedFor = (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ pendingMessages = <<>>
+/\ matchIndex = ( s1 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 0)
+/\ pendingConfChangeIndex = (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s2 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s3 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s4 :>
+      [ log |-> 0,
+        currentTerm |-> 0,
+        votedFor |-> 0,
+        commitIndex |-> 0,
+        config |-> [learners |-> {}, jointConfig |-> <<{}, {}>>] ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s4 :> <<>> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+State 2: <ScriptNext line 88, col 15 to line 90, col 33 of module MCstaleconfig>
+/\ config = ( s1 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s2 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s3 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s4 :> [learners |-> {}, jointConfig |-> <<{}, {}>>] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ reconfigCount = 0
+/\ step = 1
+/\ currentTerm = (s1 :> 2 @@ s2 :> 1 @@ s3 :> 1 @@ s4 :> 0)
+/\ votedFor = (s1 :> s1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ pendingMessages = <<>>
+/\ matchIndex = ( s1 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 0)
+/\ pendingConfChangeIndex = (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s2 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s3 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s4 :>
+      [ log |-> 0,
+        currentTerm |-> 0,
+        votedFor |-> 0,
+        commitIndex |-> 0,
+        config |-> [learners |-> {}, jointConfig |-> <<{}, {}>>] ] )
+/\ state = (s1 :> "Candidate" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s4 :> <<>> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+State 3: <ScriptNext line 88, col 15 to line 90, col 33 of module MCstaleconfig>
+/\ config = ( s1 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s2 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s3 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s4 :> [learners |-> {}, jointConfig |-> <<{}, {}>>] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ reconfigCount = 0
+/\ step = 2
+/\ currentTerm = (s1 :> 2 @@ s2 :> 1 @@ s3 :> 1 @@ s4 :> 0)
+/\ votedFor = (s1 :> s1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ pendingMessages = ( [ mdest |-> s1,
+    msource |-> s1,
+    mtype |-> "RequestVoteResponse",
+    mterm |-> 2,
+    mvoteGranted |-> TRUE ] :>
+      1 )
+/\ matchIndex = ( s1 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 0)
+/\ pendingConfChangeIndex = (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s2 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s3 :>
+      [ log |-> 3,
+        currentTerm |-> 1,
+        votedFor |-> 0,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s4 :>
+... (6435 lines cut)
+      [ log |-> 5,
+        currentTerm |-> 3,
+        votedFor |-> s2,
+        commitIndex |-> 4,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s3 :>
+      [ log |-> 3,
+        currentTerm |-> 3,
+        votedFor |-> s2,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s4 :>
+      [ log |-> 5,
+        currentTerm |-> 3,
+        votedFor |-> s4,
+        commitIndex |-> 5,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s4}, {}>>] ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Candidate")
+/\ messages = ( [ mdest |-> s1,
+    msource |-> s4,
+    mtype |-> "AppendEntriesResponse",
+    mterm |-> 2,
+    msubtype |-> "heartbeat",
+    msuccess |-> TRUE,
+    mmatchIndex |-> 0 ] :>
+      1 )
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> )
+/\ votesGranted = (s1 :> {s1, s2} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+
+State 64: <ScriptNext line 88, col 15 to line 90, col 33 of module MCstaleconfig>
+/\ config = ( s1 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s4}, {}>>] @@
+  s2 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s3 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] @@
+  s4 :> [learners |-> {}, jointConfig |-> <<{s1, s2, s4}, {}>>] )
+/\ votesResponded = (s1 :> {s1, s2} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+/\ reconfigCount = 2
+/\ step = 63
+/\ currentTerm = (s1 :> 3 @@ s2 :> 3 @@ s3 :> 3 @@ s4 :> 3)
+/\ votedFor = (s1 :> s4 @@ s2 :> s2 @@ s3 :> s2 @@ s4 :> s4)
+/\ pendingMessages = <<>>
+/\ matchIndex = ( s1 :> (s1 :> 5 @@ s2 :> 5 @@ s3 :> 0 @@ s4 :> 5) @@
+  s2 :> (s1 :> 0 @@ s2 :> 5 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 5) )
+/\ commitIndex = (s1 :> 5 @@ s2 :> 4 @@ s3 :> 3 @@ s4 :> 5)
+/\ pendingConfChangeIndex = (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 5,
+        currentTerm |-> 3,
+        votedFor |-> s4,
+        commitIndex |-> 5,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s4}, {}>>] ] @@
+  s2 :>
+      [ log |-> 5,
+        currentTerm |-> 3,
+        votedFor |-> s2,
+        commitIndex |-> 4,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s3 :>
+      [ log |-> 3,
+        currentTerm |-> 3,
+        votedFor |-> s2,
+        commitIndex |-> 3,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s3}, {}>>] ] @@
+  s4 :>
+      [ log |-> 5,
+        currentTerm |-> 3,
+        votedFor |-> s4,
+        commitIndex |-> 5,
+        config |-> [learners |-> {}, jointConfig |-> <<{s1, s2, s4}, {}>>] ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Leader")
+/\ messages = ( [ mdest |-> s1,
+    msource |-> s4,
+    mtype |-> "AppendEntriesResponse",
+    mterm |-> 2,
+    msubtype |-> "heartbeat",
+    msuccess |-> TRUE,
+    mmatchIndex |-> 0 ] :>
+      1 )
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           term |-> 1,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ],
+         [ value |-> [newconf |-> {s1, s2, s4}, learners |-> {}],
+           term |-> 2,
+           type |-> "ConfigEntry" ] >> )
+/\ votesGranted = (s1 :> {s1, s2} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {s1, s4})
+
+182 states generated, 172 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 64.
+Finished in 03s at (2026-11-07 04:30:49)
+Trace exploration spec path: ./MCstaleconfig_TTrace_1794025845.tla

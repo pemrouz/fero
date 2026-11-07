@@ -243,35 +243,54 @@ def consts_for(b, calm, soft):
     return c
 
 
-def run_one(idx, kind, line, desc, new_lines, fixed_counts):
+def run_one(idx, kind, line, desc, new_lines, fixed_counts, prev=None):
     d = os.path.join(WORK, f'm{idx:03d}')
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, 'SlotMoveFixed.tla'), 'w') as f:
         f.write('\n'.join(new_lines))
     shutil.copy(os.path.join(ROOT, 'tla', 'SlotMove.tla'), os.path.join(d, 'SlotMove.tla'))
     res = {'id': idx, 'kind': kind, 'line': line, 'desc': desc, 'runs': {}}
+    # a survivor re-checked on more bounds keeps the runs it already has
+    done_runs = dict(prev['runs']) if prev else {}
     invs = ['Inv1', 'Inv2', 'Inv3', 'Inv4', 'Inv5', 'Inv6', 'Inv8', 'Inv9']
     counts = {}
     for b in BOUNDS:
+        if b in done_runs and done_runs[b].get('verdict') == 'holds':
+            res['runs'][b] = done_runs[b]
+            counts[b] = done_runs[b]['distinct']
+            continue
         consts = consts_for(b, calm=False, soft=False)
+        cap = CAP * fixed_counts[b]
         tlcrun.write_model(d, consts, invs, extends='SlotMoveFixed', module='MC',
-                           extra_defs=EDGE_DEFS, copy_spec=False)
+                           extra_defs=EDGE_DEFS + cap_defs(cap), copy_spec=False)
+        add_cap(d)
         out, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
-        r = classify(out)
+        r = classify(out, cap)
         r['secs'] = round(secs, 1)
         res['runs'][b] = r
-        if r['verdict'] in ('caught', 'ill-formed'):
+        if r['verdict'] in ('caught', 'ill-formed', 'unbounded'):
             res['verdict'] = r['verdict']
             res['by'] = f'{b}: {r.get("prop")}'
             return res
         counts[b] = r['distinct']
     # no safety property broke: property 7 on move
     for b in ('move',):
+        if b + '-live' in done_runs and not done_runs[b + '-live']['stuck']:
+            res['runs'][b + '-live'] = done_runs[b + '-live']
+            continue
         consts = consts_for(b, calm=True, soft=True)
+        cap = CAP * fixed_counts[b]
         tlcrun.write_model(d, consts, ['SoftInv', 'CalmNode'], extends='SlotMoveFixed',
-                           module='MC', copy_spec=False)
+                           module='MC', extra_defs=cap_defs(cap), copy_spec=False)
+        add_cap(d)
         out, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
         fails, nodes, edges, distinct, errors, keep = tlcrun.parse(out)
+        if distinct is not None and distinct >= cap:
+            res['runs'][b + '-live'] = {'stuck': None, 'calm': len(nodes), 'secs': round(secs, 1),
+                                        'distinct': distinct, 'errors': errors[:3]}
+            res['verdict'] = 'unbounded'
+            res['by'] = f'{b}-live: more than {cap:,} states'
+            return res
         live = agef.check(nodes, edges)
         res['runs'][b + '-live'] = {'stuck': live['stuck'], 'calm': len(nodes), 'secs': round(secs, 1),
                                     'errors': errors[:3]}
@@ -290,11 +309,29 @@ def run_one(idx, kind, line, desc, new_lines, fixed_counts):
 # reports the failed Assert as an error naming "property 6 fails on a commit".
 EDGE_DEFS = ''
 
+# A mutant can make the state space blow up (a guard that stopped a step from
+# repeating). Each run is capped at CAP times the fixed protocol's states on
+# that bound: states past the cap are not expanded (a TLC CONSTRAINT; with one
+# worker the search order, and so the cut, is deterministic). A run that
+# reaches the cap with no property broken is "unbounded": the mutant changes
+# the protocol's reachable states by more than CAP times, and no property
+# broke in the part searched.
+CAP = 10
+
+
+def cap_defs(cap):
+    return f'\nCapOK == TLCGet("distinct") < {int(cap)}'
+
+
+def add_cap(d):
+    with open(os.path.join(d, 'MC.cfg'), 'a') as f:
+        f.write('CONSTRAINT CapOK\n')
+
 VIOL = re.compile(r'Invariant (\w+) is violated')
 DIST = re.compile(r'([\d,]+) states generated, ([\d,]+) distinct states found')
 
 
-def classify(out):
+def classify(out, cap=None):
     m = VIOL.search(out)
     if m:
         return {'verdict': 'caught', 'prop': m.group(1),
@@ -305,7 +342,10 @@ def classify(out):
         err = [l for l in out.splitlines() if 'rror' in l or 'xception' in l][:3]
         return {'verdict': 'ill-formed', 'prop': None, 'errors': err}
     d = DIST.search(out)
-    return {'verdict': 'holds', 'distinct': int(d.group(2).replace(',', '')) if d else None}
+    n = int(d.group(2).replace(',', '')) if d else None
+    if cap and n is not None and n >= cap:
+        return {'verdict': 'unbounded', 'prop': f'more than {int(cap):,} states', 'distinct': n}
+    return {'verdict': 'holds', 'distinct': n}
 
 
 def fixed_counts():
@@ -379,6 +419,8 @@ def main():
     ap.add_argument('--budget', type=float, default=0)
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--left', action='store_true', help='print how many mutants are not run yet')
+    ap.add_argument('--survivors-left', action='store_true',
+                    help='print how many uncaught mutants have not yet run on every bound in E15_MUT_BOUNDS')
     ap.add_argument('--redo-survivors', action='store_true',
                     help='run again the mutants no bound caught, on the bounds not tried yet')
     ap.add_argument('--run', action='store_true')
@@ -405,6 +447,10 @@ def main():
     if a.left:
         print(sum(1 for k in range(1, len(muts) + 1) if f'm{k:03d}' not in results))
         return
+    if a.survivors_left:
+        print(sum(1 for r in results.values() if r['verdict'] in ('survived', 'equivalent')
+                  and not set(BOUNDS) <= set(r['runs'])))
+        return
     if a.run:
         base = fixed_counts()
         k, n = map(int, a.slice.split('/'))
@@ -420,7 +466,7 @@ def main():
                 continue
             if a.budget and time.time() - t0 > a.budget:
                 break
-            r = run_one(idx, kind, line, desc, new, base)
+            r = run_one(idx, kind, line, desc, new, base, prev=prev)
             results[f'm{idx:03d}'] = r
             print(f'm{idx:03d}', r['verdict'], r.get('by', ''), desc, flush=True)
             # merge with what other slices wrote meanwhile

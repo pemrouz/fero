@@ -1,0 +1,112 @@
+{
+ "r21-append-ef/jar": {
+  "complete": true,
+  "depth": 22,
+  "distinct": 2905,
+  "error": null,
+  "generated": 19990,
+  "overrides": false,
+  "queue": 0,
+  "secs": 15,
+  "violated": null
+ },
+ "r21-append-ef/stubs": {
+  "complete": true,
+  "depth": 22,
+  "distinct": 2905,
+  "error": null,
+  "generated": 19990,
+  "overrides": false,
+  "queue": 0,
+  "secs": 11,
+  "violated": null
+ },
+ "r21-script/jar": {
+  "complete": false,
+  "depth": 73,
+  "distinct": 79,
+  "error": null,
+  "generated": 140,
+  "overrides": false,
+  "queue": 0,
+  "secs": 4,
+  "violated": "NotGoal"
+ },
+ "r21-script/stubs": {
+  "complete": false,
+  "depth": 73,
+  "distinct": 79,
+  "error": null,
+  "generated": 140,
+  "overrides": false,
+  "queue": 0,
+  "secs": 4,
+  "violated": "NotGoal"
+ },
+ "stale2-mutant/jar": {
+  "complete": false,
+  "depth": 54,
+  "distinct": 71,
+  "error": null,
+  "generated": 128,
+  "overrides": false,
+  "queue": 0,
+  "secs": 4,
+  "violated": "MoreThanOneLeaderInv"
+ },
+ "stale2-mutant/stubs": {
+  "complete": false,
+  "depth": 54,
+  "distinct": 71,
+  "error": null,
+  "generated": 128,
+  "overrides": false,
+  "queue": 0,
+  "secs": 4,
+  "violated": "MoreThanOneLeaderInv"
+ },
+ "stale2/jar": {
+  "complete": true,
+  "depth": 34,
+  "distinct": 51,
+  "error": null,
+  "generated": 94,
+  "overrides": false,
+  "queue": 0,
+  "secs": 6,
+  "violated": null
+ },
+ "stale2/stubs": {
+  "complete": true,
+  "depth": 34,
+  "distinct": 51,
+  "error": null,
+  "generated": 94,
+  "overrides": false,
+  "queue": 0,
+  "secs": 7,
+  "violated": null
+ },
+ "staleconfig/jar": {
+  "complete": false,
+  "depth": 64,
+  "distinct": 172,
+  "error": null,
+  "generated": 182,
+  "overrides": false,
+  "queue": 0,
+  "secs": 3,
+  "violated": "MoreThanOneLeaderInv"
+ },
+ "staleconfig/stubs": {
+  "complete": false,
+  "depth": 64,
+  "distinct": 172,
+  "error": null,
+  "generated": 182,
+  "overrides": false,
+  "queue": 0,
+  "secs": 4,
+  "violated": "MoreThanOneLeaderInv"
+ }
+}

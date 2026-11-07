@@ -1,0 +1,81 @@
+# Anomaly 3: with --concurrency 4n, Maelstrom's lin-kv reads only in the keys of the first thread group.
+# Made by tools/keys_by_group.py from each run's history.edn. 'thread group' = thread // 2n; reads come only from threads 0..n-1.
+# Source (in the Maelstrom 0.2.4 jar): jepsen/tests/linearizable_register.clj (concurrent-generator (* 2 n) ... (gen/reserve n r ...)),
+# jepsen/generator.clj reserve (absolute thread ranges, with its own TODO about nested reserves), jepsen/generator/interpreter.clj:89 (node = thread mod n).
+c3-ri-s1: 3 nodes, concurrency 12 (groups of 6 threads per key; reads only on threads 0..2)
+  key 0: 1862 ops, 0.2-40.0 s, thread group [0], threads 0..5, reads ok 359
+  key 1: 808 ops, 0.2-17.9 s, thread group [1], threads 6..11, reads ok 0
+  key 2: 914 ops, 17.9-38.9 s, thread group [1], threads 6..11, reads ok 0
+  key 3: 406 ops, 38.9-49.9 s, thread group [1], threads 6..11, reads ok 0
+  key 4: 912 ops, 40.0-61.1 s, thread group [0], threads 0..5, reads ok 128
+  key 5: 426 ops, 49.9-61.3 s, thread group [1], threads 6..11, reads ok 0
+  key 6: 816 ops, 61.1-82.5 s, thread group [0], threads 0..5, reads ok 145
+  key 7: 466 ops, 61.1-72.4 s, thread group [1], threads 6..11, reads ok 0
+  key 8: 446 ops, 71.5-82.4 s, thread group [1], threads 6..11, reads ok 0
+  key 9: 464 ops, 82.3-91.4 s, thread group [1], threads 6..11, reads ok 0
+  key 10: 776 ops, 82.5-100.2 s, thread group [0], threads 0..5, reads ok 136
+  key 11: 452 ops, 91.4-100.1 s, thread group [1], threads 6..11, reads ok 0
+  read invocations by thread (node = thread mod n): t0/n0: 779, t1/n1: 233, t2/n2: 127
+  write+cas invocations by thread: t3: 705, t4: 212, t5: 127, t6: 1037, t7: 418, t8: 209, t9: 176, t10: 173, t11: 178
+c5-ri-s1: 5 nodes, concurrency 20 (groups of 10 threads per key; reads only on threads 0..4)
+  key 0: 796 ops, 0.1-19.0 s, thread group [0], threads 0..9, reads ok 183
+  key 1: 714 ops, 0.1-15.4 s, thread group [1], threads 10..19, reads ok 0
+  key 2: 104 ops, 15.3-18.9 s, thread group [1], threads 10..19, reads ok 0
+  key 3: 598 ops, 18.0-30.2 s, thread group [1], threads 10..19, reads ok 0
+  key 4: 1222 ops, 18.2-43.9 s, thread group [0], threads 0..9, reads ok 262
+  key 5: 626 ops, 29.8-43.2 s, thread group [1], threads 10..19, reads ok 0
+  key 6: 498 ops, 43.0-53.1 s, thread group [1], threads 10..19, reads ok 0
+  key 7: 1284 ops, 43.2-70.4 s, thread group [0], threads 0..9, reads ok 309
+  key 8: 776 ops, 52.7-70.5 s, thread group [1], threads 10..19, reads ok 0
+  key 9: 272 ops, 70.0-77.3 s, thread group [0], threads 0..9, reads ok 56
+  key 10: 44 ops, 70.2-72.7 s, thread group [1], threads 10..19, reads ok 0
+  key 11: 162 ops, 71.8-77.4 s, thread group [1], threads 10..19, reads ok 0
+  key 12: 480 ops, 77.0-89.1 s, thread group [0], threads 0..9, reads ok 100
+  key 13: 86 ops, 77.2-80.5 s, thread group [1], threads 10..19, reads ok 0
+  key 14: 424 ops, 79.7-89.4 s, thread group [1], threads 10..19, reads ok 0
+  key 15: 64 ops, 88.7-91.3 s, thread group [1], threads 10..19, reads ok 0
+  key 16: 478 ops, 88.9-100.1 s, thread group [0], threads 0..9, reads ok 105
+  key 17: 478 ops, 90.5-100.2 s, thread group [1], threads 10..19, reads ok 0
+  read invocations by thread (node = thread mod n): t0/n0: 728, t1/n1: 222, t2/n2: 85, t3/n3: 65, t4/n4: 71
+  write+cas invocations by thread: t5: 701, t6: 202, t7: 85, t8: 59, t9: 48, t10: 877, t11: 391, t12: 192, t13: 133, t14: 119, t15: 115, t16: 119, t17: 119, t18: 113, t19: 109
+r3-mix-s4: 3 nodes, concurrency 6 (groups of 6 threads per key; reads only on threads 0..2)
+  key 0: 2736 ops, 0.1-32.4 s, thread group [0], threads 0..5, reads ok 540
+  key 1: 2178 ops, 32.3-58.7 s, thread group [0], threads 0..5, reads ok 415
+  key 2: 2956 ops, 58.6-90.5 s, thread group [0], threads 0..5, reads ok 714
+  key 3: 932 ops, 90.5-100.1 s, thread group [0], threads 0..5, reads ok 223
+  read invocations by thread (node = thread mod n): t0/n0: 1207, t1/n1: 651, t2/n2: 395
+  write+cas invocations by thread: t3: 1171, t4: 596, t5: 381
+r5-mix-s4: 5 nodes, concurrency 10 (groups of 10 threads per key; reads only on threads 0..4)
+  key 0: 2034 ops, 0.1-21.9 s, thread group [0], threads 0..9, reads ok 355
+  key 1: 2330 ops, 21.8-47.0 s, thread group [0], threads 0..9, reads ok 457
+  key 2: 1302 ops, 47.0-62.8 s, thread group [0], threads 0..9, reads ok 195
+  key 3: 1342 ops, 61.9-77.1 s, thread group [0], threads 0..9, reads ok 254
+  key 4: 744 ops, 77.0-85.5 s, thread group [0], threads 0..9, reads ok 160
+  key 5: 1418 ops, 85.5-100.1 s, thread group [0], threads 0..9, reads ok 304
+  read invocations by thread (node = thread mod n): t0/n0: 1128, t1/n1: 423, t2/n2: 262, t3/n3: 289, t4/n4: 188
+  write+cas invocations by thread: t5: 1143, t6: 429, t7: 249, t8: 261, t9: 213
+
+# The jar's reserve:
+  (let [gens (->> args
+                  drop-last
+                  (partition 2)
+                  ; Construct [thread-set gen] tuples defining the range of
+                  ; thread indices covering a given generator, lower
+                  ; inclusive, upper exclusive. TODO: I think there might be a
+                  ; bug here: if we construct nested reserves or otherwise
+                  ; restrict threads, an inner reserve might not understand
+                  ; that its threads don't start at 0.
+                  (reduce (fn [[n gens] [thread-count gen]]
+                            (let [n' (+ n thread-count)]
+                              [n' (conj gens [(set (range n n')) gen])]))
+                          [0 []])
+                  second)
+        ranges      (mapv first gens)
+# The jar's linearizable-register generator:
+   :generator (let [n (count (:nodes opts))]
+                (independent/concurrent-generator
+                  (* 2 n)
+                  (range)
+                  (fn [k]
+                    (cond->> (gen/reserve n r (gen/mix [w cas cas]))
+                      ; We randomize the limit a bit so that over time, keys

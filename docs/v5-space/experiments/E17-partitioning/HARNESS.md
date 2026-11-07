@@ -27,8 +27,17 @@ python3 harness/cli.py --option slot --bound read --flip read.after    # one com
 python3 harness/cli.py --option slot --rules                   # the rule list
 ./run.sh slot                                                  # ablation + mutants, in 20-minute pieces under the heavy lock
 FRESH=1 ./run.sh slot                                          # the same, ignoring the checkpoint (a second agent's re-run)
+python3 harness/cli.py --option slot --ablate --giveup         # the same with the give-up path pinned -> results/slot+giveup-ablation.json
+python3 harness/cli.py --option rekey-carry --ablate --warm-from rekey   # start from rekey's dropped rules
+python3 harness/cli.py --option rekey --ablate --warm-from rekey \
+    --warm-keep freeze.rkcom --warm-drop freeze.cutcom --warm-drop cut.append --tag rekey-alt   # another greedy order
 python3 harness/report.py > results/summary.md
 ```
+
+- `--giveup` pins (never drops) the rules listed in the model's `GIVEUP` tuple: the appends that start a give-up (cancel, abort, abandon). The ablation then finds what else a give-up needs to hand the partition back (property L5g). The result is saved as `<option>+giveup`.
+- `--warm-from X` starts from the rules `results/X-ablation.json` dropped. It is used only if every bound holds with them dropped; then pass 1, greedy and the final pass run as usual, so the result is still 1-minimal. `--warm-keep` and `--warm-drop` edit that list. Use it to try another greedy order (finding 5 in the README) or a sibling variant.
+- `--tag NAME` saves the result as `results/NAME-ablation.json` (the checkpoint stays `results/<option>-checkpoint.json`, shared by every run of that option, so run them one after the other, not at once).
+- `--no-mutants` skips the mutants (used for `rekey+giveup`, whose core mutants are already counted).
 
 The command line re-runs itself with `PYTHONHASHSEED=0`, so state digests are the same from run to run (they decide whether a mutant is equivalent).
 
@@ -77,10 +86,12 @@ All live in `world.py` (`PROPS`, `World.check`, `World.check_edge`, `World.goals
 | P4 | A cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows (a snapshot that replaces it must extend it). |
 | P6 | One writer per partition: at most one group holds it open. |
 | L4 | The reader can always catch up. |
-| L5 | Grow and shrink finish: every change under way can end once faults and timers stop. |
+| L5 | Every change under way can end once faults and timers stop. |
+| L5b | Grow and shrink finish: from every state reached with no give-up timer (cancel, abort, abandon), every planned change can still complete (`done_all`). Without it, a model that never starts a change passes L5. |
+| L5g | A give-up gives the partition back: once a change is given up (its cancel, abort or abandon committed), the source group can hold the partition again, alone (`given_up`). |
 | L7 | Every attempt can get an answer once faults and timers stop. |
 
-Liveness is AG EF goal over the **calm** steps: commit, `deliver` and `read`. No crash, no `tick`, no `control`. From every reachable state, calm steps alone must be able to reach the goal. A state where the log-length cap (10 entries a group) stopped an append counts as able to reach it, and the run reports it (`cap hit`). The designed models built so far never hit the cap; a model without an idempotence guard often does. A run also stops at 1.5 million states, to bound memory: if it found no counterexample by then, the result is `LIMIT` (undecided), and the ablation keeps the rule.
+Liveness is AG EF goal over the **calm** steps: commit, `deliver` and `read`. No crash, no `tick`, no `control`. From every reachable state, calm steps alone must be able to reach the goal. A state where the log-length cap (10 entries a group) stopped an append counts as able to reach it, and the run reports it (`cap hit`). The designed models built so far never hit the cap; a model without an idempotence guard often does. A run also stops at 1.5 million states, to bound memory: if it found no counterexample by then, the result is `LIMIT` (undecided). The ablation keeps such a rule and the report marks it `undecided`, so a count with undecided rules is an upper bound. A `LIMIT` on the verify bound puts nothing back (the result says `verify_undecided`), and a mutant stopped at the limit is `undecided`, never counted as caught. A model with a give-up path pinned can be ten times bigger than its core (slot's `deep` bound: 5,036 states core, 1.1 million with the give-up path), so expect undecided rules there.
 
 ## Adding an option, step by step
 
@@ -94,12 +105,16 @@ Liveness is AG EF goal over the **calm** steps: commit, `deliver` and `read`. No
    - `rows(w, st, g, part)`: the partition's rows at g by its committed log, as a tuple of attempt ids in order.
    - `settled(w, st)`: no change under way, and every tail empty.
    - `actions()`: your list of `Action`s.
+   - `done_all(w, st)`: every change the bound plans has completed (L5b). Without it, L5b is trivially true.
+   - `given_up(w, st)`: `[(partition, source group)]` for the latest change if it was given up (L5g). Return `[]` if your option has no give-up path.
    - `show(entry)`: optional, for traces.
+   - At module level, `GIVEUP = (...)`: the rule ids that start a give-up (the appends of cancel, abort, abandon), pinned by `--giveup`. Leave it out if the option has none.
 3. **Read the bound's layouts your way.** `bounds.py` gives a list of layouts: partition → group number, at the start and after each change. Numbers are units of load, not your groups. `fixN` uses the first layout's count. `rekey` reads each layout's count as a generation's cell count. `slot` reads layout changes as slot moves. For `split`: grow = G0 splits and p's half goes to the new group; shrink = the merge back. For lanes: map p and q to two resources sharing lanes. For `pslot`: let p and q be two resources' partitions that start in one shared group; the grow splits p's resource out.
 4. **Write the client's actions**: a `write` action (`deliver`, params: every attempt × every group), a `refuse` action, and the reader's `read` action (and anything your cursor needs). Copy them from `fixN` and change only what your option changes. `fixN`'s 13 necessary rules are the floor every option pays.
 5. **Write your move or change protocol** as further actions.
 6. **Run it**: `python3 harness/cli.py --option <name>`. The model as designed must hold every property on every bound. If it does not, the trace shows why: fix the model (or report a real bug in the design you are modelling).
-7. **Ablate**: `./run.sh <name>`. Then add the name to `ORDER` in `report.py` and `OPTIONS` in `cli.py`.
+7. **Ablate**: add the name to `OPTIONS` in `cli.py`, a line for it in `run.sh` (copy `slot`'s: the core, then `--giveup` if it has a give-up path), and the name and `name+giveup` to `ORDER` in `report.py` (`pslot`, `split` and `lanes` are there already). Then `./run.sh <name>`, and `python3 harness/report.py > results/summary.md`.
+8. **Write `options/<folder>/README.md`** in the style of `options/slot/README.md`: what it is, the model, what it leaves out, the results. Compare with fixN's 13: the count that matters is "beyond fixN".
 
 ## Rules for writing rules (or the counts are not comparable)
 

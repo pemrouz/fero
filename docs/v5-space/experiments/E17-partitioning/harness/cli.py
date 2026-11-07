@@ -47,10 +47,13 @@ def main():
     ap.add_argument('--ablate', action='store_true')
     ap.add_argument('--no-mutants', action='store_true')
     ap.add_argument('--giveup', action='store_true', help='pin the option\'s give-up path (GIVEUP)')
+    ap.add_argument('--pin', action='append', default=[], help='pin these rules instead of GIVEUP (with --tag)')
     ap.add_argument('--warm-from', help='start from another option\'s dropped rules (results/<it>-ablation.json)')
     ap.add_argument('--warm-drop', action='append', default=[], help='also drop this rule in the warm start')
     ap.add_argument('--warm-keep', action='append', default=[], help='keep this rule in the warm start')
     ap.add_argument('--tag', help='save as results/<tag>-ablation.json (an alternative run)')
+    ap.add_argument('--reverse', action='store_true', help='greedy drops in reverse model-text order')
+    ap.add_argument('--seed-from', help='copy cached jobs from results/<it>-checkpoint.json into a new tagged checkpoint')
     ap.add_argument('--jobs', type=int, default=2)
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--cap', type=int, default=runner.CAP)
@@ -74,8 +77,10 @@ def main():
         return
     if a.ablate:
         out = os.path.join(os.path.dirname(HERE), 'results')
-        ck = os.path.join(out, f'{a.option}-checkpoint.json')
-        pins = runner.giveup(a.option) if a.giveup else ()
+        # one checkpoint per option, shared by its core and +giveup runs (run
+        # them one after the other); a --tag run keeps its own
+        ck = os.path.join(out, f'{a.tag or a.option}-checkpoint.json')
+        pins = tuple(a.pin) if a.pin else runner.giveup(a.option) if a.giveup else ()
         tag = f'{a.option}+giveup' if a.giveup else a.option
         if a.giveup and not pins:
             print(f'  {a.option} has no give-up path')
@@ -87,9 +92,21 @@ def main():
             warm = [x for x in warm if x not in a.warm_keep] + a.warm_drop
         if a.tag:
             tag = a.tag
+        if a.seed_from and not os.path.exists(ck):
+            # a cache only: the same job gives the same result, so sharing
+            # it changes nothing but time
+            src = os.path.join(out, f'{a.seed_from}-checkpoint.json')
+            if os.path.exists(src):
+                with open(src) as f:
+                    old = json.load(f)
+                # a job's key names the rules, not the option: seed only
+                # from a checkpoint of the same option
+                assert old['option'] == a.option, (old['option'], a.option)
+                with open(ck, 'w') as f:
+                    json.dump({'option': a.option, 'cache': old['cache']}, f)
         try:
             res = runner.ablate(a.option, ck, jobs=a.jobs, budget=a.budget, mutate=not a.no_mutants,
-                                pinned=pins, warm=warm)
+                                pinned=pins, warm=warm, reverse=a.reverse)
         except runner.OutOfTime:
             print(f'  {tag}: out of time for this piece; run again to continue')
             sys.exit(3)

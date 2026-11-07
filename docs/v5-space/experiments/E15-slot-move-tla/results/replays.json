@@ -167,6 +167,118 @@
   "tla_steps": 16,
   "variant": "abort-keeps-table"
  },
+ "b-aborts-after-open-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 20,
+  "secs": 5.0,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "b-aborts-after-open"
+ },
+ "b-serves-before-open-deep-p2": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 23,
+  "secs": 4.5,
+  "tla_states": 24,
+  "tla_steps": 23,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-deep-p4": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 15,
+  "secs": 3.5,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-deep-p6": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 18,
+  "secs": 4.1,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-write-p2": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 23,
+  "secs": 3.0,
+  "tla_states": 24,
+  "tla_steps": 23,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 15,
+  "secs": 3.3,
+  "tla_states": 16,
+  "tla_steps": 15,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-write-p5": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 5,
+  "py_steps": 22,
+  "secs": 2.9,
+  "tla_states": 23,
+  "tla_steps": 22,
+  "variant": "b-serves-before-open"
+ },
+ "b-serves-before-open-write-p6": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 18,
+  "secs": 2.9,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "b-serves-before-open"
+ },
  "design-move-p1": {
   "bound": "move",
   "edge": false,
@@ -292,6 +404,132 @@
   "tla_states": 16,
   "tla_steps": 15,
   "variant": "design"
+ },
+ "fence-N-from-committed-deep-p2": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 21,
+  "secs": 3.5,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-deep-p3": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 3,
+  "py_steps": 18,
+  "secs": 3.4,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-deep-p4": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 18,
+  "secs": 3.7,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-deep-p6": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 12,
+  "secs": 2.9,
+  "tla_states": 13,
+  "tla_steps": 12,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-deep-p7": {
+  "bound": "deep",
+  "calm_states": 34,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 13,
+  "reached": true,
+  "secs": 3.0,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-write-p3": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 3,
+  "py_steps": 18,
+  "secs": 3.6,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 18,
+  "secs": 3.6,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-write-p6": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 12,
+  "secs": 2.8,
+  "tla_states": 13,
+  "tla_steps": 12,
+  "variant": "fence-N-from-committed"
+ },
+ "fence-N-from-committed-write-p7": {
+  "bound": "write",
+  "calm_states": 34,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 13,
+  "reached": true,
+  "secs": 2.5,
+  "variant": "fence-N-from-committed"
  },
  "fence-without-ready-move-p7": {
   "bound": "move",
@@ -643,6 +881,76 @@
   "tla_steps": 25,
   "variant": "fixed-but-unfence-at-old-epoch"
  },
+ "guards-on-committed-deep-p1": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 20,
+  "secs": 2.9,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-deep-p2": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 21,
+  "secs": 3.4,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-deep-p4": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 18,
+  "secs": 3.9,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-deep-p6": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 17,
+  "secs": 3.1,
+  "tla_states": 18,
+  "tla_steps": 17,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-deep-p9": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 18,
+  "secs": 2.9,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "guards-on-committed"
+ },
  "guards-on-committed-move-p1": {
   "bound": "move",
   "edge": false,
@@ -671,6 +979,90 @@
   "tla_steps": 18,
   "variant": "guards-on-committed"
  },
+ "guards-on-committed-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 20,
+  "secs": 3.0,
+  "tla_states": 21,
+  "tla_steps": 20,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-write-p2": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 21,
+  "secs": 3.3,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 18,
+  "secs": 3.4,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-write-p5": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 5,
+  "py_steps": 21,
+  "secs": 3.8,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-write-p6": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 17,
+  "secs": 3.7,
+  "tla_states": 18,
+  "tla_steps": 17,
+  "variant": "guards-on-committed"
+ },
+ "guards-on-committed-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 18,
+  "secs": 4.8,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "guards-on-committed"
+ },
  "no-carried-outcomes-dedup-p5": {
   "bound": "dedup",
   "edge": false,
@@ -684,6 +1076,48 @@
   "tla_states": 22,
   "tla_steps": 21,
   "variant": "no-carried-outcomes"
+ },
+ "no-carried-outcomes-write-p5": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 5,
+  "py_steps": 21,
+  "secs": 4.5,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "no-carried-outcomes"
+ },
+ "no-carried-sequence-deep-p2": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 21,
+  "secs": 3.9,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "no-carried-sequence"
+ },
+ "no-carried-sequence-deep-p6": {
+  "bound": "deep",
+  "edge": true,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 21,
+  "secs": 4.2,
+  "tla_states": 22,
+  "tla_steps": 21,
+  "variant": "no-carried-sequence"
  },
  "no-exporting-move-p7": {
   "bound": "move",
@@ -755,6 +1189,34 @@
   "tla_steps": 18,
   "variant": "no-exporting"
  },
+ "no-exporting-three-p7": {
+  "bound": "three",
+  "calm_states": 6,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 3,
+  "reached": true,
+  "secs": 2.3,
+  "variant": "no-exporting"
+ },
+ "no-exporting-three-p9": {
+  "bound": "three",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 18,
+  "secs": 2.6,
+  "tla_states": 19,
+  "tla_steps": 18,
+  "variant": "no-exporting"
+ },
  "no-exporting-write-p7": {
   "bound": "write",
   "calm_states": 6,
@@ -810,6 +1272,48 @@
   "reached": true,
   "secs": 2.7,
   "variant": "ready-before-copy-commits"
+ },
+ "stamp-from-committed-deep-p3": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 3,
+  "py_steps": 22,
+  "secs": 2.8,
+  "tla_states": 23,
+  "tla_steps": 22,
+  "variant": "stamp-from-committed"
+ },
+ "stamp-from-committed-deep-p4": {
+  "bound": "deep",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 22,
+  "secs": 3.1,
+  "tla_states": 23,
+  "tla_steps": 22,
+  "variant": "stamp-from-committed"
+ },
+ "stamp-from-committed-deep-p6": {
+  "bound": "deep",
+  "edge": true,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 7,
+  "secs": 3.3,
+  "tla_states": 8,
+  "tla_steps": 7,
+  "variant": "stamp-from-committed"
  },
  "stream-before-fence-commits-move-p1": {
   "bound": "move",
@@ -1031,6 +1535,104 @@
   "prop": 9,
   "py_steps": 16,
   "secs": 2.8,
+  "tla_states": 17,
+  "tla_steps": 16,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p1": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 1,
+  "py_steps": 17,
+  "secs": 2.8,
+  "tla_states": 18,
+  "tla_steps": 17,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p2": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 2,
+  "py_steps": 25,
+  "secs": 2.7,
+  "tla_states": 26,
+  "tla_steps": 25,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p4": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 4,
+  "py_steps": 22,
+  "secs": 2.6,
+  "tla_states": 23,
+  "tla_steps": 22,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p5": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 5,
+  "py_steps": 25,
+  "secs": 3.8,
+  "tla_states": 26,
+  "tla_steps": 25,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p6": {
+  "bound": "write",
+  "edge": true,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 6,
+  "py_steps": 25,
+  "secs": 4.1,
+  "tla_states": 26,
+  "tla_steps": 25,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p7": {
+  "bound": "write",
+  "calm_states": 15,
+  "complete": true,
+  "done_reachable": false,
+  "edge": false,
+  "errors": [],
+  "ok": true,
+  "prop": 7,
+  "py_steps": 13,
+  "reached": true,
+  "secs": 2.9,
+  "variant": "unfence-on-appended-abort"
+ },
+ "unfence-on-appended-abort-write-p9": {
+  "bound": "write",
+  "edge": false,
+  "errors": [
+   "Error: The behavior up to this point is:"
+  ],
+  "ok": true,
+  "prop": 9,
+  "py_steps": 16,
+  "secs": 2.6,
   "tla_states": 17,
   "tla_steps": 16,
   "variant": "unfence-on-appended-abort"
