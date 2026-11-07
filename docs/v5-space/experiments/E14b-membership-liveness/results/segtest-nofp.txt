@@ -1,0 +1,24 @@
+{
+ "run": "three-1c1f",
+ "segment seconds": 150,
+ "one piece": {
+  "segments": 1,
+  "distinct": 555676,
+  "nodes": 555676,
+  "edges": 774910,
+  "agef": "PASS",
+  "stuck_live": 0
+ },
+ "segments": {
+  "segments": 2,
+  "distinct": 574478,
+  "nodes": 574478,
+  "edges": 795090,
+  "agef": "FAIL",
+  "stuck_live": 282
+ },
+ "same nodes": false,
+ "same edges": false,
+ "nodes only in one": 1130154,
+ "edges only in one": 1570000
+}

@@ -1,0 +1,671 @@
+{
+ "AddLearnerF:drop-guard:r10": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 183717,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 151,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 4,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 13526,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 17,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 642511,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 379,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "AddLearnerF:drop-guard:r10#rule": "/\\ j \\notin GetConfig(i) \\cup GetLearners(i)      \\* [g]",
+ "AddVoterF:drop-guard:r11": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 186253,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 130,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 3,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12312,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 15,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 521873,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 232,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "AddVoterF:drop-guard:r11#rule": "/\\ j \\notin GetConfig(i) \\cup GetLearners(i)      \\* [g]",
+ "CanCampaign:drop-guard:r19": {
+  "m2": {
+   "agef": null,
+   "complete": false,
+   "distinct": 1493456,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 902,
+   "stuck_live": null,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 2,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 50667,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 40,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": null,
+   "complete": false,
+   "distinct": 703683,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 227,
+   "stuck_live": null,
+   "violated": null
+  }
+ },
+ "CanCampaign:drop-guard:r19#rule": "/\\ i \\in GetConfig(i)      \\* [g]",
+ "DemoteF:drop-guard:r13": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 120011,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 148,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 9,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 24,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 500230,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 460,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "DemoteF:drop-guard:r13#rule": "/\\ j \\in GetConfig(i)      \\* [g]",
+ "FeroApplyConf:drop-update-config:r17": {
+  "m2": {
+   "skipped": true
+  },
+  "m2p": {
+   "skipped": true
+  },
+  "m3": {
+   "agef": "FAIL",
+   "complete": true,
+   "distinct": 5376,
+   "error": null,
+   "plan": "FAIL",
+   "plan_stuck": 628,
+   "secs": 9,
+   "stuck_live": 628,
+   "violated": null
+  },
+  "m3c": {
+   "skipped": true
+  }
+ },
+ "FeroApplyConf:drop-update-config:r17#rule": "/\\ config' = [config EXCEPT ![i] = CommittedConf(i)]      \\* [u config]",
+ "FeroApplyConf:drop-update-state:r18": {
+  "m2": {
+   "skipped": true
+  },
+  "m2p": {
+   "skipped": true
+  },
+  "m3": {
+   "agef": "FAIL",
+   "complete": true,
+   "distinct": 2776,
+   "error": null,
+   "plan": "FAIL",
+   "plan_stuck": 728,
+   "secs": 6,
+   "stuck_live": 728,
+   "violated": null
+  },
+  "m3c": {
+   "skipped": true
+  }
+ },
+ "FeroApplyConf:drop-update-state:r18#rule": "/\\ state' = [state EXCEPT ![i] = IF state[i] = Leader /\\ i \\notin CommittedConf(i).jointConfig[1] THEN Follower ELSE state[i]]      \\* [u state]",
+ "FeroBecomeLeader:drop-guard:r01": {
+  "m2": {
+   "skipped": true
+  },
+  "m3": {
+   "agef": null,
+   "complete": false,
+   "distinct": 891,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 5,
+   "stuck_live": null,
+   "violated": "MoreUpToDateCorrectInv"
+  }
+ },
+ "FeroBecomeLeader:drop-guard:r01#rule": "/\\ votesGranted[i] \\cap GetConfig(i) \\in Quorum(GetConfig(i))      \\* [g]",
+ "FeroBecomeLeader:drop-update-log:r03": {
+  "m2": {
+   "skipped": true
+  },
+  "m3": {
+   "agef": "FAIL",
+   "complete": true,
+   "distinct": 5698,
+   "error": null,
+   "plan": "FAIL",
+   "plan_stuck": 416,
+   "secs": 11,
+   "stuck_live": 416,
+   "violated": null
+  }
+ },
+ "FeroBecomeLeader:drop-update-log:r03#rule": "/\\ log' = [log EXCEPT ![i] = Append(@, [term |-> currentTerm[i], type |-> ValueEntry, value |-> Noop])]      \\* [u log]",
+ "FeroBecomeLeader:drop-update-pendingConfChangeIndex:r02": {
+  "m2": {
+   "agef": null,
+   "complete": false,
+   "distinct": 48753,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 43,
+   "stuck_live": null,
+   "violated": "QuorumLogInvLive"
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 16,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "FeroBecomeLeader:drop-update-pendingConfChangeIndex:r02#rule": "/\\ pendingConfChangeIndex' = [pendingConfChangeIndex EXCEPT ![i] = Len(log[i])]      \\* [u pendingConfChangeIndex]",
+ "PromoteF:drop-guard:r12": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 121609,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 97,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 4,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12312,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 20,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 521873,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 385,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "PromoteF:drop-guard:r12#rule": "/\\ j \\in GetLearners(i)      \\* [g]",
+ "ProposeConf:drop-guard:r04": {
+  "m2": {
+   "skipped": true
+  },
+  "m3": {
+   "agef": null,
+   "complete": false,
+   "distinct": 7,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 3,
+   "stuck_live": null,
+   "violated": "ElectionSafetyInv"
+  }
+ },
+ "ProposeConf:drop-guard:r04#rule": "/\\ state[i] = Leader      \\* [g]",
+ "ProposeConf:drop-guard:r05": {
+  "m2": {
+   "agef": null,
+   "complete": false,
+   "distinct": 15779,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 20,
+   "stuck_live": null,
+   "violated": "QuorumLogInvLive"
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 16,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "ProposeConf:drop-guard:r05#rule": "/\\ pendingConfChangeIndex[i] <= commitIndex[i]      \\* [g]",
+ "ProposeConf:drop-guard:r06": {
+  "m2": {
+   "agef": null,
+   "complete": false,
+   "distinct": 4557,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 11,
+   "stuck_live": null,
+   "violated": "QuorumLogInvLive"
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 17,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "ProposeConf:drop-guard:r06#rule": "/\\ ConfApplied(i)      \\* [g]",
+ "ProposeConf:drop-guard:r07": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 124952,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 103,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 3,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 17,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 500230,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 372,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "ProposeConf:drop-guard:r07#rule": "/\\ newVoters # {}      \\* [g]",
+ "ProposeConf:drop-update-log:r08": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 60,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 4,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 40,
+   "error": null,
+   "plan": "FAIL",
+   "plan_stuck": 40,
+   "secs": 2,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 40,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 3,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "skipped": true
+  }
+ },
+ "ProposeConf:drop-update-log:r08#rule": "/\\ log' = [log EXCEPT ![i] = Append(@, [term |-> currentTerm[i], type |-> ConfigEntry, value |-> [newconf |-> newVoters, learners |-> newLearners]])]      \\* [u log]",
+ "ProposeConf:drop-update-pendingConfChangeIndex:r09": {
+  "m2": {
+   "agef": null,
+   "complete": false,
+   "distinct": 17365,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 20,
+   "stuck_live": null,
+   "violated": "QuorumLogInvLive"
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 17,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "ProposeConf:drop-update-pendingConfChangeIndex:r09#rule": "/\\ pendingConfChangeIndex' = [pendingConfChangeIndex EXCEPT ![i] = Len(log'[i])]      \\* [u pendingConfChangeIndex]",
+ "ProposeConf:flip-<=-to-<:r05": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 38444,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 35,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 4,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 16,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 432680,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 293,
+   "stuck_live": 0,
+   "violated": null
+  }
+ },
+ "ProposeConf:flip-<=-to-<:r05#rule": "/\\ pendingConfChangeIndex[i] <= commitIndex[i]      \\* [g]",
+ "RemoveF:drop-guard:r14": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 102930,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 99,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": null,
+   "complete": null,
+   "distinct": null,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": null,
+   "stuck_live": null,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 20,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": null,
+   "complete": null,
+   "distinct": null,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": null,
+   "stuck_live": null,
+   "violated": null
+  }
+ },
+ "RemoveF:drop-guard:r14#rule": "/\\ j \\in GetConfig(i) \\cup GetLearners(i)      \\* [g]",
+ "design": {
+  "m2": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 100736,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 108,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m2p": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 572,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 3,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 12098,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 24,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m3c": {
+   "agef": "PASS",
+   "complete": true,
+   "distinct": 500230,
+   "error": null,
+   "plan": "PASS",
+   "plan_stuck": 0,
+   "secs": 486,
+   "stuck_live": 0,
+   "violated": null
+  },
+  "m4c": {
+   "agef": null,
+   "complete": false,
+   "distinct": 691952,
+   "error": null,
+   "plan": null,
+   "plan_stuck": null,
+   "secs": 903,
+   "stuck_live": null,
+   "violated": null
+  }
+ }
+}

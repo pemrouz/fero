@@ -1,0 +1,37 @@
+# run three-1c1f: scenario three, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 1, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "all", "ReconfigurationLimit": 1}
+# spec LiveSpec (MCferolive.tla), CommunityModules-deps.jar, 1 segment(s), [559] s wall in all, TLC -workers 2
+# done: True
+
+## segment 1
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 4 and seed 4047110572960469867 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 1770] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 06:56:49)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 06:56:50.
+Checkpointing of run st/26-11-07-06-56-47.495
+Progress(9) at 2026-11-07 06:56:53: 535 states generated (535 s/min), 348 distinct states found (348 ds/min), 148 states left on queue.
+Progress(39) at 2026-11-07 06:57:53: 170,907 states generated (170,372 s/min), 66,573 distinct states found (66,225 ds/min), 5,048 states left on queue.
+... (6 progress lines)
+Progress(87) at 2026-11-07 07:04:53: 1,212,066 states generated (133,468 s/min), 486,230 distinct states found (56,658 ds/min), 4,789 states left on queue.
+Progress(102) at 2026-11-07 07:05:54: 1,349,026 states generated (136,960 s/min), 545,703 distinct states found (59,473 ds/min), 2,239 states left on queue.
+Checkpointing completed at (2026-11-07 07:00:53)
+Checkpointing of run st/26-11-07-06-56-47.495
+Checkpointing completed at (2026-11-07 07:04:53)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.5E-8
+  based on the actual fingerprints:  val = 7.4E-9
+1375824 states generated, 555676 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 126.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 2).
+Finished in 09min 18s at (2026-11-07 07:06:06)
+
+# agef2.py (AG EF goal over progress steps)
+states 555676  edges 774910 (raw lines 1375823, ends not found 0)  initial 1
+goal states 108120  can reach goal 508182
+judged states (highest term <= 2) 9024
+stuck states 616  of which with a live majority 0  (not judged, near the term bound: 46878)
+plan: judged fault-free states with a live majority 2464, plan-done states 108120, cannot finish the plan 0  -> PASS
+
+RESULT: PASS (no stuck state with a live majority)

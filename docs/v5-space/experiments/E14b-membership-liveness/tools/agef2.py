@@ -185,6 +185,13 @@ def check(paths, judge, ntrace=1, labels=()):
                                                            res['plan_stuck'], 'FAIL' if pstuck.any() else 'PASS'))
         res['plan_result'] = 'FAIL' if pstuck.any() else 'PASS'
     res['result'] = 'FAIL' if stuck_live.any() else 'PASS'
+    if missing:
+        # An edge whose end has no node line means the graph is broken (for
+        # example segments written under different fingerprint functions);
+        # a state may then look stuck only because its edges are lost.
+        res['result'] = 'INVALID'
+        res['plan_result'] = 'INVALID'
+        lines.append('\nINVALID: %d edge ends have no node line; the graph is incomplete' % missing)
     lines.append('\nRESULT: %s' % ('FAIL (stuck with a live majority)' if stuck_live.any()
                                    else 'PASS (no stuck state with a live majority)'))
     return res, '\n'.join(lines)

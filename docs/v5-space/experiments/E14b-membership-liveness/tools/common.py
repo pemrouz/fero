@@ -88,5 +88,8 @@ def summary(out):
                 queue=int(m[2].replace(',', '')) if m else None,
                 depth=int(d.group(1)) if d else None,
                 violated=viol.group(1) if viol else None,
-                complete='Model checking completed. No error has been found.' in out,
+                # TLC prints this line also when -Dtlc2.TLC.stopAfter stops it
+                # early, so a run is complete only with nothing left on the queue.
+                complete=('Model checking completed. No error has been found.' in out
+                          and m is not None and int(m[2].replace(',', '')) == 0),
                 error=err)

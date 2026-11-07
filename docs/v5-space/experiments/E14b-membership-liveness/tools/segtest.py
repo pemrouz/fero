@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """segtest.py: checks the segment machinery of live.py.
 
-One run (default three-1c-full) is checked twice: in one piece, and cut into
-segments of about 90 seconds (TLC checkpoints every minute, stops itself at
-90 s, and the next segment resumes from the last checkpoint). The two state
+One run (default two-1c1f-rbd) is checked twice: in one piece, and cut into
+segments of SEG seconds (default 90; TLC checkpoints every minute, stops
+itself at SEG s, and the next segment resumes from the last checkpoint). The two state
 graphs must be the same: the same node ids, the same edges, the same
 distinct-state count from TLC, and the same AG EF result.
 
-  python3 tools/segtest.py [RUN]
+  python3 tools/segtest.py [RUN] [SEG]
 Writes results/segtest.txt.
 """
 import gzip
 import glob
 import json
 import os
+import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -36,14 +37,21 @@ def graph(name):
 
 
 def main():
-    run = sys.argv[1] if len(sys.argv) > 1 else 'three-1c-full'
+    run = sys.argv[1] if len(sys.argv) > 1 else 'two-1c1f-rbd'
+    seg = int(sys.argv[2]) if len(sys.argv) > 2 else 90
     r = L.RUNS[run]
-    one = L.go('segtest-one', seg_secs=1500, max_seg=1, r=r, result_name='segtest-one')
-    cut = L.go('segtest-cut', seg_secs=90, max_seg=40, ckpt_min=1, r=r, result_name='segtest-cut')
+    raw = os.path.join(C.SP, 'e14b', 'segraw')
+    # both runs start fresh (a left-over unfinished run would be resumed)
+    for n in ('segtest-one', 'segtest-cut'):
+        shutil.rmtree(os.path.join(C.WORK, n), ignore_errors=True)
+    one = L.go('segtest-one', seg_secs=1500, max_seg=1, r=r, result_name='segtest-one', results_dir=raw,
+               record=False, redo=True, heap='4g')
+    cut = L.go('segtest-cut', seg_secs=seg, max_seg=40, ckpt_min=1, r=r, result_name='segtest-cut',
+               results_dir=raw, record=False, redo=True, heap='4g')
     n1, e1 = graph('segtest-one')
     n2, e2 = graph('segtest-cut')
     rows = {
-        'run': run,
+        'run': run, 'segment seconds': seg,
         'one piece': dict(segments=one['segments'], distinct=one['distinct'], nodes=len(n1), edges=len(e1),
                           agef=one.get('agef', {}).get('result'), stuck_live=one.get('agef', {}).get('stuck_live')),
         'segments': dict(segments=cut['segments'], distinct=cut['distinct'], nodes=len(n2), edges=len(e2),

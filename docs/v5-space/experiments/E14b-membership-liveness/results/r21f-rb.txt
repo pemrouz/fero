@@ -1,0 +1,43 @@
+# run r21f-rb: scenario four-voters, {"AllowDrop": false, "AllowStepDown": false, "BatchVote": true, "DeadView": false, "EagerNet": false, "EagerReady": true, "FaultLimit": 1, "InitR21": true, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "demote", "ReconfigurationLimit": 0}
+# spec LiveSpec (MCferolive.tla), CommunityModules-deps.jar, 1 segment(s), [1379] s wall in all, TLC -workers 2
+# done: True
+
+## segment 1
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 2692985824358682296 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 17663] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 09:29:18)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 09:29:19.
+Checkpointing of run st/26-11-07-09-29-16.735
+Progress(9) at 2026-11-07 09:29:22: 717 states generated (717 s/min), 350 distinct states found (350 ds/min), 141 states left on queue.
+Progress(38) at 2026-11-07 09:30:22: 143,484 states generated (142,767 s/min), 40,786 distinct states found (40,436 ds/min), 2,822 states left on queue.
+... (19 progress lines)
+Progress(103) at 2026-11-07 09:50:23: 3,826,958 states generated (258,434 s/min), 994,200 distinct states found (60,688 ds/min), 17,765 states left on queue.
+Progress(108) at 2026-11-07 09:51:23: 4,145,786 states generated (318,828 s/min), 1,077,499 distinct states found (83,299 ds/min), 15,598 states left on queue.
+Checkpointing completed at (2026-11-07 09:33:22)
+Checkpointing of run st/26-11-07-09-29-16.735
+Checkpointing completed at (2026-11-07 09:37:22)
+Checkpointing of run st/26-11-07-09-29-16.735
+Checkpointing completed at (2026-11-07 09:41:22)
+Checkpointing of run st/26-11-07-09-29-16.735
+Checkpointing completed at (2026-11-07 09:45:22)
+Checkpointing of run st/26-11-07-09-29-16.735
+Checkpointing completed at (2026-11-07 09:49:23)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.0E-7
+  based on the actual fingerprints:  val = 1.3E-7
+4438214 states generated, 1143532 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 120.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 9 and the 95th percentile is 4).
+Finished in 22min 58s at (2026-11-07 09:52:14)
+
+# agef2.py (AG EF goal over progress steps)
+states 1143532  edges 2476853 (raw lines 4438213, ends not found 0)  initial 1
+goal states 189756  can reach goal 875115
+judged states (highest term <= 2) 5
+stuck states 3  of which with a live majority 0  (not judged, near the term bound: 268414)
+plan: judged fault-free states with a live majority 1, plan-done states 189756, cannot finish the plan 0  -> PASS
+
+RESULT: PASS (no stuck state with a live majority)

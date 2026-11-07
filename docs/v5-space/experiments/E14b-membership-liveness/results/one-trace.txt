@@ -1,0 +1,49 @@
+Error: Invariant QuorumLogInvLive is violated.
+(v<t> = an entry of term t; C<t>:{...} = a configuration entry of term t with those voters)
+1 <Initial predicate>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 2, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1}, v2 >> | s2 :> << C1:{s1}, v2 >> | s3 :> << C1:{s1}, v2 >> )
+    applied config ( s1 [V{s1} L{s2, s3}], s2 [V{s1} L{s2, s3}], s3 [V{s1} L{s2, s3}] )
+2 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 2, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1}, v2, C2:{s1, s2} >> | s2 :> << C1:{s1}, v2 >> | s3 :> << C1:{s1}, v2 >> )
+7 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+9 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    applied config ( s1 [V{s1, s2} L{s3}], s2 [V{s1} L{s2, s3}], s3 [V{s1} L{s2, s3}] )
+11 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3} >> | s2 :> << C1:{s1}, v2 >> | s3 :> << C1:{s1}, v2 >> )
+15 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3} >> | s2 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3} >> | s3 :> << C1:{s1}, v2 >> )
+17 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 3, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+23 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 4, s2 3, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+27 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 4, s2 4, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+30 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s1, s3 s1)
+31 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s1, s3 s1)
+    applied config ( s1 [V{s1, s2} L{s3}], s2 [V{s1, s2, s3} L{}], s3 [V{s1} L{s2, s3}] )
+33 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 2) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s1)
+38 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 Nil)
+40 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+43 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Leader, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+    log ( s1 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3} >> | s2 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3}, v3 >> | s3 :> << C1:{s1}, v2 >> )
+55 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Leader, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 4, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+    log ( s1 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3} >> | s2 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3}, v3 >> | s3 :> << C1:{s1}, v2, C2:{s1, s2}, C2:{s1, s2, s3}, v3 >> )
+57 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Leader, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 4, s3 4) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+60 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Leader, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 5, s3 4) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+64 <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+    role (s1 Follower, s2 Leader, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 4, s2 5, s3 5) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)

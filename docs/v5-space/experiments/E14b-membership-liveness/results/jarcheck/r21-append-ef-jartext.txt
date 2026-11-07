@@ -1,0 +1,312 @@
+# r21-append-ef-jartext: MCferoraft.tla with r21-append-ef.cfg, the jar's .tla text, no Java overrides, 4 s wall (cap 900 s)
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 17 and seed 5639098329574384662 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 13666] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 07:33:36)
+Warning: The sets Perms(SymVoters)\cupPerms(InitLearners), and Perms(Joiners) have been defined to be a symmetry set but contain less than two elements.
+(Use the -nowarning option to disable this warning.)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 07:33:37.
+Error: TLC threw an unexpected exception.
+This was probably caused by an error in the spec or model.
+See the User Output or TLC Console for clues to what happened.
+The exception was a java.lang.RuntimeException
+: Attempted to apply function:
+<<>>
+to argument "msource", which is not in the domain of the function.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 0
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+/\ goalv = FALSE
+/\ votedFor = (s1 :> s1 @@ s2 :> s1 @@ s3 :> s1 @@ s4 :> s1)
+/\ pendingMessages = <<>>
+/\ dead = {s1}
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s2 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s3 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s4 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+/\ up = {s2, s3, s4}
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+State 2: <FeroNext line 492, col 13 to line 492, col 69 of module MCferoraft>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 0
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 3 @@ s4 :> 2)
+/\ goalv = FALSE
+/\ votedFor = (s1 :> s1 @@ s2 :> s1 @@ s3 :> s3 @@ s4 :> s1)
+/\ pendingMessages = <<>>
+/\ dead = {s1}
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s2 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s3 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s4 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+/\ up = {s2, s3, s4}
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+State 3: <FeroNext line 492, col 13 to line 492, col 69 of module MCferoraft>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 0
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 3 @@ s4 :> 2)
+/\ goalv = FALSE
+/\ votedFor = (s1 :> s1 @@ s2 :> s1 @@ s3 :> s3 @@ s4 :> s1)
+/\ pendingMessages = ( [ mdest |-> s2,
+    msource |-> s3,
+    mterm |-> 3,
+    mtype |-> "RequestVoteRequest",
+    mlastLogTerm |-> 2,
+    mlastLogIndex |-> 2 ] :>
+      1 )
+/\ dead = {s1}
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 2)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s2 :>
+      [ log |-> 3,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s3 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] @@
+  s4 :>
+      [ log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3, s4}, {}>>, learners |-> {}],
+        currentTerm |-> 2,
+        votedFor |-> s1 ] )
+/\ state = (s1 :> "Follower" @@ s2 :> "Follower" @@ s3 :> "Candidate" @@ s4 :> "Follower")
+/\ up = {s2, s3, s4}
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3, s4}, learners |-> {s2}],
+           type |-> "ConfigEntry",
+           term |-> 2 ] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s4 :>
+      << [ value |-> [newconf |-> {s1, s2, s3, s4}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+Error: The error occurred when TLC was evaluating the nested
+expressions at the following positions:
+0. Line 492, column 13 to line 492, column 69 in MCferoraft
+1. Line 492, column 13 to line 492, column 41 in MCferoraft
+2. Line 492, column 13 to line 492, column 21 in MCferoraft
+3. Line 445, column 5 to line 447, column 59 in MCferoraft
+4. Line 445, column 8 to line 445, column 15 in MCferoraft
+5. Line 433, column 13 to line 434, column 68 in MCferoraft
+6. Line 433, column 16 to line 433, column 59 in MCferoraft
+7. Line 433, column 16 to line 433, column 25 in MCferoraft
+8. Line 419, column 5 to line 427, column 40 in MCferoraft
+9. Line 427, column 8 to line 427, column 40 in MCferoraft
+10. Line 427, column 8 to line 427, column 16 in MCferoraft
+11. Line 399, column 5 to line 416, column 81 in MCferoraft
+12. Line 408, column 8 to line 408, column 29 in MCferoraft
+13. Line 408, column 22 to line 408, column 29 in MCferoraft
+14. Line 478, column 5 to line 480, column 88 in etcdraft
+15. Line 478, column 8 to line 478, column 22 in etcdraft
+16. Line 230, column 5 to line 236, column 6 in etcdraft
+17. Line 479, column 8 to line 479, column 29 in etcdraft
+18. Line 185, column 5 to line 187, column 53 in etcdraft
+19. Line 186, column 8 to line 187, column 53 in etcdraft
+20. Line 186, column 11 to line 186, column 39 in etcdraft
+21. Line 186, column 23 to line 186, column 39 in etcdraft
+22. Line 186, column 23 to line 186, column 26 in etcdraft
+23. Line 185, column 17 to line 185, column 34 in etcdraft
+24. Line 177, column 5 to line 177, column 93 in etcdraft
+25. Line 121, column 4 to line 121, column 77 in BagsExt
+26. Line 103, column 5 to line 109, column 32 in BagsExt
+27. Line 107, column 9 to line 109, column 32 in BagsExt
+28. Line 34, column 3 to line 38, column 13 in Folds
+29. Line 38, column 7 to line 38, column 13 in Folds
+30. Line 35, column 9 to line 37, column 40 in Folds
+31. Line 36, column 14 to line 37, column 40 in Folds
+32. Line 37, column 18 to line 37, column 40 in Folds
+33. Line 177, column 26 to line 177, column 65 in etcdraft
+34. Line 177, column 29 to line 177, column 41 in etcdraft
+35. Line 177, column 29 to line 177, column 37 in etcdraft
+
+
+22 states generated, 14 distinct states found, 9 states left on queue.
+The depth of the complete state graph search is 4.
+Finished in 03s at (2026-11-07 07:33:38)
+Trace exploration spec path: ./MCferoraft_TTrace_1794036814.tla
