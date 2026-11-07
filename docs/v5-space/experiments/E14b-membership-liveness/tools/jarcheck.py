@@ -16,6 +16,7 @@ Writes results/jarcheck.md (the table) and results/jarcheck/<run>-<set>.txt.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -48,14 +49,38 @@ def mutant_src(name):
     return '\n'.join(ls)
 
 
-def one(name, stubs):
+# The module sets: 'jar' (CommunityModules-deps.jar on the classpath: its
+# .tla files and its Java overrides), 'stubs' (E-14's stand-ins), 'jartext'
+# (the jar's own .tla files copied in, the jar left off the classpath, so
+# TLC evaluates the jar's TLA+ definitions with no Java override), and
+# 'jartext-bagstub' (as jartext, but BagsExt is E-14's stand-in).
+SETS = ('jar', 'stubs', 'jartext', 'jartext-bagstub')
+
+
+def jar_text_dir():
+    d = os.path.join(C.SP, 'e14b', 'cmtext')
+    if not os.path.isdir(d):
+        os.makedirs(d)
+        subprocess.run(['unzip', '-q', '-o', C.CMJAR, '*.tla', '-d', d], check=True)
+    return d
+
+
+def one(name, mset):
     spec, cfg, extra, mutant, workers, cap = RUNS[name]
     if C.time_left() < 90:
         return None
     cap = int(min(cap, C.time_left() - 40))
-    tag = '%s-%s' % (name, 'stubs' if stubs else 'jar')
+    stubs = mset != 'jar'
+    tag = '%s-%s' % (name, mset)
     wd = C.fresh_dir('jar-' + tag)
-    C.stage(wd, stubs, [os.path.join(C.RAFT_TLA, f) for f in extra])
+    C.stage(wd, mset == 'stubs', [os.path.join(C.RAFT_TLA, f) for f in extra])
+    if mset.startswith('jartext'):
+        td = jar_text_dir()
+        for f in os.listdir(td):
+            if f.endswith('.tla') and not (mset == 'jartext-bagstub' and f == 'BagsExt.tla'):
+                shutil.copy(os.path.join(td, f), wd)
+        if mset == 'jartext-bagstub':
+            shutil.copy(os.path.join(C.E14_TLA, 'BagsExt.tla'), wd)
     if mutant:
         open(os.path.join(wd, 'MCferoraft.tla'), 'w').write(mutant_src(mutant))
     cfgname = os.path.basename(cfg)
@@ -75,7 +100,10 @@ def one(name, stubs):
     os.makedirs(os.path.join(C.RESULTS, 'jarcheck'), exist_ok=True)
     with open(os.path.join(C.RESULTS, 'jarcheck', tag + '.txt'), 'w') as f:
         f.write('# %s: %s with %s, %s, %.0f s wall (cap %d s)\n' % (
-            tag, spec, cfgname, 'E-14 stand-ins' if stubs else 'CommunityModules-deps.jar', secs, cap))
+            tag, spec, cfgname, {'jar': 'CommunityModules-deps.jar', 'stubs': 'E-14 stand-ins',
+                                 'jartext': "the jar's .tla text, no Java overrides",
+                                 'jartext-bagstub': "the jar's .tla text, no Java overrides, E-14's BagsExt"}[mset],
+            secs, cap))
         lines = C.trim(out).splitlines()
         # keep the head, the progress lines and the tail; a trace is cut to 60 lines
         if len(lines) > 400:
@@ -91,12 +119,14 @@ def main():
     path = os.path.join(C.RESULTS, 'jarcheck.json')
     if os.path.exists(path):
         res = json.load(open(path))
+    sets = [x.split('=')[1].split(',') for x in sys.argv[1:] if x.startswith('--sets=')]
+    sets = sets[0] if sets else ['jar', 'stubs']
     for n in names:
-        for stubs in (False, True):
-            key = '%s/%s' % (n, 'stubs' if stubs else 'jar')
+        for mset in sets:
+            key = '%s/%s' % (n, mset)
             if key in res and '--redo' not in sys.argv:
                 continue
-            s = one(n, stubs)
+            s = one(n, mset)
             if s is None:
                 print('%s: no time left in this hold' % key, flush=True)
                 continue
@@ -104,11 +134,11 @@ def main():
             json.dump(res, open(path, 'w'), indent=1, sort_keys=True)
     rows = ['| run | module set | distinct states | depth | queue left | verdict | wall s |', '|---|---|---|---|---|---|---|']
     for n in RUNS:
-        for st in ('jar', 'stubs'):
+        for st in SETS:
             s = res.get('%s/%s' % (n, st))
             if not s:
                 continue
-            v = ('violates ' + s['violated']) if s['violated'] else ('complete, no violation' if s['complete'] else (s['error'] or 'stopped at cap'))
+            v = ('violates ' + s['violated']) if s['violated'] else ('complete, no violation' if s['complete'] else (('TLC error: ' + s['error'].replace('|', '/')) if s['error'] else 'stopped at cap'))
             rows.append('| %s | %s | %s | %s | %s | %s | %s |' % (n, st, s['distinct'], s['depth'], s['queue'], v, s['secs']))
     open(os.path.join(C.RESULTS, 'jarcheck.md'), 'w').write('\n'.join(rows) + '\n')
 

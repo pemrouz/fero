@@ -1,4 +1,4 @@
-# run r21: scenario four-voters, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 0, "InitR21": true, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "demote", "ReconfigurationLimit": 0}
+# run r21-rb (run as "r21" before R3 DeadView and R4 EagerNet were added to MCferolive.tla; the model then had R1 and R2 only): scenario four-voters, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 0, "InitR21": true, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "demote", "ReconfigurationLimit": 0}
 # spec LiveSpec (MCferolive.tla), CommunityModules-deps.jar, 1 segment(s), [160] s wall in all, TLC -workers 2
 # done: True
 

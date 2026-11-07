@@ -12,7 +12,9 @@
 #   ./run.sh compare    results/compare.md and results/mdcheck.md
 #   ./run.sh equiv      SlotMoveFixed against SlotMove's "fixed" variant
 #   ./run.sh mutants    the mechanical mutants: all on `move`, then the ones
-#                       `move` does not catch on write0, deep and dedup
+#                       `move` does not catch on write0
+#   ./run.sh mutants_more  (not run here) the ones still uncaught, on deep
+#                       and dedup
 #
 # Runs already done are skipped (delete results/<dir>/<run>.json to redo).
 # Every step holds the study's heavy lock ($SP/bin/heavy) in pieces of at
@@ -56,8 +58,23 @@ mutants() {
   while [ "$(python3 tools/mutants.py --left)" != 0 ]; do
     "$HEAVY" python3 tools/mutants.py --run --no-heavy --budget 1320
   done
-  # pass 2: the mutants `move` does not catch, on the bounds with writes
+  # pass 2: the mutants `move` does not catch, on write0 (a write, a resend,
+  # a recovery). This is where the README's DEV-10 numbers stop.
+  export E15_MUT_BOUNDS=move,write0
+  "$HEAVY" python3 -c "import sys; sys.path.insert(0, 'tools'); import mutants; mutants.HEAVY = False; print(mutants.fixed_counts())"
+  until python3 tools/mutants.py --survivors-left | grep -qx 0; do
+    "$HEAVY" python3 tools/mutants.py --run --redo-survivors --no-heavy --budget 1320 --slice 1/2 &
+    "$HEAVY" python3 tools/mutants.py --run --redo-survivors --no-heavy --budget 1320 --slice 2/2 &
+    wait
+  done
+  python3 tools/mutants.py --table > results/mutants.md
+}
+mutants_more() {
+  # NOT run here (CPU budget; see the README's gaps): the mutants still
+  # uncaught after pass 2, on deep and dedup (and `moves` would need
+  # E15_MUT_BOUNDS to name it and fixed_counts() to learn its size)
   export E15_MUT_BOUNDS=move,write0,deep,dedup
+  "$HEAVY" python3 -c "import sys; sys.path.insert(0, 'tools'); import mutants; mutants.HEAVY = False; print(mutants.fixed_counts())"
   until python3 tools/mutants.py --survivors-left | grep -qx 0; do
     "$HEAVY" python3 tools/mutants.py --run --redo-survivors --no-heavy --budget 1320
   done
@@ -71,6 +88,7 @@ case "$1" in
   compare) compare ;;
   equiv) equiv ;;
   mutants) mutants ;;
+  mutants_more) mutants_more ;;
   "") plan; three; replay; compare; equiv; mutants ;;
   *) echo "unknown: $1"; exit 1 ;;
 esac

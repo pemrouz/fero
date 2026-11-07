@@ -3,3 +3,10 @@ Python 3.13.17
 4
 Mem:              15           0          13           0           1          14
 Fri Nov  6 19:34:08 UTC 2026
+
+# resumed after a container restart (rekey-carry+giveup, rekey-rev, rekey-carry-rev):
+Linux 6.18.44-fc-v300 x86_64
+Python 3.13.17
+4
+Mem:              15           4          11           0           0          11
+Sat Nov  7 05:11:34 UTC 2026

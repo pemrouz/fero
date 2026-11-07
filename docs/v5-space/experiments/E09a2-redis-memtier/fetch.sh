@@ -23,3 +23,10 @@ apt-get install -y --no-install-recommends redis-server=5:7.0.15-1ubuntu0.24.04.
 mkdir -p "$SP/dl/e09a2-cited"
 curl -sSfL -o "$SP/dl/e09a2-cited/redis-benchmark.c" https://raw.githubusercontent.com/redis/redis/7.0.15/src/redis-benchmark.c
 echo "6e0172a2b4f0da7c1719d6db1dc0c54727015923b7df009cce7b7acb0a3f1d80  $SP/dl/e09a2-cited/redis-benchmark.c" | sha256sum -c -
+# 4. server.c and aof.c of Redis 7.0.15, read to cite that with appendfsync always a reply (a GET's too) leaves
+#    only after the AOF write and fdatasync of its event-loop pass (beforeSleep: flushAppendOnlyFile, then
+#    handleClientsWithPendingWritesUsingThreads; cited, not run)
+curl -sSfL -o "$SP/dl/e09a2-cited/server.c" https://raw.githubusercontent.com/redis/redis/7.0.15/src/server.c
+curl -sSfL -o "$SP/dl/e09a2-cited/aof.c" https://raw.githubusercontent.com/redis/redis/7.0.15/src/aof.c
+echo "f5c00904d47ed964c1f21d5755aa891cc2ccf777ee5225957d01e8e2c147bb0d  $SP/dl/e09a2-cited/server.c" | sha256sum -c -
+echo "ece2cf8aacfab72a4d4c686aaa5dad7299b1b874bbeb4c4b210ee56e10563b9f  $SP/dl/e09a2-cited/aof.c" | sha256sum -c -

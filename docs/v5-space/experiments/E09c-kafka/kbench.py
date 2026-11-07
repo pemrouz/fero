@@ -126,7 +126,9 @@ def start_kafka(setup):
             'share.coordinator.state.topic.min.isr=2',
             # bench hygiene: no 3 s wait before a consumer group's first join; deleted topics free disk at once
             'group.initial.rebalance.delay.ms=0', 'log.segment.delete.delay.ms=1000',
-        ]) + '\n')
+        ] + [x for x in os.environ.get('KBENCH_BROKER_EXTRA', '').split(';') if x]) + '\n')
+        # KBENCH_BROKER_EXTRA (unset in every timed table run): extra broker settings, ';'-separated; only
+        # tools/sharediag.py sets it, for its heartbeat test
         r = subprocess.run([K + '/bin/kafka-storage.sh', 'format', '-t', cid, '-c', conf],
                            capture_output=True, text=True, env=TOOL_ENV)
         if r.returncode != 0:

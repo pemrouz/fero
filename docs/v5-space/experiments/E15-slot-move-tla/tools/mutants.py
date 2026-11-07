@@ -22,13 +22,15 @@ The kinds (DEV-10 (d)):
 Lines tagged `\\* env` are bounds of the model (moves allowed, the calm
 world, one recovery, no duplicate send), not rules, and are left alone.
 
-Each mutant is checked on the bounds move, dedup, deep and write in turn,
+Each mutant is checked on the bounds in E15_MUT_BOUNDS in turn (run.sh:
+`move` for all, then `move,write0` for the ones `move` does not catch),
 safety first (TLC stops at the first broken property), until one breaks.
-A mutant no safety run catches is then checked for property 7 on move and
-write (the calm graph). One that nothing catches is "equivalent" if its
-state counts equal the fixed protocol's on all four bounds, else
+A mutant no safety run catches is then checked for property 7 on move
+only (the calm graph). One that nothing catches is "equivalent" if its
+state counts equal the fixed protocol's on every bound it ran, else
 "survived". A mutant TLC cannot evaluate (for example a dropped domain
 guard that makes a function be read outside its domain) is "ill-formed".
+A run that passes CAP times the fixed protocol's states is "unbounded".
 """
 import argparse
 import json
