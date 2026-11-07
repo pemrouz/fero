@@ -1,0 +1,27 @@
+# Broker log excerpt (all 3 brokers, sorted by time) from the sharediag-hb run (share heartbeat 1,000 ms), 2026-11-07 05:24.
+# Lines: share-group joins and target assignments for the groups of share runs 1 and 2, and the auto-creation of __share_group_state.
+# Source: $SP/e09/kafka/logs/b{0,1,2}.out (overwritten by the next Kafka run). Long lines cut at 240 characters.
+[2026-11-07 05:24:37,351] WARN Auto topic creation failed for __consumer_offsets with error 'TOPIC_ALREADY_EXISTS': Topic '__consumer_offsets' already exists.. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:37,351] WARN Auto topic creation failed for __consumer_offsets with error 'TOPIC_ALREADY_EXISTS': Topic '__consumer_offsets' already exists.. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:37,842] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Member 0FH2UI2ST5ys8mZR_XBJFw joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Grou
+[2026-11-07 05:24:37,908] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Computed a new target assignment for epoch 2 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@7d1dc865
+[2026-11-07 05:24:37,958] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Member WbpwbQFPR8WINFOZ09f9Ag joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Grou
+[2026-11-07 05:24:37,960] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Member NYRknw1TTBSMNiKdDqJpdQ joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Grou
+[2026-11-07 05:24:37,960] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Member kNIaFJL0TPmzfO1LSixR2Q joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Grou
+[2026-11-07 05:24:37,993] INFO Sent auto-creation request for [__share_group_state] to the active controller. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:37,994] INFO Sent auto-creation request for [__share_group_state] to the active controller. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:37,997] INFO Sent auto-creation request for [__share_group_state] to the active controller. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:38,040] WARN Auto topic creation failed for __share_group_state with error 'TOPIC_ALREADY_EXISTS': Topic '__share_group_state' already exists.. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:38,040] WARN Auto topic creation failed for __share_group_state with error 'TOPIC_ALREADY_EXISTS': Topic '__share_group_state' already exists.. (org.apache.kafka.server.DefaultAutoTopicCreationManager)
+[2026-11-07 05:24:38,992] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Computed a new target assignment for epoch 5 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@7d1dc865
+[2026-11-07 05:24:40,992] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Computed a new target assignment for epoch 6 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@7d1dc865
+[2026-11-07 05:24:46,020] INFO [GroupCoordinator id=3 topic=__consumer_offsets partition=1] [GroupId sgdiag-1-1794029074] Computed a new target assignment for epoch 8 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@7d1dc865
+[2026-11-07 05:24:50,179] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Member Mf8jRFu9TJGF0wTWtXgZ5A joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Gro
+[2026-11-07 05:24:50,217] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Computed a new target assignment for epoch 2 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@4de5a84
+[2026-11-07 05:24:50,239] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Member U5X9X1DrT5SH7KGAPbwaZA joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Gro
+[2026-11-07 05:24:50,241] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Member tBNscgNESkCWTM2c0fzYMw joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Gro
+[2026-11-07 05:24:50,242] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Member wWfiml8tREWWgsr7UnnTHQ joins the share group using the share protocol. (org.apache.kafka.coordinator.group.Gro
+[2026-11-07 05:24:51,263] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Computed a new target assignment for epoch 5 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@4de5a84
+[2026-11-07 05:24:55,284] INFO [GroupCoordinator id=1 topic=__consumer_offsets partition=48] [GroupId sgdiag-2-1794029087] Computed a new target assignment for epoch 6 with 'org.apache.kafka.coordinator.group.assignor.SimpleAssignor@4de5a84
+# partitions of __share_group_state seen on broker 1:
+50
