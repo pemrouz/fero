@@ -153,3 +153,7 @@
 {"exp":"E-06","part":"undo-check","rows":100000,"states_checked":5,"key_order_kept":5,"of":5,"remove_undo_keeps_key_order":false}
 {"exp":"E-06","part":"rewind","rows":100000,"method":"undo","K":0,"view":true,"tape_inputs":300,"samples":20,"rerun_ms_median":10.361,"rerun_ms_p90":14.118,"rerun_ms_max":15.77,"replayed_inputs_median":0,"snapshots":0,"take_ms_median":0,"kept_heap_mb":0,"keep_us_per_record":0}
 {"run":3,"loadavg":"2.07 2.18 2.50 1/147 7065","cmd":"/home/user/fero/docs/v5-space/experiments/E06-fork-rewind/bench/rewind.mjs 1000000 snap 100 0","samples":"20"}
+{"exp":"E-06","part":"rewind","rows":1000000,"method":"snap","K":100,"view":false,"tape_inputs":1000,"samples":20,"rerun_ms_median":1126.041,"rerun_ms_p90":1287.9,"rerun_ms_max":1292.041,"replayed_inputs_median":48,"snapshots":10,"take_ms_median":524.365,"kept_heap_mb":480.2,"keep_us_per_record":0}
+{"run":3,"loadavg":"2.54 2.26 2.50 2/210 7639","cmd":"/home/user/fero/docs/v5-space/experiments/E06-fork-rewind/bench/rewind.mjs 1000000 imm 100 0","samples":"20"}
+{"exp":"E-06","part":"rewind","rows":1000000,"method":"imm","K":100,"view":false,"tape_inputs":20000,"samples":20,"rerun_ms_median":660.988,"rerun_ms_p90":837.106,"rerun_ms_max":855.333,"replayed_inputs_median":48,"snapshots":200,"take_ms_median":0.002,"kept_heap_mb":-11.3,"keep_us_per_record":5.133}
+{"run":3,"loadavg":"2.41 2.30 2.50 1/148 8120","cmd":"/home/user/fero/docs/v5-space/experiments/E06-fork-rewind/bench/rewind.mjs 1000000 snap 1000 0","samples":"20"}
