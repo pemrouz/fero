@@ -23,11 +23,12 @@ Checks:
   F8  "copy only what moves" (SC-08(f), "data moved ... <= its share"): no
       reachable state has rows of a partition the layouts never move in any
       group but the one that held it at the start.
-  R   a log that does NOT ignore an exact repeat. The harness ignores an
-      append of an entry already in the log (HARNESS.md), so a guard that only
-      stops an exact repeat is never counted. A real log appends it. With
-      repeats appended (up to the same 10-entry cap), which smallest sets
-      still hold, and which dropped rules come back?
+  R   a step taken twice. The harness ignores an append of an entry
+      already in the log (HARNESS.md), so a guard that only stops an exact
+      repeat is never counted. A real log appends it: a handler run twice (an
+      at-least-once delivery, a retry) writes its entry twice unless a guard
+      stops it. Here an entry may be appended once more (at most two copies).
+      Which smallest sets still hold, and which dropped rule comes back?
   B   bigger bounds: part 2's readback, readback1 and bothread (extra.py),
       and two with a THIRD group, which no shared bound has: chain3 (p moves
       G0 -> G1 -> G2 with the reader on) and fork3 (p and q leave G0 for G1
@@ -238,21 +239,27 @@ def run_others():
 
 # ------------------------------------------------------------------ R: repeats appended
 def repeat_append(self, g, entry):
-    """world.Draft.append without "a log never holds the same entry twice"."""
+    """world.Draft.append, but an entry already in the log may be appended
+    ONCE more (at most two copies): a step taken twice, as an at-least-once
+    delivery or a retried handler does in a real log. (Unlimited repeats fill
+    every log to the cap and the state space past any limit.)"""
     if self.groups is None:
         self.groups = list(self.st[0])
     com, tail, lost, cr = self.groups[g]
+    if (com + tail).count(entry) >= 2:
+        return
     if len(com) + len(tail) >= self.w.cap:
         self.capped = True
         return
     self.groups[g] = (com, tail + (entry,), lost, cr)
 
 
-def check(opt, drop, bounds, stop_first=True):
+def check(opt, drop, bounds, stop_first=True, limit=None):
     cls, _ = runner.load(opt)
     out = {}
     for b in bounds:
-        r = explore(World(cls, bound(b), Mutation(drop=drop), cap=runner.CAP), stop_first=stop_first, limit=A.limit)
+        r = explore(World(cls, bound(b), Mutation(drop=drop), cap=runner.CAP), stop_first=stop_first,
+                    limit=limit or A.limit)
         out[b] = r
         if (r.fail or not r.complete) and stop_first:
             break
@@ -269,44 +276,70 @@ def first_bad(rs):
     return None
 
 
-def repair(opt, drop, bounds):
-    """Which dropped rules, put back, make every bound hold: one at a time
-    first; then greedily (the rule whose return moves the first failure
-    furthest), at most 4 rules."""
-    singles = []
-    for rule in drop:
-        trial = [x for x in drop if x != rule]
-        if first_bad(check(opt, trial, bounds)) is None:
-            singles.append(rule)
-    if singles:
-        return f'put back any one of {singles}'
+RLIMIT = 300_000     # states per run in the repeat check and its repairs
+
+
+def repair(opt, drop, bounds, limit=None):
+    """Which dropped rules must come back so every bound holds. First, one
+    at a time: idempotence guards (role 'idem') first, the others only if no
+    idem guard alone repairs it. If no single rule does, greedily: put back
+    the rule that pushes the first failure furthest (a later bound, or more
+    steps), idem guards first on a tie, until every bound holds (at most 6);
+    then drop again any rule put back that is no longer needed, so the set
+    returned is 1-minimal among those put back. A run stopped at the state
+    limit counts as not repaired (undecided)."""
+    roles = {r.id: r.role for r in runner.rule_list(opt)}
+    idem = [r for r in drop if roles.get(r) == 'idem']
+    rest = [r for r in drop if roles.get(r) != 'idem']
+    for group in (idem, rest):
+        singles = []
+        for rule in group:
+            trial = [x for x in drop if x != rule]
+            if first_bad(check(opt, trial, bounds, limit=limit)) is None:
+                singles.append(rule)
+        if singles:
+            return f'repair: put back any one of {singles}'
+    order = list(bounds)
+
+    def score(fb):
+        if fb is None:
+            return (len(order) + 1, 0)
+        return (order.index(fb[0]), 0 if fb[1] == 'LIMIT' else fb[2])
+
     back = []
     cur = list(drop)
-    order = list(bounds)
-    for _ in range(4):
+    while len(back) < 6:
         best = None
-        for rule in cur:
+        for rule in idem + rest:
+            if rule not in cur:
+                continue
             trial = [x for x in cur if x != rule]
-            fb = first_bad(check(opt, trial, bounds))
-            if fb is None:
-                back.append(rule)
-                return f'put back {back} (greedy; each needed in that order)'
-            key = (order.index(fb[0]), fb[2] if fb[1] != 'LIMIT' else 10 ** 9)
+            sc = score(first_bad(check(opt, trial, bounds, limit=limit)))
+            key = (sc, 1 if roles.get(rule) == 'idem' else 0)
             if best is None or key > best[0]:
                 best = (key, rule)
+            if sc[0] == len(order) + 1 and roles.get(rule) == 'idem':
+                break
         if best is None:
             break
         back.append(best[1])
         cur = [x for x in cur if x != best[1]]
-    return f'no repair of up to 4 rules found (tried {back})'
+        if best[0][0][0] == len(order) + 1:
+            for rule in list(back):           # minimise: is each one still needed?
+                trial = cur + [rule]
+                if first_bad(check(opt, trial, bounds, limit=limit)) is None:
+                    back.remove(rule)
+                    cur = trial
+            return f'repair: put back all of {back} (greedy, then each checked still needed)'
+    return f'repair: no set of up to 6 rules found (tried {back})'
 
 
 def run_repeat():
-    print('## R: a log that appends an exact repeat\n')
+    print('## R: a log that may append an exact repeat once\n')
     print('Each smallest set on the shared sweep and twice1, then readback, with world.Draft.append changed so an '
-          'entry already in the log is appended again (up to the same 10-entry cap). A cap hit still counts as '
-          'able to reach a liveness goal, as in the harness, so the liveness results here are weaker than the '
-          'safety ones.\n')
+          'entry already in the log may be appended once more (a step taken twice: at most two copies of an '
+          'entry, within the same 10-entry cap). A cap hit still counts as able to reach a liveness goal, as in '
+          'the harness. Runs stop at 300,000 states (LIMIT: undecided).\n')
     orig = world.Draft.append
     world.Draft.append = repeat_append
     try:
@@ -322,16 +355,19 @@ def run_repeat():
             if name.endswith('+abort') or name.endswith('+giveup'):
                 bounds = list(SWEEP) + ['readback']
             t0 = time.time()
-            rs = check(opt, drop, bounds)
+            rs = check(opt, drop, bounds, limit=RLIMIT)
             fb = first_bad(rs)
             sizes = ', '.join(f'{b} {r.states:,}' for b, r in rs.items())
             if fb is None:
-                print(f'{name}: holds every bound with repeats appended ({sizes}; {time.time() - t0:.0f}s)')
+                print(f'{name}: holds every bound with a step taken twice ({sizes}; {time.time() - t0:.0f}s)')
+            elif fb[1] == 'LIMIT':
+                print(f'{name}: undecided: {fb[0]} passed {RLIMIT:,} states with no counterexample ({sizes})')
+                print('    ' + repair(opt, drop, bounds, limit=RLIMIT))
             else:
                 b, p, d, tr = fb
-                print(f'{name}: FAILS {p} on {b} in {d} steps with repeats appended ({sizes}):')
+                print(f'{name}: FAILS {p} on {b} in {d} steps with a step taken twice ({sizes}):')
                 print(show(tr))
-                print('    ' + repair(opt, drop, bounds))
+                print('    ' + repair(opt, drop, bounds, limit=RLIMIT))
             sys.stdout.flush()
     finally:
         world.Draft.append = orig

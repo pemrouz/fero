@@ -10,7 +10,7 @@ in the run folder holds any of the cluster's #meta, and none is still locked
 by a live process (the dirs were wiped), the file is stale. The process
 renames it aside, says so, and founds a new cluster with a new id."
 
-THE WORLD (not counted). Three processes of one project's run on one box
+THE WORLD (not counted). Four processes of one project's run on one box
 (they always reach each other while up). The run folder holds the
 `cluster-id` file (an id, or none) and one dir per process. A dir holds an
 id (or nothing) and whether it holds a #meta replica; it is locked while
@@ -27,10 +27,11 @@ PROPERTIES
   G1  one cluster per project: never two ids that each have a committed
       client write and a dir still holding them.
   G2  AG EF: from every state where every process is up and every dir is
-      readable, calm steps reach a state where some process can commit a
+      readable, calm steps reach a state where every process can commit a
       write (its dir holds the file's id, and a majority of that id's #meta
-      replicas is up). A joining process becomes a #meta replica (healing
-      grows one-box #meta from one voter to three as members arrive).
+      replicas is up). A joining process becomes a #meta replica while #meta
+      has fewer than three (healing grows one-box #meta from one voter to
+      three as members arrive); a fourth member holds no #meta replica.
 """
 
 import os
@@ -40,7 +41,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
                                 'E16-controller-loop', 'engine'))
 from engine import Action, Guard, Cmp, Update   # noqa: E402
 
-P = 3
+P = 4
+META = 3           # #meta has at most three voters; a fourth member holds no #meta replica
 FIELDS = ('proc', 'file', 'minted', 'unread', 'wrote', 'faults')
 IX = {f: i for i, f in enumerate(FIELDS)}
 E = frozenset()
@@ -130,7 +132,9 @@ class OneBox:
         return []
 
     def goals(self, st):
-        return {'G2': any(self.can_write(st, p) for p in range(P))}
+        # every process of the run is up, in the file's cluster, and that
+        # cluster can commit
+        return {'G2': all(self.can_write(st, p) for p in range(P))}
 
 
     def judged(self, st):
@@ -167,7 +171,8 @@ class OneBox:
         def join(w, st, b, d):
             # it joins, and healing makes it a #meta replica (one-box #meta
             # starts with one voter and grows to three as members arrive)
-            set_dir(st, d, b['p'], (st[IX['file']], True))
+            c = st[IX['file']]
+            set_dir(st, d, b['p'], (c, len(w.meta_of(st, c)) < META))
 
         def wr(w, st, b, d):
             d.f['wrote'] = st[IX['wrote']] | {w.did(st, b['p'])}
@@ -209,6 +214,10 @@ class OneBox:
 
 
 OPTIONS = {'draft': OneBox}
+# Pinned: a process joins only through a member of the cluster (the member's
+# leader adds it: Raft's membership change). That is how joining works, not a
+# rule of the design; without it a process "joins" a cluster no one serves.
+PINNED = {'draft': ('join.member',)}
 
 BOUNDS = {
     'one1': dict(faults=1),

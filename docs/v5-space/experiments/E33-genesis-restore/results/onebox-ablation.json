@@ -1,0 +1,634 @@
+{
+ "bounds": [
+  "one1",
+  "one2",
+  "one3"
+ ],
+ "verify": [],
+ "pinned": [
+  "join.member"
+ ],
+ "base": {
+  "one1": {
+   "states": 784,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    784,
+    3544,
+    2216810981431076750
+   ],
+   "judged": {
+    "G2": [
+     74,
+     0
+    ]
+   }
+  },
+  "one2": {
+   "states": 2584,
+   "secs": 0.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2584,
+    13352,
+    8566963935582992659
+   ],
+   "judged": {
+    "G2": [
+     209,
+     0
+    ]
+   }
+  },
+  "one3": {
+   "states": 6592,
+   "secs": 0.43,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    6592,
+    37792,
+    4611774491111339537
+   ],
+   "judged": {
+    "G2": [
+     344,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "create.nodir",
+   "dropped"
+  ],
+  [
+   "join.nodir",
+   "dropped"
+  ],
+  [
+   "stale.file",
+   "dropped"
+  ],
+  [
+   "stale.nodir",
+   "dropped"
+  ],
+  [
+   "stale.nomember",
+   "dropped"
+  ],
+  [
+   "stale.unlocked",
+   "dropped"
+  ],
+  [
+   "create.create",
+   "dropped in the final pass"
+  ],
+  [
+   "create.nofile",
+   "dropped in the final pass"
+  ]
+ ],
+ "removed": [
+  "create.nodir",
+  "join.nodir",
+  "stale.file",
+  "stale.nodir",
+  "stale.nomember",
+  "stale.unlocked",
+  "create.create",
+  "create.nofile"
+ ],
+ "put_back": [],
+ "minimal": {
+  "one1": {
+   "states": 1288,
+   "secs": 0.07,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1288,
+    7924,
+    6175727946479973037
+   ],
+   "judged": {
+    "G2": [
+     146,
+     0
+    ]
+   }
+  },
+  "one2": {
+   "states": 4804,
+   "secs": 0.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4804,
+    32924,
+    13925334583586430238
+   ],
+   "judged": {
+    "G2": [
+     413,
+     0
+    ]
+   }
+  },
+  "one3": {
+   "states": 13312,
+   "secs": 0.75,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    13312,
+    98908,
+    9507375320454039423
+   ],
+   "judged": {
+    "G2": [
+     680,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "create.nofile",
+   "kind": "guard",
+   "role": "found",
+   "note": "the exclusive create succeeds only if no cluster-id file exists",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "create.nodir",
+   "kind": "guard",
+   "role": "found",
+   "note": "its own dir holds no id",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "create.create",
+   "kind": "update",
+   "role": "found",
+   "note": "it mints the id and is #meta's only voter",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.nodir",
+   "kind": "guard",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.member",
+   "kind": "guard",
+   "role": "join",
+   "note": "it reaches a member of the cluster the file names",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "one1",
+    "G2",
+    5,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "start",
+     "3"
+    ],
+    [
+     "join",
+     "(('p', 0), ('q', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "join.join",
+   "kind": "update",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "start",
+     "3"
+    ]
+   ]
+  },
+  {
+   "id": "stale.file",
+   "kind": "guard",
+   "role": "stale",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "stale.nodir",
+   "kind": "guard",
+   "role": "stale",
+   "note": "its own dir holds no id of the file (else it is a member and waits)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "stale.nomember",
+   "kind": "guard",
+   "role": "stale",
+   "note": "it reaches no member within connect.wait",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "stale.nometa",
+   "kind": "guard",
+   "role": "stale",
+   "note": "no dir it can read holds the cluster's #meta",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G1",
+    7,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "stale",
+     "(('p', 0),)"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "stale",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "stale.unlocked",
+   "kind": "guard",
+   "role": "stale",
+   "note": "no dir is still locked by a live process",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "stale.readable",
+   "kind": "guard",
+   "role": "stale",
+   "note": "a dir it cannot read may hold #meta: then the file is not stale",
+   "cmp": null,
+   "alone": [
+    "one2",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G1",
+    7,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "stale",
+     "(('p', 0),)"
+    ],
+    [
+     "unreadable",
+     "0"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "stale",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "stale.refound",
+   "kind": "update",
+   "role": "stale",
+   "note": "rename the file aside and found with a new id",
+   "cmp": null,
+   "alone": [
+    "one2",
+    "G2",
+    8,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "start",
+     "3"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "join.join",
+   "caught": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "start",
+     "3"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stale.nometa",
+   "caught": [
+    "one1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "stale",
+     "(('p', 0),)"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "stale",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stale.readable",
+   "caught": [
+    "one1",
+    "G1",
+    7,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "stale",
+     "(('p', 0),)"
+    ],
+    [
+     "unreadable",
+     "0"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "stale",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stale.refound",
+   "caught": [
+    "one1",
+    "G2",
+    4,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "start",
+     "3"
+    ]
+   ]
+  }
+ ],
+ "option": "draft",
+ "secs": 23
+}

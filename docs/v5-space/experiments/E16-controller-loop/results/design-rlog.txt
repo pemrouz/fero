@@ -1,0 +1,4 @@
+rlog r1: 48 states, 0.0s: all hold
+    RL3: 27 judged states, 0 cannot reach the goal
+rlog r2: 288 states, 0.0s: all hold
+    RL3: 107 judged states, 0 cannot reach the goal

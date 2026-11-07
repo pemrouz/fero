@@ -87,7 +87,27 @@ So `rejoin` costs **2 rules**, keeps Raft as published, and meets F-22's MUST. I
 
 ### 3. Z `par`: the cheapest repair, and two damaged replicas
 
-PAR-RESULTS-PENDING
+`par` = a checksum per entry finds the damage; the replica keeps its id and the rest of its log, refuses to vote, take appends or stand while an entry is bad, and copies the bad entry from a peer that knows it is committed.
+
+| Run | Faults | States | Safety | Liveness (AG EF) |
+|---|---|---|---|---|
+| `par1` | 1 damage | 62,743, complete | all 10 invariants hold | 1,897 judged states with a live majority, **0 stuck**; 501 of them with the entry still bad |
+| `par1r2` | 1 damage, two client entries | 455,856, complete | all hold | (safety only) |
+| `par2d` | **2 damages, on two replicas, at different offsets**, no crash | 565,222, complete | all hold | **276 judged states with both replicas damaged: 0 stuck**; 64 of them with both entries still bad, all of which reach a working leader |
+| `par2` | 2 damages, any offsets (the same offset on two replicas included) | did not finish in 760 s (TLC stopped; no counterexample was reported before it) | - | - |
+| `par2d-leader` | as `par2d`, but repair only from the current leader | 195,119, complete | all hold | **22 of the 244 judged two-damage states are stuck (9%)**: every one with both entries still bad |
+| `par2-leader` | as `par2`, repair only from the current leader | 461,901, complete | all hold | **54 of the 1,292 judged two-damage states are stuck (4%)**, every one with both entries still bad (54 of 284) |
+
+Why repair must come from any peer, not only the leader (`par2d-leader`, condensed; `XX` is the zeroed record, `bad@k` the slot marked bad):
+
+```
+ 16 s1:L t2 [g n2 c2] ci3 | s2:F t2 [g n2 c2] ci2 | s3:F t2 [g XX] ci2 bad@2          s3 restarted; its entry 2 is bad
+ 17 s1:F t2 [g n2 XX] ci3 bad@3 | s2:F t2 [g n2 c2] ci2 | s3:F t2 [g XX] ci2 bad@2   the leader restarts; its entry 3 is bad
+```
+
+Now two of three voters refuse to vote, so s2 can never win, so there is no leader, so leader-only repair never starts. With repair from any peer, s3 copies entry 2 from s2 (s2 knows it committed), votes again, and a leader is elected whose commit index then covers entry 3 for s1. So the two-bad-replicas case needs peer repair, as PAR (FAST'18) does it.
+
+MUTANTS-PENDING
 
 ## What the model leaves out
 

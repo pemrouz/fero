@@ -266,5 +266,12 @@ BOUNDS = {
 }
 SWEEP = ('b1', 'b2', 'b3')
 VERIFY = ()
-PINNED = {'design': ('lock.one', 'move.one', 'restore.budget', 'restore.world', 'read.take'),
-          'naive': ('lock.one', 'move.one', 'restore.budget', 'restore.world', 'read.take')}
+# Pinned: the bounds, and the world's own steps written as updates (a
+# record lands in the log; a restore brings the backup back; the reader takes
+# a record). Without them the model has nothing left to check.
+# A slot move raising the epoch is E-15's rule (the slot design), the world
+# here: in one slot it has no job of its own, so it is pinned too.
+PINNED = {'design': ('lock.one', 'move.one', 'restore.budget', 'restore.world', 'read.take',
+                     'write.stamp', 'lock.stamp', 'move.epoch'),
+          'naive': ('lock.one', 'move.one', 'restore.budget', 'restore.world', 'read.take',
+                    'write.stamp', 'lock.stamp', 'move.epoch')}

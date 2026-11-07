@@ -1,0 +1,88 @@
+{
+ "ParDetect:drop-update-bad:r01": {
+  "by": "ZLogInv on par1 (2 states in the trace)",
+  "runs": {
+   "par1": {
+    "complete": false,
+    "distinct": 17,
+    "error": null,
+    "secs": 4,
+    "stuck_live": null,
+    "violated": "ZLogInv"
+   }
+  },
+  "verdict": "caught"
+ },
+ "ZIgnore:drop-guard:r04": {
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 251995,
+    "error": null,
+    "secs": 140,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par1r2": {
+    "complete": true,
+    "distinct": 2171440,
+    "error": null,
+    "secs": 476,
+    "stuck_live": null,
+    "violated": null
+   },
+   "par2d": {
+    "complete": false,
+    "distinct": null,
+    "error": null,
+    "secs": 700,
+    "stuck_live": null,
+    "violated": null
+   }
+  },
+  "verdict": "undecided"
+ },
+ "ZNormal:drop-guard:r02": {
+  "by": "ZMoreUpToDateCorrectInv on par1 (32 states in the trace)",
+  "runs": {
+   "par1": {
+    "complete": false,
+    "distinct": 15169,
+    "error": null,
+    "secs": 24,
+    "stuck_live": null,
+    "violated": "ZMoreUpToDateCorrectInv"
+   }
+  },
+  "verdict": "caught"
+ },
+ "ZNormal:drop-guard:r03": {
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 73611,
+    "error": null,
+    "secs": 54,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par1r2": {
+    "complete": true,
+    "distinct": 569912,
+    "error": null,
+    "secs": 134,
+    "stuck_live": null,
+    "violated": null
+   },
+   "par2d": {
+    "complete": true,
+    "distinct": 820872,
+    "error": null,
+    "secs": 391,
+    "stuck_live": 0,
+    "violated": null
+   }
+  },
+  "verdict": "not caught"
+ }
+}

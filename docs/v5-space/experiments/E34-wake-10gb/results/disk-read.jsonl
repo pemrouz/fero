@@ -1,0 +1,8 @@
+{"run":2,"loadavg":"0.93 2.04 3.39 1/155 17686","probe":"dd-read","mem_available_mb":14745}
+{"exp": "E-34", "part": "dd-read", "file": "b10g.snap", "dd": "10195634650 bytes (10 GB, 9.5 GiB) copied, 3.81918 s, 2.7 GB/s"}
+{"run":2,"loadavg":"0.94 2.02 3.38 1/159 17697","probe":"dd-read","mem_available_mb":15366}
+{"exp": "E-34", "part": "dd-read", "file": "b10g.snap", "dd": "10195634650 bytes (10 GB, 9.5 GiB) copied, 2.44567 s, 4.2 GB/s"}
+{"run":3,"loadavg":"1.13 1.74 2.49 1/150 25082","probe":"dd-read","mem_available_mb":14856}
+{"exp": "E-34", "part": "dd-read", "file": "b10g.snap", "dd": "10195634650 bytes (10 GB, 9.5 GiB) copied, 3.79423 s, 2.7 GB/s"}
+{"run":3,"loadavg":"1.12 1.73 2.48 1/151 25101","probe":"dd-read","mem_available_mb":15090}
+{"exp": "E-34", "part": "dd-read", "file": "b10g.snap", "dd": "10195634650 bytes (10 GB, 9.5 GiB) copied, 1.71587 s, 5.9 GB/s"}

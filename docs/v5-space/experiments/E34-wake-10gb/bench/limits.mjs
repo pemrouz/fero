@@ -13,7 +13,7 @@ let n = 0, err = null
 const t0 = Date.now()
 try {
   if (what === 'map') { const m = new Map(); for (; n < LIMIT; n++) { m.set('k' + n, n); if ((n & 0xffff) === 0 && over()) { err = 'stopped at 150 s'; break } } }
-  else if (what === 'object') { const o = {}; for (; n < LIMIT; n++) { o['k' + n] = n; if ((n & 0xffff) === 0 && over()) { err = 'stopped at 150 s'; break } } }
+  else if (what === 'object') { const o = {}; for (; n < LIMIT; n++) { o['k' + n] = n; if ((n & 0x3ff) === 0 && over()) { err = 'stopped at 150 s'; break } } }
   else if (what === 'source') {
     const S = await import(pathToFileURL(process.env.TREE + '/fero/api/substrate.ts').href)
     const D = await import(pathToFileURL(process.env.TREE + '/data/api/index.ts').href)

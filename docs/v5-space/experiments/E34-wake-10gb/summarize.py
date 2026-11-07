@@ -71,7 +71,7 @@ if os.path.exists(wg):
         print('|---|---|---|---|---|')
         gg = defaultdict(list)
         for w in ws:
-            gg[(w['where'], w['worker_old_mb'])].append(w)
+            gg[(w['where'], w['worker_old_mb'] if w['where'] == 'worker' else '-')].append(w)
         for k, v in sorted(gg.items()):
             print(f"| {k[0]} | {k[1] if k[0] == 'worker' else '-'} | {', '.join(str(x['longest'][0][0]) for x in v)} | {', '.join(str(x['longest'][0][1]) for x in v)} | {ms([x['build_ms'] / 1000 for x in v])} |")
 

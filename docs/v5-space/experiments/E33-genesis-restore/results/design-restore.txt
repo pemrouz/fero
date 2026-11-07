@@ -1,6 +1,6 @@
 design b1: 640 states, 0.0s: all hold
 design b2: 1,184 states, 0.0s: all hold
-design b3: 8,868 states, 0.3s: all hold
+design b3: 8,868 states, 0.1s: all hold
 naive b1: 710 states, 0.0s: R1 (6 steps), R2 (5 steps)
   R1: shortest trace, 6 steps
      1. issue a1
@@ -16,7 +16,7 @@ naive b1: 710 states, 0.0s: R1 (6 steps), R2 (5 steps)
      4. restore (('snap', ((), 1, 0, 1)),)
      5. lock ()
 naive b2: 1,184 states, 0.0s: all hold
-naive b3: 11,356 states, 0.3s: R1 (6 steps), R2 (5 steps)
+naive b3: 11,356 states, 0.2s: R1 (6 steps), R2 (5 steps)
   R1: shortest trace, 6 steps
      1. issue a1
      2. backup 0

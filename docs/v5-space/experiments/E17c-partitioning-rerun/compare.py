@@ -73,8 +73,9 @@ def main():
         o = load(os.path.join(ORIG, f'{n}-ablation.json'))
         m = load(os.path.join(mine_dir, f'{n}-ablation.json'))
         if o is None or m is None:
-            w(f'| {n} | {"no original" if o is None else ""}{"not re-run yet" if m is None else ""} |'
-              + ' |' * 11)
+            vfy = os.path.exists(os.path.join(mine_dir, f'{n}-verify.json'))
+            why = 'no original' if o is None else 'set checked fresh by verify.py (below)' if vfy else 'not re-run'
+            w(f'| {n} | {why} |' + ' |' * 11)
             continue
         if 'error' in m or 'error' in o:
             w(f'| {n} | error: orig {o.get("error")}; re-run {m.get("error")} |' + ' |' * 11)
@@ -140,6 +141,26 @@ def main():
         if und:
             notes.append(f'{n}: kept as undecided (LIMIT) in the re-run: {und}')
     w('')
+    # the results checked by verify.py (the original smallest set, fresh)
+    vs = [n for n in NAMES if os.path.exists(os.path.join(mine_dir, f'{n}-verify.json'))]
+    if vs:
+        w('## The original smallest sets checked fresh (verify.py)\n')
+        w('For these results this re-run did not re-derive the set from the full model (budget); it checked the '
+          'original set fresh: it holds every sweep bound with the same state sets, and dropping any one kept rule '
+          'breaks a property with the same first failure (bound, property, steps) as the original reported.\n')
+        w('| Result | Kept (pinned) | Holds every bound | Same state digests | Same twice1 | Necessary | '
+          'Undecided (LIMIT) | Not needed | First failures equal to the original |')
+        w('|---|---|---|---|---|---|---|---|---|')
+        for n in vs:
+            v = load(os.path.join(mine_dir, f'{n}-verify.json'))
+            yn = lambda x: 'yes' if x else 'NO'   # noqa: E731
+            w(f'| {n} | {v["kept"]} ({len(v["pinned"])}) | {yn(v["minimal_holds"])} | {yn(v["same_digests"])} | '
+              f'{yn(v["same_verify"])} | {v["necessary_rerun"]} | {v["undecided_rerun"]} | '
+              f'{", ".join(v["not_needed_rerun"]) or "none"} | {v["agree_with_orig"]} of {v["of"]} |')
+            for r in v['rows']:
+                if not r['same']:
+                    notes.append(f'{n} (verify): {r["id"]}: orig {r["orig"]}, re-run {r["rerun"]}')
+        w('')
     if notes:
         w('## Differences and notes\n')
         for x in notes:

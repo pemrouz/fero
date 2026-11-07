@@ -67,6 +67,7 @@ class Compiled:
 
     def __init__(self, model, mutation=None):
         self.model = model
+        self.err = None
         m = mutation
         self.acts = []
         for a in model.actions():
@@ -92,10 +93,24 @@ class Compiled:
         out = list(md.world(st))
         for a, gs, us in self.acts:
             for b in a.params(md, st):
-                if all(g(md, st, b) for g in gs):
+                try:
+                    ok = all(g(md, st, b) for g in gs)
+                except (TypeError, IndexError, KeyError, ValueError):
+                    # a guard that cannot be evaluated once another guard is
+                    # dropped: reported as ERR, as TLC reports it
+                    self.err = (a.name, a.label(b))
+                    continue
+                if ok:
                     d = Draft(md.to_draft(st))
-                    for u in us:
-                        u.fn(md, st, b, d)
+                    try:
+                        for u in us:
+                            u.fn(md, st, b, d)
+                    except (TypeError, IndexError, KeyError, ValueError):
+                        # an update that cannot be evaluated (a mutant
+                        # dropped the guard that made it defined): reported
+                        # as property ERR, as TLC reports an evaluation error
+                        self.err = (a.name, a.label(b))
+                        continue
                     t = md.freeze(d)
                     if t != st:
                         out.append(((a.name, a.label(b)), a.kind, t))
@@ -145,7 +160,11 @@ def explore(model, mutation=None, stop_first=True, liveness=True, limit=1_500_00
     i = 0
     while i < len(states):
         s = states[i]
-        for lab, kind, t in c.succ(s):
+        succ = c.succ(s)
+        if c.err is not None and 'ERR' not in r.fail:
+            r.fail['ERR'] = (('edge', i, c.err, i), None)
+            c.err = None
+        for lab, kind, t in succ:
             r.edges += 1
             j = index.get(t)
             if j is None:

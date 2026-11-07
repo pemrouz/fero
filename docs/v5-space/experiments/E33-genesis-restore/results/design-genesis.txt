@@ -1,7 +1,7 @@
 draft any1: 206 states, 0.0s: all hold
     G2: 159 judged states, 0 cannot reach the goal
     G2all: 48 judged states, 0 cannot reach the goal
-draft any2: 1,006 states, 0.1s: G1 (10 steps)
+draft any2: 1,006 states, 0.0s: G1 (10 steps)
     G2: 581 judged states, 0 cannot reach the goal
     G2all: 131 judged states, 0 cannot reach the goal
   G1: shortest trace, 10 steps
@@ -15,7 +15,7 @@ draft any2: 1,006 states, 0.1s: G1 (10 steps)
      8. start 1
      9. found (('p', 1),)
     10. write 1
-draft any3: 1,418 states, 0.1s: G1 (10 steps), G2 (10 steps)
+draft any3: 1,418 states, 0.0s: G1 (10 steps), G2 (10 steps)
     G2: 880 judged states, 48 cannot reach the goal
     G2all: 358 judged states, 0 cannot reach the goal
   G1: shortest trace, 10 steps
@@ -40,9 +40,9 @@ draft any3: 1,418 states, 0.1s: G1 (10 steps), G2 (10 steps)
      8. found (('p', 1),)
      9. start 0
     10. crash 1
-draft onebox1: 153 states, 0.0s: G1 (4 steps), G2 (5 steps)
-    G2: 87 judged states, 12 cannot reach the goal
-    G2all: 39 judged states, 0 cannot reach the goal
+draft onebox1: 165 states, 0.0s: G1 (4 steps), G2 (5 steps)
+    G2: 105 judged states, 12 cannot reach the goal
+    G2all: 47 judged states, 0 cannot reach the goal
   G1: shortest trace, 4 steps
      1. start 1
      2. start 2
@@ -63,9 +63,9 @@ unanimous any2: 294 states, 0.0s: all hold
 unanimous any3: 484 states, 0.0s: all hold
     G2: 308 judged states, 18 cannot reach the goal
     G2all: 110 judged states, 0 cannot reach the goal
-unanimous onebox1: 87 states, 0.0s: all hold
-    G2: 47 judged states, 3 cannot reach the goal
-    G2all: 17 judged states, 0 cannot reach the goal
+unanimous onebox1: 99 states, 0.0s: all hold
+    G2: 65 judged states, 3 cannot reach the goal
+    G2all: 25 judged states, 0 cannot reach the goal
 init any1: 206 states, 0.0s: all hold
     G2: 159 judged states, 0 cannot reach the goal
     G2all: 48 judged states, 0 cannot reach the goal
@@ -75,9 +75,9 @@ init any2: 942 states, 0.0s: all hold
 init any3: 870 states, 0.0s: all hold
     G2: 384 judged states, 0 cannot reach the goal
     G2all: 126 judged states, 0 cannot reach the goal
-init onebox1: 153 states, 0.0s: G1 (4 steps), G2 (5 steps)
-    G2: 70 judged states, 12 cannot reach the goal
-    G2all: 32 judged states, 0 cannot reach the goal
+init onebox1: 165 states, 0.0s: G1 (4 steps), G2 (5 steps)
+    G2: 101 judged states, 12 cannot reach the goal
+    G2all: 46 judged states, 0 cannot reach the goal
   G1: shortest trace, 4 steps
      1. start 1
      2. start 2
@@ -89,18 +89,22 @@ init onebox1: 153 states, 0.0s: G1 (4 steps), G2 (5 steps)
      3. init (('p', 1),)
      4. start 0
      5. crash 1
-objcas any1: 217 states, 0.0s: all hold
-    G2: 115 judged states, 0 cannot reach the goal
-    G2all: 34 judged states, 0 cannot reach the goal
-objcas any2: 723 states, 0.0s: all hold
-    G2: 319 judged states, 0 cannot reach the goal
-    G2all: 55 judged states, 0 cannot reach the goal
-objcas any3: 464 states, 0.0s: all hold
-    G2: 232 judged states, 0 cannot reach the goal
-    G2all: 76 judged states, 0 cannot reach the goal
-objcas onebox1: 234 states, 0.0s: G2 (3 steps)
-    G2: 125 judged states, 20 cannot reach the goal
-    G2all: 59 judged states, 0 cannot reach the goal
+objcas any1: 750 states, 0.0s: all hold
+    G2: 529 judged states, 0 cannot reach the goal
+    G2all: 208 judged states, 0 cannot reach the goal
+objcas any2: 3,598 states, 0.1s: all hold
+    G2: 2,041 judged states, 0 cannot reach the goal
+    G2all: 469 judged states, 0 cannot reach the goal
+objcas any3: 4,088 states, 0.1s: all hold
+    G2: 2,422 judged states, 0 cannot reach the goal
+    G2all: 832 judged states, 0 cannot reach the goal
+objcas onebox1: 497 states, 0.0s: G1 (3 steps), G2 (3 steps)
+    G2: 295 judged states, 64 cannot reach the goal
+    G2all: 151 judged states, 0 cannot reach the goal
+  G1: shortest trace, 3 steps
+     1. start 1
+     2. found (('p', 1),)
+     3. write 1
   G2: shortest trace, 3 steps
      1. start 0
      2. start 1

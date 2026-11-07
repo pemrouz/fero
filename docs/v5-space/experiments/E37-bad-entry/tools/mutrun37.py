@@ -25,8 +25,15 @@ WORK = os.path.join(run37.SP, 'e37', 'mutants')
 def main():
     args = sys.argv[1:]
     runs = (args[args.index('--runs') + 1] if '--runs' in args else 'par1,par2').split(',')
+    # cheapest first, and the big one-damage run with two client entries last
+    # (it is only needed for a damaged server that could lead)
+    runs = sorted(runs, key=lambda r: {'par1': 0, 'par2d': 1}.get(r, 2))
     timeout = int(args[args.index('--timeout') + 1]) if '--timeout' in args else 900
     only = [args[i + 1] for i, a in enumerate(args) if a == '--only']
+    heavy = '--inhold' not in args       # inside one hold of the heavy lock already
+    budget = float(args[args.index('--budget') + 1]) if '--budget' in args else None
+    import time
+    t0 = time.time()
     subprocess.run([sys.executable, os.path.join(HERE, 'tools', 'mutants.py'), '--write', WORK], check=True,
                    capture_output=True)
     resp = os.path.join(HERE, 'results', 'mutants.json')
@@ -36,12 +43,16 @@ def main():
         mut = open(os.path.join(WORK, name, 'MUTANT')).read().split('\n')[0]
         if only and mut not in only and name not in only:
             continue
-        if mut in res and res[mut].get('verdict') in ('caught', 'not caught', 'error'):
+        if mut in res and res[mut].get('verdict') in ('caught', 'not caught', 'error', 'undecided'):
             continue
+        if budget and time.time() - t0 > budget:
+            print('budget used; run again to continue', flush=True)
+            break
         row = {'runs': {}}
         verdict = 'not caught'
         for r in runs:
-            s = run37.do(r, timeout, mutant=os.path.join(WORK, name), tag='mut-' + name[:40] + '-' + r, save=False)
+            s = run37.do(r, timeout, mutant=os.path.join(WORK, name), tag='mut-' + name[:40] + '-' + r, save=False,
+                         heavy=heavy)
             row['runs'][r] = {k: s.get(k) for k in ('distinct', 'violated', 'complete', 'stuck_live', 'error', 'secs')}
             d = design.get(r, {})
             if s.get('error'):
@@ -58,6 +69,8 @@ def main():
                 break
             if not s.get('complete'):
                 verdict = 'undecided'
+                row['by'] = 'did not finish on %s within %d s' % (r, timeout)
+                break
         row['verdict'] = verdict
         res[mut] = row
         json.dump(res, open(resp, 'w'), indent=1, sort_keys=True)
