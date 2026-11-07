@@ -1,0 +1,419 @@
+{
+ "bounds": [
+  "any1",
+  "any2"
+ ],
+ "verify": [
+  "any3"
+ ],
+ "pinned": [],
+ "base": {
+  "any1": {
+   "states": 206,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    206,
+    522,
+    15368449961814987908
+   ],
+   "judged": {
+    "G2": [
+     159,
+     0
+    ],
+    "G2all": [
+     48,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 942,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    942,
+    3198,
+    15018688745875527322
+   ],
+   "judged": {
+    "G2": [
+     501,
+     0
+    ],
+    "G2all": [
+     87,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "init.majority",
+   "dropped"
+  ],
+  [
+   "init.noid",
+   "dropped"
+  ],
+  [
+   "join.noid",
+   "dropped"
+  ],
+  [
+   "join.hasid",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "init.majority",
+  "init.noid",
+  "join.noid",
+  "join.hasid"
+ ],
+ "put_back": [],
+ "minimal": {
+  "any1": {
+   "states": 1211,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1211,
+    4650,
+    7279741274764973561
+   ],
+   "judged": {
+    "G2": [
+     521,
+     0
+    ],
+    "G2all": [
+     149,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 4386,
+   "secs": 0.15,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4386,
+    20232,
+    4934804424956614129
+   ],
+   "judged": {
+    "G2": [
+     1383,
+     0
+    ],
+    "G2all": [
+     231,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "any3": {
+   "states": 2840,
+   "secs": 0.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2840,
+    14850,
+    3713238980957424439
+   ],
+   "judged": {
+    "G2": [
+     901,
+     0
+    ],
+    "G2all": [
+     313,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "init.once",
+   "kind": "guard",
+   "role": "found",
+   "note": "the operator runs init once (the CLI refuses a second)",
+   "cmp": null,
+   "alone": [
+    "any2",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "init",
+     "(('p', 0),)"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "init",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "init.majority",
+   "kind": "guard",
+   "role": "found",
+   "note": "init waits until its seed reaches a majority of the seeds",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "init.noid",
+   "kind": "guard",
+   "role": "found",
+   "note": "init refuses a seed that already has an id",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "init.mint",
+   "kind": "update",
+   "role": "found",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "join.noid",
+   "kind": "guard",
+   "role": "join",
+   "note": "a seed with no id (new, or back without its dir)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.hasid",
+   "kind": "guard",
+   "role": "join",
+   "note": "finds an id at a seed it reaches",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.adopt",
+   "kind": "update",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G2",
+    5,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G2",
+    3,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "init",
+     "(('p', 0),)"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "init.once",
+   "caught": [
+    "any1",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "init",
+     "(('p', 0),)"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "init",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "init.mint",
+   "caught": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "join.adopt",
+   "caught": [
+    "any1",
+    "G2",
+    3,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "init",
+     "(('p', 0),)"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "option": "init",
+ "secs": 1
+}

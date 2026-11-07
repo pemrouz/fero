@@ -1,0 +1,20 @@
+self three1: 1,917 states, 0.1s: all hold
+    P5: 1,345 judged states, 0 cannot reach the goal
+    P8: 1,345 judged states, 0 cannot reach the goal
+    SWAP: 572 judged states, 0 cannot reach the goal
+    WAIT: 17 judged states, 0 cannot reach the goal
+self four1: 1,553 states, 0.1s: all hold
+    P5: 1,226 judged states, 0 cannot reach the goal
+    P8: 1,226 judged states, 0 cannot reach the goal
+    SWAP: 327 judged states, 0 cannot reach the goal
+    WAIT: 17 judged states, 0 cannot reach the goal
+self meta1: 3,978 states, 0.2s: all hold
+    P5: 2,798 judged states, 0 cannot reach the goal
+    P8: 2,798 judged states, 0 cannot reach the goal
+    SWAP: 1,180 judged states, 0 cannot reach the goal
+    WAIT: 1,327 judged states, 0 cannot reach the goal
+self two-a: 15,534 states, 0.9s: all hold
+    P5: 8,801 judged states, 0 cannot reach the goal
+    P8: 8,801 judged states, 0 cannot reach the goal
+    SWAP: 4,221 judged states, 120 cannot reach the goal
+    WAIT: 277 judged states, 0 cannot reach the goal

@@ -1,1 +1,3 @@
 {"exp":"E-34","part":"limits","what":"map","held":16777216,"error":"Map maximum size exceeded","seconds":32.278,"heap_mb":892}
+{"exp":"E-34","part":"limits","what":"source","held":16777216,"error":"Map maximum size exceeded","seconds":21.873,"heap_mb":1867}
+{"exp":"E-34","part":"limits","what":"object","held":null,"error":"stopped by hand after about 330 s at 99% CPU and 1.1 GB RSS: the probe checks its 150 s cap only every 65,536 keys, and inserting into one huge dictionary-mode object had slowed so far that the check was not reached","seconds":330,"heap_mb":null}

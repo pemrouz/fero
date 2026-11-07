@@ -16,6 +16,8 @@ import sys
 
 
 def blocks(text):
+    # agef37.py prints its traces as '--- state N'; TLC as 'State N: <...>'
+    text = re.sub(r'^--- state (\d+)\s*$', r'State \1: <agef>', text, flags=re.M)
     parts = re.split(r'^State (\d+): <([^>]*)>\s*$', text, flags=re.M)
     out = []
     for k in range(1, len(parts) - 2, 3):

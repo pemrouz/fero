@@ -1,0 +1,19 @@
+# run par1r2 (one damage, two client entries (safety only)): 97 s wall incl. waiting for the lock, cap 700 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 45 and seed 8469237352526603745 with 2 workers on 4 cores with 2222MB heap and 64MB offheap memory [pid: 6946] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 11:54:09)
+Warning: The sets Perms(SymVoters)\cupPerms(InitLearners), and Perms(Joiners) have been defined to be a symmetry set but contain less than two elements.
+(Use the -nowarning option to disable this warning.)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 11:54:09.
+Progress(23) at 2026-11-07 11:54:12: 21,610 states generated (21,610 s/min), 8,985 distinct states found (8,985 ds/min), 1,467 states left on queue.
+Progress(58) at 2026-11-07 11:55:12: 756,756 states generated (735,146 s/min), 311,255 distinct states found (302,270 ds/min), 14,725 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.7E-8
+  based on the actual fingerprints:  val = 1.6E-8
+1146130 states generated, 455856 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 90.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 13 and the 95th percentile is 3).
+Finished in 01min 36s at (2026-11-07 11:55:44)

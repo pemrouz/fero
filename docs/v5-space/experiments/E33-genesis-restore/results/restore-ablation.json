@@ -1,0 +1,943 @@
+{
+ "bounds": [
+  "b1",
+  "b2",
+  "b3"
+ ],
+ "verify": [],
+ "pinned": [
+  "lock.one",
+  "move.one",
+  "restore.budget",
+  "restore.world",
+  "read.take",
+  "write.stamp",
+  "lock.stamp",
+  "move.epoch"
+ ],
+ "base": {
+  "b1": {
+   "states": 640,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    640,
+    1012,
+    7080894859796738770
+   ],
+   "judged": {}
+  },
+  "b2": {
+   "states": 1184,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1184,
+    1970,
+    2225581600394834171
+   ],
+   "judged": {}
+  },
+  "b3": {
+   "states": 8868,
+   "secs": 0.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    8868,
+    14876,
+    2943373993217207158
+   ],
+   "judged": {}
+  }
+ },
+ "greedy": [
+  [
+   "restore.hw",
+   "dropped"
+  ],
+  [
+   "refused.unknown",
+   "dropped"
+  ],
+  [
+   "refused.reset",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "restore.hw",
+  "refused.unknown",
+  "refused.reset"
+ ],
+ "put_back": [],
+ "minimal": {
+  "b1": {
+   "states": 732,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    732,
+    981,
+    10700617520397497763
+   ],
+   "judged": {}
+  },
+  "b2": {
+   "states": 1184,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1184,
+    1734,
+    12994898692181695600
+   ],
+   "judged": {}
+  },
+  "b3": {
+   "states": 10575,
+   "secs": 0.21,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    10575,
+    14895,
+    3638795396428066274
+   ],
+   "judged": {}
+  }
+ },
+ "rules": [
+  {
+   "id": "write.session",
+   "kind": "guard",
+   "role": "session",
+   "note": "an attempt from a session older than the restore is refused",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "write.dedup",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "an attempt already applied in this history is not applied again",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R3",
+    3,
+    [
+     "R3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R3",
+    3,
+    [
+     "R3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "write.stamp",
+   "kind": "update",
+   "role": "stamp",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "b3",
+    "LIMIT",
+    400001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "write.seq",
+   "kind": "update",
+   "role": "stamp",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "lock.one",
+   "kind": "guard",
+   "role": "bound",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "b3",
+    "LIMIT",
+    400002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "b3",
+    "LIMIT",
+    400002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "lock.stamp",
+   "kind": "update",
+   "role": "stamp",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "b3",
+    "LIMIT",
+    400001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "b3",
+    "LIMIT",
+    400002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "lock.seq",
+   "kind": "update",
+   "role": "stamp",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "move.one",
+   "kind": "guard",
+   "role": "bound",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "b1",
+    "LIMIT",
+    400001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "b1",
+    "LIMIT",
+    400003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "move.hw",
+   "kind": "update",
+   "role": "epoch",
+   "note": "the new epoch is recorded in the store before use",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R2",
+    5,
+    [
+     "R2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R2",
+    5,
+    [
+     "R2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "move",
+     "()"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "move.epoch",
+   "kind": "update",
+   "role": "epoch",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "restore.budget",
+   "kind": "guard",
+   "role": "bound",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "b1",
+    "LIMIT",
+    400002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "b1",
+    "R2",
+    5,
+    [
+     "R2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "restore.world",
+   "kind": "update",
+   "role": "bound",
+   "note": "the backup comes back (the world)",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "LIMIT",
+    400001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "restore.epoch",
+   "kind": "update",
+   "role": "epoch",
+   "note": "a new epoch above every epoch used",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R2",
+    4,
+    [
+     "R2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R2",
+    4,
+    [
+     "R2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "restore.hw",
+   "kind": "update",
+   "role": "epoch",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "restore.sgen",
+   "kind": "update",
+   "role": "session",
+   "note": "sessions cleared: a new generation",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "read.known",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "a cursor this history does not hold is refused (unknown-log)",
+   "cmp": null,
+   "alone": [
+    "b1",
+    "R4",
+    6,
+    [
+     "R4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "b1",
+    "R4",
+    6,
+    [
+     "R4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "read",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "read",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "read.take",
+   "kind": "update",
+   "role": "bound",
+   "note": "the reader takes the record (the world)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "refused.unknown",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refused.reset",
+   "kind": "update",
+   "role": "cursor",
+   "note": "the reader starts over from a snapshot",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "write.session",
+   "caught": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.dedup",
+   "caught": [
+    "b1",
+    "R3",
+    3,
+    [
+     "R3"
+    ]
+   ],
+   "trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.seq",
+   "caught": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "lock.seq",
+   "caught": [
+    "b1",
+    "R1",
+    3,
+    [
+     "R1"
+    ]
+   ],
+   "trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "move.hw",
+   "caught": [
+    "b1",
+    "R2",
+    5,
+    [
+     "R2"
+    ]
+   ],
+   "trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "move",
+     "()"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "restore.epoch",
+   "caught": [
+    "b1",
+    "R2",
+    4,
+    [
+     "R2"
+    ]
+   ],
+   "trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "restore.sgen",
+   "caught": [
+    "b1",
+    "R3",
+    5,
+    [
+     "R3"
+    ]
+   ],
+   "trace": [
+    [
+     "issue",
+     "a1"
+    ],
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "write",
+     "(('a', 'a1'), ('g', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.known",
+   "caught": [
+    "b1",
+    "R4",
+    6,
+    [
+     "R4"
+    ]
+   ],
+   "trace": [
+    [
+     "backup",
+     "0"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "read",
+     "()"
+    ],
+    [
+     "restore",
+     "(('snap', ((), 1, 0, 1)),)"
+    ],
+    [
+     "lock",
+     "()"
+    ],
+    [
+     "read",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "restore: epoch <-> sgen",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "design",
+ "secs": 134
+}

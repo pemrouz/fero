@@ -6,3 +6,5 @@ pslot-fused 45 s wall
 pslot-fused-rev 5 s wall
 pslot-fused+abort 11 s wall
 slot 1628 s wall
+rekey 1722 s wall
+lanes 2728 s wall

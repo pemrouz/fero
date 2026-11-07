@@ -70,4 +70,7 @@ if chk:
     for d in chk:
         g[d['rows']].append(d)
     for n, v in sorted(g.items()):
+        if sum(x['of'] for x in v) == 0:
+            print(f"| {n:,} | not checked (a full compare costs O(rows) per rerun) | - | - |")
+            continue
         print(f"| {n:,} | {sum(x['states_checked'] for x in v)} (all equal) | {sum(x['key_order_kept'] for x in v)} of {sum(x['of'] for x in v)} | {sorted(set(str(x['remove_undo_keeps_key_order']) for x in v))} |")

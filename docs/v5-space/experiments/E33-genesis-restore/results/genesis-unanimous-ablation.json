@@ -1,0 +1,665 @@
+{
+ "bounds": [
+  "any1",
+  "any2"
+ ],
+ "verify": [
+  "any3"
+ ],
+ "pinned": [],
+ "base": {
+  "any1": {
+   "states": 56,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    56,
+    159,
+    4039870387033975117
+   ],
+   "judged": {
+    "G2": [
+     39,
+     9
+    ],
+    "G2all": [
+     12,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 294,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    294,
+    885,
+    10746072745193800595
+   ],
+   "judged": {
+    "G2": [
+     207,
+     24
+    ],
+    "G2all": [
+     51,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "found.noid",
+   "dropped"
+  ],
+  [
+   "join.noid",
+   "dropped"
+  ],
+  [
+   "join.hasid",
+   "kept: with the others dropped it breaks G2all on any1 in 10 steps"
+  ],
+  [
+   "found.noid",
+   "put back: without it the smallest model breaks G2all on any3 in 12 steps"
+  ]
+ ],
+ "removed": [
+  "join.noid"
+ ],
+ "put_back": [
+  [
+   "found.noid",
+   "put back: without it the smallest model breaks G2all on any3 in 12 steps"
+  ]
+ ],
+ "minimal": {
+  "any1": {
+   "states": 56,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    56,
+    159,
+    4039870387033975117
+   ],
+   "judged": {
+    "G2": [
+     39,
+     9
+    ],
+    "G2all": [
+     12,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 320,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    320,
+    987,
+    4509074165230716109
+   ],
+   "judged": {
+    "G2": [
+     221,
+     24
+    ],
+    "G2all": [
+     59,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "any3": {
+   "states": 546,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    546,
+    1878,
+    14366481835549467669
+   ],
+   "judged": {
+    "G2": [
+     340,
+     18
+    ],
+    "G2all": [
+     118,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "found.all",
+   "kind": "guard",
+   "role": "found",
+   "note": "it reaches every seed",
+   "cmp": ">=",
+   "alone": [
+    "any2",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any2",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "wipe",
+     "1"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "found.noid",
+   "kind": "guard",
+   "role": "found",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any3",
+    "G2all",
+    12,
+    [
+     "G2all"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "wipe",
+     "1"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "wipe",
+     "2"
+    ],
+    [
+     "start",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "found.mint",
+   "kind": "update",
+   "role": "found",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G2all",
+    3,
+    [
+     "G2all"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G2all",
+    3,
+    [
+     "G2all"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "join.noid",
+   "kind": "guard",
+   "role": "join",
+   "note": "a seed with no id (new, or back without its dir)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.hasid",
+   "kind": "guard",
+   "role": "join",
+   "note": "finds an id at a seed it reaches",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any3",
+    "G2all",
+    18,
+    [
+     "G2all"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "join",
+     "(('p', 1), ('q', 0))"
+    ],
+    [
+     "join",
+     "(('p', 2), ('q', 0))"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "join",
+     "(('p', 1), ('q', 0))"
+    ],
+    [
+     "join",
+     "(('p', 2), ('q', 0))"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "join",
+     "(('p', 1), ('q', 0))"
+    ],
+    [
+     "join",
+     "(('p', 2), ('q', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "join.adopt",
+   "kind": "update",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any2",
+    "G2all",
+    8,
+    [
+     "G2all"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any2",
+    "G2all",
+    8,
+    [
+     "G2all"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "wipe",
+     "1"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "found.all",
+   "caught": [
+    "any2",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "wipe",
+     "1"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "found.noid",
+   "caught": [
+    "any3",
+    "G2all",
+    12,
+    [
+     "G2all"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "found.mint",
+   "caught": [
+    "any1",
+    "G2all",
+    3,
+    [
+     "G2all"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "join.hasid",
+   "caught": [
+    "any3",
+    "G2all",
+    18,
+    [
+     "G2all"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "join.adopt",
+   "caught": [
+    "any2",
+    "G2all",
+    8,
+    [
+     "G2all"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "wipe",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "wipe",
+     "1"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "found.all",
+   "caught": [
+    "any1",
+    "G2all",
+    3,
+    [
+     "G2all"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "start",
+     "2"
+    ]
+   ]
+  }
+ ],
+ "option": "unanimous",
+ "secs": 1
+}

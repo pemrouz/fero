@@ -21,7 +21,7 @@ sha256sum tla/MCferolive.tla ../E14-membership-on-commit/tla/MCferoraft.tla tla/
 java -version 2>&1 | grep -v Picked >> results/versions.txt
 python3 --version >> results/versions.txt
 if [ "$1" = mutants ]; then
-  python3 tools/mutrun37.py --runs par1,par1r2,par2d
+  for k in 1 2 3 4; do "$SP/bin/heavy" timeout 1560 python3 tools/mutrun37.py --runs par1,par1r2,par2d --inhold --budget 900; done
   exit 0
 fi
 if [ $# -gt 0 ]; then
@@ -37,4 +37,4 @@ python3 tools/run37.py rejoin1 rejoin2 --timeout 1500
 #    different offsets; repair only from the leader.
 python3 tools/run37.py par1 par1r2 par1c par2 par2d par2d-leader par2-leader --timeout 1500
 # 4. DEV-10's mutants of the par fix.
-python3 tools/mutrun37.py --runs par1,par1r2,par2d
+for k in 1 2 3 4; do "$SP/bin/heavy" timeout 1560 python3 tools/mutrun37.py --runs par1,par1r2,par2d --inhold --budget 900; done

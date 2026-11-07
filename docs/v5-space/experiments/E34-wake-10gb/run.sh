@@ -52,6 +52,11 @@ if [ "$1" = _big ]; then
   LIMIT_ROWS=2500000 $O 7168 "$B/wake.mjs" "$W/b10g.snap" big lane
   LIMIT_ROWS=2500000 $O 7168 "$B/wake-d13.mjs" "$W/b10g.snap" big all
   $O 4096 "$B/wake-d13.mjs" "$W/b10g.snap" big none
+  # how fast this disk reads the 10 GB snapshot back, with whatever the page cache holds after the wakes
+  for i in 1 2; do
+    printf '{"run":%s,"loadavg":"%s","probe":"dd-read","mem_available_mb":%s}\n' "$run" "$(cat /proc/loadavg)" "$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)" >> "$R/disk-read.jsonl"
+    dd if="$W/b10g.snap" of=/dev/null bs=64M 2>&1 | tail -1 | python3 -c 'import json,sys; print(json.dumps({"exp":"E-34","part":"dd-read","file":"b10g.snap","dd":sys.stdin.read().strip()}))' >> "$R/disk-read.jsonl"
+  done
   exit 0
 fi
 

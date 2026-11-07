@@ -23,6 +23,18 @@
   "trace_states": 32,
   "violated": "NoLostCommit"
  },
+ "cut1r2": {
+  "complete": false,
+  "depth": 32,
+  "distinct": 28020,
+  "error": null,
+  "generated": 71941,
+  "note": "one damage, two client entries",
+  "queue": 3297,
+  "secs": 8,
+  "trace_states": 32,
+  "violated": "NoLostCommit"
+ },
  "ghost1": {
   "complete": false,
   "depth": 16,
@@ -63,6 +75,46 @@
   "trace_states": null,
   "violated": null
  },
+ "par1r2": {
+  "complete": true,
+  "depth": 90,
+  "distinct": 455856,
+  "error": null,
+  "generated": 1146130,
+  "note": "one damage, two client entries (safety only)",
+  "queue": 0,
+  "secs": 97,
+  "trace_states": null,
+  "violated": null
+ },
+ "par2": {
+  "complete": false,
+  "depth": null,
+  "distinct": null,
+  "error": null,
+  "generated": null,
+  "note": "two damages on two replicas, any offsets, no crash",
+  "queue": null,
+  "secs": 760,
+  "trace_states": null,
+  "violated": null
+ },
+ "par2-leader": {
+  "by_damage": "0 damaged: 234 judged live-majority states, 0 stuck; 1 damaged: 1077 judged live-majority states, 0 stuck; 2 damaged: 1292 judged live-majority states, 54 stuck; 0 still bad: 1172 judged live-majority states, 0 stuck; 1 still bad: 1147 judged live-majority states, 0 stuck; 2 still bad: 284 judged live-majority states, 54 stuck",
+  "complete": true,
+  "depth": 116,
+  "distinct": 461901,
+  "error": null,
+  "generated": 1135180,
+  "judged": 2603,
+  "note": "two damages, any offsets, repair only from the current leader",
+  "queue": 0,
+  "secs": 303,
+  "stuck": 54,
+  "stuck_live": 54,
+  "trace_states": null,
+  "violated": null
+ },
  "par2d": {
   "by_damage": "0 damaged: 234 judged live-majority states, 0 stuck; 1 damaged: 1095 judged live-majority states, 0 stuck; 2 damaged: 276 judged live-majority states, 0 stuck; 0 still bad: 902 judged live-majority states, 0 stuck; 1 still bad: 639 judged live-majority states, 0 stuck; 2 still bad: 64 judged live-majority states, 0 stuck",
   "complete": true,
@@ -76,6 +128,22 @@
   "secs": 498,
   "stuck": 0,
   "stuck_live": 0,
+  "trace_states": null,
+  "violated": null
+ },
+ "par2d-leader": {
+  "by_damage": "0 damaged: 234 judged live-majority states, 0 stuck; 1 damaged: 1077 judged live-majority states, 0 stuck; 2 damaged: 244 judged live-majority states, 22 stuck; 0 still bad: 868 judged live-majority states, 0 stuck; 1 still bad: 623 judged live-majority states, 0 stuck; 2 still bad: 64 judged live-majority states, 22 stuck",
+  "complete": true,
+  "depth": 116,
+  "distinct": 195119,
+  "error": null,
+  "generated": 481416,
+  "judged": 1555,
+  "note": "two damages at different offsets, repair only from the current leader",
+  "queue": 0,
+  "secs": 86,
+  "stuck": 22,
+  "stuck_live": 22,
   "trace_states": null,
   "violated": null
  },

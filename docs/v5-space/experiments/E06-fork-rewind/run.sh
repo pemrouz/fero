@@ -13,13 +13,15 @@ export TREE=$W/tree
 export IMMUTABLE=${IMMUTABLE:-$SP/dl/immutable/pkg/package/dist/immutable.es.js}
 R=$HERE/results
 B=$HERE/bench
-NODE="node --expose-gc --experimental-strip-types --no-warnings"
+# 6 GB heap: at 1e6 rows the parent, its view, a fork, a deep copy and an Immutable map are alive at once
+# (with the default 2 GB heap, fork.mjs at 1e6 rows died out of memory in the first run)
+NODE="node --max-old-space-size=6144 --expose-gc --experimental-strip-types --no-warnings"
 mkdir -p "$W" "$R"
 
 if [ "$1" = _one ]; then
   f=$2; run=$3; shift 3
   printf '{"run":%s,"loadavg":"%s","cmd":"%s","samples":"%s"}\n' "$run" "$(cat /proc/loadavg)" "$*" "${SAMPLES:-20}" >> "$f"
-  $NODE "$@" >> "$f"
+  $NODE "$@" >> "$f" 2> "$W/stderr.txt" || printf '{"exp":"E-06","part":"failed","cmd":"%s","stderr":"%s"}\n' "$*" "$(tail -c 300 "$W/stderr.txt" | tr '\n"' '  ')" >> "$f"
   exit 0
 fi
 
@@ -31,7 +33,7 @@ setup() {
 
 if [ "$1" = _batch ]; then
   run=$2; O="$HERE/run.sh _one"
-  for n in 1000 100000 1000000; do
+  for n in ${SIZES:-1000 100000 1000000}; do
     $O "$R/fork.jsonl" $run "$B/fork.mjs" $n
     for k in 100 1000 10000; do
       $O "$R/rewind.jsonl" $run "$B/rewind.mjs" $n snap $k 0

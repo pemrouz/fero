@@ -1,0 +1,467 @@
+{
+ "bounds": [
+  "any1",
+  "any2"
+ ],
+ "verify": [
+  "any3"
+ ],
+ "pinned": [],
+ "base": {
+  "any1": {
+   "states": 750,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    750,
+    2439,
+    6295684504367537970
+   ],
+   "judged": {
+    "G2": [
+     529,
+     0
+    ],
+    "G2all": [
+     208,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 3598,
+   "secs": 0.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3598,
+    14352,
+    7001368510452450420
+   ],
+   "judged": {
+    "G2": [
+     2041,
+     0
+    ],
+    "G2all": [
+     469,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "found.noid",
+   "dropped"
+  ],
+  [
+   "adopt.noid",
+   "dropped"
+  ],
+  [
+   "join.noid",
+   "dropped"
+  ],
+  [
+   "join.hasid",
+   "dropped"
+  ],
+  [
+   "join.adopt",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "found.noid",
+  "adopt.noid",
+  "join.noid",
+  "join.hasid",
+  "join.adopt"
+ ],
+ "put_back": [],
+ "minimal": {
+  "any1": {
+   "states": 750,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    750,
+    2265,
+    6295684504367537970
+   ],
+   "judged": {
+    "G2": [
+     529,
+     0
+    ],
+    "G2all": [
+     208,
+     0
+    ]
+   }
+  },
+  "any2": {
+   "states": 3910,
+   "secs": 0.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3910,
+    15288,
+    3385872230267149546
+   ],
+   "judged": {
+    "G2": [
+     2245,
+     0
+    ],
+    "G2all": [
+     523,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "any3": {
+   "states": 4606,
+   "secs": 0.15,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4606,
+    18978,
+    17397268160314921266
+   ],
+   "judged": {
+    "G2": [
+     2664,
+     0
+    ],
+    "G2all": [
+     900,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "found.absent",
+   "kind": "guard",
+   "role": "found",
+   "note": "If-None-Match: * succeeds only while no id is stored",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "found",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "found.noid",
+   "kind": "guard",
+   "role": "found",
+   "note": "its own dir holds no id (the one-box file wins)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "found.create",
+   "kind": "update",
+   "role": "found",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.noid",
+   "kind": "guard",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "adopt.stored",
+   "kind": "guard",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "adopt",
+     "(('p', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.adopt",
+   "kind": "update",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "any1",
+    "G2",
+    5,
+    [
+     "G2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "join.noid",
+   "kind": "guard",
+   "role": "join",
+   "note": "a seed with no id (new, or back without its dir)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.hasid",
+   "kind": "guard",
+   "role": "join",
+   "note": "finds an id at a seed it reaches",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "join.adopt",
+   "kind": "update",
+   "role": "join",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "found.absent",
+   "caught": [
+    "any1",
+    "G1",
+    6,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "found",
+     "(('p', 0),)"
+    ],
+    [
+     "write",
+     "0"
+    ],
+    [
+     "found",
+     "(('p', 1),)"
+    ],
+    [
+     "write",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "found.create",
+   "caught": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.stored",
+   "caught": [
+    "any1",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "adopt",
+     "(('p', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.adopt",
+   "caught": [
+    "any1",
+    "G2",
+    2,
+    [
+     "G2"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "option": "objcas",
+ "secs": 2
+}

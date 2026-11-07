@@ -69,7 +69,42 @@ What is **not** shared: E-17's world (`harness/world.py`) is a world of partitio
 
 The ablation sweeps the one-fault bounds and verifies on `two-a` (E-17's SWEEP and VERIFY).
 
-RESULTS-PENDING
+## Results
+
+Machine: 4 vCPU, 15 GB, shared with other agents; Python 3.13, standard library ([results/versions.txt](results/versions.txt)). Raw output: [results/design-self.txt](results/design-self.txt), [results/design-cent-co.txt](results/design-cent-co.txt), [results/design-rlog.txt](results/design-rlog.txt), [results/design-extra.txt](results/design-extra.txt); the ablations in `results/*-ablation.json` and [results/summary.md](results/summary.md). All model-checked here.
+
+### 1. Both options are safe and live at these bounds
+
+| Bound | `self`: states | `cent-co`: states | P2, P3, P9 | P5: stuck with a live majority | P8: healing cannot finish |
+|---|---|---|---|---|---|
+| `three1` | 1,917 | 9,885 | hold in both | 0 of 1,345 / 0 of 6,777 | 0 / 0 |
+| `four1` | 1,553 | 4,752 | hold in both | 0 / 0 | 0 / 0 |
+| `meta1` | 3,978 | 10,282 | hold in both | 0 / 0 | 0 / 0 |
+| `two-a` | 15,534 | 347,262 | hold in both | 0 of 8,801 / 0 of 236,582 | 0 / 0 |
+EXTRA-ROWS
+
+`cent-co` has 3 to 22 times the states of `self` at the same bounds: its commands are state of their own (decided, live, timed out, done), on top of the group's.
+
+### 2. Where `self` heals and `cent-co` waits
+
+WAIT counts the states with a live majority while `#meta` is down or cut off from that majority, from which healing cannot finish until `#meta` returns:
+
+| Bound | `self` | `cent-co` |
+|---|---|---|
+| `meta1` (`#meta` down from the start, one member fault) | 0 of 1,327 | **210 of 415** |
+| `two-a` | 0 of 277 | **234 of 1,058** |
+WAIT-EXTRA
+
+For example (`meta1`): `#meta` has no majority; voter 1 crashes; `evict.after` passes. `self`'s leader adds spare 3, lets it catch up, promotes it and removes 1. `cent-co` has no controller, so the group stays at two live voters of three until `#meta` returns; one more crash then stops its writes. Once `#meta` is back, healing finishes in every state (P8 holds with `#meta` up), so the wait is a delay, not a stuck state. Its length is the `#meta` outage.
+
+### 3. What the model found on the way (each a rule the design needs)
+
+- **`cent-co` must re-check "gone" on the group's own links before a removal.** The first `cent-co` model ran a removal whenever the epoch matched, and the search found (P2, 15 steps, in that earlier version; the ablation below shows the same rule needed in the final one): voter 1 crashes and is replaced by a swap (4 voters); `#meta`'s leader is cut off from the group's side, so to it voter 0 looks gone; it decides "remove 0" at the current epoch; the cut heals; the group's leader runs the command, since the epoch still matches, and removes voter 0, which is up, while voter 1 is still down: two answering voters hold the commit offset where there were three. The epoch check protects against a changed config, not against a changed view of who is alive. The fix is DESIGN-V5's own planner rule ("a leader whose link to that life is up ignores it"), here `exec.gone`.
+- **`cent-co` needs an operator lifecycle.** With one command per epoch (PD's one operator per region) and no timeout, a command the group refuses (the voter came back) blocks the controller for that epoch for ever (P8, 13 steps, in an earlier version: the group sits at four voters). PD cancels such operators on a timeout; here `c_expire`.
+- **A surplus removal must wait until the voters left answer**, not only hold the commit offset (P2, 12 steps, in both options): a voter that crashed but was not yet evicted still "holds" the offset on its disk.
+- **A second fault during a swap can stop writes, in both options (SWAP).** On commit (E-14), a promotion from three voters to four commits on the old majority; if the new voter (or another) then fails, the four-voter config has two of four down, and no leader can commit until one returns: `two-a` has 120 such states for `self` and 624 for `cent-co` (`three2`: 3,024 for `self`). healing.py did not judge these (on append, the four-voter config is in force at once, and it has no live majority). E-14b found the same window when growing from two voters to three. Joint consensus (CockroachDB's atomic replication changes) would not have it (reasoned). It is the same for both options, so it does not decide this axis; it is a stated limit of single-step swaps.
+
+ABLATION-PENDING
 
 ## What the model leaves out
 

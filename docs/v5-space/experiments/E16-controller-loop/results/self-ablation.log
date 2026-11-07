@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/cli.py", line 86, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/cli.py", line 65, in main
+    out = ab.run(mutate=not a.no_mutants, pinned=tuple(getattr(mod, 'PINNED', {}).get(a.option, ())))
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 330, in run
+    res1[i] = self.per(Mutation(drop=[i]), bn)
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 308, in per
+    x = self.run1(m, b, full)
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 287, in run1
+    r = explore(model, m, stop_first=not full, limit=self.limit)
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 156, in explore
+    succ = c.succ(s)
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 96, in succ
+    if all(g(md, st, b) for g in gs):
+       ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 96, in <genexpr>
+    if all(g(md, st, b) for g in gs):
+           ~^^^^^^^^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/models/heal.py", line 404, in <lambda>
+    Guard('live', lambda w, st, b: not w.gone_to(st, L(w, st), b['r']), role='target',
+                                       ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/models/heal.py", line 134, in gone_to
+    return r[0] in st[1][s]
+                   ~~~~~^^^
+TypeError: tuple indices must be integers or slices, not NoneType

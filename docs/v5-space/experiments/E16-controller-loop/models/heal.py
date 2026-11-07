@@ -128,6 +128,8 @@ class World:
         """Observers on side s count replica r gone: its link has been down
         past evict.after, or its member is back with a new disk. A link that
         is up is seen at once, so a member observers reach is never gone."""
+        if s is None:
+            return False                 # no observer (no leader): nothing is gone to it
         up, inc, side = st[0][r[0]]
         if up and side == s:
             return inc != r[1]
