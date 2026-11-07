@@ -1,0 +1,365 @@
+fixN readback [minimal of fixN]: 19 states, 0.0s: all hold
+fixN readback1 [minimal of fixN]: 61 states, 0.0s: all hold
+fixN bothread [minimal of fixN]: 51 states, 0.0s: all hold
+slot readback [minimal of slot]: 1,235 states, 0.1s: all hold
+slot readback1 [minimal of slot]: 7,510 states, 0.8s: all hold
+slot bothread [minimal of slot]: 3,056 states, 0.3s: all hold
+slot readback [minimal of slot-rev]: 1,929 states, 0.3s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('s', 1), 1)
+      11. export ('s', 'G1', '->', 'G0')
+      12. commit G1 ('exp', 's', 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), 's', 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+slot readback1 [minimal of slot-rev]: 12,212 states, 1.6s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('s', 1), 1)
+      11. export ('s', 'G1', '->', 'G0')
+      12. commit G1 ('exp', 's', 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), 's', 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+slot bothread [minimal of slot-rev]: 3,056 states, 0.3s: all hold
+    repair: put back any one of ['fence.once'] and every bound given and every sweep bound holds
+slot readback [minimal of slot+abort]: 65,368 states, 11.2s: all hold
+slot bothread [minimal of slot+abort]: 287,648 states, 38.5s: all hold
+rekey-carry readback [minimal of rekey-carry]: 1,471 states, 0.4s: all hold
+rekey-carry readback1 [minimal of rekey-carry]: 10,967 states, 3.9s: all hold
+rekey-carry bothread [minimal of rekey-carry]: 2,447 states, 0.3s: all hold
+pslot readback [minimal of pslot]: 1,235 states, 0.2s: all hold
+pslot readback1 [minimal of pslot]: 7,510 states, 1.2s: all hold
+pslot bothread [minimal of pslot]: 3,056 states, 0.4s: all hold
+pslot readback [minimal of pslot-rev]: 1,929 states, 0.3s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+      11. export (('P', 0), 'G1', '->', 'G0')
+      12. commit G1 ('exp', ('P', 0), 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), ('P', 0), 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+pslot readback1 [minimal of pslot-rev]: 12,212 states, 2.0s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+      11. export (('P', 0), 'G1', '->', 'G0')
+      12. commit G1 ('exp', ('P', 0), 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), ('P', 0), 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+pslot bothread [minimal of pslot-rev]: 3,056 states, 0.4s: all hold
+    repair: put back any one of ['fence.once'] and every bound given and every sweep bound holds
+pslot readback [minimal of pslot+abort]: 65,368 states, 10.6s: all hold
+pslot bothread [minimal of pslot+abort]: 287,648 states, 39.4s: all hold
+pslot-fused readback [minimal of pslot-fused]: 257 states, 0.0s: all hold
+pslot-fused readback1 [minimal of pslot-fused]: 1,193 states, 0.2s: all hold
+pslot-fused bothread [minimal of pslot-fused]: 532 states, 0.1s: all hold
+pslot-fused readback [minimal of pslot-fused-rev]: 257 states, 0.0s: all hold
+pslot-fused readback1 [minimal of pslot-fused-rev]: 1,193 states, 0.1s: all hold
+pslot-fused bothread [minimal of pslot-fused-rev]: 532 states, 0.0s: all hold
+pslot-fused readback [minimal of pslot-fused+abort]: 591 states, 0.1s: all hold
+pslot-fused bothread [minimal of pslot-fused+abort]: 4,817 states, 0.3s: all hold
+split readback [minimal of split]: 400 states, 0.0s: P4 (15)
+    P4 in 15 steps: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+split readback1 [minimal of split]: 2,008 states, 0.2s: P4 (15)
+    P4 in 15 steps: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+split bothread [minimal of split]: 532 states, 0.0s: all hold
+    repair: put back any one of ['merged.base'] and every bound given and every sweep bound holds
+split readback [minimal of split-rev]: 400 states, 0.0s: P4 (15)
+    P4 in 15 steps: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+split readback1 [minimal of split-rev]: 2,008 states, 0.1s: P4 (15)
+    P4 in 15 steps: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+split bothread [minimal of split-rev]: 532 states, 0.0s: all hold
+    repair: put back any one of ['merged.base'] and every bound given and every sweep bound holds
+split readback [minimal of split+giveup]: 865 states, 0.1s: P4 (15)
+    P4 in 15 steps: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+split bothread [minimal of split+giveup]: 532 states, 0.0s: all hold
+    repair: put back any one of ['merged.base'] and every bound given and every sweep bound holds
+lanes readback [minimal of lanes]: 1,929 states, 0.1s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes readback1 [minimal of lanes]: 12,212 states, 1.4s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes bothread [minimal of lanes]: 3,056 states, 0.3s: all hold
+    repair: put back any one of ['fence.once'] and every bound given and every sweep bound holds
+lanes readback [minimal of lanes-rev]: 1,929 states, 0.3s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes readback1 [minimal of lanes-rev]: 12,212 states, 1.4s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes bothread [minimal of lanes-rev]: 3,056 states, 0.3s: all hold
+    repair: put back any one of ['fence.once'] and every bound given and every sweep bound holds
+lanes-carry readback [minimal of lanes-carry]: 1,235 states, 0.6s: all hold
+lanes-carry readback1 [minimal of lanes-carry]: 7,510 states, 0.9s: all hold
+lanes-carry bothread [minimal of lanes-carry]: 3,056 states, 0.2s: all hold
+lanes readback [minimal of lanes+abort]: 65,368 states, 12.3s: all hold
+lanes bothread [minimal of lanes+abort]: 287,648 states, 32.5s: all hold
+pslot readback [as written]: 14,725 states, 2.3s: all hold
+pslot readback1 [as written]: 102,091 states, 15.3s: all hold
+pslot bothread [as written]: 54,703 states, 5.9s: all hold
+pslot-fused readback [as written]: 591 states, 0.0s: all hold
+pslot-fused readback1 [as written]: 5,525 states, 0.4s: all hold
+pslot-fused bothread [as written]: 4,817 states, 0.4s: all hold
+split readback [as written]: 863 states, 0.1s: all hold
+split readback1 [as written]: 5,077 states, 0.4s: all hold
+split bothread [as written]: 532 states, 0.0s: all hold
+lanes readback [as written]: 14,725 states, 1.6s: all hold
+lanes readback1 [as written]: 102,091 states, 12.7s: all hold
+lanes bothread [as written]: 54,703 states, 5.0s: all hold
+lanes-carry readback [as written]: 14,725 states, 1.7s: all hold
+lanes-carry readback1 [as written]: 102,091 states, 10.7s: all hold
+lanes-carry bothread [as written]: 54,703 states, 3.3s: all hold
+== lanes-atfence: lanes' smallest set, copy at the fence, without final.once
+lanes-atfence grow [minimal of lanes]: 1,086 states, 0.1s: all hold
+lanes-atfence shrink [minimal of lanes]: 1,086 states, 0.1s: all hold
+lanes-atfence both [minimal of lanes]: 2,130 states, 0.2s: all hold
+lanes-atfence read [minimal of lanes]: 2,625 states, 0.1s: all hold
+lanes-atfence deep [minimal of lanes]: 5,036 states, 0.2s: all hold
+lanes-atfence twice [minimal of lanes]: 249 states, 0.0s: all hold
+lanes-atfence twice1 [minimal of lanes]: 763 states, 0.0s: all hold
+lanes-atfence readback [minimal of lanes]: 3,067 states, 0.2s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=1', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes-atfence readback1 [minimal of lanes]: 18,206 states, 1.8s: L7 (17)
+    L7 in 17 steps: every attempt can get an answer (applied or refused) once faults and timers stop
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=1', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+lanes-atfence bothread [minimal of lanes]: 2,840 states, 0.2s: all hold
+== lanes as ablated: lanes' smallest set without final.once, for comparison
+lanes both [minimal of lanes]: 2,764 states, 0.1s: P1 (14)
+    P1 in 14 steps: no acknowledged write lost or extra: every group that holds a partition open has exactly its history as rows
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. write ('w3', 'L0')
+       6. final ((0, 0, 1), 'END', (-1, -1, -1))
+       7. commit L0 ('w', 'w3', 'q', (0, 0, 2), 1)
+       8. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       9. open ((0, 0, 1),)
+      10. commit L1 ('open', (0, 0, 1), 'r')
+      11. write ('w1', 'L1')
+      12. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      13. final ((0, 0, 1), 'END', (-1, -1, -1))
+      14. commit L1 ('cp', (0, 0, 1), 'r', 'upto=3', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+== lanes-atfence: as above, with fence.once put back
+lanes-atfence readback [minimal of lanes, back: fence.once]: 1,235 states, 0.1s: all hold
+lanes-atfence readback1 [minimal of lanes, back: fence.once]: 7,510 states, 0.5s: all hold
+lanes-atfence bothread [minimal of lanes, back: fence.once]: 2,840 states, 0.2s: all hold
+lanes-atfence both [minimal of lanes, back: fence.once]: 2,130 states, 0.1s: all hold
+lanes-atfence twice1 [minimal of lanes, back: fence.once]: 487 states, 0.0s: all hold

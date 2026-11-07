@@ -32,7 +32,7 @@
 #   orders        (./run.sh orders, after the rest) one more greedy order per
 #                 option, no mutants: slot-rev and rekey-rev (greedy in
 #                 reverse model-text order), rekey-carry-rev (warm start from
-#                 rekey-rev). README finding 5.
+#                 rekey-rev, greedy also in reverse order). README finding 5.
 set -e
 cd "$(dirname "$0")"
 SP=/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad
@@ -55,9 +55,11 @@ for o in $OPTS; do
         "results/$o+giveup-alt-checkpoint.json" "results/$o+giveup-checkpoint.json" "results/$o+abort-checkpoint.json"
   case "$o" in
     orders)
+      [ -n "$FRESH" ] && rm -f results/slot-rev-checkpoint.json results/rekey-rev-checkpoint.json \
+            results/rekey-carry-rev-checkpoint.json
       piece slot --reverse --tag slot-rev --seed-from slot --no-mutants
       piece rekey --reverse --tag rekey-rev --seed-from rekey --no-mutants
-      piece rekey-carry --warm-from rekey-rev --tag rekey-carry-rev --seed-from rekey-carry --no-mutants
+      piece rekey-carry --reverse --warm-from rekey-rev --tag rekey-carry-rev --seed-from rekey-carry --no-mutants
       continue ;;
     rekey-carry) piece "$o" --warm-from rekey ;;
     *) piece "$o" ;;
