@@ -1,0 +1,20 @@
+{
+ "bound": "three",
+ "capped": true,
+ "failed": [
+  7,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 1198769,
+ "live_starts": 38777,
+ "live_stuck": 230070,
+ "secs": 1446.9,
+ "states": 6554885,
+ "steps": {
+  "7": 3,
+  "9": 18
+ },
+ "transitions": 26085198,
+ "variant": "no-exporting"
+}

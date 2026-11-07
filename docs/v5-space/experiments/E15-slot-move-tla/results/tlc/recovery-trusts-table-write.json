@@ -1,0 +1,17 @@
+{
+ "bound": "write",
+ "calm_states": 1725,
+ "complete": true,
+ "distinct_total": 1170561,
+ "errors": [],
+ "failed": [],
+ "kind": "mutant",
+ "live_edges": 2459,
+ "live_stuck": 0,
+ "secs": 597.2,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1168836,
+ "steps": {},
+ "variant": "recovery-trusts-table",
+ "workers": 2
+}

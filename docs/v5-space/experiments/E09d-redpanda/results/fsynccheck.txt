@@ -1,0 +1,98 @@
+redpanda fsync: producer at 2000 records/s on 16 partitions; strace of server 1 for 8 s:
+strace: Process 839 attached with 3 threads
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.090486           4     19235           io_submit
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.090486           4     19235           total
+['40000 records sent, 1996.605770 records/sec (1.95 MB/sec), 239.47 ms avg latency, 3173.00 ms max latency, 3 ms 50th, 2184 ms 95th, 2260 ms 99th, 2296 ms 99.9th.']
+Redpanda admin /metrics, counters with flush in the name, change over those 8 s on server 1:
+  vectorized_host_diskstats_flushes_ms{cache_disk="1",data_disk="1",disk="vda",shard="0",underlying="vda"} +876
+  vectorized_host_diskstats_flushes{cache_disk="1",data_disk="1",disk="vda",shard="0",underlying="vda"} +5599
+  vectorized_host_diskstats_underlying_flushes_ms{cache_disk="1",data_disk="1",disk="vda",shard="0"} +876
+  vectorized_host_diskstats_underlying_flushes{cache_disk="1",data_disk="1",disk="vda",shard="0"} +5599
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="0",shard="0",topic="tsync"} +99
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="1",shard="0",topic="tsync"} +307
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="10",shard="0",topic="tsync"} +150
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="12",shard="0",topic="tsync"} +91
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="13",shard="0",topic="tsync"} +240
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="14",shard="0",topic="tsync"} +147
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="15",shard="0",topic="tsync"} +197
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="2",shard="0",topic="tsync"} +35
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="4",shard="0",topic="tsync"} +269
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="5",shard="0",topic="tsync"} +94
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="6",shard="0",topic="tsync"} +254
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="7",shard="0",topic="tsync"} +145
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="9",shard="0",topic="tsync"} +141
+  vectorized_raft_log_flushes{namespace="kafka",partition="0",shard="0",topic="tsync"} +95
+  vectorized_raft_log_flushes{namespace="kafka",partition="1",shard="0",topic="tsync"} +301
+  vectorized_raft_log_flushes{namespace="kafka",partition="10",shard="0",topic="tsync"} +144
+  vectorized_raft_log_flushes{namespace="kafka",partition="11",shard="0",topic="tsync"} +89
+  vectorized_raft_log_flushes{namespace="kafka",partition="12",shard="0",topic="tsync"} +86
+  vectorized_raft_log_flushes{namespace="kafka",partition="13",shard="0",topic="tsync"} +232
+  vectorized_raft_log_flushes{namespace="kafka",partition="14",shard="0",topic="tsync"} +143
+  vectorized_raft_log_flushes{namespace="kafka",partition="15",shard="0",topic="tsync"} +190
+  vectorized_raft_log_flushes{namespace="kafka",partition="2",shard="0",topic="tsync"} +33
+  vectorized_raft_log_flushes{namespace="kafka",partition="3",shard="0",topic="tsync"} +139
+  vectorized_raft_log_flushes{namespace="kafka",partition="4",shard="0",topic="tsync"} +262
+  vectorized_raft_log_flushes{namespace="kafka",partition="5",shard="0",topic="tsync"} +91
+  vectorized_raft_log_flushes{namespace="kafka",partition="6",shard="0",topic="tsync"} +248
+  vectorized_raft_log_flushes{namespace="kafka",partition="7",shard="0",topic="tsync"} +137
+  vectorized_raft_log_flushes{namespace="kafka",partition="8",shard="0",topic="tsync"} +69
+  vectorized_raft_log_flushes{namespace="kafka",partition="9",shard="0",topic="tsync"} +134
+  vectorized_raft_log_flushes{namespace="kafka_internal",partition="0",shard="0",topic="id_allocator"} +3
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="11",shard="0",topic="tsync"} +89
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="3",shard="0",topic="tsync"} +139
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="8",shard="0",topic="tsync"} +69
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka_internal",partition="0",shard="0",topic="id_allocator"} +2
+  vectorized_segment_appender_flushes{shard="0"} +2396
+redpanda wcache: producer at 2000 records/s on 16 partitions; strace of server 1 for 8 s:
+strace: Process 4570 attached with 3 threads
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.138226          13      9906           io_submit
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.138226          13      9906           total
+['40000 records sent, 1997.403376 records/sec (1.95 MB/sec), 12.86 ms avg latency, 881.00 ms max latency, 2 ms 50th, 26 ms 95th, 291 ms 99th, 318 ms 99.9th.']
+Redpanda admin /metrics, counters with flush in the name, change over those 8 s on server 1:
+  vectorized_host_diskstats_flushes_ms{cache_disk="1",data_disk="1",disk="vda",shard="0",underlying="vda"} +166
+  vectorized_host_diskstats_flushes{cache_disk="1",data_disk="1",disk="vda",shard="0",underlying="vda"} +356
+  vectorized_host_diskstats_underlying_flushes_ms{cache_disk="1",data_disk="1",disk="vda",shard="0"} +166
+  vectorized_host_diskstats_underlying_flushes{cache_disk="1",data_disk="1",disk="vda",shard="0"} +356
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="1",shard="0",topic="tsync"} +277
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="10",shard="0",topic="tsync"} +134
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="11",shard="0",topic="tsync"} +151
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="12",shard="0",topic="tsync"} +134
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="15",shard="0",topic="tsync"} +203
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="2",shard="0",topic="tsync"} +175
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="3",shard="0",topic="tsync"} +159
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="4",shard="0",topic="tsync"} +182
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="5",shard="0",topic="tsync"} +176
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="6",shard="0",topic="tsync"} +252
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="8",shard="0",topic="tsync"} +93
+  vectorized_raft_append_entries_buffer_flushes{namespace="kafka",partition="9",shard="0",topic="tsync"} +247
+  vectorized_raft_log_flushes{namespace="kafka",partition="0",shard="0",topic="tsync"} +11
+  vectorized_raft_log_flushes{namespace="kafka",partition="1",shard="0",topic="tsync"} +11
+  vectorized_raft_log_flushes{namespace="kafka",partition="10",shard="0",topic="tsync"} +6
+  vectorized_raft_log_flushes{namespace="kafka",partition="11",shard="0",topic="tsync"} +7
+  vectorized_raft_log_flushes{namespace="kafka",partition="12",shard="0",topic="tsync"} +5
+  vectorized_raft_log_flushes{namespace="kafka",partition="13",shard="0",topic="tsync"} +11
+  vectorized_raft_log_flushes{namespace="kafka",partition="14",shard="0",topic="tsync"} +7
+  vectorized_raft_log_flushes{namespace="kafka",partition="15",shard="0",topic="tsync"} +8
+  vectorized_raft_log_flushes{namespace="kafka",partition="2",shard="0",topic="tsync"} +7
+  vectorized_raft_log_flushes{namespace="kafka",partition="3",shard="0",topic="tsync"} +8
+  vectorized_raft_log_flushes{namespace="kafka",partition="4",shard="0",topic="tsync"} +8
+  vectorized_raft_log_flushes{namespace="kafka",partition="5",shard="0",topic="tsync"} +7
+  vectorized_raft_log_flushes{namespace="kafka",partition="6",shard="0",topic="tsync"} +9
+  vectorized_raft_log_flushes{namespace="kafka",partition="7",shard="0",topic="tsync"} +4
+  vectorized_raft_log_flushes{namespace="kafka",partition="8",shard="0",topic="tsync"} +4
+  vectorized_raft_log_flushes{namespace="kafka",partition="9",shard="0",topic="tsync"} +10
+  vectorized_raft_replicate_ack_all_requests_no_flush{namespace="kafka",partition="0",shard="0",topic="tsync"} +276
+  vectorized_raft_replicate_ack_all_requests_no_flush{namespace="kafka",partition="13",shard="0",topic="tsync"} +291
+  vectorized_raft_replicate_ack_all_requests_no_flush{namespace="kafka",partition="14",shard="0",topic="tsync"} +175
+  vectorized_raft_replicate_ack_all_requests_no_flush{namespace="kafka",partition="7",shard="0",topic="tsync"} +99
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="0",shard="0",topic="tsync"} +276
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="13",shard="0",topic="tsync"} +291
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="14",shard="0",topic="tsync"} +174
+  vectorized_raft_replicate_batch_flush_requests{namespace="kafka",partition="7",shard="0",topic="tsync"} +99
+  vectorized_segment_appender_flushes{shard="0"} +123

@@ -46,7 +46,11 @@ import agef  # noqa: E402
 SRC = os.path.join(ROOT, 'tla', 'SlotMoveFixed.tla')
 WORK = os.path.join(tlcrun.SP, 'e15', 'mutants')
 OUTF = os.path.join(ROOT, 'results', 'mutants.json')
-BOUNDS = ['move', 'dedup', 'deep', 'write']
+BOUNDS = os.environ.get('E15_MUT_BOUNDS', 'move,dedup,deep,write0').split(',')
+# write0 is `write` without depositions (one write to s, one resend, either
+# shard, one move, one recovery): it keeps the case fix 5 guards (a position
+# reused after a recovered target's abort) at a fraction of `write`'s size.
+# The mechanical mutants use it in place of `write` to stay in the budget.
 HEAVY = True
 
 OPEN = {'(': ')', '{': '}', '[': ']', '<<': '>>'}
@@ -228,6 +232,17 @@ def make(lines):
     return muts
 
 
+def consts_for(b, calm, soft):
+    if b == 'write0':
+        c = tlcrun.constants('fixed', 'write', calm=calm, soft=soft)
+        c['D'] = '0'
+    else:
+        c = tlcrun.constants('fixed', b, calm=calm, soft=soft)
+    c.pop('V')
+    c.pop('Fix')
+    return c
+
+
 def run_one(idx, kind, line, desc, new_lines, fixed_counts):
     d = os.path.join(WORK, f'm{idx:03d}')
     os.makedirs(d, exist_ok=True)
@@ -238,12 +253,10 @@ def run_one(idx, kind, line, desc, new_lines, fixed_counts):
     invs = ['Inv1', 'Inv2', 'Inv3', 'Inv4', 'Inv5', 'Inv6', 'Inv8', 'Inv9']
     counts = {}
     for b in BOUNDS:
-        consts = tlcrun.constants('fixed', b, calm=False, soft=False)
-        consts.pop('V')
-        consts.pop('Fix')
+        consts = consts_for(b, calm=False, soft=False)
         tlcrun.write_model(d, consts, invs, extends='SlotMoveFixed', module='MC',
                            extra_defs=EDGE_DEFS, copy_spec=False)
-        out, secs = tlcrun.tlc(d, workers=2 if b == 'write' else 1, heavy=HEAVY)
+        out, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
         r = classify(out)
         r['secs'] = round(secs, 1)
         res['runs'][b] = r
@@ -252,14 +265,12 @@ def run_one(idx, kind, line, desc, new_lines, fixed_counts):
             res['by'] = f'{b}: {r.get("prop")}'
             return res
         counts[b] = r['distinct']
-    # no safety property broke: property 7 on move and write
-    for b in ('move', 'write'):
-        consts = tlcrun.constants('fixed', b, calm=True, soft=True)
-        consts.pop('V')
-        consts.pop('Fix')
+    # no safety property broke: property 7 on move
+    for b in ('move',):
+        consts = consts_for(b, calm=True, soft=True)
         tlcrun.write_model(d, consts, ['SoftInv', 'CalmNode'], extends='SlotMoveFixed',
                            module='MC', copy_spec=False)
-        out, secs = tlcrun.tlc(d, workers=2 if b == 'write' else 1, heavy=HEAVY)
+        out, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
         fails, nodes, edges, distinct, errors, keep = tlcrun.parse(out)
         live = agef.check(nodes, edges)
         res['runs'][b + '-live'] = {'stuck': live['stuck'], 'calm': len(nodes), 'secs': round(secs, 1),
@@ -269,6 +280,7 @@ def run_one(idx, kind, line, desc, new_lines, fixed_counts):
             res['by'] = f'{b}: 7'
             return res
     same = all(counts.get(b) == fixed_counts.get(b) for b in BOUNDS)
+    res['bounds'] = list(BOUNDS)
     res['verdict'] = 'equivalent' if same else 'survived'
     res['counts'] = counts
     return res
@@ -299,21 +311,22 @@ def classify(out):
 def fixed_counts():
     """The fixed protocol's distinct state counts (safety runs, no calm)."""
     f = os.path.join(ROOT, 'results', 'fixed-counts.json')
-    if os.path.exists(f):
-        return json.load(open(f))
+    have = json.load(open(f)) if os.path.exists(f) else {}
+    if all(b in have for b in BOUNDS):
+        return have
     d = os.path.join(WORK, 'base')
     os.makedirs(d, exist_ok=True)
     shutil.copy(SRC, os.path.join(d, 'SlotMoveFixed.tla'))
     shutil.copy(os.path.join(ROOT, 'tla', 'SlotMove.tla'), os.path.join(d, 'SlotMove.tla'))
-    counts = {}
+    counts = dict(have)
     for b in BOUNDS:
-        consts = tlcrun.constants('fixed', b, calm=False, soft=False)
-        consts.pop('V')
-        consts.pop('Fix')
+        if b in counts:
+            continue
+        consts = consts_for(b, calm=False, soft=False)
         tlcrun.write_model(d, consts, ['Inv1', 'Inv2', 'Inv3', 'Inv4', 'Inv5', 'Inv6', 'Inv8',
                                        'Inv9'],
                            extends='SlotMoveFixed', module='MC', extra_defs=EDGE_DEFS, copy_spec=False)
-        out, secs = tlcrun.tlc(d, workers=2 if b == 'write' else 1, heavy=HEAVY)
+        out, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
         r = classify(out)
         assert r['verdict'] == 'holds', (b, r, out[-2000:])
         counts[b] = r['distinct']
@@ -322,29 +335,41 @@ def fixed_counts():
 
 
 def equiv():
-    """SlotMoveFixed against SlotMove with V = "fixed": the same states and
-    calm states on every bound (soft checks and the calm graph, as tlcrun)."""
-    d = os.path.join(WORK, 'equiv')
-    os.makedirs(d, exist_ok=True)
-    shutil.copy(SRC, os.path.join(d, 'SlotMoveFixed.tla'))
-    shutil.copy(os.path.join(ROOT, 'tla', 'SlotMove.tla'), os.path.join(d, 'SlotMove.tla'))
+    """SlotMoveFixed against SlotMove with V = "fixed": the same states, calm
+    states and verdicts on the mutant bounds (soft checks and the calm graph,
+    as tlcrun). For move, dedup and deep, SlotMove's counts are slot_move.py's
+    (results/py); for write0 SlotMove is run here too."""
     f = os.path.join(ROOT, 'results', 'fixed-equiv.json')
     out = json.load(open(f)) if os.path.exists(f) else {}
-    for b in ['move', 'moves', 'dedup', 'deep', 'write']:
-        if b in out:
-            continue
-        consts = tlcrun.constants('fixed', b, calm=True, soft=True)
-        consts.pop('V')
-        consts.pop('Fix')
-        tlcrun.write_model(d, consts, ['SoftInv', 'CalmNode'], extends='SlotMoveFixed',
-                           module='MC', copy_spec=False)
-        text, secs = tlcrun.tlc(d, workers=2 if b in ('write', 'moves') else 1, heavy=HEAVY)
-        fails, nodes, edges, distinct, errors, keep = tlcrun.parse(text)
-        live = agef.check(nodes, edges)
-        out[b] = {'states': distinct - len(nodes) if distinct else None, 'calm': len(nodes),
-                  'failed': sorted(fails), 'stuck': live['stuck'], 'errors': errors[:3]}
-        print(b, out[b], flush=True)
-        json.dump(out, open(f, 'w'), indent=1, sort_keys=True)
+    for spec in ('SlotMoveFixed', 'SlotMove'):
+        d = os.path.join(WORK, 'equiv-' + spec)
+        os.makedirs(d, exist_ok=True)
+        shutil.copy(SRC, os.path.join(d, 'SlotMoveFixed.tla'))
+        shutil.copy(os.path.join(ROOT, 'tla', 'SlotMove.tla'), os.path.join(d, 'SlotMove.tla'))
+        for b in (BOUNDS if spec == 'SlotMoveFixed' else ['write0']):
+            key = f'{spec}-{b}'
+            if key in out:
+                continue
+            if spec == 'SlotMove':
+                c = tlcrun.constants('fixed', 'write', calm=True, soft=True)
+                c['D'] = '0'
+            else:
+                c = consts_for(b, calm=True, soft=True)
+            tlcrun.write_model(d, c, ['SoftInv', 'CalmNode'], extends=spec, module='MC', copy_spec=False)
+            text, secs = tlcrun.tlc(d, workers=1, heavy=HEAVY)
+            fails, nodes, edges, distinct, errors, keep = tlcrun.parse(text)
+            live = agef.check(nodes, edges)
+            out[key] = {'states': distinct - len(nodes) if distinct else None, 'calm': len(nodes),
+                        'failed': sorted(fails), 'stuck': live['stuck'], 'errors': errors[:3],
+                        'secs': round(secs, 1)}
+            if b in ('move', 'dedup', 'deep'):
+                pf = os.path.join(ROOT, 'results', 'py', f'fixed-{b}.json')
+                if os.path.exists(pf):
+                    pr = json.load(open(pf))
+                    out[key]['same_as_slot_move_py'] = (pr['states'] == out[key]['states']
+                                                       and pr['live_nodes'] == out[key]['calm'])
+            print(key, out[key], flush=True)
+            json.dump(out, open(f, 'w'), indent=1, sort_keys=True)
 
 
 def main():
@@ -354,6 +379,8 @@ def main():
     ap.add_argument('--budget', type=float, default=0)
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--left', action='store_true', help='print how many mutants are not run yet')
+    ap.add_argument('--redo-survivors', action='store_true',
+                    help='run again the mutants no bound caught, on the bounds not tried yet')
     ap.add_argument('--run', action='store_true')
     ap.add_argument('--slice', default='1/1')
     ap.add_argument('--table', action='store_true')
@@ -383,7 +410,11 @@ def main():
         k, n = map(int, a.slice.split('/'))
         only = set(int(x) for x in a.only.split(',')) if a.only else None
         for idx, (kind, line, desc, new) in enumerate(muts, 1):
-            if (idx - 1) % n != k - 1 or f'm{idx:03d}' in results:
+            prev = results.get(f'm{idx:03d}')
+            if (idx - 1) % n != k - 1:
+                continue
+            if prev and not (a.redo_survivors and prev['verdict'] in ('survived', 'equivalent')
+                             and not set(BOUNDS) <= set(prev['runs'])):
                 continue
             if only and idx not in only:
                 continue

@@ -10,10 +10,11 @@
 #   ./run.sh bad      both on the known-bad histories: E-22's 7 mutant runs and lin-kv from before fix G1
 #   ./run.sh por      Porcupine per partition on every other history file
 #   ./run.sh small    jobs: every partition of 120 ops or fewer in every other file, cut in 3 chunks
+#                     (chunks 2 and 3 shuffled, so a cut at 25 min leaves a random sample)
 #   ./run.sh small1 | small2 | small3    Knossos on one chunk (each one heavy hold, cut at 25 min)
 #   ./run.sh big      Knossos on KBIG partitions per file drawn from the 600 with more than 120 ops
 #                     (p09, p22), LIMITBIG ms each, the hold cut at 25 min
-#   ./run.sh report   results/knossos-small.md from the three chunks
+#   ./run.sh report   results/knossos-small.md from the three chunks, and results/knossos-summary.md
 #   ./run.sh          all of the above, in that order. Several steps may be named: ./run.sh build self
 # Every JVM and Go step runs under $SP/bin/heavy, one hold per step, each under 30 minutes.
 # Inputs: E-22's histories in $SP/e22v (edn/, hist/, lin-kv-calm-before.jsonl, elle-raw.jsonl), its Go
@@ -41,6 +42,8 @@ BAD="$V/lin-kv-calm-before.jsonl $V/hist/mut-nodedup-lin-kv.jsonl $V/hist/mut-lo
  $V/hist/mut-nodedup-core-exactly-once.jsonl $V/hist/mut-nodedup-p11.jsonl $V/hist/mut-lostcommit-p11.jsonl \
  $V/hist/mut-nodedup-p14.jsonl $V/hist/mut-lostcommit-p14.jsonl"
 OTHER=$(ls "$V"/hist/*.jsonl | grep -v -e /lin-kv- -e /mut-)
+colons() { echo $* | tr ' ' ':'; }
+POR="$W/por-pilot.jsonl=$(colons $LINKV),$W/por-bad.jsonl=$(colons $BAD),$W/por-other.jsonl=$(colons $OTHER)"
 
 if want build; then
   rm -rf "$B"; mkdir -p "$B"
@@ -69,6 +72,7 @@ if want elle; then
   { head "ablation: real Elle 0.2.8 with the Go port's rule for never-read appends (E22B_RULE=port)"
     $HEAVY sh -c "E22B_RULE=port $JAVA clojure.main $HERE/clj/elle_check.clj $W/elle-portrule.jsonl $V/edn/*.edn"
     python3 -I "$HERE/compare.py" elle "$V/elle-raw.jsonl" "$W/elle-portrule.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/elle-portrule.md"
+  python3 -I "$HERE/compare.py" elletsv "$V/elle-raw.jsonl" "$W/elle-real.jsonl" "$W/elle-portrule.jsonl" > "$R/elle-verdicts.tsv"
   { head "real Elle 0.2.8's explanation of undo-calm-seed14 at read committed (the port finds it valid)"
     cat "$V/edn/undo-calm-seed14.edn"; echo
     $HEAVY sh -c "$JAVA clojure.main $HERE/clj/elle_explain.clj read-committed $V/edn/undo-calm-seed14.edn"; } 2>&1 | grep -v JAVA_TOOL > "$R/elle-explain-undo-calm-seed14.txt"
@@ -79,14 +83,14 @@ if want pilot; then
   : > "$W/jobs-pilot.jsonl"; python3 -I "$HERE/prep.py" all "$W/jobs-pilot.jsonl" $LINKV
   { head "pilot: Knossos (competition) on every lin-kv partition, time limit $LIMIT ms"
     $HEAVY sh -c "$B/e22b parts $W/por-pilot.jsonl $LINKV && $JAVA $KN $W/jobs-pilot.jsonl $W/knossos-pilot.jsonl $LIMIT"
-    python3 -I "$HERE/compare.py" knossos "$W/por-pilot.jsonl" "$W/knossos-pilot.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-linkv.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-pilot.jsonl=$W/jobs-pilot.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-linkv.md"
 fi
 
 if want bad; then
   : > "$W/jobs-bad.jsonl"; python3 -I "$HERE/prep.py" all "$W/jobs-bad.jsonl" $BAD
   { head "Knossos (competition) on the known-bad histories, time limit $LIMIT ms"
     $HEAVY sh -c "$B/e22b parts $W/por-bad.jsonl $BAD && $JAVA $KN $W/jobs-bad.jsonl $W/knossos-bad.jsonl $LIMIT"
-    python3 -I "$HERE/compare.py" knossos "$W/por-bad.jsonl" "$W/knossos-bad.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-bad.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-bad.jsonl=$W/jobs-bad.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-bad.md"
 fi
 
 if want por; then $HEAVY "$B/e22b" parts "$W/por-other.jsonl" $OTHER; fi
@@ -94,6 +98,9 @@ if want por; then $HEAVY "$B/e22b" parts "$W/por-other.jsonl" $OTHER; fi
 if want small; then
   rm -f "$W"/jobs-small*; python3 -I "$HERE/prep.py" sample "$W/jobs-small.jsonl" 0 0 120 $OTHER 2> "$W/small-draw.txt"
   ( cd "$W" && split -n l/3 -d -a 1 jobs-small.jsonl jobs-small- ) && wc -l "$W"/jobs-small-*
+  # chunk 0 ran in file order and finished; chunks 1 and 2 hold the slow p08, p17 partitions and are
+  # cut at 25 min, so they run in a seeded random order: what a cut leaves checked is a random sample
+  python3 -I "$HERE/prep.py" shuffle "$W/jobs-small-1" 2212; python3 -I "$HERE/prep.py" shuffle "$W/jobs-small-2" 2213
 fi
 for i in 0 1 2; do
   if want small$((i + 1)); then
@@ -106,12 +113,15 @@ if want big; then
   { head "Knossos (competition) on $KBIG partitions per file of more than 120 ops, $LIMITBIG ms each, the hold cut at 25 min"
     grep -v " 0 with" "$W/big-draw.txt"
     $HEAVY sh -c "timeout 1500 $JAVA $KN $W/jobs-big.jsonl $W/knossos-big.jsonl $LIMITBIG" || echo "stopped: exit $?"
-    python3 -I "$HERE/compare.py" knossos "$W/por-other.jsonl" "$W/knossos-big.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-big.md"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$W/knossos-big.jsonl=$W/jobs-big.jsonl"; } 2>&1 | grep -v JAVA_TOOL > "$R/knossos-big.md"
 fi
 
 if want report; then
-  cat "$W"/knossos-small-[012].jsonl > "$W/knossos-small.jsonl"
-  { head "Knossos (competition) on every partition of 120 ops or fewer in every other history file, time limit $LIMIT ms"
-    echo "# jobs: $(wc -l < "$W/jobs-small.jsonl") partitions; checked: $(wc -l < "$W/knossos-small.jsonl")"
-    python3 -I "$HERE/compare.py" knossos "$W/por-other.jsonl" "$W/knossos-small.jsonl"; } > "$R/knossos-small.md"
+  SMALL="$W/knossos-small-0.jsonl=$W/jobs-small-0,$W/knossos-small-1.jsonl=$W/jobs-small-1,$W/knossos-small-2.jsonl=$W/jobs-small-2"
+  { echo "# Knossos (competition) on the partitions of 120 ops or fewer in every other history file, time limit $LIMIT ms"
+    echo "# jobs: $(wc -l < "$W/jobs-small.jsonl") partitions; checked: $(cat "$W"/knossos-small-[012].jsonl | wc -l)"
+    python3 -I "$HERE/compare.py" knossos "$POR" "$SMALL"; } > "$R/knossos-small.md"
+  { echo "# Knossos 0.3.16 beside Porcupine v1.3.1: every run, per group and mode"
+    python3 -I "$HERE/compare.py" knsum "$POR" \
+      "$W/knossos-pilot.jsonl=$W/jobs-pilot.jsonl,$W/knossos-bad.jsonl=$W/jobs-bad.jsonl,$SMALL,$W/knossos-big.jsonl=$W/jobs-big.jsonl"; } > "$R/knossos-summary.md"
 fi

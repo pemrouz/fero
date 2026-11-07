@@ -1,0 +1,34 @@
+redpanda fsync: broker API versions (first broker), share-group APIs and a count:
+ShareGroupHeartbeat(76): UNSUPPORTED,
+ShareGroupDescribe(77): UNSUPPORTED,
+ShareFetch(78): UNSUPPORTED,
+ShareAcknowledge(79): UNSUPPORTED,
+InitializeShareGroupState(83): UNSUPPORTED,
+ReadShareGroupState(84): UNSUPPORTED,
+WriteShareGroupState(85): UNSUPPORTED,
+DeleteShareGroupState(86): UNSUPPORTED,
+ReadShareGroupStateSummary(87): UNSUPPORTED,
+DescribeShareGroupOffsets(90): UNSUPPORTED,
+AlterShareGroupOffsets(91): UNSUPPORTED,
+DeleteShareGroupOffsets(92): UNSUPPORTED,
+(the tool lists the 3 brokers; each line above appeared 3 times) APIs listed with a usable version: 135; marked UNSUPPORTED: 102
+topic tcfg configs set at create: Dynamic configs for topic tcfg are:
+rpk cluster config get write_caching_default: "false"
+rpk topic describe tcfg -c (caching and flush lines): flush.bytes 262144 DEFAULT_CONFIG | flush.ms 100 DEFAULT_CONFIG | write.caching false DEFAULT_CONFIG
+redpanda wcache: broker API versions (first broker), share-group APIs and a count:
+ShareGroupHeartbeat(76): UNSUPPORTED,
+ShareGroupDescribe(77): UNSUPPORTED,
+ShareFetch(78): UNSUPPORTED,
+ShareAcknowledge(79): UNSUPPORTED,
+InitializeShareGroupState(83): UNSUPPORTED,
+ReadShareGroupState(84): UNSUPPORTED,
+WriteShareGroupState(85): UNSUPPORTED,
+DeleteShareGroupState(86): UNSUPPORTED,
+ReadShareGroupStateSummary(87): UNSUPPORTED,
+DescribeShareGroupOffsets(90): UNSUPPORTED,
+AlterShareGroupOffsets(91): UNSUPPORTED,
+DeleteShareGroupOffsets(92): UNSUPPORTED,
+(the tool lists the 3 brokers; each line above appeared 3 times) APIs listed with a usable version: 135; marked UNSUPPORTED: 102
+topic tcfg configs set at create: Dynamic configs for topic tcfg are:
+rpk cluster config get write_caching_default: "true"
+rpk topic describe tcfg -c (caching and flush lines): flush.bytes 262144 DEFAULT_CONFIG | flush.ms 100 DEFAULT_CONFIG | write.caching true DEFAULT_CONFIG

@@ -14,7 +14,7 @@ import tokenize
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 RES = os.path.join(ROOT, 'results')
-ORDER = ('fixN', 'rekey', 'rekey+giveup', 'rekey-carry', 'rekey-carry+giveup', 'slot', 'slot+giveup',
+ORDER = ('fixN', 'rekey', 'rekey-alt', 'rekey+giveup', 'rekey-carry', 'rekey-carry+giveup', 'slot', 'slot+giveup',
          'pslot', 'pslot+giveup', 'split', 'split+giveup', 'lanes', 'lanes+giveup')
 
 

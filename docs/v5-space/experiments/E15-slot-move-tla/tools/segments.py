@@ -28,6 +28,8 @@ sys.path.insert(0, HERE)
 import tlcrun  # noqa: E402
 import agef  # noqa: E402
 
+HEAP = os.environ.get('E15_HEAP', '7g')  # TLCCache grows with the states: about 0.4 KB a state
+
 
 def segment(variant, bound, seconds, workers, cap):
     name = f'{variant}-{bound}'
@@ -52,7 +54,7 @@ def segment(variant, bound, seconds, workers, cap):
             with open(os.path.join(d, 'MC.cfg'), 'a') as f:
                 f.write('CONSTRAINT CapOK\n')
     k = st['segments'] + 1
-    cmd = ['java', '-XX:+UseParallelGC', '-Xmx3g', '-cp', tlcrun.JAR, 'tlc2.TLC',
+    cmd = ['java', '-XX:+UseParallelGC', f'-Xmx{HEAP}', '-cp', tlcrun.JAR, 'tlc2.TLC',
            '-workers', str(workers), '-nowarning', '-fp', '7', '-checkpoint', '3', '-metadir', 'st']
     if k > 1:
         last = sorted(glob.glob(os.path.join(d, 'st', '*', 'vars.chkpt')))
@@ -83,8 +85,12 @@ def segment(variant, bound, seconds, workers, cap):
 
 def merge(variant, bound, d, st, workers, cap):
     fails, nodes, edges, distinct, errors = {}, {}, [], None, []
-    for k in range(1, st['segments'] + 1):
-        f, n, e, dist, err, _ = tlcrun.parse(open(os.path.join(d, f'seg{k}.out')).read())
+    # every segment's output, including one cut short by hand (seg<k>b.out):
+    # its prints after its last checkpoint are repeated later, the ones
+    # before are not, so all are kept; the distinct count is the last one's
+    outs = sorted(glob.glob(os.path.join(d, 'seg*.out')), key=os.path.getmtime)
+    for fn in outs:
+        f, n, e, dist, err, _ = tlcrun.parse(open(fn).read())
         for p, s in f.items():
             fails[p] = min(s, fails.get(p, s))
         nodes.update(n)
@@ -105,9 +111,9 @@ def merge(variant, bound, d, st, workers, cap):
     with open(os.path.join(tlcrun.OUT, f'{variant}-{bound}.json'), 'w') as f:
         json.dump(res, f, indent=1, sort_keys=True)
     with open(os.path.join(tlcrun.OUT, f'{variant}-{bound}.log'), 'w') as f:
-        for k in range(1, st['segments'] + 1):
-            lines = [l for l in open(os.path.join(d, f'seg{k}.out')) if not l.startswith('<<')]
-            f.write(f'--- segment {k}\n' + ''.join(lines[-25:]))
+        for fn in sorted(glob.glob(os.path.join(d, 'seg*.out')), key=os.path.getmtime):
+            lines = [l for l in open(fn) if not l.startswith('<<')]
+            f.write(f'--- {os.path.basename(fn)}\n' + ''.join(lines[-25:]))
 
 
 def main():

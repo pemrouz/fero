@@ -5,6 +5,8 @@
       E-22's 8 Elle self-test cases as EDN files self-elle-<i>.edn.
   prep.py self <selftest.json> <jobs.jsonl>
       E-22's 18 Porcupine self-test cases (dumped by `e22b dumpself`) as jobs.
+  prep.py shuffle <jobs.jsonl> <seed>
+      shuffle a job file in place (seeded), so a run cut short by time checks a random sample.
   prep.py all <jobs.jsonl> <hist.jsonl>...
       every partition of every seed of the given history files.
   prep.py sample <jobs.jsonl> <k> <min-ops> <max-ops> <hist.jsonl>...
@@ -39,6 +41,13 @@ def main():
         for i, c in enumerate(d["elle"]):
             with open(os.path.join(sys.argv[3], f"self-elle-{i}.edn"), "w") as w:
                 w.write(c["edn"].strip() + "\n")
+        return
+    if cmd == "shuffle":
+        lines = open(sys.argv[2]).readlines()
+        random.Random(int(sys.argv[3])).shuffle(lines)
+        with open(sys.argv[2] + ".tmp", "w") as w:
+            w.writelines(lines)
+        os.replace(sys.argv[2] + ".tmp", sys.argv[2])
         return
     if cmd == "self":
         d = json.load(open(sys.argv[2]))

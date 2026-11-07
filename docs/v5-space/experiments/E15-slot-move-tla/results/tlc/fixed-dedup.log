@@ -1,0 +1,43 @@
+Picked up JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStoreType=JKS -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=34239 -Dhttp.nonProxyHosts=localhost|127.0.0.1|::1|127.*|0.*|::|169.254.*|api.anthropic.com|api-staging.anthropic.com|api-pr-preview.anthropic.com|mcp-proxy.anthropic.com|mcp-proxy-staging.anthropic.com|registry.npmjs.org|jsr.io|npm.jsr.io|pypi.org|files.pythonhosted.org|index.crates.io|proxy.golang.org|host.docker.internal|10.*|172.16.*|172.17.*|172.18.*|172.19.*|172.20.*|172.21.*|172.22.*|172.23.*|172.24.*|172.25.*|172.26.*|172.27.*|172.28.*|172.29.*|172.30.*|172.31.*|192.168.*|100.64.0.0/10|*.svc.cluster.local|*.svc.cluster.local -Djdk.http.auth.tunneling.disabledSchemes= -Djdk.http.auth.proxying.disabledSchemes=
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 8927796488226362806 with 2 workers on 4 cores with 2731MB heap and 64MB offheap memory [pid: 32484] (Linux 6.18.44-fc-v242 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e15/runs/fixed-dedup/MC.tla
+Parsing file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e15/runs/fixed-dedup/SlotMove.tla
+Parsing file /tmp/tlc-4074089333237525086/_TLCTrace.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file /tmp/tlc-4074089333237525086/Integers.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Parsing file /tmp/tlc-4074089333237525086/Sequences.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file /tmp/tlc-4074089333237525086/FiniteSets.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file /tmp/tlc-4074089333237525086/TLC.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file /tmp/tlc-4074089333237525086/TLCExt.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Parsing file /tmp/tlc-4074089333237525086/Naturals.tla (jar:file:/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Semantic processing of module Naturals
+Semantic processing of module Integers
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module TLCExt
+Semantic processing of module SlotMove
+Semantic processing of module _TLCTrace
+Semantic processing of module MC
+Linting of module TLCExt
+Linting of module SlotMove
+Linting of module _TLCTrace
+Linting of module MC
+Starting... (2026-11-06 22:29:27)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-06 22:29:28.
+Progress(9) at 2026-11-06 22:29:31: 6,934 states generated (6,934 s/min), 1,997 distinct states found (1,997 ds/min), 907 states left on queue.
+Progress(18) at 2026-11-06 22:30:31: 607,289 states generated (600,355 s/min), 95,364 distinct states found (93,367 ds/min), 23,922 states left on queue.
+Progress(21) at 2026-11-06 22:31:31: 1,212,272 states generated (604,983 s/min), 170,277 distinct states found (74,913 ds/min), 29,184 states left on queue.
+Progress(23) at 2026-11-06 22:32:31: 1,652,604 states generated (440,332 s/min), 223,291 distinct states found (53,014 ds/min), 26,209 states left on queue.
+Progress(25) at 2026-11-06 22:33:31: 2,017,394 states generated (364,790 s/min), 271,742 distinct states found (48,451 ds/min), 22,152 states left on queue.
+Progress(28) at 2026-11-06 22:34:31: 2,376,241 states generated (358,847 s/min), 322,182 distinct states found (50,440 ds/min), 15,150 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 4.5E-8
+  based on the actual fingerprints:  val = 7.6E-9
+2679286 states generated, 356956 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 35.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 4).
+Finished in 05min 53s at (2026-11-06 22:35:19)

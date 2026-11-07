@@ -2,7 +2,19 @@
 ;; elle_explain.clj; see elle_check.clj for why invokes are added).
 (ns e22b.pairing
   (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [elle.list-append :as la]))
+
+(defn port-rule-if-asked!
+  "E22B_RULE=port: swap Elle 0.2.8's previously-appended-element for the Go port's rule (an
+  append no read ever saw has no known predecessor, so it gets no ww or rw edge). See elle_check.clj."
+  []
+  (when (= "port" (System/getenv "E22B_RULE"))
+    (alter-var-root #'la/previously-appended-element
+                    (fn [orig]
+                      (fn [append-index write-index op [f k v :as mop]]
+                        (when (some? (get-in append-index [k :indices v]))
+                          (orig append-index write-index op mop)))))))
 
 (defn read-ops [file]
   (with-open [r (java.io.PushbackReader. (io/reader file))]

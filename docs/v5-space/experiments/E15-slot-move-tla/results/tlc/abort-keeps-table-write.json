@@ -1,0 +1,23 @@
+{
+ "bound": "write",
+ "calm_states": 1436,
+ "complete": true,
+ "distinct_total": 556190,
+ "errors": [],
+ "failed": [
+  1,
+  9
+ ],
+ "kind": "mutant",
+ "live_edges": 2018,
+ "live_stuck": 0,
+ "secs": 326.7,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 554754,
+ "steps": {
+  "1": 18,
+  "9": 16
+ },
+ "variant": "abort-keeps-table",
+ "workers": 2
+}

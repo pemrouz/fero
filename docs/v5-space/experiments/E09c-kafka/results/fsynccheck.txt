@@ -1,0 +1,16 @@
+kafka default: producer at 2000 records/s on 16 partitions; strace of server 1 for 8 s:
+strace: Process 11535 attached with 111 threads
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.017595         325        54           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.017595         325        54           total
+['40000 records sent, 1995.311019 records/sec (1.95 MB/sec), 62.67 ms avg latency, 1081.00 ms max latency, 37 ms 50th, 261 ms 95th, 471 ms 99th, 532 ms 99.9th.']
+kafka flush1: producer at 2000 records/s on 16 partitions; strace of server 1 for 8 s:
+strace: Process 18498 attached with 111 threads
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.283484         170      1666           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.283484         170      1666           total
+['40000 records sent, 1985.013151 records/sec (1.94 MB/sec), 213.77 ms avg latency, 1439.00 ms max latency, 150 ms 50th, 684 ms 95th, 908 ms 99th, 1175 ms 99.9th.']

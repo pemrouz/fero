@@ -1,0 +1,16 @@
+kafka default: broker API versions (first broker), share-group APIs and a count:
+ShareGroupHeartbeat(76): 1 [usable: 1],
+ShareGroupDescribe(77): 1 [usable: 1],
+ShareFetch(78): 1 to 2 [usable: 2],
+ShareAcknowledge(79): 1 to 2 [usable: 2],
+InitializeShareGroupState(83): 0 [usable: 0],
+ReadShareGroupState(84): 0 [usable: 0],
+WriteShareGroupState(85): 0 to 1 [usable: 1],
+DeleteShareGroupState(86): 0 [usable: 0],
+ReadShareGroupStateSummary(87): 0 to 1 [usable: 1],
+DescribeShareGroupOffsets(90): 0 to 1 [usable: 1],
+AlterShareGroupOffsets(91): 0 [usable: 0],
+DeleteShareGroupOffsets(92): 0 [usable: 0],
+(the tool lists the 3 brokers; each line above appeared 3 times) APIs listed with a usable version: 231; marked UNSUPPORTED: 6
+topic tcfg configs set at create: Dynamic configs for topic tcfg are: min.insync.replicas=2 sensitive=false synonyms={DYNAMIC_TOPIC_CONFIG:min.insync.replicas=2, DYNAMIC_DEFAULT_BROKER_CONFIG:min.insync.replicas=2, STATIC_BROKER_CONFIG:min.insync.replicas=2, DEFAULT_CONFIG:min.insync.replicas=1}
+features: Feature: metadata.version                          SupportedMinVersion: 3.3-IV3          SupportedMaxVersion: 4.4-IV2          FinalizedVersionLevel: 4.4-IV2          Epoch: 86 | Feature: share.version                             SupportedMinVersion: 0                SupportedMaxVersion: 2                FinalizedVersionLevel: 2                Epoch: 86

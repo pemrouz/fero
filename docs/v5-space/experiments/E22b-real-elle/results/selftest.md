@@ -1,4 +1,4 @@
-# self-test: real Elle 0.2.8 and Knossos 0.3.16, 2026-11-06T22:07:29Z, openjdk version "21.0.12.1" 2026-08-18, 4 vCPU, load 11.54 6.96 6.45
+# self-test: real Elle 0.2.8 and Knossos 0.3.16, 2026-11-06T22:13:17Z, openjdk version "21.0.12.1" 2026-08-18, 4 vCPU, load 12.09 11.00 8.56
 # Real Elle 0.2.8 on E-22's 8 Elle self-test cases
 
 | case | want rc / sr | port rc / sr | real rc / sr | real anomaly types | must-have found by real | agree |
@@ -6,13 +6,13 @@
 | good: serial appends and reads | True / True | True / True | True / True | none | -: True | yes |
 | bad G0: two units write x and y in opposite orders | False / False | False / False | False / False | G0 | G0: True | yes |
 | bad G1c: each unit reads the other's append | False / False | False / False | False / False | G1c | G1c: True | yes |
-| bad G1a: a read sees a failed unit's append | | | ERROR class java.lang.UnsupportedOperationException: count not supported on this type: Boolean | | | no |
+| bad G1a: a read sees a failed unit's append | False / False | False / False | False / False | G1a, empty-transaction-graph | G1a: True | yes |
 | bad G-single: a fractured read (half a unit) | True / False | True / False | True / False | G-single-item | G-single: True | yes |
 | bad G2-item: write skew | True / False | True / False | True / False | G2-item | G2-item: True | yes |
 | bad: a list that loses an element (incompatible order) | False / False | False / False | False / False | incompatible-order | incompatible-order: True | yes |
 | bad: an element appended once, read twice | False / False | False / False | False / False | duplicate-elements | duplicate-elements: True | yes |
 
-7 of 8 cases: real Elle gives the expected verdict and finds the named anomaly.
+8 of 8 cases: real Elle gives the expected verdict and finds the named anomaly.
 
 # Knossos 0.3.16 (E-22's partition model, ported) on E-22's 18 Porcupine self-test cases
 

@@ -1,0 +1,2 @@
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2026-11-06 23:31:24:902, 2026-11-06 23:31:27:809, 878.9063, 302.3413, 900000, 309597.5232, 1021, 1886, 466.0160, 477200.4242

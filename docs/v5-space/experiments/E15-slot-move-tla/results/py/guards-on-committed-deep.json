@@ -1,0 +1,26 @@
+{
+ "bound": "deep",
+ "capped": false,
+ "failed": [
+  1,
+  2,
+  4,
+  6,
+  9
+ ],
+ "kind": "mutant",
+ "live_nodes": 31856,
+ "live_starts": 4797,
+ "live_stuck": 0,
+ "secs": 72.6,
+ "states": 526891,
+ "steps": {
+  "1": 20,
+  "2": 21,
+  "4": 18,
+  "6": 17,
+  "9": 18
+ },
+ "transitions": 1897202,
+ "variant": "guards-on-committed"
+}

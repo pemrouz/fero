@@ -1,0 +1,18 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  5
+ ],
+ "kind": "mutant",
+ "live_nodes": 1737,
+ "live_starts": 400,
+ "live_stuck": 0,
+ "secs": 256.5,
+ "states": 1116592,
+ "steps": {
+  "5": 21
+ },
+ "transitions": 3304355,
+ "variant": "no-carried-outcomes"
+}

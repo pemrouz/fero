@@ -1,0 +1,95 @@
+redpanda:fsync:max-default run 0: {"total": {"records": 60000.0, "rec_s": 48154.093098, "mb_s": 47.03, "avg_ms": 248.37, "max_ms": 479.0, "p50": 243.0, "p95": 428.0, "p99": 451.0, "p999": 472.0}, "steady": {"records": 50000.0, "rec_s": 59952.038369, "mb_s": 58.55, "avg_ms": 285.3, "max_ms": 479.0, "p50": 283.0, "p95": 432.0, "p99": 452.0, "p999": 472.0}} {'n': 60000, 'rc': 0, 'wall_s': 2.48, 'server_cores': 0.42, 'client_cores': 1.66, 'other_cores': 0.13}
+Warmup first 10000 records. Steady state results will print after the complete test summary.
+60000 records sent, 48154.093098 records/sec (47.03 MB/sec), 248.37 ms avg latency, 479.00 ms max latency, 243 ms 50th, 428 ms 95th, 451 ms 99th, 472 ms 99.9th.
+50000 steady state records sent, 59952.038369 records/sec (58.55 MB/sec), 285.30 ms avg latency, 479.00 ms max latency, 283 ms 50th, 432 ms 95th, 452 ms 99th, 472 ms 99.9th.
+
+redpanda:fsync:consume run 0: {"start.time": "2026-11-07 00:03:45:385", "end.time": "2026-11-07 00:03:49:056", "data.consumed.in.MB": 58.5938, "MB.sec": 15.9613, "data.consumed.in.nMsg": 60000.0, "nMsg.sec": 16344.3203, "rebalance.time.ms": 3478.0, "fetch.time.ms": 193.0, "fetch.MB.sec": 303.5946, "fetch.nMsg.sec": 310880.829} {'n': 60000, 'rc': 0, 'wall_s': 5.93, 'server_cores': 0.05, 'client_cores': 0.54, 'other_cores': 0.03}
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2026-11-07 00:03:45:385, 2026-11-07 00:03:49:056, 58.5938, 15.9613, 60000, 16344.3203, 3478, 193, 303.5946, 310880.8290
+
+redpanda:fsync:share-4c run 0: {"unsupported": true} {'n': 60000, 'rc': None, 'wall_s': None, 'server_cores': None, 'client_cores': None, 'other_cores': None}
+share groups: not supported by this server (see apicheck.txt)
+
+redpanda:fsync:max-omb run 0: {"total": {"records": 150000.0, "rec_s": 132042.253521, "mb_s": 128.95, "avg_ms": 115.73, "max_ms": 271.0, "p50": 110.0, "p95": 209.0, "p99": 262.0, "p999": 270.0}, "steady": {"records": 125000.0, "rec_s": 164473.684211, "mb_s": 160.62, "avg_ms": 122.45, "max_ms": 271.0, "p50": 116.0, "p95": 210.0, "p99": 262.0, "p999": 270.0}} {'n': 150000, 'rc': 0, 'wall_s': 2.44, 'server_cores': 0.36, 'client_cores': 1.74, 'other_cores': 0.06}
+Warmup first 25000 records. Steady state results will print after the complete test summary.
+150000 records sent, 132042.253521 records/sec (128.95 MB/sec), 115.73 ms avg latency, 271.00 ms max latency, 110 ms 50th, 209 ms 95th, 262 ms 99th, 270 ms 99.9th.
+125000 steady state records sent, 164473.684211 records/sec (160.62 MB/sec), 122.45 ms avg latency, 271.00 ms max latency, 116 ms 50th, 210 ms 95th, 262 ms 99th, 270 ms 99.9th.
+
+server 13619 rss_mb 492
+server 13620 rss_mb 497
+server 13621 rss_mb 470
+redpanda:fsync:half run 0: {"total": {"records": 1000.0, "rec_s": 199.680511, "mb_s": 0.2, "avg_ms": 3.52, "max_ms": 286.0, "p50": 3.0, "p95": 11.0, "p99": 16.0, "p999": 286.0}, "steady": {"records": 800.0, "rec_s": 199.451508, "mb_s": 0.19, "avg_ms": 2.57, "max_ms": 8.0, "p50": 2.0, "p95": 4.0, "p99": 6.0, "p999": 8.0}, "e2e": {"count": 800, "skipped": 200, "p50": 3, "p90": 3, "p99": 6, "p999": 8, "max": 8, "mean": 2.835}, {'n': 200, 'rc': 0, 'wall_s': 6.3, 'server_cores': 0.16, 'client_cores': 1.14, 'other_cores': -0.23}
+Warmup first 200 records. Steady state results will print after the complete test summary.
+1000 records sent, 199.680511 records/sec (0.20 MB/sec), 3.52 ms avg latency, 286.00 ms max latency, 3 ms 50th, 11 ms 95th, 16 ms 99th, 286 ms 99.9th.
+800 steady state records sent, 199.451508 records/sec (0.19 MB/sec), 2.57 ms avg latency, 8.00 ms max latency, 2 ms 50th, 4 ms 95th, 6 ms 99th, 8 ms 99.9th.
+
+--- e2e consumer ---
+{"count":800,"skipped":200,"p50":3,"p90":3,"p99":6,"p999":8,"max":8,"mean":2.835}
+
+redpanda:fsync:rate50k run 0: {"total": {"records": 250000.0, "rec_s": 49840.510367, "mb_s": 48.67, "avg_ms": 9.96, "max_ms": 281.0, "p50": 3.0, "p95": 56.0, "p99": 94.0, "p999": 125.0}, "steady": {"records": 200000.0, "rec_s": 49640.109208, "mb_s": 48.48, "avg_ms": 3.24, "max_ms": 17.0, "p50": 3.0, "p95": 6.0, "p99": 8.0, "p999": 11.0}, "e2e": {"count": 200000, "skipped": 50000, "p50": 3, "p90": 5, "p99": 9, "p999": 12, "max" {'n': 50000, 'rc': 0, 'wall_s': 6.28, 'server_cores': 0.61, 'client_cores': 1.85, 'other_cores': -0.16}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+250000 records sent, 49840.510367 records/sec (48.67 MB/sec), 9.96 ms avg latency, 281.00 ms max latency, 3 ms 50th, 56 ms 95th, 94 ms 99th, 125 ms 99.9th.
+200000 steady state records sent, 49640.109208 records/sec (48.48 MB/sec), 3.24 ms avg latency, 17.00 ms max latency, 3 ms 50th, 6 ms 95th, 8 ms 99th, 11 ms 99.9th.
+
+--- e2e consumer ---
+{"count":200000,"skipped":50000,"p50":3,"p90":5,"p99":9,"p999":12,"max":16,"mean":3.575}
+
+redpanda:fsync:e2e1 run 0: {"avg_ms": 2.3199, "p50": 2.0, "p99": 6.0, "p999": 52.0} {'n': 1000, 'rc': 0, 'wall_s': 34.28, 'server_cores': 0.06, 'client_cores': 0.21, 'other_cores': 0.02}
+0	52.305981
+Avg latency: 2.3199 ms
+Percentiles: 50th = 2, 99th = 6, 99.9th = 52
+
+redpanda:fsync:ack1 run 0: {"count": 2000, "rate": 1139.9, "p50": 774, "p90": 1223, "p99": 2391, "p999": 4862, "max": 8471, "mean": 868.2} {'n': 2000, 'rc': 0, 'wall_s': 2.98, 'server_cores': 0.44, 'client_cores': 1.4, 'other_cores': 0.13}
+{"count":2000,"rate":1139.9,"p50":774,"p90":1223,"p99":2391,"p999":4862,"max":8471,"mean":868.2}
+
+server 18723 rss_mb 574
+server 18724 rss_mb 572
+server 18725 rss_mb 570
+redpanda:wcache:max-default run 0: {"total": {"records": 90000.0, "rec_s": 66420.664207, "mb_s": 64.86, "avg_ms": 167.16, "max_ms": 325.0, "p50": 166.0, "p95": 297.0, "p99": 310.0, "p999": 316.0}, "steady": {"records": 75000.0, "rec_s": 92024.539877, "mb_s": 89.87, "avg_ms": 191.82, "max_ms": 325.0, "p50": 181.0, "p95": 300.0, "p99": 310.0, "p999": 317.0}} {'n': 90000, 'rc': 0, 'wall_s': 2.61, 'server_cores': 0.43, 'client_cores': 1.78, 'other_cores': 0.09}
+Warmup first 15000 records. Steady state results will print after the complete test summary.
+90000 records sent, 66420.664207 records/sec (64.86 MB/sec), 167.16 ms avg latency, 325.00 ms max latency, 166 ms 50th, 297 ms 95th, 310 ms 99th, 316 ms 99.9th.
+75000 steady state records sent, 92024.539877 records/sec (89.87 MB/sec), 191.82 ms avg latency, 325.00 ms max latency, 181 ms 50th, 300 ms 95th, 310 ms 99th, 317 ms 99.9th.
+
+redpanda:wcache:consume run 0: {"start.time": "2026-11-07 00:06:35:457", "end.time": "2026-11-07 00:06:39:314", "data.consumed.in.MB": 87.8906, "MB.sec": 22.7873, "data.consumed.in.nMsg": 90000.0, "nMsg.sec": 23334.1976, "rebalance.time.ms": 3611.0, "fetch.time.ms": 246.0, "fetch.MB.sec": 357.279, "fetch.nMsg.sec": 365853.6585} {'n': 90000, 'rc': 0, 'wall_s': 6.18, 'server_cores': 0.06, 'client_cores': 0.54, 'other_cores': 0.04}
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2026-11-07 00:06:35:457, 2026-11-07 00:06:39:314, 87.8906, 22.7873, 90000, 23334.1976, 3611, 246, 357.2790, 365853.6585
+
+redpanda:wcache:share-4c run 0: {"unsupported": true} {'n': 90000, 'rc': None, 'wall_s': None, 'server_cores': None, 'client_cores': None, 'other_cores': None}
+share groups: not supported by this server (see apicheck.txt)
+
+redpanda:wcache:max-omb run 0: {"total": {"records": 200000.0, "rec_s": 146198.830409, "mb_s": 142.77, "avg_ms": 96.87, "max_ms": 306.0, "p50": 86.0, "p95": 217.0, "p99": 281.0, "p999": 305.0}, "steady": {"records": 166667.0, "rec_s": 192456.120092, "mb_s": 187.95, "avg_ms": 111.81, "max_ms": 306.0, "p50": 99.0, "p95": 227.0, "p99": 282.0, "p999": 305.0}} {'n': 200000, 'rc': 0, 'wall_s': 2.71, 'server_cores': 0.41, 'client_cores': 1.83, 'other_cores': 0.08}
+Warmup first 33333 records. Steady state results will print after the complete test summary.
+200000 records sent, 146198.830409 records/sec (142.77 MB/sec), 96.87 ms avg latency, 306.00 ms max latency, 86 ms 50th, 217 ms 95th, 281 ms 99th, 305 ms 99.9th.
+166667 steady state records sent, 192456.120092 records/sec (187.95 MB/sec), 111.81 ms avg latency, 306.00 ms max latency, 99 ms 50th, 227 ms 95th, 282 ms 99th, 305 ms 99.9th.
+
+server 26181 rss_mb 526
+server 26182 rss_mb 524
+server 26183 rss_mb 520
+redpanda:wcache:half run 0: {"total": {"records": 1000.0, "rec_s": 199.680511, "mb_s": 0.2, "avg_ms": 3.05, "max_ms": 267.0, "p50": 2.0, "p95": 14.0, "p99": 17.0, "p999": 267.0}, "steady": {"records": 800.0, "rec_s": 199.501247, "mb_s": 0.19, "avg_ms": 1.96, "max_ms": 5.0, "p50": 2.0, "p95": 3.0, "p99": 3.0, "p999": 5.0}, "e2e": {"count": 800, "skipped": 200, "p50": 2, "p90": 3, "p99": 3, "p999": 6, "max": 6, "mean": 2.301}, {'n': 200, 'rc': 0, 'wall_s': 6.32, 'server_cores': 0.11, 'client_cores': 1.12, 'other_cores': -0.2}
+Warmup first 200 records. Steady state results will print after the complete test summary.
+1000 records sent, 199.680511 records/sec (0.20 MB/sec), 3.05 ms avg latency, 267.00 ms max latency, 2 ms 50th, 14 ms 95th, 17 ms 99th, 267 ms 99.9th.
+800 steady state records sent, 199.501247 records/sec (0.19 MB/sec), 1.96 ms avg latency, 5.00 ms max latency, 2 ms 50th, 3 ms 95th, 3 ms 99th, 5 ms 99.9th.
+
+--- e2e consumer ---
+{"count":800,"skipped":200,"p50":2,"p90":3,"p99":3,"p999":6,"max":6,"mean":2.301}
+
+redpanda:wcache:rate50k run 0: {"total": {"records": 250000.0, "rec_s": 49840.510367, "mb_s": 48.67, "avg_ms": 7.6, "max_ms": 252.0, "p50": 2.0, "p95": 45.0, "p99": 107.0, "p999": 153.0}, "steady": {"records": 200000.0, "rec_s": 49603.174603, "mb_s": 48.44, "avg_ms": 1.96, "max_ms": 11.0, "p50": 2.0, "p95": 3.0, "p99": 6.0, "p999": 10.0}, "e2e": {"count": 200000, "skipped": 50000, "p50": 2, "p90": 3, "p99": 8, "p999": 18, "max" {'n': 50000, 'rc': 0, 'wall_s': 6.36, 'server_cores': 0.54, 'client_cores': 1.88, 'other_cores': -0.16}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+250000 records sent, 49840.510367 records/sec (48.67 MB/sec), 7.60 ms avg latency, 252.00 ms max latency, 2 ms 50th, 45 ms 95th, 107 ms 99th, 153 ms 99.9th.
+200000 steady state records sent, 49603.174603 records/sec (48.44 MB/sec), 1.96 ms avg latency, 11.00 ms max latency, 2 ms 50th, 3 ms 95th, 6 ms 99th, 10 ms 99.9th.
+
+--- e2e consumer ---
+{"count":200000,"skipped":50000,"p50":2,"p90":3,"p99":8,"p999":18,"max":21,"mean":2.368}
+
+redpanda:wcache:e2e1 run 0: {"avg_ms": 1.5787, "p50": 1.0, "p99": 6.0, "p999": 8.0} {'n': 1200, 'rc': 0, 'wall_s': 33.82, 'server_cores': 0.06, 'client_cores': 0.22, 'other_cores': 0.01}
+0	64.335304
+1000	0.549566
+Avg latency: 1.5787 ms
+Percentiles: 50th = 1, 99th = 6, 99.9th = 8
+
+redpanda:wcache:ack1 run 0: {"count": 2000, "rate": 1437.3, "p50": 487, "p90": 775, "p99": 1592, "p999": 4163, "max": 301391, "mean": 686.6} {'n': 2000, 'rc': 0, 'wall_s': 2.37, 'server_cores': 0.31, 'client_cores': 1.62, 'other_cores': 0.06}
+{"count":2000,"rate":1437.3,"p50":487,"p90":775,"p99":1592,"p999":4163,"max":301391,"mean":686.6}
+
+server 31140 rss_mb 595
+server 31141 rss_mb 571
+server 31142 rss_mb 571

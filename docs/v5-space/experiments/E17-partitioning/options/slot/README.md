@@ -18,4 +18,18 @@ It models the protocol of DESIGN-V5 §4.2 as revised after the slot-move spike, 
 - **Incarnations and epochs.** They exist for unclean recovery, which this harness does not have (HARNESS.md, "Why there is no message set"). slot_move.py checks them, and found five rules needed there.
 - **The ready position and the delta.** B's copy after the fence is a full copy of the slot, not the delta since its ready position. This is the same state at the end. The ready position only makes the unwritable window short.
 
-**Results:** see the E-17 [README](../../README.md) and [../../results/summary.md](../../results/summary.md).
+**Results** (model-checked; [../../results/slot-ablation.json](../../results/slot-ablation.json); every rule with its trace in [../../results/summary.md](../../results/summary.md)):
+- **26 of the 69 rules are necessary**: fixN's 13-rule client path, plus 13 for the move.
+- **The 13, by what breaks without them:**
+  - one writer: A takes no write once its fence is in its log; B takes `END(N)` only from a committed fence;
+  - rows: carry the rows and records; take `END(N)` once; export only a slot you hold;
+  - dedup transfer: carry the outcomes;
+  - fence transfer: carry the highest token;
+  - positions: carry the sequence;
+  - progress: the five appends of `exporting`, the fence, the final copy, its `END(N)` marker and `open`.
+- **Not needed by any property** under crash-only faults:
+  - B's `importing` entry, the bulk copy and the ready report: they only shorten the unwritable window;
+  - N in the fence: the carried sequence does that job;
+  - every guard of the give-up path, because nothing has to give up when a group always gets a new leader.
+- **Mutants:** 35 of 46 are caught. The other 11 are equivalent: each swaps two field updates of one entry. None survived.
+- **The give-up path, priced** (`+giveup`): GU_SLOT_DETAIL

@@ -1,0 +1,21 @@
+{
+ "bound": "dedup",
+ "calm_states": 5730,
+ "complete": true,
+ "distinct_total": 359120,
+ "errors": [],
+ "failed": [
+  5
+ ],
+ "kind": "mutant",
+ "live_edges": 8762,
+ "live_stuck": 0,
+ "secs": 83.5,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 353390,
+ "steps": {
+  "5": 21
+ },
+ "variant": "no-carried-outcomes",
+ "workers": 2
+}
