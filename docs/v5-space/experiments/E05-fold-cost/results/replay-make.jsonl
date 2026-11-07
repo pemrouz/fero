@@ -1,0 +1,3 @@
+{"exp":"E-05","part":"replay-make","log":"load1m","fmt":"fero","records":1000000,"bytes":125460275,"bytes_per_record":125.5}
+{"exp":"E-05","part":"replay-make","log":"mixed1m","fmt":"fero","records":1000000,"bytes":57417763,"bytes_per_record":57.4}
+{"exp":"E-05","part":"replay-make","log":"load1m","fmt":"json","records":1000000,"bytes":157476833,"bytes_per_record":157.5}

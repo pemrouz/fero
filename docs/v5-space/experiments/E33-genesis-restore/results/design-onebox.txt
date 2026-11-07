@@ -1,0 +1,6 @@
+draft one1: 200 states, 0.0s: all hold
+    G2: 30 judged states, 0 cannot reach the goal
+draft one2: 572 states, 0.0s: all hold
+    G2: 75 judged states, 0 cannot reach the goal
+draft one3: 1,248 states, 0.0s: all hold
+    G2: 120 judged states, 0 cannot reach the goal
