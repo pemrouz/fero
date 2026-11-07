@@ -37,7 +37,7 @@ What is **not** shared: E-17's world (`harness/world.py`) is a world of partitio
 ### The two options (counted)
 
 - **`self`** (5 actions): `add` a live member as a learner when a voter is gone; `promote` a caught-up learner from three voters to four; `remove` a gone voter from four; `surplus`: remove the voter ranked last from four when none is gone, once the voters left answer and hold the commit offset; `dropl`: drop a gone learner. Each is guarded by "the leader works" and "no change pending" (Raft's own rules, role `raft`) and reads gone marks from the leader's side.
-- **`cent-co`** (6 actions): the controller's `c_add`, `c_promote`, `c_remove`, `c_surplus`, `c_dropl` read gone marks from `#meta`'s side and **any config the group has committed** (a report can be late), and each writes a command into `#meta`'s log; `exec`, on the group's leader, runs a command when the leader works, no change is pending, **the epoch matches**, and the checks only the leader can make hold (the learner holds the commit offset; the voters left answer and hold it). The controller runs only while `#meta` has a leader, and a command reaches the group's leader only over a link to `#meta`'s side (topology, not rules).
+- **`cent-co`** (7 actions): the controller's `c_add`, `c_promote`, `c_remove`, `c_surplus`, `c_dropl` read gone marks from `#meta`'s side and the group's committed config (as the group reports it), issue at most one command per config epoch (PD's one operator per region), and write it into `#meta`'s list of live commands; `c_expire` is PD's operator timeout: a command the group would not run now leaves the list, so the controller can decide again; `exec`, on the group's leader, runs a command when the leader works, no change is pending, **the epoch matches**, and the checks only the leader can make hold (the learner holds the commit offset; the voters left answer and hold it; a replica to remove is gone **to the leader's own links**), then marks it done. The controller runs only while `#meta` has a leader, and a command reaches the group's leader only over a link to `#meta`'s side (topology, not rules). A late report needs no state of its own: a command decided at epoch e that runs late, or is refused by the epoch check, is what a late report leads to.
 
 ### RLOG's case
 
@@ -62,6 +62,20 @@ What is **not** shared: E-17's world (`harness/world.py`) is a world of partitio
 | `three1` | 4 | voters 0, 1, 2; member 3 spare | 1 of any kind |
 | `four1` | 4 | voters 0, 1, 2; learner 3 (healing.py's `four`) | 1 |
 | `meta1` | 4 | voters 0, 1, 2; spare 3; `#meta` down from the start | 1 member fault |
-| `three2` | 4 | voters 0, 1, 2; spare 3 | 2 of any kind |
+| `two-a` | 4 | voters 0, 1, 2; spare 3 | 2 among crash, lost disk, `#meta` down (the ablation's verify bound) |
+| `two-b` | 4 | the same | 2 among crash, member cut, `#meta`'s leader cut |
+| `two-c` | 4 | the same | 2 among member cut and `#meta`'s leader cut |
+| `three2` | 4 | the same | 2 of any kind |
+
+The ablation sweeps the one-fault bounds and verifies on `two-a` (E-17's SWEEP and VERIFY).
 
 RESULTS-PENDING
+
+## What the model leaves out
+
+- **`#meta` is abstract here**: up or down, and the side its leader is on. In `cent-co`, `#meta` heals itself through the same loop (its leader is the controller and the group's leader at once, so the epoch check is trivial there), and in `self` it heals itself like any group; so the two options are equal on `#meta`'s own healing (reasoned). Its own majority loss is any group's majority loss: F-12.
+- **No leave (Ctrl-C), pause, planner hints, retiring or draining**, which healing.py round 2 had. A leave is where the options would differ most (reasoned): in `self` the group's leader runs it; in `cent-co` a leave while `#meta` is down cannot carry, so the leaver either waits (a Ctrl-C that hangs) or exits as a crash would.
+- **Groups start at three voters**: no growth from one voter, no two-to-one step back (healing.py's `one` and `two`), no log replicas or witnesses.
+- **Raft is an abstract group**: elections, commits and catch-up are atomic steps; messages are not modelled one by one. E-14 and E-14b check etcd's Raft itself.
+- **Time is only order**: `evict.after` passing is a step, CheckQuorum is a step, the operator timeout is a step that always fires in the end.
+- **Bounds**: 4 members, 1 or 2 faults, one data group. `cent-co` on `two-b`, `two-c` and `three2` did not finish within 900,000 states (memory); safety held in every state explored.
