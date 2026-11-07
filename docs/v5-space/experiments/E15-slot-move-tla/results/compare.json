@@ -1648,7 +1648,16 @@
   "py_states": 7510764,
   "py_live": 17819,
   "py": "all hold",
-  "py_failed": []
+  "py_failed": [],
+  "tlc_states": 7510764,
+  "tlc_live": 17819,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 1372.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
  },
  {
   "variant": "no-exporting",

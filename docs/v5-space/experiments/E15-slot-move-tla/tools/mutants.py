@@ -414,6 +414,36 @@ def equiv():
             json.dump(out, open(f, 'w'), indent=1, sort_keys=True)
 
 
+def claim(idx):
+    """Claim mutant idx for this pass (E15_MUT_BOUNDS) and this process."""
+    d = os.path.join(WORK, 'claims', '-'.join(BOUNDS))
+    os.makedirs(d, exist_ok=True)
+    f = os.path.join(d, f'm{idx:03d}')
+    try:
+        pid = int(open(f).read().strip())
+        os.kill(pid, 0)
+        return pid == os.getpid()      # held by a live process
+    except (FileNotFoundError, ValueError, ProcessLookupError):
+        pass
+    tmp = f'{f}.{os.getpid()}'
+    with open(tmp, 'w') as h:
+        h.write(str(os.getpid()))
+    try:
+        os.link(tmp, f)                # atomic: fails if another process got there first
+    except FileExistsError:
+        try:
+            pid = int(open(f).read().strip())
+            os.kill(pid, 0)
+            return pid == os.getpid()
+        except (ValueError, ProcessLookupError):
+            os.replace(tmp, f)         # the holder is gone: take it over
+            return True
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--equiv', action='store_true')
@@ -429,6 +459,9 @@ def main():
     ap.add_argument('--slice', default='1/1')
     ap.add_argument('--table', action='store_true')
     ap.add_argument('--only', default=None, help='comma-separated mutant ids')
+    ap.add_argument('--claim', action='store_true',
+                    help='claim each mutant (a file naming this pid) before running it, so several '
+                         'processes can share one pass; a claim whose process is gone is taken over')
     a = ap.parse_args()
     global HEAVY
     HEAVY = not a.no_heavy
@@ -468,6 +501,8 @@ def main():
                 continue
             if a.budget and time.time() - t0 > a.budget:
                 break
+            if a.claim and not claim(idx):
+                continue
             r = run_one(idx, kind, line, desc, new, base, prev=prev)
             results[f'm{idx:03d}'] = r
             print(f'm{idx:03d}', r['verdict'], r.get('by', ''), desc, flush=True)
