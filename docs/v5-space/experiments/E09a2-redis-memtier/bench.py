@@ -40,13 +40,24 @@ SETUPS = {
     'aof':     dict(n=1, args=['--appendonly', 'yes', '--appendfsync', 'always']),  # PERF-02's matched config
     'aof-r3':  dict(n=3, args=['--appendonly', 'yes', '--appendfsync', 'always']),  # same, with two async replicas
 }
+# The prototype host (E-45's host.ts over E-22's simulator): `proto` with Node's default heap (about 2 GB here), then
+# `proto8g` with an 8 GB heap, because the simulator keeps every verb in memory (its history, for the checkers) and the
+# `proto` hold's GET at pipeline 16 ran out of the default heap (results/raw/proto-get-p16-1-failed.txt)
+PROTOS = ['proto', 'proto8g']
+PROTO_HEAP_MB = {'proto': None, 'proto8g': 8192}
+
+
+class RunFailed(Exception):
+    pass
+
+
 # redis-benchmark control rows: exactly E-09a's command and fill, -n from E-09a's nreq.json (copied in ours)
 NREQ = json.load(open(HERE + '/nreq.json'))
 
 
 def configs():
     c = {}
-    for s in list(SETUPS) + ['proto']:
+    for s in list(SETUPS) + PROTOS:
         for t in ('set', 'get', 'incr', 'mix'):
             if s == 'aof-r3' and t == 'get':
                 continue  # as E-09a: a GET touches neither the AOF nor the replicas; the 'aof' rows cover it
@@ -56,17 +67,21 @@ def configs():
     # be told apart from a change in the box since E-09a ran: every E-09a row on Redis (GET, SET, INCR; the
     # default hold first ran only the SET ones, its GET and INCR controls ran in a hold of their own), and SET on
     # the prototype
-    for s in list(SETUPS) + ['proto']:
+    for s in list(SETUPS) + PROTOS:
         for t in ('set', 'get', 'incr'):
-            if (s == 'aof-r3' and t == 'get') or (s == 'proto' and t != 'set'):
+            if (s == 'aof-r3' and t == 'get') or (s in PROTOS and t != 'set'):
                 continue
             for p in (1, 16):
                 c['%s-%s-p%d-rb' % (s, t, p)] = dict(setup=s, test=t, pipe=p, tool='redis-benchmark')
     # the bridge hold `b2`: the container restarted (a new boot of the VM) between the `default2` and the `r3`
     # holds, and the new boot's fsync was much faster, so `aof`'s matched rows run again on the new boot beside
     # `aof-r3` (the first boot's `aof` rows are kept as they are). Same setup and command; `same_as` names the row.
+    # A second restart (a third boot, kernel build fc-v310) came before `b2` could run, so `b2` also repeats
+    # `aof-r3`'s six memtier rows: aof and aof-r3 then sit on one boot, and the r3 repeats show whether the third
+    # boot matches the second (the `r3` hold's rows are kept as they are).
     for n in ('aof-set-p1', 'aof-set-p16', 'aof-incr-p1', 'aof-incr-p16', 'aof-mix-p1', 'aof-mix-p16', 'aof-get-p16',
-              'aof-set-p1-rb', 'aof-set-p16-rb', 'aof-get-p16-rb'):
+              'aof-set-p1-rb', 'aof-set-p16-rb', 'aof-get-p16-rb',
+              'aof-r3-set-p1', 'aof-r3-set-p16', 'aof-r3-incr-p1', 'aof-r3-incr-p16', 'aof-r3-mix-p1', 'aof-r3-mix-p16'):
         c['b2-' + n] = dict(c[n], same_as=n)
     # probe-only variants (never in a hold): the same 200 connections on fewer memtier threads, to see whether
     # Redis's idle time under memtier at pipeline 16 comes from sharing the 4 vCPUs with the client
@@ -116,8 +131,8 @@ def box_busy():
 # ---- servers -------------------------------------------------------------------------------------------
 
 def start(setup):
-    if setup == 'proto':
-        return start_proto()
+    if setup in PROTOS:
+        return start_proto(setup)
     subprocess.run(['pkill', '-f', 'redis-server 127.0.0.1:3648'], capture_output=True)
     shutil.rmtree(WORK + '/data', ignore_errors=True)
     procs = []
@@ -142,14 +157,16 @@ def start(setup):
     raise SystemExit('redis did not start')
 
 
-def start_proto():
+def start_proto(setup):
     # E-45's host: one Node process holding the E-22 simulated world (3 servers, virtual clock) and the RESP
     # gateway inside server s1. Durability: the resource default (`persisted`, simulated fsync).
     subprocess.run(['pkill', '-f', 'host.ts resp --listen 127.0.0.1:%d' % GW_PORT], capture_output=True)
     os.makedirs(WORK, exist_ok=True)
     log = open(WORK + '/proto-host.log', 'w')
-    p = subprocess.Popen(['node', '--experimental-strip-types', '--no-warnings', E45 + '/host.ts', 'resp',
-                          '--listen', '127.0.0.1:%d' % GW_PORT, '--every', '1000'],
+    heap = PROTO_HEAP_MB[setup]
+    p = subprocess.Popen(['node'] + (['--max-old-space-size=%d' % heap] if heap else []) +
+                         ['--experimental-strip-types', '--no-warnings', E45 + '/host.ts', 'resp',
+                          '--listen', '127.0.0.1:%d' % GW_PORT, '--every', '5' if heap else '1000'],
                          stdout=log, stderr=subprocess.STDOUT, cwd=E45)
     for _ in range(300):
         if open(WORK + '/proto-host.log').read().startswith('ready'):
@@ -173,7 +190,7 @@ def stop(procs):
 
 
 def port_of(setup):
-    return GW_PORT if setup == 'proto' else PORTS[0]
+    return GW_PORT if setup in PROTOS else PORTS[0]
 
 
 # ---- fill (not measured) ----------------------------------------------------------------------------------
@@ -288,14 +305,16 @@ def run_one(name, run, record=True, secs=None, n=None):
     for f in glob.glob(prefix + '_*') + glob.glob(prefix + '.json'):
         os.remove(f)
     host_tail = ''
+    failed = None
+    out = ''
     try:
         if c['tool'] == 'memtier':
             # Redis: fill before every run (as E-09a); prototype: only where GETs need the keys (see README)
-            if c['setup'] != 'proto' or c['test'] in ('get', 'mix'):
+            if c['setup'] not in PROTOS or c['test'] in ('get', 'mix'):
                 fill_memtier(port)
             cmd = memtier_cmd(c, port, prefix, secs)
         else:
-            if c['setup'] != 'proto':
+            if c['setup'] not in PROTOS:
                 fill_rb(port)
             cmd = rb_cmd(c, port, n or NREQ[c.get('same_as', name)])
         la = loadavg()
@@ -321,9 +340,15 @@ def run_one(name, run, record=True, secs=None, n=None):
         if sc0 and sc1:
             res['primary_oncpu_s'] = round((sc1[0] - sc0[0]) / 1e9, 2); res['primary_runq_wait_s'] = round((sc1[1] - sc0[1]) / 1e9, 3)
         if c['tool'] == 'memtier':
-            per, meta = parse_memtier(prefix + '.json')
+            try:
+                per, meta = parse_memtier(prefix + '.json')
+            except (OSError, ValueError, KeyError) as e:
+                per, meta = {}, {'memtier_json_error': repr(e)}
             res.update(meta)
-            tot = per['Totals']
+            tot = per.get('Totals')
+            if not tot or not tot.get('count'):
+                failed = 'memtier recorded no replies'
+                tot = dict.fromkeys(('ops_s', 'avg_ms', 'p50', 'p90', 'p99', 'p999', 'p9999', 'max_ms', 'sec_min', 'sec_max', 'count'))
             res.update({k: tot[k] for k in ('ops_s', 'avg_ms', 'p50', 'p90', 'p99', 'p999', 'p9999', 'max_ms', 'sec_min', 'sec_max', 'count')})
             res['per_type'] = {k: v for k, v in per.items() if k != 'Totals'}
             g = per.get('Gets')
@@ -333,12 +358,21 @@ def run_one(name, run, record=True, secs=None, n=None):
         else:
             res.update(parse_rb(out))
             res['count'] = res.get('requests')
+            if not res.get('ops_s'):
+                failed = 'redis-benchmark printed no throughput (exit %d)' % r.returncode
     finally:
         stop(procs)
-        if c['setup'] == 'proto':
+        if c['setup'] in PROTOS:
             log = open(WORK + '/proto-host.log').read()
-            host_tail = '\n'.join(l for l in log.splitlines() if l.startswith(('ready', 'summary')))
-    if c['setup'] == 'proto':
+            host_tail = '\n'.join(l for l in log.splitlines() if l.startswith(('ready', 'summary', '[', '<---', 'FATAL'))
+                                  or 'Mark-Compact' in l)
+    if failed:
+        if record:
+            os.makedirs(RES + '/raw', exist_ok=True)
+            open('%s/raw/%s-failed.txt' % (RES, tag), 'w').write('# FAILED: %s\n' % failed + trim(out) +
+                                                               (('\n# prototype host:\n' + host_tail + '\n') if host_tail else ''))
+        raise RunFailed('%s run %d: %s; host: %s' % (name, run, failed, host_tail[-300:].replace('\n', ' | ')))
+    if c['setup'] in PROTOS:
         m = re.search(r'errors\{([^}]*)\}', host_tail)
         res['gateway_errors'] = m.group(1) if m else '?'
         m = re.search(r'summary.*cpu=([\d.]+)s', host_tail)
@@ -457,7 +491,7 @@ def compare(rows):
         mt = [r for r in rows if r['config'] == n]
         if not mt:
             continue
-        e = [r for r in e9 if r['config'] == c.get('same_as', n)] if c['setup'] != 'proto' else []
+        e = [r for r in e9 if r['config'] == c.get('same_as', n)] if c['setup'] not in PROTOS else []
         h = [r for r in rows if r['config'] == n + '-rb']
         sm, se, sh = stat(mt, 'ops_s'), stat(e, 'ops_s'), stat(h, 'ops_s')
         lat = lambda rs: ('%.2f / %.2f' % (med([r.get('p50') for r in rs]), med([r.get('p99') for r in rs]))) if rs else '-'
@@ -470,7 +504,7 @@ def compare(rows):
     out += ['', '### redis-benchmark here against redis-benchmark in E-09a (same command: is the box the same?)', '',
             '| row | rb here ops/s | E-09a rb ops/s | ratio | agree? | rb here p99 | E-09a rb p99 |', '|---|---|---|---|---|---|---|']
     for n, c in CONFIGS.items():
-        if c['tool'] != 'redis-benchmark' or c['setup'] == 'proto':
+        if c['tool'] != 'redis-benchmark' or c['setup'] in PROTOS:
             continue
         h = [r for r in rows if r['config'] == n]
         e = [r for r in e9 if r['config'] == c.get('same_as', n)[:-3]]
@@ -479,6 +513,19 @@ def compare(rows):
         sh, se = stat(h, 'ops_s'), stat(e, 'ops_s')
         out.append('| %s | %s | %s | %s | %s | %s | %s |' % (n[:-3], fmt(sh), fmt(se), ('%.2f' % (sh['med'] / se['med'])) if se else '-',
                    agree(sh, se), fmt(stat(h, 'p99'), '%.3f'), fmt(stat(e, 'p99'), '%.3f')))
+    # the bridge hold: the same row on two boots of the VM (aof: boot 1 -> boot 3; aof-r3: boot 2 -> boot 3)
+    out += ['', '### The same row on another boot (the `b2` hold, on the third boot, against the first run of that row)', '',
+            '`aof` rows first ran on boot 1 (hold `aof`), `aof-r3` rows on boot 2 (hold `r3`); `b2` ran both on boot 3.', '',
+            '| row | tool | first run ops/s | b2 ops/s | b2 / first | agree? | first p99 | b2 p99 |', '|---|---|---|---|---|---|---|---|']
+    for n, c in CONFIGS.items():
+        if not n.startswith('b2-'):
+            continue
+        b, f = [r for r in rows if r['config'] == n], [r for r in rows if r['config'] == c['same_as']]
+        if not b or not f:
+            continue
+        sb, sf = stat(b, 'ops_s'), stat(f, 'ops_s')
+        out.append('| %s | %s | %s | %s | %.2f | %s | %s | %s |' % (c['same_as'], c['tool'], fmt(sf), fmt(sb), sb['med'] / sf['med'],
+                   agree(sb, sf), fmt(stat(f, 'p99'), '%.3f'), fmt(stat(b, 'p99'), '%.3f')))
     return '\n'.join(out)
 
 
@@ -576,7 +623,14 @@ def main():
             for n in names:
                 if (n, k) in done:
                     continue
-                r = run_one(n, k)
+                try:
+                    r = run_one(n, k)
+                except RunFailed as e:
+                    line = '%s FAILED %s (not recorded as a run; see results/raw/%s-%d-failed.txt)' % (time.strftime('%Y-%m-%dT%H:%M:%S'), e, n, k)
+                    print(line, flush=True)
+                    with open(RES + '/timing-log.txt', 'a') as log:
+                        log.write(line + '\n')
+                    continue
                 line = '%s %s run %d: %.0f ops/s p50 %s p99 %s p99.9 %s max %s (load %s)' % (
                     r['at'], n, k, r.get('ops_s') or 0, r.get('p50'), r.get('p99'), r.get('p999'), r.get('max_ms'), r['loadavg_before'])
                 print(line, flush=True)
