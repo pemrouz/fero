@@ -33,32 +33,121 @@ To reproduce: `./fetch.sh` (data at 63fea66), then `./run.sh` (setup, memory, ti
 All raw lines are in [results/](results) (`fold.jsonl`, `group-scale.jsonl`, `mem.jsonl`, `replay.jsonl`, `hash.jsonl`, `d13.jsonl`; each timed process is preceded by its load average). The tables below are printed by [summarize.py](summarize.py) from those files.
 
 <!-- tables:start (python3 summarize.py) -->
+
+### fold: µs per record, wall (CPU), median of runs (spread of run medians)
+
+| rows | views | mode | field update | whole-row set | insert | delete | runs |
+|---|---|---|---|---|---|---|---|
+| 1,000 | none | rec | 0.63 [cpu 0.94] | 0.61 [cpu 0.85] | 0.60 [cpu 1.90] | 0.62 [cpu 2.12] | 1 |
+| 1,000 | none | b256 | 0.29 [cpu 0.39] | 0.22 [cpu 0.34] | 0.28 [cpu 0.38] | 0.26 [cpu 0.34] | 1 |
+| 1,000 | group | rec | 11.4 [cpu 12.3] | 11.0 [cpu 11.3] | 11.6 [cpu 13.5] | 12.0 [cpu 13.5] | 1 |
+| 1,000 | group | b256 | 0.91 [cpu 1.13] | 1.01 [cpu 1.28] | 2.30 [cpu 4.29] | 1.75 [cpu 3.43] | 1 |
+| 1,000 | filter100 | rec | 7.95 [cpu 9.18] | 8.16 [cpu 8.59] | 5.89 [cpu 8.03] | 7.84 [cpu 9.08] | 1 |
+| 1,000 | filter100 | b256 | 2.66 [cpu 2.87] | 2.14 [cpu 2.34] | 1.04 [cpu 2.71] | 3.35 [cpu 5.27] | 1 |
+| 100,000 | none | rec | 1.58 [cpu 2.33] | 1.08 [cpu 1.36] | 1.17 [cpu 1.97] | 0.67 [cpu 1.40] | 1 |
+| 100,000 | none | b256 | 1.09 [cpu 1.52] | 0.51 [cpu 0.77] | 0.64 [cpu 0.95] | 0.66 [cpu 1.03] | 1 |
+| 100,000 | group | rec | 2,751 [cpu 2,975] | 2,707 [cpu 2,924] | 1,189 [cpu 1,386] | 1,192 [cpu 1,409] | 1 |
+| 100,000 | group | b256 | 155.9 [cpu 172.5] | 164.6 [cpu 176.2] | 68.3 [cpu 78.1] | 80.8 [cpu 91.0] | 1 |
+| 100,000 | filter100 | rec | 21.7 [cpu 25.0] | 21.7 [cpu 23.9] | 7.52 [cpu 9.59] | 18.8 [cpu 21.3] | 1 |
+| 100,000 | filter100 | b256 | 8.98 [cpu 10.1] | 8.57 [cpu 10.0] | 2.01 [cpu 2.79] | 7.66 [cpu 8.23] | 1 |
+| 1,000,000 | none | rec | 2.88 [cpu 9.89] | 2.51 [cpu 4.49] | 1.23 [cpu 4.78] | 1.03 [cpu 4.00] | 1 |
+| 1,000,000 | none | b256 | 1.90 [cpu 4.10] | 1.45 [cpu 2.63] | 0.80 [cpu 2.37] | 0.45 [cpu 1.72] | 1 |
+| 1,000,000 | group | rec | 44,075 [cpu 45,783] | 44,718 [cpu 46,758] | 20,405 [cpu 22,022] | 21,144 [cpu 22,933] | 1 |
+| 1,000,000 | group | b256 | 2,647 [cpu 3,134] | 2,704 [cpu 3,223] | 1,122 [cpu 1,641] | 1,149 [cpu 1,611] | 1 |
+| 1,000,000 | filter100 | rec | 44.0 [cpu 113.2] | 43.6 [cpu 85.8] | 8.14 [cpu 31.7] | 36.7 [cpu 65.7] | 1 |
+| 1,000,000 | filter100 | b256 | 25.9 [cpu 49.9] | 21.8 [cpu 67.7] | 2.18 [cpu 8.42] | 16.1 [cpu 31.1] | 1 |
+
+load average at start of each process: median 2.81, range 1.07-3.94, n=18
+
+### group view cost against bucket size (lane batches of 256, µs per record)
+
+| rows | rows per bucket | none | counts (length(fn)) | group | group + sink |
+|---|---|---|---|---|---|
+| 1,000 | 62 | 0.37 | 0.39 | 1.31 | 1.40 |
+| 10,000 | 625 | 0.41 | 0.43 | 12.1 | 15.0 |
+| 100,000 | 6,250 | 1.63 | 6.32 | 160.6 | 175.4 |
+| 1,000,000 | 62,500 | 3.15 | 5.39 | 2,953 | 2,867 |
+
+load average at start of each process: median 1.28, range 1.05-1.32, n=4
+
+### memory: bytes of V8 heap per row after full GC (runs agree to within a few bytes; median shown)
+
+| rows | form | views | heap/row after load | after churn | views add | heap/row with views | RSS/row after churn | heap limit MB |
+|---|---|---|---|---|---|---|---|---|
+| 1,000 | seam | none | 522 | 616 | 1 | 618 | 2531 | 2096 |
+| 1,000 | seam | group | 522 | 616 | 191 | 807 | 2228 | 2096 |
+| 1,000 | seam | filter100 | 522 | 616 | 249 | 866 | 2228 | 2096 |
+| 1,000 | map | none | 577 | 537 | 0 | 537 | 2097 | 2096 |
+| 100,000 | seam | none | 338 | 323 | 0 | 323 | 790 | 2096 |
+| 100,000 | seam | group | 338 | 323 | 182 | 505 | 791 | 2096 |
+| 100,000 | seam | filter100 | 338 | 323 | 31 | 354 | 781 | 2096 |
+| 100,000 | map | none | 320 | 304 | 0 | 304 | 771 | 2096 |
+| 1,000,000 | seam | none | 331 | 315 | 0 | 315 | 542 | 2096 |
+| 1,000,000 | seam | group | 331 | 315 | 146 | 461 | 540 | 2096 |
+| 1,000,000 | seam | filter100 | 331 | 315 | 46 | 361 | 539 | 2096 |
+| 1,000,000 | map | none | 310 | 294 | 0 | 294 | 537 | 2096 |
+
+row size: 114 B as JSON, 125 B in fero's codec (one insert record).
+
+### replay from an encoded log (1e6 records, file in page cache)
+
+| log | format | views | seconds | records/s | s per GB | read s | decode s | fold s | view build s | heap MB |
+|---|---|---|---|---|---|---|---|---|---|---|
+| load1m.log | fero | none | 4.46 | 223,945 | 35.6 | 0.55 | 2.72 | 0.88 | 0.00 | 324.0 |
+| load1m.log | fero | group | 5.81 | 172,094 | 46.3 | 0.07 | 2.68 | 0.89 | 1.87 | 464.0 |
+| mixed1m.log | fero | none | 3.05 | 328,110 | 53.1 | 0.23 | 1.46 | 1.22 | 0.00 | 49.0 |
+| load1m.json | json | none | 3.20 | 312,410 | 20.3 | 0.61 | 1.48 | 0.74 | 0.00 | 286.0 |
+
+load average at start of each process: median 1.79, range 1.73-1.93, n=4
+
+### hashing the folded state on the main thread (ms)
+
+| rows | xx-sum | sha-sorted | md5-each | json-xx | encode-only |
+|---|---|---|---|---|---|
+| 100,000 | 200.7 | 201.9 | 322.5 | 88.3 | 176.5 |
+| 1,000,000 | 1,870 | 2,875 | 3,657 | 851.1 | 1,837 |
+
+load average at start of each process: median 1.67, range 1.32-1.93, n=10
+
+### decision 13's form: bytes per row on each thread, and the worker's hash
+
+| rows | worker form | projection | main heap/row | worker heap/row | worker arena/row | total/row | RSS/row | worker hash ms | load ms |
+|---|---|---|---|---|---|---|---|---|---|
+| 100,000 | compact | all | 338 | 64 | 126 | 528 | 1351 | 26.4 | 1,096 |
+| 100,000 | compact | none | 1 | 64 | 126 | 191 | 873 | 35.9 | 908.0 |
+| 100,000 | data | all | 338 | 339 | 0 | 678 | 1592 | 193.5 | 966.0 |
+| 1,000,000 | compact | all | 331 | 49 | 130 | 510 | 621 | 237.3 | 9,248 |
+| 1,000,000 | compact | none | 0 | 54 | 130 | 184 | 314 | 234.0 | 8,166 |
+| 1,000,000 | data | all | 331 | 331 | 0 | 661 | 777 | 1,954 | 8,214 |
+
+load average at start of each process: median 1.74, range 1.50-1.86, n=6
+
 <!-- tables:end -->
 
 ## What the numbers say
 
-**1. The fold itself is cheap; fero v4's one-commit-per-record path and decoding are not.** Handing data a committed batch of 256 records costs FOLD_B256 µs of main-thread time per record with no views (field updates, whole-row sets, inserts and deletes; 1e3 to 1e6 rows). It grows with the number of rows (cache misses), not with the batch. Process CPU, which counts V8's GC helper threads, is higher at 1e6 rows (FOLD_CPU_1M µs), because the collector marks a 330 MB heap while the fold runs. fero v4's own path, one `applyRec` and one data commit per record, costs FOLD_REC µs. Decoding a ~100 B record with fero v4's codec costs more than folding it: DECODE_US µs per insert record in the replay (fold: FOLD_REPLAY_US µs). So a TS follower that folds what it receives pays about DECODE_PLUS_FOLD µs per record, most of it the codec.
+**1. The fold itself is cheap; fero v4's one-commit-per-record path and decoding are not.** Handing data a committed batch of 256 records costs 0.22-1.90 µs of main-thread time per record with no views (field updates, whole-row sets, inserts and deletes; 1e3 to 1e6 rows). It grows with the number of rows (cache misses), not with the batch. Process CPU, which counts V8's GC helper threads, is higher at 1e6 rows (1.72-4.10 µs), because the collector marks a 330 MB heap while the fold runs. fero v4's own path, one `applyRec` and one data commit per record, costs 0.60-2.88 µs. Decoding a ~100 B record with fero v4's codec costs more than folding it: 2.7 µs per insert record in the replay (fold: 0.9 µs). So a TS follower that folds what it receives pays about 3.6 µs per record, most of it the codec.
 
-**2. Rows are small: about 330 B of heap each, 6 times under DEP-13's 2 KB.** A small row costs MEM_ROW B of V8 heap after a full collection at 1e5 to 1e6 rows (a plain `Map` of the same decoded rows: MEM_MAP B, so data adds about 20 B a row). Rewriting every row leaves the same size (old versions are collected). A `group` view adds MEM_GROUP B a row, 100 filters MEM_FILTER B a row. RSS per row at 1e6 rows is about 540 B. The default heap here is 2,096 MB (`heap_size_limit`), so the default flags hold about 5 million small rows (E-34 loads 5e6 into it, with 1,707 MB used). At 1e3 rows the per-row figures are dominated by fixed costs.
+**2. Rows are small: about 330 B of heap each, 6 times under DEP-13's 2 KB.** A small row costs 315-338 B of V8 heap after a full collection at 1e5 to 1e6 rows (a plain `Map` of the same decoded rows: 294-320 B, so data adds about 20 B a row). Rewriting every row leaves the same size (old versions are collected). A `group` view adds 146-182 B a row, 100 filters 31-46 B a row. RSS per row at 1e6 rows is about 540 B. The default heap here is 2,096 MB (`heap_size_limit`), so the default flags hold about 5 million small rows (E-34 loads 5e6 into it, with 1,707 MB used). At 1e3 rows the per-row figures are dominated by fixed costs.
 
-**3. Decision 13's form fits too: about 510-530 B a row with every row on both threads.** The worker's compact rows cost D13_WORKER B a row (D13_ARENA B of encoded bytes outside the V8 heap, plus D13_WHEAP B of heap for the key index), the main thread's projection the same ~330 B as above: D13_TOTAL B in all. Holding rows as objects on both threads (the naive form) costs D13_NAIVE B. Both are well under 2 KB, so DEP-13 needs no restating for decision 13.
+**3. Decision 13's form fits too: about 510-530 B a row with every row on both threads.** The worker's compact rows cost 184-191 B a row (126-130 B of encoded bytes outside the V8 heap, plus 54-64 B of heap for the key index), the main thread's projection the same ~330 B as above: 510-528 B in all. Holding rows as objects on both threads (the naive form) costs 661-678 B. Both are well under 2 KB, so DEP-13 needs no restating for decision 13.
 
-**4. Hashing 1e6 rows takes under 1 s only where the rows are already bytes.** On the worker's compact rows, an order-free 64-bit xxHash sum of 1e6 rows takes HASH_WORKER_1M ms (and gives the same digest as the main thread's hash of the same state). Where rows are objects, the encoding dominates: fero's codec encode alone takes ENC_1M ms for 1e6 rows, so `xx-sum` takes HASH_XX_1M ms, a sorted SHA-256 HASH_SHA_1M ms, and node:crypto per row HASH_MD5_1M ms. V8's `JSON.stringify` is the fastest encoder in JS (`json-xx`: HASH_JSON_1M ms), and is deterministic here because replicas that fold the same log build rows with the same key order. So F-21's hourly check is affordable on a kernel worker that holds encoded rows (decision 13), or in slices on the main thread; one 1-2 s block on the main thread would stall methods and views.
+**4. Hashing 1e6 rows takes under 1 s only where the rows are already bytes.** On the worker's compact rows, an order-free 64-bit xxHash sum of 1e6 rows takes 234 ms (and gives the same digest as the main thread's hash of the same state). Where rows are objects, the encoding dominates: fero's codec encode alone takes 1,837 ms for 1e6 rows, so `xx-sum` takes 1,870 ms, a sorted SHA-256 2,875 ms, and node:crypto per row 3,657 ms. V8's `JSON.stringify` is the fastest encoder in JS (`json-xx`: 851 ms), and is deterministic here because replicas that fold the same log build rows with the same key order. So F-21's hourly check is affordable on a kernel worker that holds encoded rows (decision 13), or in slices on the main thread; one 1-2 s block on the main thread would stall methods and views.
 
-**5. Replay runs at REPLAY_LOAD records a second for a 1e6-row snapshot, REPLAY_MIXED for a mixed log, and decoding is most of it.** Rebuilding 1e6 small rows from fero v4's codec takes REPLAY_LOAD_S s (REPLAY_LOAD_SGB s per GB of log). The same records as JSON take REPLAY_JSON_S s (REPLAY_JSON_SGB s per GB). A `group` view built after the rows adds VIEW_BUILD s at 1e6 rows. So 2.5 s rebuilds about ROWS_IN_2_5S small rows; and F-05's 2.5 s already includes failure detection and an election (`election.ms` is 2 s in DESIGN-V5), which leaves about half a second, about ROWS_IN_0_5S rows.
+**5. Replay runs at 224,000 records a second for a 1e6-row snapshot, 328,000 for a mixed log, and decoding is most of it.** Rebuilding 1e6 small rows from fero v4's codec takes 4.5 s (36 s per GB of log). The same records as JSON take 3.2 s (20 s per GB). A `group` view built after the rows adds 1.9 s at 1e6 rows. So 2.5 s rebuilds about 560,000 small rows; and F-05's 2.5 s already includes failure detection and an election (`election.ms` is 2 s in DESIGN-V5), which leaves about half a second, about 110,000 rows.
 
-**6. A finding outside the question: data's `group` view costs O(rows in a bucket) per commit.** With one `group` view (16 buckets) a field update costs GROUP_1E3 µs at 1e3 rows, GROUP_1E5 µs at 1e5 and GROUP_1E6 µs at 1e6 in batches of 256, and GROUP_REC_1E5 µs / GROUP_REC_1E6 µs with fero v4's one commit per record. [group-scale.mjs](bench/group-scale.mjs) shows why: the cost tracks the rows per bucket (62 → 62,500), with or without a sink, while a counting view over the same buckets (`length(fn)`) stays at a few µs. data's `BucketNode` rebuilds each touched bucket's whole emitted object on every commit (`ops/bucket.ts`, "rebuilding a touched bucket is one O(B) object fill"), and loading rows under a live `group` view is therefore quadratic (a 1e6-row load under one did not finish in minutes; views here are built after the rows). 100 `filter` views cost FILTER_1E5 µs a record at 1e5 rows and FILTER_1E6 µs at 1e6 (batches of 256): every predicate runs on every change, about 0.1-0.25 µs per view. P-12 asks for ≤ 1 µs per affected view and 5,000 room views at ≤ 20 µs a write: neither `group` (above about 100 rows a bucket) nor many `filter`s meets it today. This is a data-side change for every candidate (DATA-05): `group` must emit per-row deltas into a bucket, and many filters over one key need routing, not one predicate call each.
+**6. A finding outside the question: data's `group` view costs O(rows in a bucket) per commit.** With one `group` view (16 buckets) a field update costs 0.9 µs at 1e3 rows, 156 µs at 1e5 and 2,647 µs at 1e6 in batches of 256, and 2,751 µs / 44,075 µs with fero v4's one commit per record. [group-scale.mjs](bench/group-scale.mjs) shows why: the cost tracks the rows per bucket (62 → 62,500), with or without a sink, while a counting view over the same buckets (`length(fn)`) stays at a few µs. data's `BucketNode` rebuilds each touched bucket's whole emitted object on every commit (`ops/bucket.ts`, "rebuilding a touched bucket is one O(B) object fill"), and loading rows under a live `group` view is therefore quadratic: the first memory run, which built the view before loading 1e6 rows, had used about 2.5 minutes of CPU without finishing when it was stopped. Views here are built after the rows. 100 `filter` views cost 9.0 µs a record at 1e5 rows and 25.9 µs at 1e6 (batches of 256): every predicate runs on every change, about 0.09-0.26 µs per view per change. P-12 asks for ≤ 1 µs per affected view and 5,000 room views at ≤ 20 µs a write: neither `group` (above about 100 rows a bucket) nor many `filter`s meets it today. This is a data-side change for every candidate (DATA-05): `group` must emit per-row deltas into a bucket, and many filters over one key need routing, not one predicate call each.
 
 ## Against the thresholds
 
 | Threshold | Measured | Result |
 |---|---|---|
-| ≤ 2 µs per record (the fold) | lane, batch 256, no views: FOLD_B256 µs wall (1e3-1e6 rows); CPU incl. GC threads up to FOLD_CPU_1M µs at 1e6; fero v4's per-record path FOLD_REC µs; decode adds DECODE_US µs | **met for the fold in batches** on the main thread up to 1e6 rows; not met by v4's per-record path at 1e6, nor once decoding with v4's codec is counted |
-| ≤ 2 KB per small row | MEM_ROW B heap (1e5-1e6), about 540 B RSS | **met** (6 ×) |
-| decision 13's form ≤ 2 KB a row | D13_TOTAL B (compact worker + full projection); D13_NAIVE B naive | **met**; DEP-13 stands for it |
-| hash of 1e6 rows ≤ 1 s of a background thread | HASH_WORKER_1M ms on the worker's compact rows; HASH_XX_1M ms on main-thread objects with v4's codec (HASH_JSON_1M ms with JSON) | **met on a worker that holds encoded rows**; not met by encoding objects with v4's codec |
-| fold ≥ 30 % of E-02's CPU per append (1.65 µs leader, 1.2 µs follower) | lane CPU LANE_CPU_RANGE µs (1e3-1e6 rows); with decode about DECODE_PLUS_FOLD µs | **crossed** from about 1e5 rows for the lane alone, and at any size once decoding is counted: a folding follower spends about twice the CPU of E-02's follower per record (about 0.2 of a core at 50,000 writes/s, not a whole core) |
-| replay of one group's state > 2.5 s → LEAN fails F-05 without its standby | REPLAY_LOAD records/s: 1e6 small rows take REPLAY_LOAD_S s; 2.5 s holds about ROWS_IN_2_5S rows | **crossed** for groups above about half a million small rows (or about ROWS_IN_0_5S once the election's 2 s is taken out): LEAN needs its warm standby |
+| ≤ 2 µs per record (the fold) | lane, batch 256, no views: 0.22-1.90 µs wall (1e3-1e6 rows); CPU incl. GC threads up to 1.72-4.10 µs at 1e6; fero v4's per-record path 0.60-2.88 µs; decode adds 2.7 µs | **met for the fold in batches** on the main thread up to 1e6 rows; not met by v4's per-record path at 1e6, nor once decoding with v4's codec is counted |
+| ≤ 2 KB per small row | 315-338 B heap (1e5-1e6), about 540 B RSS | **met** (6 ×) |
+| decision 13's form ≤ 2 KB a row | 510-528 B (compact worker + full projection); 661-678 B naive | **met**; DEP-13 stands for it |
+| hash of 1e6 rows ≤ 1 s of a background thread | 234 ms on the worker's compact rows; 1,870 ms on main-thread objects with v4's codec (851 ms with JSON) | **met on a worker that holds encoded rows**; not met by encoding objects with v4's codec |
+| fold ≥ 30 % of E-02's CPU per append (1.65 µs leader, 1.2 µs follower) | lane CPU 0.34-4.10 µs (1e3-1e6 rows); with decode about 3.6 µs | **crossed** from about 1e5 rows for the lane alone, and at any size once decoding is counted: a folding follower spends about twice the CPU of E-02's follower per record (about 0.2 of a core at 50,000 writes/s, not a whole core) |
+| replay of one group's state > 2.5 s → LEAN fails F-05 without its standby | 224,000 records/s: 1e6 small rows take 4.5 s; 2.5 s holds about 560,000 rows | **crossed** for groups above about half a million small rows (or about 110,000 once the election's 2 s is taken out): LEAN needs its warm standby |
 
 ## What this box cannot show
 
@@ -70,6 +159,6 @@ All raw lines are in [results/](results) (`fold.jsonl`, `group-scale.jsonl`, `me
 
 ## Verdict
 
-VERDICT_TEXT
+**Every replica can afford to fold, on memory and on the fold itself.** A small row costs 315-338 B of heap, 6 times under DEP-13's 2 KB (510-528 B in decision 13's two-thread form), and data's lane folds a committed batch at 0.22-1.90 µs a record up to 1e6 rows. What is not cheap sits around the fold. fero v4's codec decodes a ~100 B record in about 2.7 µs, three times the fold; V8's native `JSON.parse` did the same records in about half that, and E-03 found that building the objects in Rust is no faster, so the record format, not the language, is the lever (a point for DEV-09's L0 format). fero v4's one data commit per record costs up to 0.60-2.88 µs. And data's `group` view costs O(rows per bucket) per commit, 2,647 µs a record at 1e6 rows, which fails P-12 for every candidate until data changes. Because of the decode, a folding follower spends about twice E-02's follower CPU per record, so the 30 % line is crossed (about 0.2 of a core at 50,000 writes a second, not a whole core). A cold rebuild of 1e6 rows takes 4.5 s, so LEAN without its warm standby fails F-05 for groups above about half a million small rows. F-21's hash of 1e6 rows takes 234 ms on a worker that already holds encoded rows, but 1,870 ms if objects must be encoded first.
 
-VERDICT_LINE
+Q-05: the fold is affordable on every replica: 0.22-1.90 µs per record in 256-record batches up to 1e6 rows (fero v4's one commit per record: 0.60-2.88 µs), 315-338 B of heap per ~100 B row (510-528 B in decision 13's two-thread form; both far under 2 KB), 1e6 rows replayed in 4.5 s (224,000 records/s, 36 s per GB, mostly fero v4's 2.7 µs decode), and a 1e6-row hash in 234 ms on a worker holding encoded rows (1,870 ms from objects); but decode plus fold is about twice E-02's follower CPU per append, and data's `group` view costs O(rows per bucket) per commit (2,647 µs a record at 1e6 rows). Moves: MIN and every F `all` row up on P-01, DEP-13 and F-21 (with decision 13's encoded rows); LEAN up a little on CPU (a folding follower doubles its CPU per record) but down on F-05 without its warm standby (a cold rebuild passes 2.5 s above about 560,000 rows); every candidate down on P-12 until data's `group` emits per-row deltas (a data-side change, DATA-05); no move on L (the decode's cost is the record format's, DEV-09).

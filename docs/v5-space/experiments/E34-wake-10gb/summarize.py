@@ -44,6 +44,7 @@ for k, v in sorted(g.items(), key=lambda k: (k[0][0] != 'small', k[0][1], k[0][2
     print(f"| {k[1]:,} | {k[0]} | {v[0]['snapshot_gb']} | {k[2]} | {k[3]} | {k[4]} | {ms([x['wake_to_first_write_s'] for x in v])} | {ms([x['load_s'] for x in v])} | {ms([x['first_write_ms'] for x in v])} | {ms([x['max_rss_mb'] for x in v])} | {ms(heapafter)} | {ms(gcl)} | {len(v)} |")
 
 print('\n### under 10,000 writes a second for 30 s after the wake: GC pauses and event-loop delay (ms)\n')
+print('A 30 s phase has fewer than 1,000 GCs, so its p99.9 is its longest pause.\n')
 print('| rows | shape | form | heap flag | writes/s | GC max (main) | GC p99.9 (main) | major GCs (main) | GC max (worker) | GC p99.9 (worker) | loop delay p99.9 | loop delay max |')
 print('|---|---|---|---|---|---|---|---|---|---|---|---|')
 for k, v in sorted(g.items(), key=lambda k: (k[0][0] != 'small', k[0][1], k[0][2], k[0][3], str(k[0][4]))):
