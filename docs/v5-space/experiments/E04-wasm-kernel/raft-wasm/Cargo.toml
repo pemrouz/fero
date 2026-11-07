@@ -1,0 +1,20 @@
+[package]
+name = "e04_raftwasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+raft = { version = "=0.7.0", default-features = false, features = ["protobuf-codec"] }
+raft-proto = { version = "=0.7.0", default-features = false, features = ["protobuf-codec"] }
+protobuf = "=2.28.0"
+slog = "2"
+getrandom = { version = "0.2", features = ["custom"] }
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+panic = "abort"

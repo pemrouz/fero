@@ -1,0 +1,75 @@
+{"run":1,"loadavg":"2.00 4.23 5.75 1/150 16576"}
+{"node":"v26.13.0","measure":"js-call-baseline","ns":10.49,"min":8.27,"max":52.38,"reps":5}
+{"node":"v26.13.0","measure":"napi-empty-call","ns":26.05,"min":25.02,"max":31.41,"reps":5}
+{"node":"v26.13.0","measure":"napi-call-u32","ns":128.2,"min":116.94,"max":138.37,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-owned(napi-rs Buffer)","ns":169.3,"min":158.13,"max":219.35,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-slice(&[u8])","ns":120.12,"min":109.48,"max":146.98,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-fill(JS-owned, Rust writes)","ns":126.11,"min":109.7,"max":144.2,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-new(Vec->external Buffer)","ns":3451.05,"min":3355.06,"max":4607.37,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-copy(create_buffer_copy)","ns":5770.22,"min":5580.75,"max":6162.31,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, napi-rs Function::call","ns":103.95,"min":92.27,"max":112.06,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, raw napi_call_function","ns":84.26,"min":78.59,"max":94.34,"reps":5}
+{"node":"v26.13.0","measure":"rust->js direct, batch 1","ns":142.32,"min":122,"max":151.63,"reps":5,"batch":1,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 16","ns":18.39,"min":18.13,"max":21.65,"reps":5,"batch":16,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 256","ns":11.23,"min":11,"max":12.55,"reps":5,"batch":256,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 4096","ns":9.85,"min":9.63,"max":10.51,"reps":5,"batch":4096,"recBytes":100}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 1","ns":4012.33,"min":3621.32,"max":4232.61,"processCpuNsPerRec":5324.65,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 16","ns":404.79,"min":377.1,"max":410.84,"processCpuNsPerRec":533.2,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 256","ns":45.87,"min":44.56,"max":56.35,"processCpuNsPerRec":67.14,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 4096","ns":25.67,"min":21.44,"max":30.32,"processCpuNsPerRec":44.88,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 1","ns":17.76,"min":15.41,"max":19.34,"processCpuNsPerRec":35.25,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 16","ns":16.18,"min":15.7,"max":19.42,"processCpuNsPerRec":32.63,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 256","ns":15.4,"min":15.24,"max":17.01,"processCpuNsPerRec":30.88,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 4096","ns":15.39,"min":14.51,"max":16.05,"processCpuNsPerRec":30.2,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 256","ns":20.2,"min":18,"max":23.66,"processCpuNsPerRec":40.52,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 4096","ns":20.25,"min":18.83,"max":20.5,"processCpuNsPerRec":40.51,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"run":2,"loadavg":"2.57 6.39 7.80 1/156 29284"}
+{"node":"v26.13.0","measure":"js-call-baseline","ns":8.05,"min":7.82,"max":8.75,"reps":5}
+{"node":"v26.13.0","measure":"napi-empty-call","ns":19.2,"min":19.18,"max":24.76,"reps":5}
+{"node":"v26.13.0","measure":"napi-call-u32","ns":96.37,"min":91.37,"max":105.84,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-owned(napi-rs Buffer)","ns":166.49,"min":160.74,"max":171.19,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-slice(&[u8])","ns":106.97,"min":101.85,"max":120.68,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-fill(JS-owned, Rust writes)","ns":129.82,"min":127.07,"max":135.77,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-new(Vec->external Buffer)","ns":3161.97,"min":3081.22,"max":4938.66,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-copy(create_buffer_copy)","ns":5377.05,"min":5256.61,"max":5464.45,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, napi-rs Function::call","ns":92.16,"min":85.9,"max":110.27,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, raw napi_call_function","ns":94.66,"min":87.75,"max":100.02,"reps":5}
+{"node":"v26.13.0","measure":"rust->js direct, batch 1","ns":136.19,"min":118.29,"max":151.39,"reps":5,"batch":1,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 16","ns":18.29,"min":17.33,"max":18.3,"reps":5,"batch":16,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 256","ns":10.19,"min":10.04,"max":10.25,"reps":5,"batch":256,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 4096","ns":11.09,"min":10.86,"max":11.37,"reps":5,"batch":4096,"recBytes":100}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 1","ns":4217.64,"min":3799.46,"max":4667.32,"processCpuNsPerRec":5475.46,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 16","ns":387.93,"min":369.56,"max":405.87,"processCpuNsPerRec":509.12,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 256","ns":55.22,"min":43.82,"max":57.57,"processCpuNsPerRec":78.32,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 4096","ns":26.52,"min":25.26,"max":27.49,"processCpuNsPerRec":45.52,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 1","ns":14.61,"min":12.17,"max":17.02,"processCpuNsPerRec":29.76,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 16","ns":14.26,"min":12.66,"max":15.28,"processCpuNsPerRec":28.88,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 256","ns":16.33,"min":14.04,"max":16.88,"processCpuNsPerRec":32.94,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 4096","ns":14.87,"min":14.36,"max":18.16,"processCpuNsPerRec":29.9,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 256","ns":21.31,"min":19.92,"max":24.46,"processCpuNsPerRec":42.39,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 4096","ns":20.86,"min":18.43,"max":22.04,"processCpuNsPerRec":41.54,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"run":3,"loadavg":"1.62 4.29 7.50 1/149 12831"}
+{"node":"v26.13.0","measure":"js-call-baseline","ns":8.13,"min":7.44,"max":13.02,"reps":5}
+{"node":"v26.13.0","measure":"napi-empty-call","ns":19.27,"min":18.97,"max":19.83,"reps":5}
+{"node":"v26.13.0","measure":"napi-call-u32","ns":104.75,"min":92.81,"max":148.97,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-owned(napi-rs Buffer)","ns":185.86,"min":164.29,"max":202.3,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-in-slice(&[u8])","ns":106.19,"min":101.36,"max":112.82,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-fill(JS-owned, Rust writes)","ns":110.1,"min":107.52,"max":138.86,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-new(Vec->external Buffer)","ns":3403.45,"min":3240.58,"max":4459.69,"reps":5}
+{"node":"v26.13.0","measure":"buf4k-out-copy(create_buffer_copy)","ns":5849.79,"min":5766.35,"max":5989.34,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, napi-rs Function::call","ns":91.93,"min":86.22,"max":113.12,"reps":5}
+{"node":"v26.13.0","measure":"rust->js per record, raw napi_call_function","ns":93.39,"min":81.55,"max":96.28,"reps":5}
+{"node":"v26.13.0","measure":"rust->js direct, batch 1","ns":122.84,"min":115.1,"max":129.1,"reps":5,"batch":1,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 16","ns":18.42,"min":18.06,"max":23.61,"reps":5,"batch":16,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 256","ns":10.73,"min":10.6,"max":10.8,"reps":5,"batch":256,"recBytes":100}
+{"node":"v26.13.0","measure":"rust->js direct, batch 4096","ns":9.39,"min":9.22,"max":10.31,"reps":5,"batch":4096,"recBytes":100}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 1","ns":4107.39,"min":3957.07,"max":4438.08,"processCpuNsPerRec":5360.72,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 16","ns":382.84,"min":358.85,"max":411.21,"processCpuNsPerRec":504.36,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 256","ns":45.75,"min":44.72,"max":46.17,"processCpuNsPerRec":66.69,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js tsfn, batch 4096","ns":25.86,"min":22.76,"max":26.97,"processCpuNsPerRec":44.41,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record, producer thread and JS run in parallel"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 1","ns":16.89,"min":14.98,"max":20.3,"processCpuNsPerRec":34.08,"reps":5,"batch":1,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 16","ns":16.63,"min":14.1,"max":16.81,"processCpuNsPerRec":33.33,"reps":5,"batch":16,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 256","ns":14.77,"min":13.76,"max":16.21,"processCpuNsPerRec":29.13,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring, batch 4096","ns":14.97,"min":14.48,"max":16.35,"processCpuNsPerRec":29.24,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 256","ns":23.77,"min":17.51,"max":24.55,"processCpuNsPerRec":45.77,"reps":5,"batch":256,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}
+{"node":"v26.13.0","measure":"rust thread->js SAB ring (bulk copy out), batch 4096","ns":22.71,"min":20.59,"max":23.86,"processCpuNsPerRec":45.24,"reps":5,"batch":4096,"recBytes":100,"note":"wall ns per record; JS spins (both threads busy)"}

@@ -1,0 +1,75 @@
+{"run":1,"loadavg":"5.61 7.66 9.60 1/151 27112"}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts","ms":139.1,"min":130.48,"max":142.75,"events":172871,"nsPerEvent":804.62,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm","ms":96.06,"min":90.05,"max":102.42,"events":172871,"nsPerEvent":555.69,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port","ms":396.21,"min":366.54,"max":475.43,"events":288276,"nsPerEvent":1374.41,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed","ms":526.37,"min":508.27,"max":590.88,"events":283457,"nsPerEvent":1856.98,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance","ms":383.65,"min":363.21,"max":419.47,"events":285099,"nsPerEvent":1345.68,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts (no data fold)","ms":141.18,"min":121.12,"max":145.59,"events":172871,"nsPerEvent":816.7,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm (no data fold)","ms":83.44,"min":78.66,"max":117.48,"events":172871,"nsPerEvent":482.64,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port (no data fold)","ms":393.99,"min":377.32,"max":458.5,"events":288276,"nsPerEvent":1366.7,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed (no data fold)","ms":573.93,"min":553.11,"max":593.92,"events":283457,"nsPerEvent":2024.74,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance (no data fold)","ms":364.87,"min":332.06,"max":388.37,"events":285099,"nsPerEvent":1279.78,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K ts","p50ms":0.0146,"p99ms":0.083,"p99min":0.0801,"p99max":0.0858,"maxms":1.899,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, shared instance","p50ms":0.0118,"p99ms":0.0565,"p99min":0.0505,"p99max":0.0602,"maxms":1.707,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, fresh instance","p50ms":0.0523,"p99ms":8.2543,"p99min":6.0861,"p99max":24.9406,"maxms":37.127,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft ts-port","p50ms":0.028,"p99ms":0.089,"p99min":0.0816,"p99max":0.2177,"maxms":1.784,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, fresh instance","p50ms":0.3953,"p99ms":7.212,"p99min":7.0647,"p99max":9.6215,"maxms":55.685,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, shared instance","p50ms":0.0134,"p99ms":0.0419,"p99min":0.0414,"p99max":0.0475,"maxms":2.049,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K ts, per event","ns":500.84,"min":438.2,"max":591.06,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, one call per event","ns":178.33,"min":161.26,"max":254.33,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, whole trace in one call","ns":71.02,"min":65.81,"max":79.25,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"wasm-size","k":59603,"raft":1342615}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile K module","us":8.75,"min":7.79,"max":10.85,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile raft-rs module","us":421.72,"min":398.44,"max":491.63,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate K","us":363.73,"min":271.75,"max":628.22,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate raft-rs","us":633.02,"min":511.33,"max":931.77,"reps":5}
+{"run":2,"loadavg":"2.66 5.70 7.75 2/146 596"}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts","ms":190.81,"min":149.3,"max":231.67,"events":172871,"nsPerEvent":1103.8,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm","ms":102,"min":92.89,"max":157.83,"events":172871,"nsPerEvent":590.04,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port","ms":445.16,"min":369.62,"max":536.99,"events":288276,"nsPerEvent":1544.23,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed","ms":554.73,"min":502.97,"max":634.2,"events":283457,"nsPerEvent":1957.02,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance","ms":419.99,"min":364.94,"max":501.18,"events":285099,"nsPerEvent":1473.15,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts (no data fold)","ms":155.98,"min":131.58,"max":194.25,"events":172871,"nsPerEvent":902.29,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm (no data fold)","ms":86.76,"min":81.72,"max":112.76,"events":172871,"nsPerEvent":501.86,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port (no data fold)","ms":391.99,"min":372.89,"max":479.22,"events":288276,"nsPerEvent":1359.76,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed (no data fold)","ms":584.42,"min":526.71,"max":623.14,"events":283457,"nsPerEvent":2061.77,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance (no data fold)","ms":355.9,"min":300.25,"max":425.67,"events":285099,"nsPerEvent":1248.33,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K ts","p50ms":0.0221,"p99ms":0.0956,"p99min":0.0909,"p99max":0.1029,"maxms":1.933,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, shared instance","p50ms":0.0102,"p99ms":0.0462,"p99min":0.0416,"p99max":0.0735,"maxms":1.802,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, fresh instance","p50ms":0.0587,"p99ms":7.3202,"p99min":4.8019,"p99max":22.483,"maxms":38.405,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft ts-port","p50ms":0.0258,"p99ms":0.0996,"p99min":0.0961,"p99max":0.1884,"maxms":2.562,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, fresh instance","p50ms":0.4956,"p99ms":7.9432,"p99min":6.4565,"p99max":16.6969,"maxms":67.435,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, shared instance","p50ms":0.0206,"p99ms":0.0601,"p99min":0.043,"p99max":0.0632,"maxms":2.734,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K ts, per event","ns":570.72,"min":460.76,"max":629.92,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, one call per event","ns":212.51,"min":148.62,"max":239.65,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, whole trace in one call","ns":81.1,"min":73.47,"max":89.34,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"wasm-size","k":59603,"raft":1342615}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile K module","us":7.3,"min":6.5,"max":9.02,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile raft-rs module","us":448.1,"min":393.51,"max":496.72,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate K","us":340.62,"min":220.4,"max":778.23,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate raft-rs","us":695.38,"min":556.15,"max":908.14,"reps":5}
+{"run":3,"loadavg":"1.97 4.09 6.25 1/142 6661"}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts","ms":150.26,"min":146.11,"max":170.95,"events":172871,"nsPerEvent":869.19,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm","ms":104.86,"min":99.87,"max":112.3,"events":172871,"nsPerEvent":606.57,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port","ms":387.31,"min":365.74,"max":482.92,"events":288276,"nsPerEvent":1343.52,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed","ms":564.55,"min":519.21,"max":633.46,"events":283457,"nsPerEvent":1991.67,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance","ms":347.45,"min":333.44,"max":411.24,"events":285099,"nsPerEvent":1218.7,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K ts (no data fold)","ms":122.69,"min":115.51,"max":166.23,"events":172871,"nsPerEvent":709.71,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"K wasm (no data fold)","ms":83.17,"min":78.21,"max":84.59,"events":172871,"nsPerEvent":481.09,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft ts-port (no data fold)","ms":343.27,"min":320.37,"max":346.41,"events":288276,"nsPerEvent":1190.76,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, fresh instance per seed (no data fold)","ms":550.01,"min":519.79,"max":575.49,"events":283457,"nsPerEvent":1940.38,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"chaos-200","kernel":"raft-rs wasm, one instance (no data fold)","ms":323.32,"min":298.45,"max":381.12,"events":285099,"nsPerEvent":1134.06,"violations":0,"ticks":130,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K ts","p50ms":0.0128,"p99ms":0.0675,"p99min":0.061,"p99max":0.0768,"maxms":1.557,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, shared instance","p50ms":0.0105,"p99ms":0.0541,"p99min":0.0446,"p99max":0.0601,"maxms":1.521,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"K wasm, fresh instance","p50ms":0.0524,"p99ms":6.5439,"p99min":4.7353,"p99max":7.8016,"maxms":43.721,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft ts-port","p50ms":0.028,"p99ms":0.1426,"p99min":0.0802,"p99max":0.215,"maxms":2.128,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, fresh instance","p50ms":0.4453,"p99ms":8.2146,"p99min":5.9543,"p99max":34.2822,"maxms":52.66,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"fresh node + scenario","kernel":"raft-rs wasm, shared instance","p50ms":0.016,"p99ms":0.0526,"p99min":0.0484,"p99max":0.0561,"maxms":1.964,"n":2000,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K ts, per event","ns":460.58,"min":446.49,"max":526.2,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, one call per event","ns":169.52,"min":140.51,"max":235.83,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"replay","kernel":"K wasm, whole trace in one call","ns":81,"min":75.87,"max":98.75,"events":172871,"reps":5}
+{"node":"v22.22.0","measure":"wasm-size","k":59603,"raft":1342615}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile K module","us":18.61,"min":17.19,"max":50.74,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"compile raft-rs module","us":691.43,"min":682.52,"max":708.88,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate K","us":305.27,"min":266.35,"max":744,"reps":5}
+{"node":"v22.22.0","measure":"wasm-setup","what":"instantiate raft-rs","us":674.29,"min":545.49,"max":975.07,"reps":5}

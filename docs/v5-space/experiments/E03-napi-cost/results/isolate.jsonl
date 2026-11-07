@@ -1,0 +1,60 @@
+{"run":1,"loadavg":"1.52 3.40 5.29 1/147 17281"}
+{"host":"node v22.22.0","measure":"memory","loadMs":6.85,"heapDataLoadedBytes":815000,"heapPerRowBytes":182,"rssBytes":52654080,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v22.22.0","measure":"js loop floor","ns":0.62,"min":0.54,"max":0.66,"reps":5}
+{"host":"node v22.22.0","measure":"data fold, batch 256 (ns/record)","ns":87.23,"min":72.43,"max":119.29,"reps":5}
+{"run":1,"loadavg":"1.56 3.38 5.27 1/147 17291"}
+{"host":"node v26.13.0","measure":"memory","loadMs":16.04,"heapDataLoadedBytes":846872,"heapPerRowBytes":184,"rssBytes":60727296,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v26.13.0","measure":"js loop floor","ns":0.32,"min":0.32,"max":0.4,"reps":5}
+{"host":"node v26.13.0","measure":"data fold, batch 256 (ns/record)","ns":79.2,"min":71.37,"max":92.88,"reps":5}
+{"run":1,"loadavg":"1.56 3.38 5.27 1/147 17299"}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"memory","createUs":10474,"loadMs":5.11,"heapBareBytes":1271648,"heapDataLoadedBytes":286392,"heapPerRowBytes":196,"rssIsolateBytes":23080960,"rssBytes":36724736}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"js loop floor","ns":0.39,"min":0.39,"max":0.44,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"empty op","ns":2.92,"min":2.42,"max":3.04,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"4 KB buffer op","ns":6.84,"min":6.71,"max":10.26,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"data fold, batch 256 (ns/record)","ns":71.30,"min":60.61,"max":80.38,"reps":5}
+{"run":1,"loadavg":"1.56 3.38 5.27 1/147 17305"}
+{"host":"rquickjs 0.14.0","measure":"memory","createUs":356,"loadMs":14.51,"heapBareBytes":95824,"heapDataLoadedBytes":778291,"heapPerRowBytes":417,"rssIsolateBytes":876544,"rssBytes":10407936}
+{"host":"rquickjs 0.14.0","measure":"js loop floor","ns":16.21,"min":15.08,"max":18.07,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"empty op","ns":43.31,"min":38.20,"max":53.62,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"4 KB buffer op","ns":83.06,"min":81.76,"max":109.48,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"data fold, batch 256 (ns/record)","ns":1444.33,"min":1407.34,"max":1560.03,"reps":5}
+{"run":2,"loadavg":"1.52 4.89 7.11 1/156 30551"}
+{"host":"node v22.22.0","measure":"memory","loadMs":6.97,"heapDataLoadedBytes":814928,"heapPerRowBytes":182,"rssBytes":52731904,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v22.22.0","measure":"js loop floor","ns":0.63,"min":0.62,"max":0.7,"reps":5}
+{"host":"node v22.22.0","measure":"data fold, batch 256 (ns/record)","ns":76.34,"min":64.29,"max":88.17,"reps":5}
+{"run":2,"loadavg":"1.52 4.89 7.11 1/156 30559"}
+{"host":"node v26.13.0","measure":"memory","loadMs":6.76,"heapDataLoadedBytes":846872,"heapPerRowBytes":183,"rssBytes":61501440,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v26.13.0","measure":"js loop floor","ns":0.37,"min":0.37,"max":0.44,"reps":5}
+{"host":"node v26.13.0","measure":"data fold, batch 256 (ns/record)","ns":78.86,"min":62.49,"max":84.7,"reps":5}
+{"run":2,"loadavg":"1.52 4.89 7.11 1/156 30567"}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"memory","createUs":9963,"loadMs":4.05,"heapBareBytes":1280464,"heapDataLoadedBytes":277576,"heapPerRowBytes":196,"rssIsolateBytes":22937600,"rssBytes":36745216}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"js loop floor","ns":0.39,"min":0.37,"max":0.39,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"empty op","ns":2.56,"min":2.27,"max":3.54,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"4 KB buffer op","ns":8.24,"min":8.11,"max":14.78,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"data fold, batch 256 (ns/record)","ns":68.88,"min":52.61,"max":80.86,"reps":5}
+{"run":2,"loadavg":"1.52 4.89 7.11 1/155 30575"}
+{"host":"rquickjs 0.14.0","measure":"memory","createUs":231,"loadMs":9.23,"heapBareBytes":95824,"heapDataLoadedBytes":778291,"heapPerRowBytes":417,"rssIsolateBytes":942080,"rssBytes":10399744}
+{"host":"rquickjs 0.14.0","measure":"js loop floor","ns":17.87,"min":12.51,"max":18.33,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"empty op","ns":40.35,"min":31.01,"max":44.08,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"4 KB buffer op","ns":86.14,"min":83.68,"max":96.77,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"data fold, batch 256 (ns/record)","ns":1424.68,"min":1400.48,"max":1441.34,"reps":5}
+{"run":3,"loadavg":"1.42 3.43 6.85 1/147 14188"}
+{"host":"node v22.22.0","measure":"memory","loadMs":9.45,"heapDataLoadedBytes":814928,"heapPerRowBytes":182,"rssBytes":52228096,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v22.22.0","measure":"js loop floor","ns":0.62,"min":0.61,"max":0.63,"reps":5}
+{"host":"node v22.22.0","measure":"data fold, batch 256 (ns/record)","ns":89.58,"min":83.88,"max":103.75,"reps":5}
+{"run":3,"loadavg":"1.42 3.43 6.85 1/147 14196"}
+{"host":"node v26.13.0","measure":"memory","loadMs":8.04,"heapDataLoadedBytes":846872,"heapPerRowBytes":183,"rssBytes":61136896,"note":"heap delta after gc; a fresh Node process, not a fresh isolate"}
+{"host":"node v26.13.0","measure":"js loop floor","ns":0.39,"min":0.39,"max":0.39,"reps":5}
+{"host":"node v26.13.0","measure":"data fold, batch 256 (ns/record)","ns":68.03,"min":63.83,"max":93.3,"reps":5}
+{"run":3,"loadavg":"1.38 3.39 6.82 1/147 14204"}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"memory","createUs":12929,"loadMs":5.02,"heapBareBytes":1282688,"heapDataLoadedBytes":275352,"heapPerRowBytes":196,"rssIsolateBytes":22835200,"rssBytes":37175296}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"js loop floor","ns":0.38,"min":0.38,"max":0.46,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"empty op","ns":2.23,"min":2.17,"max":2.40,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"4 KB buffer op","ns":6.64,"min":6.57,"max":7.71,"reps":5}
+{"host":"deno_core 0.413.0 (v8 crate 150.4.0)","measure":"data fold, batch 256 (ns/record)","ns":69.84,"min":66.04,"max":70.42,"reps":5}
+{"run":3,"loadavg":"1.38 3.39 6.82 1/148 14211"}
+{"host":"rquickjs 0.14.0","measure":"memory","createUs":200,"loadMs":10.21,"heapBareBytes":95824,"heapDataLoadedBytes":778291,"heapPerRowBytes":417,"rssIsolateBytes":991232,"rssBytes":10403840}
+{"host":"rquickjs 0.14.0","measure":"js loop floor","ns":14.90,"min":12.41,"max":15.44,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"empty op","ns":37.76,"min":36.98,"max":39.88,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"4 KB buffer op","ns":71.70,"min":67.93,"max":76.48,"reps":5}
+{"host":"rquickjs 0.14.0","measure":"data fold, batch 256 (ns/record)","ns":1208.50,"min":1201.35,"max":1311.11,"reps":5}
