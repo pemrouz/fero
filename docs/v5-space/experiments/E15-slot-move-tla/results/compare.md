@@ -74,7 +74,7 @@
 | b-serves-before-open | deep | 322,170 / 17,539 | 322,170 / 17,539 | 2 (23), 4 (15), 6 (18) | 2 (23), 4 (15), 6 (18) | yes |
 | b-serves-before-open-commits | deep | 309,016 / 16,961 | 309,016 / 16,961 | all hold | all hold | yes |
 | guards-on-committed | deep | 526,891 / 31,856 | 526,891 / 31,856 | 1 (20), 2 (21), 4 (18), 6 (17), 9 (18) | 1 (20), 2 (21), 4 (18), 6 (17), 9 (18) | yes |
-| fixed | three | 7,510,764 / 17,819 | — | all hold | — |  |
+| fixed | three | 7,510,764 / 17,819 | 7,510,764 / 17,819 | all hold | all hold | yes |
 | no-exporting | three | 6,554,885 / 1,198,769 | — | 7 (3), 9 (18) | — |  |
 
-73 of 76 runs done on both; 73 same verdict; 73 same state counts; 73 same steps.
+74 of 76 runs done on both; 74 same verdict; 74 same state counts; 74 same steps.

@@ -13,6 +13,17 @@ count from the last segment, which TLC carries across the checkpoint).
 
 Without --loop it runs ONE segment and must itself be run under the heavy
 lock; with --loop it takes the lock for each segment.
+
+A segment can also be cut by a crash (a container restart). Then the prints
+TLC made just before its newest checkpoint may be lost, and resuming from
+that checkpoint would lose them for good (they are not printed again). So the
+log is written line by line, and at each "Checkpointing completed" line the
+log is fsynced, the disk synced, and the checkpoint recorded in
+segments.json. A later segment resumes only from that recorded checkpoint,
+and only if no checkpoint file has changed since; otherwise it stops and
+says the run must start again from scratch. A cut attempt's log is kept
+(seg<k>-cut<n>.out) and merged: the prints before its last recorded
+checkpoint are not repeated after the resume.
 """
 import argparse
 import glob
@@ -54,26 +65,54 @@ def segment(variant, bound, seconds, workers, cap):
             with open(os.path.join(d, 'MC.cfg'), 'a') as f:
                 f.write('CONSTRAINT CapOK\n')
     k = st['segments'] + 1
+    log = os.path.join(d, f'seg{k}.out')
+    if os.path.exists(log):
+        # an earlier attempt at segment k was cut by a crash: keep its log
+        n = 1
+        while os.path.exists(os.path.join(d, f'seg{k}-cut{n}.out')):
+            n += 1
+        os.rename(log, os.path.join(d, f'seg{k}-cut{n}.out'))
     cmd = ['java', '-XX:+UseParallelGC', f'-Xmx{HEAP}', '-cp', tlcrun.JAR, 'tlc2.TLC',
            '-workers', str(workers), '-nowarning', '-fp', '7', '-checkpoint', '3', '-metadir', 'st']
-    if k > 1:
-        last = sorted(glob.glob(os.path.join(d, 'st', '*', 'vars.chkpt')))
-        rec = os.path.dirname(max(last, key=os.path.getmtime))
-        cmd += ['-recover', os.path.relpath(rec, d)]
+    if st.get('ckpt'):
+        rec = os.path.join(d, st['ckpt']['dir'])
+        files = glob.glob(os.path.join(rec, '*.chkpt'))
+        newer = [os.path.basename(f) for f in files
+                 if os.path.getmtime(f) > st['ckpt']['vars_mtime'] + 2]
+        if os.path.getmtime(os.path.join(rec, 'vars.chkpt')) != st['ckpt']['vars_mtime'] or newer:
+            raise SystemExit(f'{name}: TLC wrote a checkpoint after the last one recorded '
+                             f'({newer or "vars.chkpt"}); prints before it may be lost. '
+                             f'Start again from scratch (move {d} aside).')
+        cmd += ['-recover', st['ckpt']['dir']]
     cmd += ['MC.tla']
     t0 = time.time()
-    out = open(os.path.join(d, f'seg{k}.out'), 'w')
+    out = open(log, 'w', buffering=1)
     p = subprocess.Popen(cmd, cwd=d, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     stopped = False
     for line in p.stdout:
         out.write(line)
-        if line.startswith('Checkpointing completed') and time.time() - t0 > seconds:
-            p.terminate()
-            stopped = True
-            break
+        if line.startswith('Checkpointing completed'):
+            out.flush()
+            os.fsync(out.fileno())
+            os.sync()
+            ck = max(glob.glob(os.path.join(d, 'st', '*', 'vars.chkpt')), key=os.path.getmtime)
+            st['ckpt'] = {'dir': os.path.relpath(os.path.dirname(ck), d),
+                          'vars_mtime': os.path.getmtime(ck), 'log': os.path.basename(log),
+                          'at': line.strip()}
+            tmp = state + '.tmp'
+            with open(tmp, 'w') as f:
+                json.dump(st, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, state)
+            os.sync()
+            if time.time() - t0 > seconds:
+                p.terminate()
+                stopped = True
+                break
     out.close()
     p.wait()
-    text = open(os.path.join(d, f'seg{k}.out')).read()
+    text = open(log).read()
     st['segments'] = k
     st.setdefault('secs', []).append(round(time.time() - t0, 1))
     st['done'] = (not stopped) and 'distinct states found' in text

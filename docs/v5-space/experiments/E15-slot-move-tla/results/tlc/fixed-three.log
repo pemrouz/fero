@@ -1,0 +1,26 @@
+--- seg1.out
+Progress(30) at 2026-11-07 06:18:40: 15,315,401 states generated (1,056,028 s/min), 4,834,098 distinct states found (334,653 ds/min), 454,775 states left on queue.
+Progress(31) at 2026-11-07 06:19:40: 16,328,462 states generated (1,013,061 s/min), 5,148,396 distinct states found (314,298 ds/min), 424,645 states left on queue.
+Checkpointing of run st/26-11-07-06-05-35.239
+Checkpointing completed at (2026-11-07 06:20:41)
+Progress(32) at 2026-11-07 06:20:41: 17,230,869 states generated (902,407 s/min), 5,467,450 distinct states found (319,054 ds/min), 410,170 states left on queue.
+Progress(33) at 2026-11-07 06:21:41: 18,147,441 states generated (916,572 s/min), 5,765,938 distinct states found (298,488 ds/min), 371,722 states left on queue.
+Progress(34) at 2026-11-07 06:22:41: 18,960,920 states generated (813,479 s/min), 6,055,825 distinct states found (289,887 ds/min), 347,085 states left on queue.
+Checkpointing of run st/26-11-07-06-05-35.239
+Checkpointing completed at (2026-11-07 06:23:41)
+Progress(35) at 2026-11-07 06:23:41: 19,779,919 states generated (818,999 s/min), 6,344,125 distinct states found (288,300 ds/min), 310,534 states left on queue.
+Progress(36) at 2026-11-07 06:24:41: 20,526,824 states generated (746,905 s/min), 6,622,193 distinct states found (278,068 ds/min), 264,409 states left on queue.
+Progress(37) at 2026-11-07 06:25:41: 21,200,254 states generated (673,430 s/min), 6,882,019 distinct states found (259,826 ds/min), 210,359 states left on queue.
+Checkpointing of run st/26-11-07-06-05-35.239
+Checkpointing completed at (2026-11-07 06:26:41)
+Progress(38) at 2026-11-07 06:26:41: 21,818,584 states generated (618,330 s/min), 7,130,076 distinct states found (248,057 ds/min), 151,054 states left on queue.
+Progress(40) at 2026-11-07 06:27:41: 22,378,635 states generated (560,051 s/min), 7,368,610 distinct states found (238,534 ds/min), 84,510 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 6.2E-6
+  based on the actual fingerprints:  val = 7.1E-6
+22692463 states generated, 7528583 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 50.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 26 and the 95th percentile is 3).
+Finished in 22min 52s at (2026-11-07 06:28:27)

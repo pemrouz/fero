@@ -10,7 +10,7 @@
 | fixed | write | 1,107,824: all hold | 1,107,824: all hold | 1,107,824: all hold | yes |
 | fixed | dedup | 351,262: all hold | 351,262: all hold | 351,262: all hold | yes |
 | fixed | deep | 308,274: all hold | 308,274: all hold | 308,274: all hold | yes |
-| fixed | three | 7,510,764: all hold | 7,510,764: all hold | — | no |
+| fixed | three | 7,510,764: all hold | 7,510,764: all hold | 7,510,764: all hold | yes |
 | fixed-but-recovery-resumes | move | 71,784: 9 (19) | 71,784: 9 (19) | 71,784: 9 (19) | yes |
 | fixed-but-recovery-resumes | moves | 1,175,418: 1 (32), 9 (19) | 1,175,418: 1 (32), 9 (19) | 1,175,418: 1 (32), 9 (19) | yes |
 | fixed-but-recovery-resumes | write | 1,835,310: 9 (19) | 1,835,310: 9 (19) | 1,835,310: 9 (19) | yes |
@@ -30,7 +30,7 @@
 | fixed-but-unfence-at-old-epoch | moves | 869,816: all hold | 869,816: all hold | 869,816: all hold | yes |
 | fixed-but-unfence-at-old-epoch | write | 1,069,440: 6 (25) | 1,069,440: 6 (25) | 1,069,440: 6 (25) | yes |
 
-28 of 29 rows the same in all three.
+29 of 29 rows the same in all three.
 
 | mutant | slot_move.md: caught by | slot_move.py here, full runs | TLC here | note |
 |---|---|---|---|---|
