@@ -1,0 +1,20 @@
+# shipped-asis-stubs: MCetcdraft.tla with MCetcdraft.cfg, E-14 stand-ins, 282 s wall (cap 300 s)
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 107 and seed 6268232077366558207 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 28002] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 08:25:08)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 08:25:08.
+Progress(8) at 2026-11-07 08:25:11: 8,264 states generated (8,264 s/min), 1,994 distinct states found (1,994 ds/min), 1,473 states left on queue.
+Progress(11) at 2026-11-07 08:26:11: 821,829 states generated (813,565 s/min), 172,928 distinct states found (170,934 ds/min), 124,996 states left on queue.
+Progress(12) at 2026-11-07 08:27:11: 1,733,805 states generated (911,976 s/min), 359,074 distinct states found (186,146 ds/min), 258,606 states left on queue.
+Progress(12) at 2026-11-07 08:28:11: 2,558,469 states generated (824,664 s/min), 523,788 distinct states found (164,714 ds/min), 377,268 states left on queue.
+Progress(12) at 2026-11-07 08:29:11: 3,368,820 states generated (810,351 s/min), 683,551 distinct states found (159,763 ds/min), 491,323 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.3E-7
+  based on the actual fingerprints:  val = 1.7E-6
+3888247 states generated, 779930 distinct states found, 557978 states left on queue.
+The depth of the complete state graph search is 12.
+The average outdegree of the complete state graph is 4 (minimum is 0, the maximum 31 and the 95th percentile is 6).
+Finished in 04min 41s at (2026-11-07 08:29:48)

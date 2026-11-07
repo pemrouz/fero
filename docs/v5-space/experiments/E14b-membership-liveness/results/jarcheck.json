@@ -10,6 +10,28 @@
   "secs": 15,
   "violated": null
  },
+ "r21-append-ef/jartext": {
+  "complete": false,
+  "depth": 4,
+  "distinct": 14,
+  "error": "Error: TLC threw an unexpected exception.",
+  "generated": 22,
+  "overrides": [],
+  "queue": 9,
+  "secs": 4,
+  "violated": null
+ },
+ "r21-append-ef/jartext-bagstub": {
+  "complete": true,
+  "depth": 22,
+  "distinct": 2905,
+  "error": null,
+  "generated": 19990,
+  "overrides": [],
+  "queue": 0,
+  "secs": 13,
+  "violated": null
+ },
  "r21-append-ef/stubs": {
   "complete": true,
   "depth": 22,
@@ -43,6 +65,28 @@
   "secs": 4,
   "violated": "NotGoal"
  },
+ "shipped-asis/jar": {
+  "complete": false,
+  "depth": 12,
+  "distinct": 1097543,
+  "error": null,
+  "generated": 5462003,
+  "overrides": [],
+  "queue": 786181,
+  "secs": 283,
+  "violated": null
+ },
+ "shipped-asis/stubs": {
+  "complete": false,
+  "depth": 12,
+  "distinct": 779930,
+  "error": null,
+  "generated": 3888247,
+  "overrides": [],
+  "queue": 557978,
+  "secs": 282,
+  "violated": null
+ },
  "stale2-mutant/jar": {
   "complete": false,
   "depth": 54,
@@ -74,6 +118,28 @@
   "overrides": false,
   "queue": 0,
   "secs": 6,
+  "violated": null
+ },
+ "stale2/jartext": {
+  "complete": false,
+  "depth": 4,
+  "distinct": 4,
+  "error": "Error: TLC threw an unexpected exception.",
+  "generated": 4,
+  "overrides": [],
+  "queue": 0,
+  "secs": 2458,
+  "violated": null
+ },
+ "stale2/jartext-bagstub": {
+  "complete": true,
+  "depth": 34,
+  "distinct": 51,
+  "error": null,
+  "generated": 94,
+  "overrides": [],
+  "queue": 0,
+  "secs": 4,
   "violated": null
  },
  "stale2/stubs": {

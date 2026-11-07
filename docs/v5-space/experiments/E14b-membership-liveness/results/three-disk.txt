@@ -1,0 +1,304 @@
+# run three-disk: scenario three+spare, {"AllowDrop": false, "AllowLoseDisk": true, "AllowStepDown": false, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "replace"}
+# spec LiveSpec (MCferolive.tla), CommunityModules-deps.jar, 2 segment(s), [1402, 963] s wall in all, TLC -workers 2
+# done: True
+
+## segment 1
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 6950639738735742487 with 2 workers on 4 cores with 4551MB heap and 64MB offheap memory [pid: 27790] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 10:51:12)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 10:51:13.
+Checkpointing of run st/26-11-07-10-51-10.478
+Progress(9) at 2026-11-07 10:51:16: 689 states generated (689 s/min), 431 distinct states found (431 ds/min), 173 states left on queue.
+Progress(32) at 2026-11-07 10:52:16: 94,908 states generated (94,219 s/min), 42,263 distinct states found (41,832 ds/min), 7,269 states left on queue.
+... (21 progress lines)
+Progress(62) at 2026-11-07 11:14:18: 4,380,848 states generated (369,343 s/min), 1,619,820 distinct states found (133,569 ds/min), 144,917 states left on queue.
+Progress(62) at 2026-11-07 11:14:31: 4,466,036 states generated (85,188 s/min), 1,649,148 distinct states found (29,328 ds/min), 146,308 states left on queue.
+Checkpointing completed at (2026-11-07 10:55:16)
+Checkpointing of run st/26-11-07-10-51-10.478
+Checkpointing completed at (2026-11-07 10:59:16)
+Checkpointing of run st/26-11-07-10-51-10.478
+Checkpointing completed at (2026-11-07 11:03:17)
+Checkpointing of run st/26-11-07-10-51-10.478
+Checkpointing completed at (2026-11-07 11:07:17)
+Checkpointing of run st/26-11-07-10-51-10.478
+Checkpointing completed at (2026-11-07 11:11:18)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.5E-7
+  based on the actual fingerprints:  val = 8.2E-8
+4466040 states generated, 1649148 distinct states found, 146308 states left on queue.
+The depth of the complete state graph search is 62.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 15 and the 95th percentile is 3).
+Checkpointing of run st/26-11-07-10-51-10.478
+Checkpointing completed at (2026-11-07 11:14:31)
+Finished in 23min 21s at (2026-11-07 11:14:31)
+
+## segment 2
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -4548594720019841716 with 2 workers on 4 cores with 4551MB heap and 64MB offheap memory [pid: 1176] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 11:24:46)
+Starting recovery from checkpoint st/26-11-07-10-51-10.478/
+Recovery completed. 1649148 states examined. 146308 states on queue.
+Checkpointing of run st/26-11-07-10-51-10.478/
+Progress(59) at 2026-11-07 11:24:50: 1,651,695 states generated (1,651,695 s/min), 1,649,971 distinct states found (1,649,971 ds/min), 146,374 states left on queue.
+Progress(59) at 2026-11-07 11:25:50: 1,817,103 states generated (165,408 s/min), 1,709,907 distinct states found (59,936 ds/min), 151,450 states left on queue.
+... (12 progress lines)
+Progress(65) at 2026-11-07 11:38:51: 4,245,024 states generated (181,258 s/min), 2,582,978 distinct states found (65,699 ds/min), 212,864 states left on queue.
+Progress(65) at 2026-11-07 11:39:51: 4,434,564 states generated (189,540 s/min), 2,644,964 distinct states found (61,986 ds/min), 215,468 states left on queue.
+Checkpointing completed at (2026-11-07 11:28:50)
+Checkpointing of run st/26-11-07-10-51-10.478/
+Checkpointing completed at (2026-11-07 11:32:51)
+Checkpointing of run st/26-11-07-10-51-10.478/
+Checkpointing completed at (2026-11-07 11:36:51)
+Error: Invariant LeaderCompletenessInv is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 0
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+/\ goalv = TRUE
+/\ votedFor = (s1 :> s1 @@ s2 :> s1 @@ s3 :> s1 @@ s4 :> Nil)
+/\ pendingMessages = <<>>
+/\ dead = {}
+/\ planv = FALSE
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 1 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s2 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s3 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s4 :>
+      [ currentTerm |-> 0,
+        votedFor |-> Nil,
+        log |-> 0,
+        commitIndex |-> 0,
+        config |-> [jointConfig |-> <<{}, {}>>, learners |-> {}] ] )
+/\ state = (s1 :> "Leader" @@ s2 :> "Follower" @@ s3 :> "Follower" @@ s4 :> "Follower")
+/\ up = {s1, s2, s3, s4}
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2] >> @@
+  s4 :> <<>> )
+/\ votesGranted = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+
+State 2: <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {} @@ s2 :> {} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 1
+/\ faults = 0
+/\ currentTerm = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+/\ goalv = TRUE
+/\ votedFor = (s1 :> s1 @@ s2 :> s1 @@ s3 :> s1 @@ s4 :> Nil)
+/\ pendingMessages = <<>>
+/\ dead = {}
+/\ planv = FALSE
+/\ matchIndex = ( s1 :> (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 2 @@ s2 :> 2 @@ s3 :> 2 @@ s4 :> 0)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 3 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s2 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s3 :>
+      [ currentTerm |-> 2,
+        votedFor |-> s1,
+        log |-> 2,
+... (5595 lines cut)
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> @@
+  s4 :> <<>> )
+/\ votesGranted = (s1 :> {s1, s3} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+
+State 66: <LiveNext line 168, col 13 to line 168, col 93 of module MCferolive>
+/\ config = ( s1 :> [jointConfig |-> <<{s1, s3}, {}>>, learners |-> {}] @@
+  s2 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s3 :> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] @@
+  s4 :> [jointConfig |-> <<{}, {}>>, learners |-> {}] )
+/\ votesResponded = (s1 :> {s1, s3} @@ s2 :> {s1, s2, s3} @@ s3 :> {} @@ s4 :> {})
+/\ sentCommit = ( s1 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<2, 2>> @@ s3 :> <<4, 3>> @@ s4 :> <<0, 0>>) @@
+  s2 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s3 :>
+      (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) @@
+  s4 :> (s1 :> <<0, 0>> @@ s2 :> <<0, 0>> @@ s3 :> <<0, 0>> @@ s4 :> <<0, 0>>) )
+/\ reconfigCount = 2
+/\ faults = 1
+/\ currentTerm = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 4 @@ s4 :> 0)
+/\ goalv = FALSE
+/\ votedFor = (s1 :> s1 @@ s2 :> s2 @@ s3 :> s1 @@ s4 :> Nil)
+/\ pendingMessages = <<>>
+/\ dead = {}
+/\ planv = FALSE
+/\ matchIndex = ( s1 :> (s1 :> 5 @@ s2 :> 0 @@ s3 :> 5 @@ s4 :> 0) @@
+  s2 :> (s1 :> 0 @@ s2 :> 3 @@ s3 :> 0 @@ s4 :> 0) @@
+  s3 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) @@
+  s4 :> (s1 :> 0 @@ s2 :> 0 @@ s3 :> 0 @@ s4 :> 0) )
+/\ commitIndex = (s1 :> 5 @@ s2 :> 2 @@ s3 :> 3 @@ s4 :> 0)
+/\ livev = TRUE
+/\ pendingConfChangeIndex = (s1 :> 4 @@ s2 :> 3 @@ s3 :> 0 @@ s4 :> 0)
+/\ durableState = ( s1 :>
+      [ currentTerm |-> 4,
+        votedFor |-> s1,
+        log |-> 5,
+        commitIndex |-> 3,
+        config |-> [jointConfig |-> <<{s1, s3}, {}>>, learners |-> {}] ] @@
+  s2 :>
+      [ currentTerm |-> 3,
+        votedFor |-> s2,
+        log |-> 4,
+        commitIndex |-> 2,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s3 :>
+      [ currentTerm |-> 4,
+        votedFor |-> s1,
+        log |-> 5,
+        commitIndex |-> 3,
+        config |-> [jointConfig |-> <<{s1, s2, s3}, {}>>, learners |-> {}] ] @@
+  s4 :>
+      [ currentTerm |-> 0,
+        votedFor |-> Nil,
+        log |-> 0,
+        commitIndex |-> 0,
+        config |-> [jointConfig |-> <<{}, {}>>, learners |-> {}] ] )
+/\ state = (s1 :> "Leader" @@ s2 :> "Leader" @@ s3 :> "Follower" @@ s4 :> "Follower")
+/\ up = {s1, s2, s3, s4}
+/\ messages = <<>>
+/\ log = ( s1 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> @@
+  s2 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 3] >> @@
+  s3 :>
+      << [ value |-> [newconf |-> {s1, s2, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 1 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 2],
+         [ value |-> [newconf |-> {s1, s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [ value |-> [newconf |-> {s3}, learners |-> {}],
+           type |-> "ConfigEntry",
+           term |-> 2 ],
+         [value |-> [val |-> 1], type |-> "ValueEntry", term |-> 4] >> @@
+  s4 :> <<>> )
+/\ votesGranted = (s1 :> {s1, s3} @@ s2 :> {s2, s3} @@ s3 :> {} @@ s4 :> {})
+
+4685822 states generated, 2736260 distinct states found, 218467 states left on queue.
+The depth of the complete state graph search is 66.
+Checkpointing of run st/26-11-07-10-51-10.478/
+Checkpointing completed at (2026-11-07 11:40:47)
+Finished in 16min 02s at (2026-11-07 11:40:47)

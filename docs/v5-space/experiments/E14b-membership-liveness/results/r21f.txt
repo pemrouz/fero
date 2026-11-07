@@ -1,0 +1,28 @@
+# run r21f: scenario four-voters, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 1, "InitR21": true, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "demote", "ReconfigurationLimit": 0}
+# spec LiveSpec (MCferolive.tla), CommunityModules-deps.jar, 1 segment(s), [55] s wall in all, TLC -workers 2
+# done: True
+
+## segment 1
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 65 and seed 1540673430271155941 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 20141] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 07:56:09)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 07:56:10.
+Model checking completed. No error has been found.
+Progress(11) at 2026-11-07 07:56:13: 661 states generated (661 s/min), 302 distinct states found (302 ds/min), 77 states left on queue.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 5.2E-11
+63350 states generated, 25175 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 113.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 7 and the 95th percentile is 2).
+Finished in 53s at (2026-11-07 07:57:02)
+
+# agef2.py (AG EF goal over progress steps)
+states 25175  edges 35987 (raw lines 63349, ends not found 0)  initial 1
+goal states 2638  can reach goal 19676
+judged states (highest term <= 2) 5
+stuck states 3  of which with a live majority 0  (not judged, near the term bound: 5496)
+plan: judged fault-free states with a live majority 1, plan-done states 2638, cannot finish the plan 0  -> PASS
+
+RESULT: PASS (no stuck state with a live majority)
