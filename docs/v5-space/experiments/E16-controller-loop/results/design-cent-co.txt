@@ -3,18 +3,22 @@ cent-co three1: 9,885 states, 1.0s: all hold
     P8: 6,760 judged states, 0 cannot reach the goal
     SWAP: 3,108 judged states, 0 cannot reach the goal
     WAIT: 17 judged states, 0 cannot reach the goal
-cent-co four1: 4,752 states, 0.5s: all hold
+cent-co four1: 4,752 states, 0.7s: all hold
     P5: 3,534 judged states, 0 cannot reach the goal
     P8: 3,495 judged states, 0 cannot reach the goal
     SWAP: 1,218 judged states, 0 cannot reach the goal
     WAIT: 39 judged states, 0 cannot reach the goal
-cent-co meta1: 10,282 states, 1.0s: all hold
+cent-co meta1: 10,282 states, 1.4s: all hold
     P5: 7,174 judged states, 0 cannot reach the goal
     P8: 6,759 judged states, 0 cannot reach the goal
     SWAP: 3,108 judged states, 0 cannot reach the goal
     WAIT: 415 judged states, 210 cannot reach the goal
-cent-co two-a: 347,262 states, 49.6s: all hold
+cent-co two-a: 347,262 states, 67.9s: P8 (3 steps)
     P5: 236,582 judged states, 0 cannot reach the goal
-    P8: 235,524 judged states, 0 cannot reach the goal
+    P8: 235,524 judged states, 1,064 cannot reach the goal
     SWAP: 97,024 judged states, 624 cannot reach the goal
-    WAIT: 1,058 judged states, 234 cannot reach the goal
+    WAIT: 1,058 judged states, 408 cannot reach the goal
+  P8: shortest trace, 3 steps
+     1. lose-disk 0
+     2. crash 3
+     3. recover 0

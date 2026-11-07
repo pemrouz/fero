@@ -156,10 +156,12 @@ class World:
         return any(maj(sum(1 for v in vot if self.ans(st, v, s)), len(vot)) for s in (0, 1))
 
     def free_cands(self, st, s):
-        """Live members on side s, not gone there, with no replica in the config."""
-        cfgm = {r[0] for r in st[IX['vot']] | st[IX['lrn']]}
+        """Live members on side s that could replace a voter: up, reached,
+        and not a voter (a learner is a candidate for a swap, as in
+        healing.py's P8)."""
+        vm = {r for r in st[IX['vot']]}
         return [m for m in range(self.N) if st[0][m][0] and st[0][m][2] == s
-                and m not in st[1][s] and m not in cfgm]
+                and m not in st[1][s] and self.cur(st, m) not in vm]
 
     # ------------------------------------------------------------ world steps
     def world(self, st):
@@ -394,8 +396,9 @@ class SelfHeal(World):
                 Guard('idle', g_idle, role='raft', note='one change at a time (etcd)'),
                 Guard('cand', lambda w, st, b: w.ans(st, b['r'], L(w, st)) and b['r'][0] not in st[1][L(w, st)],
                       role='target', note='a live member the leader reaches, not gone'),
-                Guard('new', lambda w, st, b: all(r[0] != b['r'][0] for r in st[IX['vot']] | st[IX['lrn']]),
-                      role='target', note='not already in the config'),
+                Guard('new', lambda w, st, b: b['r'] not in st[IX['vot']] | st[IX['lrn']],
+                      role='target', note='this replica is not already in the config (a member back '
+                                          'with a new disk is a new replica: DESIGN-V5 4.1)'),
                 Guard('need', lambda w, st, b: need(w, st, L(w, st)), role='target',
                       note='a voter is gone to the leader (a replacement is needed)'),
             ], [Update('append', add_upd, role='step')]),
@@ -481,7 +484,7 @@ class CentCo(World):
                       note='one command per reported epoch (PD: one operator per region at a time)'),
                 Guard('cand', lambda w, st, b: w.ans(st, b['r'], M(w, st)) and b['r'][0] not in st[1][M(w, st)],
                       role='target'),
-                Guard('new', lambda w, st, b: all(r[0] != b['r'][0] for r in b['vot'] | b['lrn']), role='target'),
+                Guard('new', lambda w, st, b: b['r'] not in b['vot'] | b['lrn'], role='target'),
                 Guard('need', lambda w, st, b: any(w.gone_to(st, M(w, st), v) for v in b['vot']), role='target'),
             ], [Update('issue', issue('add'), role='step')]),
             Action('c_promote', 'deliver', reports, [

@@ -4,7 +4,11 @@
 
 **Threshold (QUESTIONS Q-37).** A fix of 2 rules or fewer keeps Raft, with Z `par` or `rejoin` as the count says. More than 2 → R `vsr` (Viewstamped Replication Revisited with protocol-aware recovery, as TigerBeetle runs it) is costed as a candidate row.
 
-IN-SHORT-PENDING
+**In short.**
+- **Raft as published loses an acknowledged write** when one voter keeps its id and one fsynced entry below the commit point reads back bad (model-checked on etcd's own spec): if the bad entry is cut as a torn tail (F-10's rule), the server's shorter log lets a lagging candidate win with its vote, and the new leader overwrites the committed write (one fault, 32 states). A silent flip breaks log agreement at once. So every Raft row needs a checksum per entry.
+- **Z `rejoin` (the draft's choice) is a fix of 2 rules**, both shown necessary: the checksum turns damage into a wipe, and the wiped replica never votes under its old id (back under its old id, it loses a committed write the same way). It is safe and live with one damaged replica (27,985 states, no stuck state). It meets F-22's MUST. With one bad entry on **each of two** replicas it is never writable without F-12's operator step: two of three voters are gone.
+- **Z `par` (repair the one entry from a peer, keep the vote)** meets F-22's SHOULD: with one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (565,222 states, 276 two-damage states, 0 stuck). It costs **7 rules** (6 shown necessary by mutants, 1 by reasoning). Repair only from the leader is not enough: 4 to 9% of the two-damage states are stuck, because two damaged voters refuse their votes and no leader can be elected to repair them.
+- By the threshold: a 2-rule fix (`rejoin`) keeps Raft for F-22's MUST; F-22's SHOULD needs more than 2 rules (`par`: 7), so R `vsr` is costed as a candidate row against "Raft + `par`".
 
 ## Words used here
 
@@ -107,7 +111,23 @@ Why repair must come from any peer, not only the leader (`par2d-leader`, condens
 
 Now two of three voters refuse to vote, so s2 can never win, so there is no leader, so leader-only repair never starts. With repair from any peer, s3 copies entry 2 from s2 (s2 knows it committed), votes again, and a leader is elected whose commit index then covers entry 3 for s1. So the two-bad-replicas case needs peer repair, as PAR (FAST'18) does it.
 
-MUTANTS-PENDING
+**The rules of `par`, counted as DEV-10 says** ([tools/mutants.py](tools/mutants.py) made 11 mutants from the 10 tagged lines; [tools/mutrun37.py](tools/mutrun37.py) ran each on `par1`, then `par2d`, then `par1r2`, until one caught it; table in [results/mutants.md](results/mutants.md), runs in [results/mutants.json](results/mutants.json)):
+
+| Rule (tagged line) | Mutant | Result |
+|---|---|---|
+| the checksum marks the slot bad (`ParDetect`) | update dropped | **caught**: `LogInv` at once (the zeroed record is read as data; 2 states) |
+| a damaged server grants no vote (`ZNormal`, first guard) | guard dropped | **caught**: `MoreUpToDateCorrectInv` (32 states): with its last entry bad, the server compares a term of 0 and votes for a candidate that lacks a committed entry |
+| a damaged server takes no append (`ZNormal`, second guard) | guard dropped | not caught on `par1`, `par1r2` or `par2d` (73,611 / 569,912 / 820,872 states): **not needed** |
+| a damaged server drops such requests (`ZIgnore`) | guard dropped (any server may drop them) | undecided: `par1` and `par1r2` finish with no counterexample, `par2d` did not finish in 700 s; it only adds message loss, so at most liveness |
+| a damaged server does not stand (`ZTimeout`) | guard dropped | **caught**: `LogMatchingInv` on `par2d` (56 states): a server whose entry 3 is bad but whose last entry is good wins, leads, and copies its zeroed entry 3 to a follower that lacked it |
+| repair: the peer's slot is not bad itself (`ZRepair`) | guard dropped | not caught: in these runs the two bad entries are at different offsets (`par2d`); with the same offset on two replicas (`par2`, which did not finish) it copies garbage, so it is needed by reasoning |
+| repair: the peer knows the entry is committed (`commitIndex[j] >= bad[i]`) | guard dropped | **caught** as a TLC evaluation error: the copy reads past the end of a peer's shorter log |
+| the same comparison | `>=` flipped to `>` | **caught**: 14 stuck states with a live majority on `par2d` (the peer that knows exactly up to that entry may not repair) |
+| repair: the server is damaged (`bad[i] # 0`) | guard dropped | equivalent (repairing an undamaged server changes nothing: the same 62,743 states on `par1`) |
+| repair copies the entry | update dropped | **caught**: `LogInv` (3 states): the mark is cleared over a zeroed record |
+| repair clears the mark | update dropped | **caught**: 76 stuck states with a live majority on `par2d` (two damaged servers that never vote again) |
+
+So the cheapest `par` costs **6 rules shown necessary** (the checksum mark; no vote; no standing; repair from a peer that knows the entry committed; the copy; clearing the mark), plus 1 needed by reasoning (the peer's own slot is not bad), so **7**, against `rejoin`'s 2. Taking appends while damaged is allowed. Mutants: 11, 1 equivalent, 7 caught of the 10 others (70%; DEV-03 asks 85%): the two survivors are the append guard (not needed) and the peer-slot guard (its case did not finish), and one is undecided.
 
 ## What the model leaves out
 
@@ -120,4 +140,23 @@ MUTANTS-PENDING
 - **Disks that lie about fsync, torn writes of several entries, and damage to the term or vote record** are not modelled (F-10 names a lying disk as residual risk).
 - **Liveness is "a path exists"** (AG EF), as in E-14, not a fairness proof.
 
-RESULTS-END
+
+## Against the threshold
+
+The threshold: "a fix of ≤ 2 rules keeps Raft, with Z `par` or `rejoin` as the count says; more → R `vsr` (VR Revisited plus protocol-aware recovery, as TigerBeetle runs it) is costed as a candidate row."
+
+- **Raft as published (Z `crash`) does not keep acknowledged writes** when one voter keeps its id and loses or corrupts one entry below the commit point: one fault, 32 states (cut), or 2 states (silent). Every row that runs Raft must take a checksum per entry; F-10's "a torn tail is cut" is safe only for a tail the checksum shows was never acknowledged.
+- **`rejoin` is a fix of 2 rules**, each shown necessary (`cut1-obs`, `silent1`; `ghost1-obs`). It keeps Raft as published and meets F-22's MUST. With one bad entry on each of two replicas it is **never** writable without F-12's operator step (`rejoin2`): two of three voters are gone under their ids.
+- **`par` (peer repair) meets F-22's SHOULD**: every judged state with one bad entry on each of two replicas, at different offsets, reaches a working leader (`par2d`: 276 of 276), with no invariant broken. It costs 7 rules (6 shown necessary by mutants, 1 by reasoning): more than 2. Repair only from the leader is not enough (4 to 9% of those states stuck).
+- So, by the threshold: **Raft stays, with Z `rejoin`** (2 rules, the draft's DESIGN-V5 4.1 choice) for F-22's MUST. F-22's SHOULD needs `par`'s 7 rules or R `vsr`; the threshold says `vsr` is then costed as a candidate row. `par` inside Raft is the smaller step (reasoned): it keeps etcd's raft as the core and adds PAR's repair (Alagappan et al., FAST'18, built their CTRL into LogCabin, a Raft implementation, and ZooKeeper; cited).
+
+## How to rerun
+
+```sh
+./fetch.sh        # tla2tools.jar, CommunityModules 202611060952, etcd's raft at c51f010, into $SP/dl/
+./run.sh          # every run above, then the mutants (each TLC run under the heavy lock)
+./run.sh par2d    # one run (python3 tools/run37.py --list)
+./run.sh mutants  # DEV-10's mutants of the par fix
+```
+
+Q-37: No for Raft as published (a voter that keeps its id and cuts one bad entry as a torn tail lets a lagging leader overwrite a committed write: TLC, one fault, 32 states); Z `rejoin` fixes it in 2 rules (checksum plus wipe; never vote under the old id) and meets F-22's MUST, but two replicas with one bad entry each are never writable without F-12; Z `par` (checksum, refuse to vote or stand, repair the entry from any peer that knows it committed) keeps every two-damage state writable (565,222 states, 0 stuck) at 7 rules, so by the threshold R `vsr` is costed as a candidate row for F-22's SHOULD. Moves: every Raft row (MIN, MIN-P, MIN-TS, RUST, SRV, LEAN, DRAFT, CELL, LANE, SPLIT, RLOG, EMB-V8, SIDE) up on F-22 (M) and F-10 with Z `rejoin` (+2 rules, already DESIGN-V5 4.1), and needs Z `par` (+7 rules: PAR's repair inside Raft) for F-22 (S); PD (Raft with Z `crash`) down on F-22 (M) until it takes a checksum and `rejoin`; ISR and OBJ (Z `crash`, not Raft) not checked here; R `vsr` gains a reason to be costed (F-22 S), against Raft + `par`; DEV-01 +1 mechanism for `par` (the per-entry bad mark and peer repair), none for `rejoin` beyond the incarnation the rows already count.

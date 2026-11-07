@@ -28,3 +28,18 @@
 {"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"default","build_ms":4703,"gcs":41,"longest":[[130.1,4],[44.7,1],[43.7,1],[40.5,1],[40,1]],"size":5000000}
 {"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"4096","build_ms":4397,"gcs":41,"longest":[[53.4,1],[42.3,1],[36.5,1],[31,1],[30.5,1]],"size":5000000}
 {"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"4096","build_ms":4622,"gcs":41,"longest":[[163.4,4],[48.3,1],[41.5,1],[38,1],[33.8,1]],"size":5000000}
+{"run":4,"loadavg":"0.86 1.18 1.56 1/152 3060","probe":"worker-gc"}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"default","build_ms":4531,"gcs":41,"longest":[[57.7,1],[35.4,1],[33.6,1],[32.4,1],[30.9,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"default","build_ms":4889,"gcs":40,"longest":[[258.3,4],[42.9,1],[37.6,1],[37.1,1],[32.5,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"4096","build_ms":4800,"gcs":41,"longest":[[49.8,1],[42,1],[39.4,1],[35.9,1],[30.3,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"4096","build_ms":4831,"gcs":40,"longest":[[143.4,4],[42.3,1],[35.2,1],[34.4,1],[31.5,1]],"size":5000000}
+{"run":4,"loadavg":"0.97 1.18 1.55 1/149 3096","probe":"worker-gc"}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"default","build_ms":4822,"gcs":42,"longest":[[48.5,1],[42.6,1],[41.8,1],[41.4,4],[37.6,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"default","build_ms":4918,"gcs":41,"longest":[[167.9,4],[45.4,1],[38.2,1],[38.1,1],[37.9,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"4096","build_ms":4633,"gcs":42,"longest":[[134.3,4],[48.1,1],[43.9,1],[37,1],[35.2,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"4096","build_ms":4875,"gcs":41,"longest":[[162.7,4],[50.3,1],[41.3,1],[40.2,1],[37.2,1]],"size":5000000}
+{"run":4,"loadavg":"0.98 1.17 1.54 1/153 3164","probe":"worker-gc"}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"default","build_ms":4651,"gcs":42,"longest":[[49.9,1],[44.4,1],[39.7,1],[35.6,1],[35,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"default","build_ms":4887,"gcs":41,"longest":[[123.4,4],[45.1,1],[39.3,1],[38.5,1],[37.8,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"main","worker_old_mb":"4096","build_ms":4631,"gcs":41,"longest":[[45.2,1],[43,1],[31.9,1],[31.9,1],[23.9,1]],"size":5000000}
+{"exp":"E-34","part":"worker-gc","where":"worker","worker_old_mb":"4096","build_ms":4946,"gcs":41,"longest":[[163.8,4],[62.7,4],[44.3,1],[40.5,1],[37.7,1]],"size":5000000}

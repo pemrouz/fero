@@ -51,6 +51,7 @@ ap.add_argument('--work', required=True)
 ap.add_argument('what', nargs='+', choices=('others', 'repeat', 'bigger', 'stats', 'all'))
 ap.add_argument('--only', action='append', default=[], help='only these result names')
 ap.add_argument('--limit', type=int, default=1_500_000)
+ap.add_argument('--res', help='where the smallest sets are (default WORK/results)')
 A = ap.parse_args()
 sys.path.insert(0, os.path.join(A.work, 'harness'))
 
@@ -61,7 +62,7 @@ from dsl import Mutation                           # noqa: E402
 from world import World, PROPS, is_calm            # noqa: E402
 from explore import explore                        # noqa: E402
 
-RES = os.path.join(A.work, 'results')
+RES = A.res or os.path.join(A.work, 'results')
 
 # the smallest sets checked, and the option each one is a set of
 SETS = ['fixN', 'slot', 'slot-rev', 'slot+abort', 'rekey', 'rekey-alt', 'rekey-carry', 'rekey-carry-alt',
@@ -334,9 +335,38 @@ def repair(opt, drop, bounds, limit=None):
     return f'repair: no set of up to 6 rules found (tried {back})'
 
 
+def repair_all(opt, drop, bounds, limit=None):
+    """For R: put back every dropped idempotence guard (role 'idem') at once;
+    if that is not enough, every dropped guard. If every bound then holds,
+    drop each one put back again, in model-text order, keeping it dropped if
+    every bound still holds: what is left is the set R needs back (1-minimal
+    among those put back)."""
+    rl = runner.rule_list(opt)
+    roles = {r.id: r.role for r in rl}
+    guards = {r.id for r in rl if hasattr(r, 'op')}
+    idem = [r for r in drop if roles.get(r) == 'idem']
+    other = [r for r in drop if r in guards and r not in idem]
+    fb = None
+    for extra in (idem, idem + other):
+        cur = [x for x in drop if x not in extra]
+        fb = first_bad(check(opt, cur, bounds, limit=limit))
+        if fb is None:
+            back = [r for r in [x.id for x in rl] if r in extra]
+            for r in list(back):
+                if first_bad(check(opt, cur + [r], bounds, limit=limit)) is None:
+                    back.remove(r)
+                    cur = cur + [r]
+            return f'repair: put back {back} ({len(back)} rule{"s" if len(back) != 1 else ""})', back
+    what = f'{fb[1]} on {fb[0]}' if fb else '?'
+    return f'repair: not repaired even with every dropped guard put back ({what})', None
+
+
+ROPT = {'split': 'once-split', 'pslot-fused': 'once-pslot-fused'}
+
+
 def run_repeat():
     print('## R: a log that may append an exact repeat once\n')
-    print('Each smallest set on the shared sweep and twice1, then readback, with world.Draft.append changed so an '
+    print('Each smallest set on the shared sweep and twice1 (twice1 left out for the give-up sets), with world.Draft.append changed so an '
           'entry already in the log may be appended once more (a step taken twice: at most two copies of an '
           'entry, within the same 10-entry cap). A cap hit still counts as able to reach a liveness goal, as in '
           'the harness. Runs stop at 300,000 states (LIMIT: undecided).\n')
@@ -351,23 +381,29 @@ def run_repeat():
                 print(f'{name}: no result yet')
                 continue
             opt = option_of(name)
-            bounds = list(SWEEP) + list(VERIFY) + ['readback']
+            if os.path.isdir(os.path.join(A.work, 'options', 'once')) and opt in ROPT:
+                # the variant with the once guards its model never wrote; they
+                # start dropped, like every once guard the ablation dropped
+                base = {r.id for r in runner.rule_list(opt)}
+                opt = ROPT[opt]
+                drop = drop + [r.id for r in runner.rule_list(opt) if r.id not in base]
+            bounds = list(SWEEP) + list(VERIFY)
             if name.endswith('+abort') or name.endswith('+giveup'):
-                bounds = list(SWEEP) + ['readback']
+                bounds = list(SWEEP)
             t0 = time.time()
             rs = check(opt, drop, bounds, limit=RLIMIT)
             fb = first_bad(rs)
             sizes = ', '.join(f'{b} {r.states:,}' for b, r in rs.items())
             if fb is None:
-                print(f'{name}: holds every bound with a step taken twice ({sizes}; {time.time() - t0:.0f}s)')
+                print(f'{name} ({opt}): holds every bound with a step taken twice ({sizes}; {time.time() - t0:.0f}s)')
             elif fb[1] == 'LIMIT':
-                print(f'{name}: undecided: {fb[0]} passed {RLIMIT:,} states with no counterexample ({sizes})')
-                print('    ' + repair(opt, drop, bounds, limit=RLIMIT))
+                print(f'{name} ({opt}): undecided: {fb[0]} passed {RLIMIT:,} states with no counterexample ({sizes})')
+                print('    ' + repair_all(opt, drop, bounds, limit=RLIMIT)[0])
             else:
                 b, p, d, tr = fb
-                print(f'{name}: FAILS {p} on {b} in {d} steps with a step taken twice ({sizes}):')
+                print(f'{name} ({opt}): FAILS {p} on {b} in {d} steps with a step taken twice ({sizes}):')
                 print(show(tr))
-                print('    ' + repair(opt, drop, bounds, limit=RLIMIT))
+                print('    ' + repair_all(opt, drop, bounds, limit=RLIMIT)[0])
             sys.stdout.flush()
     finally:
         world.Draft.append = orig

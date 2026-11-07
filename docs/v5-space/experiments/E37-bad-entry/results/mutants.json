@@ -84,5 +84,156 @@
    }
   },
   "verdict": "not caught"
+ },
+ "ZRepair:drop-guard:r06": {
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 62743,
+    "error": null,
+    "secs": 48,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par1r2": {
+    "complete": true,
+    "distinct": 455856,
+    "error": null,
+    "secs": 108,
+    "stuck_live": null,
+    "violated": null
+   },
+   "par2d": {
+    "complete": true,
+    "distinct": 565222,
+    "error": null,
+    "secs": 274,
+    "stuck_live": 0,
+    "violated": null
+   }
+  },
+  "verdict": "not caught"
+ },
+ "ZRepair:drop-guard:r07": {
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 62743,
+    "error": null,
+    "secs": 28,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par1r2": {
+    "complete": true,
+    "distinct": 455856,
+    "error": null,
+    "secs": 98,
+    "stuck_live": null,
+    "violated": null
+   },
+   "par2d": {
+    "complete": true,
+    "distinct": 570034,
+    "error": null,
+    "secs": 251,
+    "stuck_live": 0,
+    "violated": null
+   }
+  },
+  "verdict": "not caught"
+ },
+ "ZRepair:drop-guard:r08": {
+  "runs": {
+   "par1": {
+    "complete": false,
+    "distinct": 1900,
+    "error": "Error: TLC threw an unexpected exception.",
+    "secs": 16,
+    "stuck_live": null,
+    "violated": null
+   }
+  },
+  "verdict": "error"
+ },
+ "ZRepair:drop-update-bad:r10": {
+  "by": "stuck with a live majority on par2d: 76 states (design: 0)",
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 37012,
+    "error": null,
+    "secs": 42,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par2d": {
+    "complete": true,
+    "distinct": 24245,
+    "error": null,
+    "secs": 22,
+    "stuck_live": 76,
+    "violated": null
+   }
+  },
+  "verdict": "caught"
+ },
+ "ZRepair:drop-update-log:r09": {
+  "by": "ZLogInv on par1 (3 states in the trace)",
+  "runs": {
+   "par1": {
+    "complete": false,
+    "distinct": 41,
+    "error": null,
+    "secs": 4,
+    "stuck_live": null,
+    "violated": "ZLogInv"
+   }
+  },
+  "verdict": "caught"
+ },
+ "ZRepair:flip->=-to->:r08": {
+  "by": "stuck with a live majority on par2d: 14 states (design: 0)",
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 40009,
+    "error": null,
+    "secs": 38,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par2d": {
+    "complete": true,
+    "distinct": 151800,
+    "error": null,
+    "secs": 93,
+    "stuck_live": 14,
+    "violated": null
+   }
+  },
+  "verdict": "caught"
+ },
+ "ZTimeout:drop-guard:r05": {
+  "by": "ZLogMatchingInv on par2d (56 states in the trace)",
+  "runs": {
+   "par1": {
+    "complete": true,
+    "distinct": 65606,
+    "error": null,
+    "secs": 32,
+    "stuck_live": 0,
+    "violated": null
+   },
+   "par2d": {
+    "complete": false,
+    "distinct": 144091,
+    "error": null,
+    "secs": 67,
+    "stuck_live": null,
+    "violated": "ZLogMatchingInv"
+   }
+  },
+  "verdict": "caught"
  }
 }

@@ -26,3 +26,7 @@ Traceback (most recent call last):
     return r[0] in st[1][s]
                    ~~~~~^^^
 TypeError: tuple indices must be integers or slices, not NoneType
+  pass 1: 11 of 34 rules necessary alone
+  mutants: 2; caught 2; equivalent 0; undecided 0; survived 0
+self: 2 rules kept of 34; error: None
+  pass 1: 12 of 34 rules necessary alone

@@ -1,0 +1,13 @@
+0479088bd833da485e5227a61c15439e552b4afb948c4fa71caed0b1141c8e31  tla/MCferolive.tla
+bf98edba6869016d2a656a81721af61495a8b9eb1fdbd5cb18abbb2665efaba3  ../E14-membership-on-commit/tla/MCferoraft.tla
+4e75e210a805e809c6ca7ecadfc19fcbdfa432d47927d00019f1b4c635bd1bef  tla/MCbadentry.tla
+15c445684529c59a59877951c7fb7df9a40da250aaa445f056ef48f56bb27044  /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/raftsrc/raft/tla/etcdraft.tla
+654aa50197faa48fa0136b41257270de6469d29ef323e7822ead59d2be43ce10  /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/tla/tla2tools.jar
+a3b27c40f1fb5085f30c6ead37e918457f8cfc62c1e50a1dc668ef592ad2b5fb  /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/communitymodules/CommunityModules-deps.jar
+MCferolive.tla copied unchanged from ../E14b-membership-liveness/tla/ (sha256 0479088b...)
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+Python 3.13.17
+numpy 2.5.3
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)

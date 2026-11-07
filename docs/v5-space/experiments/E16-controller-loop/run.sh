@@ -18,9 +18,12 @@ mkdir -p results
 
 # 1. The designs on every bound, with traces and the WAIT counts.
 for o in self cent-co; do
-  "$HEAVY" timeout 1500 python3 engine/cli.py models/heal.py "$o" > "results/design-$o.txt" 2>&1 || true
+  "$HEAVY" timeout 1500 python3 engine/cli.py models/heal.py "$o" --limit 900000 > "results/design-$o.txt" 2>&1 || true
 done
 "$HEAVY" timeout 600 python3 engine/cli.py models/rlog.py rlog > results/design-rlog.txt 2>&1 || true
+# the two-fault bounds the ablation does not use (cent-co stops at 900,000
+# states on them: safety only)
+"$HEAVY" timeout 1500 sh -c 'for o in self cent-co; do python3 engine/cli.py models/heal.py $o --bound two-b --bound two-c --bound three2 --limit 900000; done' > results/design-extra.txt 2>&1 || true
 [ "$1" = check ] && exit 0
 
 # 2. The ablation and the mutants (DEV-10), resumable: each piece runs at
