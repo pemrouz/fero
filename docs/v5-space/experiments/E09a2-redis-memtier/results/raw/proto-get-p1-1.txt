@@ -1,0 +1,30 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sets            0.00          ---          ---             ---             ---             ---             ---             ---             ---         0.00 
+Gets        23542.75     23542.75         0.00         8.50237         6.78300        13.24700        23.16700       158.71900       244.73500      3239.17 
+Waits           0.00          ---          ---             ---             ---             ---             ---             ---             ---          --- 
+Totals      23542.75     23542.75         0.00         8.50237         6.78300        13.24700        23.16700       158.71900       244.73500      3239.17 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1_FULL_RUN_1.hgrm...
+Writing GET command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1_GET_command_run_1.txt...
+Writing GET command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1_GET_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   6.536s  (user 2.842s, sys 3.694s)
+  Wall time:        20.149s
+  Cores used:       0.324   (avg 8.1% across 4 worker threads)
+  Peak utilization: 38.5%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto-get-p1-1.json
+Json file closed.
+
+# prototype host:
+ready resp 127.0.0.1:16490 (gateway in s1; seed 1; resources kv {})
+summary (SIGTERM): [28.1 s real, 0.066 s virtual, 303474 events, 572087 verbs] conns=0 in=29615179B out=51485396B ops{SET=100000 GET=472087} errors{} cpu=43.02s rss=2040MB

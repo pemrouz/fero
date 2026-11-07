@@ -1,0 +1,32 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Incrs        6101.63         0.00         0.00        32.77325        29.18300        51.71100        86.01500       436.22300       475.13500       225.77 
+Totals       6101.63         0.00         0.00        32.77325        29.18300        51.71100        86.01500       436.22300       475.13500       451.53 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2_FULL_RUN_1.hgrm...
+Writing INCR command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2_INCR_command_run_1.txt...
+Writing INCR command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2_INCR_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   3.115s  (user 1.595s, sys 1.520s)
+  Wall time:        20.051s
+  Cores used:       0.155   (avg 3.9% across 4 worker threads)
+  Peak utilization: 24.6%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-incr-p1-2.json
+Json file closed.
+
+# prototype host:
+ready resp 127.0.0.1:16490 (gateway in s1; seed 1; resources kv {})
+[5.0 s real, 0.285 s virtual, 142592 events, 41927 verbs] conns=200 in=1420869B out=166980B ops{INCR=41927} errors{} cpu=7.47s rss=540MB
+[10.0 s real, 0.515 s virtual, 262223 events, 77137 verbs] conns=200 in=2614088B out=307876B ops{INCR=77137} errors{} cpu=13.34s rss=831MB
+[15.0 s real, 0.686 s virtual, 351169 events, 103401 verbs] conns=200 in=3504191B out=412852B ops{INCR=103401} errors{} cpu=18.97s rss=1096MB
+[20.0 s real, 0.807 s virtual, 414619 events, 122017 verbs] conns=200 in=4135053B out=487448B ops{INCR=122017} errors{} cpu=25.88s rss=1196MB
+summary (SIGTERM): [21.1 s real, 0.810 s virtual, 415437 events, 122175 verbs] conns=0 in=4140410B out=488700B ops{INCR=122175} errors{} cpu=25.98s rss=1196MB

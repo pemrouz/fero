@@ -1,0 +1,35 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sets            0.00          ---          ---             ---             ---             ---             ---             ---             ---         0.00 
+Gets        44487.53     44487.53         0.00        71.92803        67.07100        82.94300       109.05500      2080.76700      4915.19900      6120.88 
+Waits           0.00          ---          ---             ---             ---             ---             ---             ---             ---          --- 
+Totals      44487.53     44487.53         0.00        71.92803        67.07100        82.94300       109.05500      2080.76700      4915.19900      6120.88 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3_FULL_RUN_1.hgrm...
+Writing GET command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3_GET_command_run_1.txt...
+Writing GET command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3_GET_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   4.374s  (user 2.029s, sys 2.346s)
+  Wall time:        20.076s
+  Cores used:       0.218   (avg 5.4% across 4 worker threads)
+  Peak utilization: 24.4%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/proto8g-get-p16-3.json
+Json file closed.
+
+# prototype host:
+ready resp 127.0.0.1:16490 (gateway in s1; seed 1; resources kv {})
+[5.0 s real, 0.042 s virtual, 196258 events, 66729 verbs] conns=50 in=9400262B out=317710B ops{SET=66729} errors{} cpu=8.21s rss=826MB
+[10.1 s real, 0.065 s virtual, 303421 events, 173920 verbs] conns=144 in=16520016B out=8483360B ops{SET=100000 GET=73920} errors{} cpu=15.35s rss=1384MB
+[15.1 s real, 0.065 s virtual, 303421 events, 416928 verbs] conns=200 in=24512279B out=34728224B ops{SET=100000 GET=316928} errors{} cpu=21.86s rss=1817MB
+[20.1 s real, 0.065 s virtual, 303421 events, 640928 verbs] conns=200 in=31879254B out=58920224B ops{SET=100000 GET=540928} errors{} cpu=28.23s rss=2481MB
+[25.2 s real, 0.065 s virtual, 303421 events, 861728 verbs] conns=200 in=39141023B out=82766624B ops{SET=100000 GET=761728} errors{} cpu=34.57s rss=3130MB
+summary (SIGTERM): [29.1 s real, 0.065 s virtual, 303421 events, 991312 verbs] conns=0 in=43402812B out=96761696B ops{SET=100000 GET=891312} errors{} cpu=38.35s rss=3518MB

@@ -1,0 +1,11 @@
+# proto-get-p16 run 1 (hold proto, 2026-11-07T06:29:38-06:30:13, boot 3): the prototype host ran out of its default V8 heap
+# (about 2 GB) about 20 s into the measured run; memtier then recorded 0 requests and bench.py stopped the hold.
+# The host's output (the native stack trace trimmed):
+ready resp 127.0.0.1:16490 (gateway in s1; seed 1; resources kv {})
+<--- Last few GCs --->
+[21219:0x2c29e000]    26537 ms: Mark-Compact 2008.9 (2089.5) -> 1990.5 (2091.8) MB, pooled: 0 MB, 1106.00 / 0.00 ms  (average mu = 0.409, current mu = 0.241) allocation failure; scavenge might not succeed
+[21219:0x2c29e000]    28882 ms: Mark-Compact 2008.3 (2091.8) -> 1996.8 (2097.0) MB, pooled: 0 MB, 2255.07 / 0.00 ms  (average mu = 0.192, current mu = 0.038) allocation failure; scavenge might not succeed
+<--- JS stacktrace --->
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+# memtier's JSON (ALL STATS, Totals): Count 0, Ops/sec 0.0; CPU wall 21.8 s
