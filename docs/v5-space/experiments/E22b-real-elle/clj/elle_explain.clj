@@ -1,6 +1,6 @@
 ;; E-22b: print real Elle's full explanation of the cycles it finds in one history, to root-cause
 ;; a disagreement with the Go port. Usage: ... clojure.main elle_explain.clj <model> <file.edn>
-;; (the same pairing of invokes as elle_check.clj).
+;; (the same pairing of invokes as elle_check.clj; E22B_RULE=port as there).
 (ns e22b.elle-explain
   (:require [elle.list-append :as la]
             [jepsen.history :as h]
@@ -8,6 +8,8 @@
             [clojure.java.io :as io]
             [clojure.pprint :refer [pprint]]
             [e22b.pairing :as pairing]))
+
+(pairing/port-rule-if-asked!)
 
 (let [[model file] *command-line-args*
       ops (pairing/read-ops file)

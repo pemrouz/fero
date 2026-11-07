@@ -25,20 +25,16 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.data.json :as json]
-            [e22b.pairing :refer [read-ops paired]]))
+            [e22b.pairing :as pairing :refer [read-ops paired]]))
 
-(when (= "port" (System/getenv "E22B_RULE"))
-  (alter-var-root #'la/previously-appended-element
-                  (fn [orig]
-                    (fn [append-index write-index op [f k v :as mop]]
-                      (when (some? (get-in append-index [k :indices v]))
-                        (orig append-index write-index op mop))))))
+(pairing/port-rule-if-asked!)
 
 (defn summarize [r]
   (let [as (:anomalies r)]
     {:valid (let [v (:valid? r)] (if (keyword? v) (name v) v))
      :types (mapv name (sort (keys as)))
-     :counts (into (sorted-map) (map (fn [[k v]] [(name k) (count v)]) as))
+     ;; most anomaly values are lists of cases; :empty-transaction-graph is just true
+     :counts (into (sorted-map) (map (fn [[k v]] [(name k) (if (coll? v) (count v) 1)]) as))
      :not (some->> (:not r) (map name) sort vec)}))
 
 (defn check-file [path]

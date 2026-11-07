@@ -1,0 +1,17 @@
+{
+ "bound": "dedup",
+ "calm_states": 5697,
+ "complete": true,
+ "distinct_total": 360901,
+ "errors": [],
+ "failed": [],
+ "kind": "mutant",
+ "live_edges": 8740,
+ "live_stuck": 0,
+ "secs": 104.3,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 355204,
+ "steps": {},
+ "variant": "b-serves-before-open-commits",
+ "workers": 2
+}

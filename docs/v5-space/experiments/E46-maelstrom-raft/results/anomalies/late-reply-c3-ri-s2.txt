@@ -1,0 +1,26 @@
+# c3-ri-s2: the one Maelstrom WARN in clean batch A, traced.
+# 1. Maelstrom's log: the assertion
+WARN [2026-11-06 22:11:12,304] n0 stdout - maelstrom.process Error!
+java.lang.AssertionError: Assert failed: Invalid dest for message #maelstrom.net.message.Message{:id 46167, :src "n0", :dest "c11", :body {:type "error", :code 22, :text "from does not match", :in_reply_to 751, :msg_id 2644}}
+
+# 2. The history: the partition that cut n0 off, process 195's cas, its timeout (:info)
+{:index 8720, :time 97962212602, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 8721, :time 97967724469, :type :invoke, :process 195, :f :cas, :value [6 [1 2]]}
+{:index 8722, :time 97972036936, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n0" #{"n2" "n1"}, "n2" #{"n0"}, "n1" #{"n0"}}]}
+{:index 8821, :time 98967526575, :type :info, :process 195, :f :cas, :value [6 [1 2]], :error :net-timeout}
+
+# 3. The network journal (tools/journal_grep.clj ... c11 751): c11 sent msg 751 (cas key 6 from 1 to 2) to n0; no reply within the 1 s client timeout
+[44519740811405 "c11" "n0" {:key 6, :from 4, :to 4, :type "cas", :msg_id 750}]
+[44519753065342 "n0" "c11" {:type "cas_ok", :in_reply_to 750, :msg_id 2600}]
+[44519836335051 "c11" "n0" {:key 6, :from 1, :to 2, :type "cas", :msg_id 751}]
+[44520840614916 "c11" "n0" {:key 10, :value 4, :type "write", :msg_id 752}]
+[44520840984873 "n0" "c11" {:type "error", :code 11, :text "proposal dropped: raft proposal dropped", :in_reply_to 752, :msg_id 2603}]
+
+# 4. n0's roles at the end (ms since the node started): isolated from 97.96 s, PreCandidate (no leader) until the final heal, then follower of n2 again
+92636 ROLE term=14 StateFollower lead=0
+92642 ROLE term=14 StateFollower lead=2
+98690 ROLE term=14 StatePreCandidate lead=0
+100175 ROLE term=14 StateFollower lead=2
+# 5. Maelstrom 'Run complete' and the late reply 54 ms later:
+INFO [2026-11-06 22:11:12,250] jepsen test runner - jepsen.core Run complete, writing
+WARN [2026-11-06 22:11:12,304] n0 stdout - maelstrom.process Error!

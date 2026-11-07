@@ -263,8 +263,13 @@ def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
         extra = [i for i in remaining if first_fail(fin[i]) is None and i not in pinned]
         if not extra:
             break
-        removed.append(extra[0])
-        greedy.append([extra[0], 'dropped in the final pass'])
+        # the rules the final pass found unnecessary: drop them greedily, each
+        # kept dropped only if every bound still holds; then pass again
+        for i in extra:
+            per = _all(wk, Mutation(drop=removed + [i]).key(), bounds)
+            if first_fail(per) is None:
+                removed.append(i)
+                greedy.append([i, 'dropped in the final pass'])
     # VERIFY: the smallest model on the big bound(s); a failure puts dropped
     # rules back, latest dropped first, until it holds everywhere
     verify = list(VERIFY)

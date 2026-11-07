@@ -1,0 +1,103 @@
+kafka:default:max-default run 0: {"total": {"records": 300000.0, "rec_s": 29055.690073, "mb_s": 28.37, "avg_ms": 964.38, "max_ms": 1845.0, "p50": 922.0, "p95": 1456.0, "p99": 1697.0, "p999": 1808.0}, "steady": {"records": 250000.0, "rec_s": 29804.482594, "mb_s": 29.11, "avg_ms": 909.07, "max_ms": 1281.0, "p50": 905.0, "p95": 1142.0, "p99": 1208.0, "p999": 1258.0}} {'n': 300000, 'rc': 0, 'wall_s': 11.78, 'server_cores': 2.74, 'client_cores': 0.82, 'other_cores': 0.03}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+In steady state.
+124661 records sent, 24927.2 records/sec (24.34 MB/sec), 976.6 ms avg latency, 1281.0 ms max latency.
+300000 records sent, 29055.690073 records/sec (28.37 MB/sec), 964.38 ms avg latency, 1845.00 ms max latency, 922 ms 50th, 1456 ms 95th, 1697 ms 99th, 1808 ms 99.9th.
+250000 steady state records sent, 29804.482594 records/sec (29.11 MB/sec), 909.07 ms avg latency, 1281.00 ms max latency, 905 ms 50th, 1142 ms 95th, 1208 ms 99th, 1258 ms 99.9th.
+
+kafka:default:consume run 0: {"start.time": "2026-11-06 23:00:07:419", "end.time": "2026-11-06 23:00:09:153", "data.consumed.in.MB": 292.9688, "MB.sec": 168.9554, "data.consumed.in.nMsg": 300000.0, "nMsg.sec": 173010.3806, "rebalance.time.ms": 1014.0, "fetch.time.ms": 720.0, "fetch.MB.sec": 406.901, "fetch.nMsg.sec": 416666.6667} {'n': 300000, 'rc': 0, 'wall_s': 3.68, 'server_cores': 0.88, 'client_cores': 1.18, 'other_cores': 0.04}
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2026-11-06 23:00:07:419, 2026-11-06 23:00:09:153, 292.9688, 168.9554, 300000, 173010.3806, 1014, 720, 406.9010, 416666.6667
+
+kafka:default:share-4c run 0: {"start.time": "2026-11-06 23:00:12:908", "end.time": "2026-11-06 23:00:21:966", "data.consumed.in.MB": 292.9688, "MB.sec": 32.3436, "nMsg.sec": 33119.894, "data.consumed.in.nMsg": 300000.0, "fetch.time.ms": 9058.0} {'n': 300000, 'rc': 0, 'wall_s': 11.5, 'server_cores': 1.2, 'client_cores': 0.59, 'other_cores': 0.03}
+start.time, end.time, data.consumed.in.MB, MB.sec, nMsg.sec, data.consumed.in.nMsg, fetch.time.ms
+2026-11-06 23:00:12:908, 2026-11-06 23:00:21:966, 292.9688, 32.3436, 33119.8940, 300000, 9058
+
+kafka:default:max-omb run 0: {"total": {"records": 300000.0, "rec_s": 116867.939229, "mb_s": 114.13, "avg_ms": 178.1, "max_ms": 542.0, "p50": 162.0, "p95": 396.0, "p99": 486.0, "p999": 541.0}, "steady": {"records": 250000.0, "rec_s": 134336.378291, "mb_s": 131.19, "avg_ms": 188.29, "max_ms": 542.0, "p50": 173.0, "p95": 403.0, "p99": 487.0, "p999": 541.0}} {'n': 300000, 'rc': 0, 'wall_s': 4.09, 'server_cores': 1.34, 'client_cores': 1.51, 'other_cores': 0.02}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+300000 records sent, 116867.939229 records/sec (114.13 MB/sec), 178.10 ms avg latency, 542.00 ms max latency, 162 ms 50th, 396 ms 95th, 486 ms 99th, 541 ms 99.9th.
+250000 steady state records sent, 134336.378291 records/sec (131.19 MB/sec), 188.29 ms avg latency, 542.00 ms max latency, 173 ms 50th, 403 ms 95th, 487 ms 99th, 541 ms 99.9th.
+
+server 8818 rss_mb 806
+server 9579 rss_mb 904
+server 10401 rss_mb 836
+kafka:default:half run 0: {"total": {"records": 10000.0, "rec_s": 1987.676406, "mb_s": 1.94, "avg_ms": 52.0, "max_ms": 563.0, "p50": 28.0, "p95": 269.0, "p99": 307.0, "p999": 321.0}, "steady": {"records": 8000.0, "rec_s": 1982.651797, "mb_s": 1.94, "avg_ms": 24.92, "max_ms": 62.0, "p50": 25.0, "p95": 44.0, "p99": 54.0, "p999": 61.0}, "e2e": {"count": 8000, "skipped": 2000, "p50": 25, "p90": 40, "p99": 54, "p999": 61, "max" {'n': 2000, 'rc': 0, 'wall_s': 6.4, 'server_cores': 1.9, 'client_cores': 1.27, 'other_cores': -0.28}
+Warmup first 2000 records. Steady state results will print after the complete test summary.
+10000 records sent, 1987.676406 records/sec (1.94 MB/sec), 52.00 ms avg latency, 563.00 ms max latency, 28 ms 50th, 269 ms 95th, 307 ms 99th, 321 ms 99.9th.
+8000 steady state records sent, 1982.651797 records/sec (1.94 MB/sec), 24.92 ms avg latency, 62.00 ms max latency, 25 ms 50th, 44 ms 95th, 54 ms 99th, 61 ms 99.9th.
+
+--- e2e consumer ---
+{"count":8000,"skipped":2000,"p50":25,"p90":40,"p99":54,"p999":61,"max":64,"mean":25.229}
+
+kafka:default:rate50k run 0: {"total": {"records": 250000.0, "rec_s": 49711.672301, "mb_s": 48.55, "avg_ms": 67.19, "max_ms": 616.0, "p50": 31.0, "p95": 286.0, "p99": 424.0, "p999": 613.0}, "steady": {"records": 200000.0, "rec_s": 49236.829148, "mb_s": 48.08, "avg_ms": 28.83, "max_ms": 132.0, "p50": 26.0, "p95": 62.0, "p99": 86.0, "p999": 118.0}, "e2e": {"count": 200000, "skipped": 50000, "p50": 32, "p90": 66, "p99": 128, "p9 {'n': 50000, 'rc': 0, 'wall_s': 6.48, 'server_cores': 1.94, 'client_cores': 1.64, 'other_cores': -0.27}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+250000 records sent, 49711.672301 records/sec (48.55 MB/sec), 67.19 ms avg latency, 616.00 ms max latency, 31 ms 50th, 286 ms 95th, 424 ms 99th, 613 ms 99.9th.
+200000 steady state records sent, 49236.829148 records/sec (48.08 MB/sec), 28.83 ms avg latency, 132.00 ms max latency, 26 ms 50th, 62 ms 95th, 86 ms 99th, 118 ms 99.9th.
+
+--- e2e consumer ---
+{"count":200000,"skipped":50000,"p50":32,"p90":66,"p99":128,"p999":275,"max":278,"mean":37.152}
+
+kafka:default:e2e1 run 0: {"avg_ms": 3.0421, "p50": 2.0, "p99": 10.0, "p999": 21.0} {'n': 2000, 'rc': 0, 'wall_s': 8.6, 'server_cores': 1.5, 'client_cores': 1.03, 'other_cores': 0.03}
+0	78.855723
+1000	2.358754
+Avg latency: 3.0421 ms
+Percentiles: 50th = 2, 99th = 10, 99.9th = 21
+
+kafka:default:ack1 run 0: {"count": 3000, "rate": 589.1, "p50": 1353, "p90": 2505, "p99": 7844, "p999": 14576, "max": 22203, "mean": 1689.3} {'n': 3000, 'rc': 0, 'wall_s': 7.11, 'server_cores': 1.68, 'client_cores': 0.8, 'other_cores': 0.06}
+{"count":3000,"rate":589.1,"p50":1353,"p90":2505,"p99":7844,"p999":14576,"max":22203,"mean":1689.3}
+
+server 15636 rss_mb 609
+server 16392 rss_mb 560
+server 17214 rss_mb 571
+kafka:flush1:max-default run 0: {"total": {"records": 60000.0, "rec_s": 8422.2347, "mb_s": 8.22, "avg_ms": 2622.65, "max_ms": 4457.0, "p50": 2794.0, "p95": 3667.0, "p99": 4029.0, "p999": 4375.0}, "steady": {"records": 50000.0, "rec_s": 7430.524595, "mb_s": 7.26, "avg_ms": 2933.73, "max_ms": 4457.0, "p50": 2883.0, "p95": 3722.0, "p99": 4073.0, "p999": 4375.0}} {'n': 60000, 'rc': 0, 'wall_s': 8.57, 'server_cores': 1.84, 'client_cores': 0.59, 'other_cores': 0.22}
+Warmup first 10000 records. Steady state results will print after the complete test summary.
+In steady state.
+32511 records sent, 6495.7 records/sec (6.34 MB/sec), 2930.2 ms avg latency, 4457.0 ms max latency.
+60000 records sent, 8422.234700 records/sec (8.22 MB/sec), 2622.65 ms avg latency, 4457.00 ms max latency, 2794 ms 50th, 3667 ms 95th, 4029 ms 99th, 4375 ms 99.9th.
+50000 steady state records sent, 7430.524595 records/sec (7.26 MB/sec), 2933.73 ms avg latency, 4457.00 ms max latency, 2883 ms 50th, 3722 ms 95th, 4073 ms 99th, 4375 ms 99.9th.
+
+kafka:flush1:consume run 0: {"start.time": "2026-11-06 23:02:36:950", "end.time": "2026-11-06 23:02:38:259", "data.consumed.in.MB": 58.5938, "MB.sec": 44.7622, "data.consumed.in.nMsg": 60000.0, "nMsg.sec": 45836.5164, "rebalance.time.ms": 1003.0, "fetch.time.ms": 306.0, "fetch.MB.sec": 191.4828, "fetch.nMsg.sec": 196078.4314} {'n': 60000, 'rc': 0, 'wall_s': 3.19, 'server_cores': 0.83, 'client_cores': 1.13, 'other_cores': 0.04}
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2026-11-06 23:02:36:950, 2026-11-06 23:02:38:259, 58.5938, 44.7622, 60000, 45836.5164, 1003, 306, 191.4828, 196078.4314
+
+kafka:flush1:share-4c run 0: {"start.time": "2026-11-06 23:02:42:049", "end.time": "2026-11-06 23:02:48:562", "data.consumed.in.MB": 58.5938, "MB.sec": 8.9964, "nMsg.sec": 9212.3445, "data.consumed.in.nMsg": 60000.0, "fetch.time.ms": 6513.0} {'n': 60000, 'rc': 0, 'wall_s': 9.42, 'server_cores': 0.81, 'client_cores': 0.54, 'other_cores': 0.04}
+start.time, end.time, data.consumed.in.MB, MB.sec, nMsg.sec, data.consumed.in.nMsg, fetch.time.ms
+2026-11-06 23:02:42:049, 2026-11-06 23:02:48:562, 58.5938, 8.9964, 9212.3445, 60000, 6513
+
+kafka:flush1:max-omb run 0: {"total": {"records": 60000.0, "rec_s": 52770.448549, "mb_s": 51.53, "avg_ms": 187.0, "max_ms": 513.0, "p50": 164.0, "p95": 425.0, "p99": 502.0, "p999": 513.0}, "steady": {"records": 50000.0, "rec_s": 69541.029207, "mb_s": 67.91, "avg_ms": 207.18, "max_ms": 513.0, "p50": 195.0, "p95": 428.0, "p99": 512.0, "p999": 513.0}} {'n': 60000, 'rc': 0, 'wall_s': 2.53, 'server_cores': 0.71, 'client_cores': 1.56, 'other_cores': 0.07}
+Warmup first 10000 records. Steady state results will print after the complete test summary.
+60000 records sent, 52770.448549 records/sec (51.53 MB/sec), 187.00 ms avg latency, 513.00 ms max latency, 164 ms 50th, 425 ms 95th, 502 ms 99th, 513 ms 99.9th.
+50000 steady state records sent, 69541.029207 records/sec (67.91 MB/sec), 207.18 ms avg latency, 513.00 ms max latency, 195 ms 50th, 428 ms 95th, 512 ms 99th, 513 ms 99.9th.
+
+server 24038 rss_mb 548
+server 24801 rss_mb 537
+server 25623 rss_mb 533
+kafka:flush1:half run 0: {"total": {"records": 2500.0, "rec_s": 497.116723, "mb_s": 0.49, "avg_ms": 60.66, "max_ms": 545.0, "p50": 43.0, "p95": 258.0, "p99": 266.0, "p999": 273.0}, "steady": {"records": 2000.0, "rec_s": 495.908753, "mb_s": 0.48, "avg_ms": 40.78, "max_ms": 71.0, "p50": 40.0, "p95": 57.0, "p99": 63.0, "p999": 69.0}, "e2e": {"count": 2000, "skipped": 500, "p50": 41, "p90": 53, "p99": 63, "p999": 67, "max": 7 {'n': 500, 'rc': 0, 'wall_s': 6.5, 'server_cores': 1.5, 'client_cores': 1.16, 'other_cores': -0.22}
+Warmup first 500 records. Steady state results will print after the complete test summary.
+2500 records sent, 497.116723 records/sec (0.49 MB/sec), 60.66 ms avg latency, 545.00 ms max latency, 43 ms 50th, 258 ms 95th, 266 ms 99th, 273 ms 99.9th.
+2000 steady state records sent, 495.908753 records/sec (0.48 MB/sec), 40.78 ms avg latency, 71.00 ms max latency, 40 ms 50th, 57 ms 95th, 63 ms 99th, 69 ms 99.9th.
+
+--- e2e consumer ---
+{"count":2000,"skipped":500,"p50":41,"p90":53,"p99":63,"p999":67,"max":70,"mean":41.152}
+
+kafka:flush1:rate50k run 0: {"total": {"records": 250000.0, "rec_s": 39154.267815, "mb_s": 38.24, "avg_ms": 671.55, "max_ms": 1262.0, "p50": 675.0, "p95": 963.0, "p99": 1082.0, "p999": 1212.0}, "steady": {"records": 200000.0, "rec_s": 38461.538462, "mb_s": 37.56, "avg_ms": 711.96, "max_ms": 1262.0, "p50": 696.0, "p95": 979.0, "p99": 1099.0, "p999": 1212.0}, "e2e": {"count": 200000, "skipped": 50000, "p50": 702, "p90": 924, " {'n': 50000, 'rc': 0, 'wall_s': 7.8, 'server_cores': 1.58, 'client_cores': 1.53, 'other_cores': -0.12}
+Warmup first 50000 records. Steady state results will print after the complete test summary.
+In steady state.
+192288 records sent, 38388.5 records/sec (37.49 MB/sec), 715.1 ms avg latency, 1262.0 ms max latency.
+250000 records sent, 39154.267815 records/sec (38.24 MB/sec), 671.55 ms avg latency, 1262.00 ms max latency, 675 ms 50th, 963 ms 95th, 1082 ms 99th, 1212 ms 99.9th.
+200000 steady state records sent, 38461.538462 records/sec (37.56 MB/sec), 711.96 ms avg latency, 1262.00 ms max latency, 696 ms 50th, 979 ms 95th, 1099 ms 99th, 1212 ms 99.9th.
+
+--- e2e consumer ---
+{"count":200000,"skipped":50000,"p50":702,"p90":924,"p99":1112,"p999":1211,"max":1263,"mean":719.814}
+
+kafka:flush1:e2e1 run 0: {"avg_ms": 5.611, "p50": 4.0, "p99": 14.0, "p999": 78.0} {'n': 1000, 'rc': 0, 'wall_s': 8.2, 'server_cores': 1.2, 'client_cores': 0.97, 'other_cores': 0.13}
+0	78.798528
+Avg latency: 5.6110 ms
+Percentiles: 50th = 4, 99th = 14, 99.9th = 78
+
+kafka:flush1:ack1 run 0: {"count": 3000, "rate": 327.6, "p50": 2688, "p90": 4156, "p99": 8781, "p999": 19105, "max": 31822, "mean": 3045.3} {'n': 3000, 'rc': 0, 'wall_s': 11.43, 'server_cores': 1.46, 'client_cores': 0.53, 'other_cores': 0.15}
+{"count":3000,"rate":327.6,"p50":2688,"p90":4156,"p99":8781,"p999":19105,"max":31822,"mean":3045.3}
+
+server 30866 rss_mb 611
+server 31623 rss_mb 617
+server 32447 rss_mb 595

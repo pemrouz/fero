@@ -1,0 +1,4494 @@
+{
+ "option": "rekey-carry",
+ "bounds": [
+  "grow",
+  "shrink",
+  "both",
+  "read",
+  "deep",
+  "twice"
+ ],
+ "pinned": [],
+ "base": {
+  "grow": {
+   "states": 67182,
+   "edges": 174586,
+   "secs": 21.98,
+   "fail": {},
+   "digest": [
+    67182,
+    174586,
+    2304708942537357941
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 312298,
+   "edges": 963988,
+   "secs": 112.4,
+   "fail": {},
+   "digest": [
+    312298,
+    963988,
+    9683283585404779710
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 94799,
+   "edges": 238565,
+   "secs": 29.52,
+   "fail": {},
+   "digest": [
+    94799,
+    238565,
+    4158193205156757773
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 223737,
+   "edges": 730645,
+   "secs": 90.79,
+   "fail": {},
+   "digest": [
+    223737,
+    730645,
+    18206559969637898118
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 91722,
+   "edges": 244129,
+   "secs": 35.15,
+   "fail": {},
+   "digest": [
+    91722,
+    244129,
+    11033895084695028828
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 221305,
+   "edges": 816120,
+   "secs": 46.3,
+   "fail": {},
+   "digest": [
+    221305,
+    816120,
+    3763948920298993801
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "warm": [
+  "refuse.route",
+  "copy.rkcom",
+  "copy.rows",
+  "cut.rkcom",
+  "cut.once",
+  "freeze.rkcom",
+  "freeze.once",
+  "flip.finals",
+  "flip.once",
+  "abandon.once",
+  "abandon.append",
+  "thaw.frz",
+  "thaw.once",
+  "cut.ready",
+  "copy.append",
+  "copy.once",
+  "cut.noab",
+  "final.once",
+  "flip.noab",
+  "abandon.noflip",
+  "thaw.abcom",
+  "thaw.append"
+ ],
+ "greedy": [
+  [
+   "refuse.route",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.rkcom",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.rows",
+   "dropped by the warm start"
+  ],
+  [
+   "cut.rkcom",
+   "dropped by the warm start"
+  ],
+  [
+   "cut.once",
+   "dropped by the warm start"
+  ],
+  [
+   "freeze.rkcom",
+   "dropped by the warm start"
+  ],
+  [
+   "freeze.once",
+   "dropped by the warm start"
+  ],
+  [
+   "flip.finals",
+   "dropped by the warm start"
+  ],
+  [
+   "flip.once",
+   "dropped by the warm start"
+  ],
+  [
+   "abandon.once",
+   "dropped by the warm start"
+  ],
+  [
+   "abandon.append",
+   "dropped by the warm start"
+  ],
+  [
+   "thaw.frz",
+   "dropped by the warm start"
+  ],
+  [
+   "thaw.once",
+   "dropped by the warm start"
+  ],
+  [
+   "cut.ready",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.append",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.once",
+   "dropped by the warm start"
+  ],
+  [
+   "cut.noab",
+   "dropped by the warm start"
+  ],
+  [
+   "final.once",
+   "dropped by the warm start"
+  ],
+  [
+   "flip.noab",
+   "dropped by the warm start"
+  ],
+  [
+   "abandon.noflip",
+   "dropped by the warm start"
+  ],
+  [
+   "thaw.abcom",
+   "dropped by the warm start"
+  ],
+  [
+   "thaw.append",
+   "dropped by the warm start"
+  ]
+ ],
+ "removed": [
+  "refuse.route",
+  "copy.rkcom",
+  "copy.rows",
+  "cut.rkcom",
+  "cut.once",
+  "freeze.rkcom",
+  "freeze.once",
+  "flip.finals",
+  "flip.once",
+  "abandon.once",
+  "abandon.append",
+  "thaw.frz",
+  "thaw.once",
+  "cut.ready",
+  "copy.append",
+  "copy.once",
+  "cut.noab",
+  "final.once",
+  "flip.noab",
+  "abandon.noflip",
+  "thaw.abcom",
+  "thaw.append"
+ ],
+ "verify": {
+  "twice1": {
+   "states": 1147,
+   "edges": 1980,
+   "secs": 0.14,
+   "fail": {},
+   "digest": [
+    1147,
+    1980,
+    4143293049913233123
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "put_back": [],
+ "minimal": {
+  "grow": {
+   "states": 1443,
+   "edges": 2916,
+   "secs": 0.25,
+   "fail": {},
+   "digest": [
+    1443,
+    2916,
+    15926650929556221361
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 4417,
+   "edges": 9932,
+   "secs": 0.89,
+   "fail": {},
+   "digest": [
+    4417,
+    9932,
+    7960823009690314614
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 1764,
+   "edges": 3626,
+   "secs": 0.32,
+   "fail": {},
+   "digest": [
+    1764,
+    3626,
+    382182477084959887
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 3218,
+   "edges": 7630,
+   "secs": 0.91,
+   "fail": {},
+   "digest": [
+    3218,
+    7630,
+    17426261969462451887
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 2270,
+   "edges": 4976,
+   "secs": 0.63,
+   "fail": {},
+   "digest": [
+    2270,
+    4976,
+    8364713765513326720
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 259,
+   "edges": 535,
+   "secs": 0.06,
+   "fail": {},
+   "digest": [
+    259,
+    535,
+    15548709086094346721
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "rules": [
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "the partition's cell in this cell's generation",
+   "cmp": null,
+   "id": "write.route",
+   "alone": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('w', 'w1', 'p', (2, 0, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('w', 'w1', 'p', (2, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "a new generation takes writes only after its flip commits",
+   "cmp": null,
+   "id": "write.live",
+   "alone": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 0), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "no write once frozen is in the log, until a committed thaw",
+   "cmp": null,
+   "id": "write.nofrz",
+   "alone": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "",
+   "cmp": null,
+   "id": "write.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "",
+   "cmp": ">=",
+   "id": "write.fence",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "(generation, cell, log index)",
+   "cmp": null,
+   "id": "write.pos",
+   "alone": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (0, 0, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (0, 0, -1), 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (0, 0, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (0, 0, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "write.append",
+   "alone": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.route",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g1c0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g1c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "",
+   "cmp": "<",
+   "id": "refuse.stale",
+   "alone": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.answer",
+   "alone": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.committed",
+   "alone": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": ">",
+   "id": "read.after",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.next",
+   "alone": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w2', (1, 0, 1))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w2', (1, 0, 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.take",
+   "alone": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.cursor",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "one re-key at a time",
+   "cmp": null,
+   "id": "start.prev",
+   "alone": [
+    "twice",
+    "P1",
+    20,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=1', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 3)"
+    ],
+    [
+     "write",
+     "('w1', 'g3c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('w', 'w1', 'p', (3, 0, 1), 1)"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=2', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "twice",
+    "P1",
+    20,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=1', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 3)"
+    ],
+    [
+     "write",
+     "('w1', 'g3c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('w', 'w1', 'p', (3, 0, 1), 1)"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=2', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "copy from the current generation",
+   "cmp": null,
+   "id": "start.src",
+   "alone": [
+    "twice",
+    "P1",
+    22,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "twice",
+    "P1",
+    22,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "start.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "copy for a committed re-key",
+   "cmp": null,
+   "id": "copy.rkcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "one bulk copy; the rest comes after the cut-over",
+   "cmp": null,
+   "id": "copy.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "id": "copy.rows",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "id": "copy.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cut.rkcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "every new cell reports a committed copy",
+   "cmp": null,
+   "id": "cut.ready",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cut.noab",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "cut.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cut.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "an old cell freezes only for a committed re-key",
+   "cmp": null,
+   "id": "freeze.rkcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "... once the catalog has committed the cut-over",
+   "cmp": null,
+   "id": "freeze.cutcom",
+   "alone": [
+    "grow",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "crash",
+     "C",
+     "tail keeps 0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "crash",
+     "C",
+     "tail keeps 0"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "freeze.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "freeze.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "the final copy covers the old cell's committed freeze",
+   "cmp": null,
+   "id": "final.frzcom",
+   "alone": [
+    "grow",
+    "P6",
+    11,
+    [
+     "P6"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=0', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=0', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P6",
+    11,
+    [
+     "P6"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=0', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=0', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "final.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "",
+   "cmp": null,
+   "id": "final.rows",
+   "alone": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'p': frozenset({'w1'})}, {'p': 1}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'p': frozenset({'w1'})}, {'p': 1}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "dedup transfer",
+   "cmp": null,
+   "id": "final.outs",
+   "alone": [
+    "grow",
+    "P3",
+    13,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=3', {'p': ['w1', 'w2']}, {}, {'p': 2}, 'fin')"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c1')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    13,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=3', {'p': ['w1', 'w2']}, {}, {'p': 2}, 'fin')"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c1')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "fence transfer",
+   "cmp": null,
+   "id": "final.tok",
+   "alone": [
+    "grow",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {'q': []}, {'q': frozenset()}, {}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': ['w2']}, {'p': frozenset({'w2'})}, {}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {'q': []}, {'q': frozenset()}, {}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': ['w2']}, {'p': frozenset({'w2'})}, {}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "final.fin",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "final.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "every new cell holds its final copy from every source",
+   "cmp": null,
+   "id": "flip.finals",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "... committed",
+   "cmp": null,
+   "id": "flip.fincom",
+   "alone": [
+    "grow",
+    "P6",
+    4,
+    [
+     "P6"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P6",
+    4,
+    [
+     "P6"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "never flip once abandon is in the catalog's log",
+   "cmp": null,
+   "id": "flip.noab",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "flip.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "decide",
+   "note": "",
+   "cmp": null,
+   "id": "flip.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "abandon only while the catalog's log has no flip",
+   "cmp": null,
+   "id": "abandon.noflip",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "abandon.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "decide",
+   "note": "",
+   "cmp": null,
+   "id": "abandon.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "decide",
+   "note": "an old cell thaws only on a committed abandon",
+   "cmp": null,
+   "id": "thaw.abcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "thaw.frz",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "thaw.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "thaw.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "write.route",
+   "caught": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('w', 'w1', 'p', (2, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.live",
+   "caught": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.nofrz",
+   "caught": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.dedup",
+   "caught": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.fence",
+   "caught": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.pos",
+   "caught": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (0, 0, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (0, 0, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.append",
+   "caught": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.dedup",
+   "caught": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g1c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.stale",
+   "caught": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.answer",
+   "caught": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.committed",
+   "caught": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.after",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.next",
+   "caught": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w2', (1, 0, 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.take",
+   "caught": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.cursor",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "start.prev",
+   "caught": [
+    "twice",
+    "P1",
+    20,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=1', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 3)"
+    ],
+    [
+     "write",
+     "('w1', 'g3c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('w', 'w1', 'p', (3, 0, 1), 1)"
+    ],
+    [
+     "final",
+     "('gen', 3, 'g3c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g3c0",
+     "('cp', 3, 'g1c0', 'upto=2', {'p': [], 'q': []}, {'p': frozenset(), 'q': frozenset()}, {'p': 0, 'q': 0}, 'fin')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "start.src",
+   "caught": [
+    "twice",
+    "P1",
+    22,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "start.append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "cut.append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "freeze.cutcom",
+   "caught": [
+    "grow",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "crash",
+     "C",
+     "tail keeps 0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "freeze.append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "final.frzcom",
+   "caught": [
+    "grow",
+    "P6",
+    11,
+    [
+     "P6"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=0', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=0', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "final.rows",
+   "caught": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {}, {'p': frozenset({'w1'})}, {'p': 1}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "final.outs",
+   "caught": [
+    "grow",
+    "P3",
+    13,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=3', {'p': ['w1', 'w2']}, {}, {'p': 2}, 'fin')"
+    ],
+    [
+     "refuse",
+     "('w1', 'g2c1')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "final.tok",
+   "caught": [
+    "grow",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 0), 2)"
+    ],
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=2', {'q': []}, {'q': frozenset()}, {}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': ['w2']}, {'p': frozenset({'w2'})}, {}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "final.fin",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "final.append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "flip.fincom",
+   "caught": [
+    "grow",
+    "P6",
+    4,
+    [
+     "P6"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "flip.append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "write.fence",
+   "caught": [
+    "read",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "refuse.stale",
+   "caught": [
+    "read",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "refuse",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (1, 0, 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "read.after",
+   "caught": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (1, 0, 0), 1)"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ],
+    [
+     "read",
+     "('g1c0', 'w1', (1, 0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "write: pos <-> append",
+   "caught": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "('w1', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w1', 'p', (0, 0, -1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('w', 'w2', 'p', (0, 0, -1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "read: take <-> cursor",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "start: src <-> append",
+   "caught": [
+    "twice",
+    "P1",
+    22,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 2, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 2)"
+    ],
+    [
+     "freeze",
+     "('gen', 2, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 2)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c0', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c0",
+     "('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ],
+    [
+     "flip",
+     "('gen', 2)"
+    ],
+    [
+     "commit",
+     "C",
+     "('flip', 2)"
+    ],
+    [
+     "write",
+     "('w1', 'g2c1')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('w', 'w1', 'p', (2, 1, 1), 1)"
+    ],
+    [
+     "start",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('rk', 3, 1)"
+    ],
+    [
+     "cut",
+     "('gen', 3)"
+    ],
+    [
+     "commit",
+     "C",
+     "('cut', 3)"
+    ],
+    [
+     "freeze",
+     "('gen', 3, 'g1c0')"
+    ],
+    [
+     "commit",
+     "g1c0",
+     "('frz', 3)"
+    ],
+    [
+     "final",
+     "('gen', 2, 'g2c1', 'from', 'g1c0')"
+    ],
+    [
+     "commit",
+     "g2c1",
+     "('cp', 2, 'g1c0', 'upto=2', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "final: rows <-> outs",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: rows <-> tok",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: rows <-> fin",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: rows <-> append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "final: outs <-> tok",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: outs <-> fin",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: outs <-> append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "final: tok <-> fin",
+   "caught": null,
+   "equivalent": true,
+   "states": {
+    "grow": 1443,
+    "shrink": 4417,
+    "both": 1764,
+    "read": 3218,
+    "deep": 2270,
+    "twice": 259
+   }
+  },
+  {
+   "kind": "swap",
+   "rule": "final: tok <-> append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "final: fin <-> append",
+   "caught": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "trace": []
+  }
+ ]
+}

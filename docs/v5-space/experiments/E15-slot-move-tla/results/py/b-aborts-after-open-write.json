@@ -1,0 +1,18 @@
+{
+ "bound": "write",
+ "capped": false,
+ "failed": [
+  4
+ ],
+ "kind": "mutant",
+ "live_nodes": 1755,
+ "live_starts": 410,
+ "live_stuck": 0,
+ "secs": 216.0,
+ "states": 1137728,
+ "steps": {
+  "4": 20
+ },
+ "transitions": 3359078,
+ "variant": "b-aborts-after-open"
+}

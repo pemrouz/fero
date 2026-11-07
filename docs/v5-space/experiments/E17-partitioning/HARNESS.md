@@ -119,7 +119,7 @@ Liveness is AG EF goal over the **calm** steps: commit, `deliver` and `read`. No
 1. The model as designed runs every `SWEEP` bound in full. Everything must hold.
 2. **Pass 1**: drop each rule alone; it is necessary if some bound then fails (bounds cheapest first, stop at the first failure).
 3. **Greedy**: drop the rules pass 1 found unnecessary, one at a time in model-text order. Keep each drop only if every bound still holds.
-4. **Final pass**: with those dropped, drop each remaining rule again. Each must now fail. If one does not, drop it too and repeat. What is left is 1-minimal.
+4. **Final pass**: with those dropped, drop each remaining rule again. Each must now fail. The ones that do not are dropped greedily (each kept dropped only if everything still holds), and the pass repeats until every rule left fails. What is left is 1-minimal.
 5. **Verify**: run the smallest model on the `VERIFY` bound (`twice1`: two changes with one crash). It is too big to sweep for `rekey` (about 1.3 million states). If it fails, dropped rules go back, the latest dropped first, until it holds.
 6. **Mutants** of the smallest model: drop each guard, drop each update, flip each `<`, `<=`, `>`, `>=`, and swap each pair of updates in one action. A mutant no bound catches is run in full. It is **equivalent** if every bound's state set (count, steps and digest) equals the smallest model's. Otherwise it **survived**.
 

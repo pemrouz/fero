@@ -1,0 +1,6 @@
+Warmup first 150000 records. Steady state results will print after the complete test summary.
+In steady state.
+211681 records sent, 42327.7 records/sec (41.34 MB/sec), 622.7 ms avg latency, 842.0 ms max latency.
+391095 records sent, 78219.0 records/sec (76.39 MB/sec), 398.6 ms avg latency, 870.0 ms max latency.
+900000 records sent, 60208.723575 records/sec (58.80 MB/sec), 479.99 ms avg latency, 1034.00 ms max latency, 463 ms 50th, 841 ms 95th, 942 ms 99th, 997 ms 99.9th.
+750000 steady state records sent, 66946.353655 records/sec (65.38 MB/sec), 435.08 ms avg latency, 870.00 ms max latency, 425 ms 50th, 726 ms 95th, 825 ms 99th, 856 ms 99.9th.

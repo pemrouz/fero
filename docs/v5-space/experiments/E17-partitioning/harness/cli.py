@@ -48,6 +48,9 @@ def main():
     ap.add_argument('--no-mutants', action='store_true')
     ap.add_argument('--giveup', action='store_true', help='pin the option\'s give-up path (GIVEUP)')
     ap.add_argument('--warm-from', help='start from another option\'s dropped rules (results/<it>-ablation.json)')
+    ap.add_argument('--warm-drop', action='append', default=[], help='also drop this rule in the warm start')
+    ap.add_argument('--warm-keep', action='append', default=[], help='keep this rule in the warm start')
+    ap.add_argument('--tag', help='save as results/<tag>-ablation.json (an alternative run)')
     ap.add_argument('--jobs', type=int, default=2)
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--cap', type=int, default=runner.CAP)
@@ -80,6 +83,10 @@ def main():
         warm = ()
         if a.warm_from:
             warm = json.load(open(os.path.join(out, f'{a.warm_from}-ablation.json')))['removed']
+        if a.warm_drop:
+            warm = [x for x in warm if x not in a.warm_keep] + a.warm_drop
+        if a.tag:
+            tag = a.tag
         try:
             res = runner.ablate(a.option, ck, jobs=a.jobs, budget=a.budget, mutate=not a.no_mutants,
                                 pinned=pins, warm=warm)

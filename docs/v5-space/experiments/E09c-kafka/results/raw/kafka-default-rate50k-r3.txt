@@ -1,0 +1,13 @@
+Warmup first 250000 records. Steady state results will print after the complete test summary.
+249801 records sent, 49950.2 records/sec (48.78 MB/sec), 11.5 ms avg latency, 344.0 ms max latency.
+In steady state.
+249902 records sent, 49980.4 records/sec (48.81 MB/sec), 4.3 ms avg latency, 29.0 ms max latency.
+250100 records sent, 50020.0 records/sec (48.85 MB/sec), 2.3 ms avg latency, 15.0 ms max latency.
+249999 records sent, 49999.8 records/sec (48.83 MB/sec), 8.8 ms avg latency, 411.0 ms max latency.
+250101 records sent, 50020.2 records/sec (48.85 MB/sec), 5.8 ms avg latency, 253.0 ms max latency.
+250026 records sent, 50005.2 records/sec (48.83 MB/sec), 4.6 ms avg latency, 255.0 ms max latency.
+1750000 records sent, 49972.871870 records/sec (48.80 MB/sec), 5.59 ms avg latency, 411.00 ms max latency, 2 ms 50th, 13 ms 95th, 82 ms 99th, 338 ms 99.9th.
+1500000 steady state records sent, 49960.031974 records/sec (48.79 MB/sec), 4.61 ms avg latency, 411.00 ms max latency, 2 ms 50th, 7 ms 95th, 82 ms 99th, 348 ms 99.9th.
+
+--- e2e consumer ---
+{"count":1500000,"skipped":250000,"p50":2,"p90":4,"p99":84,"p999":350,"max":412,"mean":4.867}

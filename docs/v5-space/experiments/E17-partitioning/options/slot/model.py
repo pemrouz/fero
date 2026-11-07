@@ -475,6 +475,8 @@ class Slot(Option):
 
 
 OPTION = Slot
-# The give-up path: the free choices to give a move up. Pinned (never
-# dropped) in the '+giveup' ablation, which finds what giving up costs.
-GIVEUP = ('cancel.append', 'abort.append')
+# The give-up path: the free choices to give a move up, and B's record of the
+# import it may later abort (without it, the ablation can make abort dead: B
+# never imports, so it never aborts). Pinned (never dropped) in the '+giveup'
+# ablation, which finds what a working give-up path costs.
+GIVEUP = ('cancel.append', 'abort.append', 'import.append')

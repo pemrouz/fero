@@ -22,4 +22,16 @@ The steps, as modelled:
 - The reverse replication Vitess sets up so a re-key can be rolled back after the flip. Here there is no going back after the flip.
 - Garbage collection of the old generation.
 
-**Results:** see the E-17 [README](../../README.md) and [../../results/summary.md](../../results/summary.md).
+**Results** (model-checked; [../../results/rekey-ablation.json](../../results/rekey-ablation.json) and [../../results/rekey-carry-ablation.json](../../results/rekey-carry-ablation.json); every rule with its trace in [../../results/summary.md](../../results/summary.md)):
+- **`rekey`: 35 of the 57 rules are necessary.** That is fixN's 13, plus 22:
+  - one writer (4): a new generation writes only after its committed flip; an old cell takes no write once frozen; the final copy covers a committed freeze; the flip waits for committed final copies;
+  - rows (3): carry the rows; one re-key at a time; copy from the current generation;
+  - dedup and fence transfer (2): carry the outcomes and the highest token;
+  - **cursor refusal (6):** refuse another generation's cursor; restart from a snapshot of a newer, flipped cell holding the partition;
+  - progress (7): the six appends, plus "freeze only for a committed catalog decision".
+- **`rekey-carry`: 29 of 51**, the same set without the six cursor rules. The copy carries each record with its position, and that costs no rule.
+- **Not needed by any property:** the bulk copy and its ready report (the cut-over could start at once), and the whole abandon path, since a crash-only world never needs to give up.
+- **Smaller with another order** (README finding 5): keep `freeze.rkcom` in place of `freeze.cutcom`, and the cut-over entry goes too: ALT_REKEY_DETAIL.
+- **Mutants:** `rekey` 44 of 53 caught, 8 equivalent swaps, 1 survivor. The survivor lets a reader re-snapshot its own generation, which is wasteful but correct. `rekey-carry` 38 of 45 caught, 7 equivalent, none survived.
+- **The give-up path, priced** (`rekey+giveup`): GU_REKEY_DETAIL
+- **States:** as written, 67,182 (`grow`) to 312,298 (`shrink`) states, against 22,797 for slot moves. The smallest model has 1,443 to 4,417.

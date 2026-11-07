@@ -1,0 +1,8 @@
+# tools/warmdiag.py kafka default, 2026-11-06 ~23:10, under $SP/bin/heavy (NOT a timing run: load went from 7.4 to 16.1
+# during it, other agents' jobs ran beside it). Diagnostic only: it shows why kbench.py warms the cluster before timing.
+# label, steady-state stats of kafka-producer-perf-test (ms), server cores, client cores
+cold-2000 {"records": 12000.0, "rec_s": 1975.959164, "mb_s": 1.93, "avg_ms": 47.68, "max_ms": 167.0, "p50": 43.0, "p95": 93.0, "p99": 146.0, "p999": 162.0} 1.0 0.44
+warm-max {"records": 1500000.0, "rec_s": 106059.534752, "mb_s": 103.57, "avg_ms": 246.85, "max_ms": 1273.0, "p50": 203.0, "p95": 632.0, "p99": 887.0, "p999": 1167.0} 1.04 0.6
+warm-2000 {"records": 12000.0, "rec_s": 1967.535662, "mb_s": 1.92, "avg_ms": 22.02, "max_ms": 175.0, "p50": 13.0, "p95": 74.0, "p99": 127.0, "p999": 171.0} 0.76 0.51
+warm-2000-linger0 {"records": 12000.0, "rec_s": 1979.544705, "mb_s": 1.93, "avg_ms": 19.32, "max_ms": 103.0, "p50": 13.0, "p95": 56.0, "p99": 86.0, "p999": 102.0} 0.98 0.52
+warm-20000 {"records": 120000.0, "rec_s": 19694.731659, "mb_s": 19.23, "avg_ms": 9.16, "max_ms": 84.0, "p50": 5.0, "p95": 33.0, "p99": 60.0, "p999": 82.0} 0.75 0.62

@@ -1,14 +1,93 @@
 # E-22b: E-22's histories re-checked with real Elle and real Knossos
 
-**Question (Q-22, real-Elle addendum; [QUESTIONS.md](../../QUESTIONS.md) §10).** E-22 checked its client histories with two Go tools: Porcupine, and a Go port of Elle taken from PingCAP's tipocket, because the real Elle (Jepsen's checker, written in Clojure) could not be downloaded then. Do the real tools give the same verdict on the same saved histories? The histories are E-22's own, in `$SP/e22v`: the 1,200 saga histories (list-append), the 26 self-test histories, and the per-partition register histories. Threshold: the same verdict on every history; any disagreement is traced to a checker bug or a history-export bug.
+**Question (Q-22, real-Elle addendum; [QUESTIONS.md](../../QUESTIONS.md) §10).** E-22 checked its client histories with two Go tools: Porcupine, and a Go port of Elle taken from PingCAP's tipocket, because the real Elle (Jepsen's checker, in Clojure) could not be downloaded then. Do the real tools give the same verdict on the same saved histories? The histories are E-22's own, kept in `$SP/e22v`: the 1,200 saga histories, the 26 self-test histories, and the per-partition register histories. Threshold (QUESTIONS.md): the same verdict on every history; any disagreement is traced to a checker bug or a history-export bug.
 
 **Words.**
 - A *history* is the record of what clients asked and what they were told.
-- *Elle* reads a history of transactions and looks for cycles between them. *List-append* is its workload: each transaction appends numbers to lists or reads whole lists, so every read shows the order of the appends before it.
-- The anomalies, in plain words: *G0*, two units wrote two rows in opposite orders; *G1a*, a reader saw a write of a unit that failed; *G-single*, a reader saw half of a unit (a fractured read); *incompatible order*, two reads of one list cannot both be true, so an element was lost; *duplicate*, an element appears twice.
-- *Read committed* forbids G0, G1 (G1a, G1b, G1c) and lost or doubled elements: P-15's MUST. *Serializable* also forbids G-single and the other G2 cycles: P-15's SHOULD.
-- *Linearizable* means every operation seems to happen at one instant between its call and its answer. *Porcupine* (Go) and *Knossos* (Jepsen's checker, Clojure) both check that, against a *model*: here, E-22's model of one fero partition (rows, versions, conditions, ops).
-- *The port* is tipocket v1.0.0's Go copy of Elle, which E-22 used. *Real Elle* is jepsen-io/elle 0.2.8.
-- A *mutant* is a planted kernel bug; its histories are known to be bad.
+- *Elle* reads a history of transactions and looks for cycles between them. *List-append* is its workload: each transaction appends numbers to lists or reads whole lists, so every read shows the order of the appends before it. *Real Elle* here is jepsen-io/elle 0.2.8. *The port* is tipocket v1.0.0's Go copy of an older Elle, which E-22 used.
+- The anomalies, in plain words: *G0*, two units wrote two rows in opposite orders; *G1a*, a reader saw a write of a unit that failed; *G-single*, a reader saw half of a unit (a fractured read); *incompatible order*, two reads of one list cannot both be true, so an element was lost; *duplicate*, one element appears twice.
+- *Read committed* forbids G0, G1a, G1b, G1c and lost or doubled elements: that is P-15's MUST. *Serializable* also forbids G-single and the other G2 cycles: P-15's SHOULD.
+- *Linearizable* means every operation seems to happen at one instant between its call and its answer. *Porcupine* (Go) and *Knossos* (Jepsen's checker, Clojure, 0.3.16) both check that against a *model*: here E-22's model of one fero partition (rows, versions, conditions, ops).
+- A *partition* is the unit of order (one row in the register workload). A *mutant* is a kernel bug E-22 planted on purpose, so its histories are known to be bad.
+- *calm*, *faults*, *shuffle* are E-22's three modes: no forced faults; one forced leader change and one slot move aimed at a write in flight; the same plus the cross-partition shuffle.
 
-DRAFT: results below are filled in as the runs finish.
+## In short
+
+- **Real Elle gives the port's verdict on every saga history that matters for P-15** (measured here, [results/elle.md](results/elle.md)): on the 900 histories of the `saga`, `owned` and `nolock` variants, both verdicts (read committed and serializable) agree on all 1,800. In `saga` and `owned`, G0 and G-single show up in exactly the same histories in both; in `nolock`, which is broken in every history by both, real Elle finds G0 in 2 more. So E-22's findings stand as real Elle sees them: the saga as API.md writes it has G0 in 16, 19 and 10 of 100 histories; with F3's two rules (`owned`) G0 is gone in all 300; fractured reads (G-single) stay in 72, 66 and 77 of 100.
+- **They disagree on 33 of the 300 `undo` histories, and real Elle is the stricter one every time** (27 read-committed verdicts, 15 serializable ones; the port said valid, real Elle says not). Root cause, a checker difference proven by an ablation: when a committed append is never seen by any read, Elle 0.2.8 places it after the last element any read saw on that list and draws edges from that (`elle/list_append.clj` in the 0.2.8 jar, `previously-appended-element`); the port draws no edge for it (tipocket `list_append/utils.go` `previouslyAppendElement`). The undo variant erases other units' appends (E-22's F4), so committed appends go unseen and real Elle finds the G0 cycles they make. With the port's rule swapped into real Elle, all 2,400 verdicts agree ([results/elle-portrule.md](results/elle-portrule.md)). Real Elle's verdict is the right one: E-22's own direct check failed every `undo` seed.
+- **The 26 self-test histories agree** (measured here, [results/selftest.md](results/selftest.md)): real Elle gives the expected verdict and finds the named anomaly in 8 of 8; Knossos, running E-22's model ported to Clojure, agrees with Porcupine and the expected answer in 18 of 18.
+- **Knossos agrees with Porcupine on every partition it checked: KNOSSOS_TOTAL_LINE** (measured here, [results/knossos-summary.md](results/knossos-summary.md)). All 1,800 register-workload (lin-kv) partitions are linearizable in both. On the 2,800 partitions of the known-bad runs (E-22's seven mutant runs and the lin-kv run from before fix G1) both find the same 94 not linearizable and the same 2,706 linearizable: the planted bugs are caught by both. Every one of the 180,759 partitions of 120 operations or fewer in the other 93 history files is linearizable in both. KNOSSOS_BIG_LINE
+- **No history-export bug changed a verdict, but E-22's export format only works with the port.** It writes completions only (no `:invoke`, no times), and the self-test cases carry no process. Real Elle's history library refuses that (a second completion with no invoke), so this experiment adds the invokes (method below). With read committed and serializable Elle uses no order of time, so this cannot change a verdict; but it also means neither Elle can check order in real time, and real Elle still passes 4, 5 and 3 `undo` histories at read committed that E-22's direct check knows are broken.
+- **Knossos is about 190 times slower than Porcupine per operation** here (1.7 ms against 0.009 ms on the register partitions, 2 cores, a loaded box; not a timing run). That still allowed every partition of 120 operations or fewer to be checked (about 70 minutes of Knossos in four heavy holds), so the "sample" became all of them except the 600 largest, which were sampled.
+
+## The results, per cell
+
+### Real Elle 0.2.8 against the port, on E-22's 1,200 saga histories
+
+Each cell is 100 histories (one per seed). "valid" counts histories with no anomaly the model forbids. Real Elle's names `G-single-item` and `G-nonadjacent-item` are the port's `G-single` and `G-nonadjacent` (Elle 0.2 splits item and predicate cycles). Measured here: [results/elle.md](results/elle.md).
+
+| variant | mode | read committed valid: port / real | agree | serializable valid: port / real | agree | G0 histories: port / real | G-single histories: port / real |
+|---|---|---|---|---|---|---|---|
+| saga | calm | 84 / 84 | 100 | 29 / 29 | 100 | 16 / 16 | 71 / 71 |
+| saga | faults | 81 / 81 | 100 | 39 / 39 | 100 | 19 / 19 | 61 / 61 |
+| saga | shuffle | 90 / 90 | 100 | 20 / 20 | 100 | 10 / 10 | 80 / 80 |
+| owned | calm | 100 / 100 | 100 | 28 / 28 | 100 | 0 / 0 | 72 / 72 |
+| owned | faults | 100 / 100 | 100 | 34 / 34 | 100 | 0 / 0 | 66 / 66 |
+| owned | shuffle | 100 / 100 | 100 | 23 / 23 | 100 | 0 / 0 | 77 / 77 |
+| undo | calm | 12 / **4** | 92 | 3 / **0** | 97 | 1 / **59** | 63 / **100** |
+| undo | faults | 19 / **5** | 86 | 8 / **0** | 92 | 2 / **65** | 60 / **100** |
+| undo | shuffle | 8 / **3** | 95 | 4 / **0** | 96 | 2 / **59** | 61 / **98** |
+| nolock | calm | 0 / 0 | 100 | 0 / 0 | 100 | 95 / 95 | 100 / 100 |
+| nolock | faults | 0 / 0 | 100 | 0 / 0 | 100 | 95 / 95 | 100 / 100 |
+| nolock | shuffle | 0 / 0 | 100 | 0 / 0 | 100 | 92 / 94 | 100 / 100 |
+| **all** | | | **1,173 of 1,200** | | **1,185 of 1,200** | | |
+
+The same histories with the port's rule for never-read appends swapped into real Elle (the ablation, [results/elle-portrule.md](results/elle-portrule.md)): read committed agrees on 1,200 of 1,200 and serializable on 1,200 of 1,200; `undo` then reads 12 / 19 / 8 valid at read committed and 3 / 8 / 4 at serializable, the port's numbers exactly.
+
+### Knossos 0.3.16 beside Porcupine v1.3.1, per partition
+
+KNOSSOS_TABLE
+
+## Every disagreement, root-caused
+
+| What differs | Where | Cause | Kind | Effect on E-22's verdicts |
+|---|---|---|---|---|
+| Real Elle finds G0 or G-single the port does not | `undo` only: 33 histories change verdict (27 at read committed, 15 at serializable), and 150 more, already invalid, gain a G0 or a G-single | Elle 0.2.8 places a committed append that no read saw after the last element seen on that list ("we still know it came after the highest observed element"); the port gives such an append no place in the version order, so no edge. In `undo`, a failed unit's undo removes the whole list (F4), erasing appends of units that committed. Example, `undo-calm-seed14`: unit 1 appended to k0 and k2; k2 reads `[2 11 1 10]` (1 before 10), but k0 ends `[5 10]` without 1, so real Elle puts 1 after 10 on k0, and units 1 and 10 form a G0 cycle ([results/elle-explain-undo-calm-seed14.txt](results/elle-explain-undo-calm-seed14.txt)). Proven by the ablation: with the port's rule in real Elle, all 33 verdicts and 150 of the 177 type differences go away. | checker: the port lacks a newer Elle inference. Neither is wrong by its own rule; the port is weaker on histories that lose writes | none: E-22 already counted `undo` as broken (its direct check failed all 300 seeds, F4); real Elle shows more of it |
+| The port reports `G-nonadjacent` beside `G-single`; real Elle reports only `G-single-item` | 381 histories (445 with the port's rule), every variant, verdicts equal | Real Elle stops searching a component for a cycle type once it has found a worse type that implies it (`elle/txn.clj` `cycle-cases-in-scc`: "Don't check a type we've already implied"); the port reports both | reporting policy | none: both are forbidden by serializable, and the history is already invalid |
+| The two find different G0 or G2 cycles in a few broken histories, even with the port's rule | 2 `nolock` histories (shuffle seeds 51 and 87: real Elle adds a G0) and 27 `undo` histories (one tool has a G-single or G-nonadjacent the other lacks) | Their version orders differ when reads disagree: real Elle orders a list by its longest read with duplicates removed (`append-index`: `distinct`), the port merges every read and keeps duplicates (`appendIndex` with `mergeOrders`). `nolock` lists hold duplicates (a recoverer re-runs a unit's pushes) and `undo` lists have incompatible reads, so the element before an append, and its ww and rw edges, differ | checker heuristics, on histories already invalid | none: duplicates, G1a or incompatible order already make every one of them invalid in both |
+| Real Elle refuses E-22's EDN as written | all 1,200 files and the 8 self-test cases | E-22 exported completions only; `jepsen.history` pairs each completion with an `:invoke` of the same process and throws on a second completion without one; the self-test cases had no `:process`, so no op counted as a client op | export format (worked with the port, not with real Elle) | none after the adapter: invokes are added next to each completion; read committed and serializable use no process or time order |
+| Knossos and Porcupine | KNOSSOS_DIS_WHERE | KNOSSOS_DIS_CAUSE | | |
+
+## Method
+
+**Inputs, unchanged.** E-22's files in `$SP/e22v`: `edn/*.edn` (1,200 saga histories, written 17:51 to 17:52 and checked by the port at 17:52, before E-22 wrote its summary; `elle-raw.jsonl` holds the port's verdict per file); `hist/*.jsonl` (per-partition histories of every check and mode, and of the mutants); `lin-kv-calm-before.jsonl` (the run before fix G1); and E-22's Go build, whose `main.go`, `model.go` and `selftest.go` are byte-identical to E-22's committed `verify/go/` (checked by `cmp` in [run.sh](run.sh)). The `before-fixes` EDN files were overwritten by E-22, so E-22's "before" Elle rows cannot be re-checked.
+
+**Real Elle.** [clj/elle_check.clj](clj/elle_check.clj) runs `elle.list-append/check` twice per history, with `{:consistency-models [:read-committed]}` and `{:consistency-models [:serializable]}`, as E-22 ran the port (verdict "valid" only when `:valid?` is `true`, as E-22 counted the port's unknowns as not valid). Two adapters, both in [clj/e22b/pairing.clj](clj/e22b/pairing.clj): an `:invoke` is added just before each completion, with the same process and transaction (reads with nil values), and `:f :txn`; an op with no process (the self-test cases) gets its own. With these two models Elle builds no realtime or process graph (`elle/txn.clj` `additional-graphs`), so where the invokes sit cannot change a verdict. The JVM runs with `-Djava.awt.headless=true` (Elle loads a plotting library that otherwise fails on a box with no display; no plots are drawn).
+
+**The root-cause ablation.** `E22B_RULE=port` replaces Elle's `previously-appended-element` with the port's rule (an append no read saw has no known predecessor) through `alter-var-root`, and nothing else; then the same 1,200 histories run again. [clj/elle_explain.clj](clj/elle_explain.clj) prints Elle's own explanation of a cycle.
+
+**Knossos.** Knossos needs the same model Porcupine used. [clj/e22b/fero_model.clj](clj/e22b/fero_model.clj) ports E-22's `verify/go/model.go` line by line (reads, writes with conditions and ops, refusals, touches, claims, writer-made entries). Go's model is nondeterministic (a touch without a ttl may or may not move a version) and Porcupine tracks a set of states; Knossos wants one deterministic model, so the Knossos model is that set of states, and a step is illegal only when no state accepts it. Numbers are made doubles, as Go's JSON makes them float64. [clj/knossos_check.clj](clj/knossos_check.clj) builds each history as E-22's `main.go` hands it to Porcupine: every operation its own client; times `int64(t × 1e6)`; a call before a return at equal times (Porcupine's ordering); a refused write is an `:ok` completion whose value says refused, so the model checks the refusal was legal (Knossos would drop a `:fail` op unchecked); a write whose client never heard back but which committed returns at 1e12 ms, as E-22 exported it. It runs `knossos.competition/analysis` (the linear and WGL searches racing, as Jepsen's checker does) with a 60 s limit per partition. Porcupine's verdict per partition comes from [go/e22b.go](go/e22b.go), an extra file in a copy of E-22's Go build that adds two commands (E-22 kept only per-file totals): `parts` (Porcupine on each partition, 20 s limit, as E-22) and `dumpself` (E-22's 26 self-test cases with both Go tools' verdicts). [compare.py](compare.py) joins the two by (file, seed, partition).
+
+**How the Knossos sample was chosen, by time.** The pilot checked all 1,800 lin-kv partitions (75,675 operations) in 128 s: 1.7 ms per operation, against 0.009 ms for Porcupine. The other 93 history files hold 180,759 partitions of at most 120 operations (954,768 operations) and 600 partitions of 681 to 902 operations (473,907 operations, in p09 and p22). At the pilot's rate the small band costs about 27 minutes plus a few ms per partition, which looked like three heavy-lock holds of 25 minutes or less, so all of it was queued, in three chunks, each to be cut at 25 minutes. The first chunk ran in file order; the other two hold the slower p08 and p17 partitions (up to 37 operations each, about 5 ms per operation) and ran in a seeded random order, so a cut would leave a random sample. No cut was needed: the three chunks took 23, 21 and 20 minutes, and all 180,759 partitions were checked. The 600 large partitions would take hours if Knossos stayed linear, so 5 per file were drawn at random (seeded by file name; 30 partitions), with 120 s each and the hold cut at 25 minutes. KNOSSOS_SAMPLE_NOTE
+
+**Locks and cost.** Every JVM and Go step ran under `$SP/bin/heavy`, each hold under 30 minutes: about 1 h 45 min of holds in all, most of it Knossos on 2 cores (so about 3.5 CPU-hours, near twice E-22's 1.5). Nothing here is a timing run; the times are what a loaded box gave (load 3 to 16) and only size the work. One operational slip, without effect on a result: `run.sh` was edited while a queued step was still reading it, so that step's shell stopped with a syntax error after its Knossos chunk had finished all 83,500 jobs.
+
+## What this box and this method cannot show
+
+- **These are E-22's simulation histories, checked again, not new runs.** A clean verdict says the histories hold, in E-22's model of the kernel; real sockets and disks are E-46's and later phases'.
+- **No order in real time.** E-22's EDN has no times, so neither Elle can check strict serializability or see a unit that committed before a read began. That is why real Elle still passes 4, 5 and 3 `undo` histories at read committed that E-22's direct check fails.
+- **Knossos checks the search, not the model.** Knossos and Porcupine run the same model (ported by hand); a wrong rule in the model would pass both. The port of the model was checked on the 18 self-test cases, and on the 94 known-bad partitions both catch.
+- **The large p09 and p22 partitions were only sampled** (KNOSSOS_BIG_SHORT).
+- **The `before-fixes` saga histories no longer exist** (E-22's run step deletes the EDN folder), so E-22's "before" Elle rows are the port's only.
+
+## Files
+
+- [run.sh](run.sh): every step, in order (`build`, `self`, `elle`, `pilot`, `bad`, `por`, `small`, `small1` to `small3`, `big`, `report`); raw output in `$SP/e22b` (about 450 MB with the job files), trimmed tables in [results/](results).
+- [results/](results): `selftest.md` (the 26 cases), `elle.md` (real Elle against the port, per cell, every verdict difference and every type-difference pattern), `elle-portrule.md` (the ablation), `elle-verdicts.tsv` (one line per saga history: the three verdicts), `elle-explain-undo-calm-seed14.txt` (a G0 the port misses, in Elle's words), `knossos-linkv.md`, `knossos-bad.md`, `knossos-small.md`, `knossos-big.md` (per history file), `knossos-summary.md` (per group and mode).
+- [fetch.sh](fetch.sh): the Clojars jars (Maven, the toolsmith's pom), checked against the sha1 Clojars publishes (elle, knossos, history) and a sha256 for every jar on the classpath.
+- [clj/](clj): `elle_check.clj`, `elle_explain.clj`, `knossos_check.clj`, `e22b/pairing.clj` (the EDN adapter and the ablation switch), `e22b/fero_model.clj` (E-22's model for Knossos).
+- [go/e22b.go](go/e22b.go), [prep.py](prep.py) (job files), [compare.py](compare.py) (the joins and tables).
+
+**Versions.** Elle 0.2.8, Knossos 0.3.16, jepsen.history 0.1.9, Clojure 1.12.0 on OpenJDK 21.0.12; Porcupine v1.3.1 and tipocket v1.0.0 (E-22's build), Go 1.24.7; Python 3.13. Box: 4 vCPU, 15 GB, one ext4 virtual disk, shared with other agents.
+
+VERDICT_LINE

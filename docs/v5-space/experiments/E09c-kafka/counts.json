@@ -1,0 +1,38 @@
+{
+  "kafka": {
+    "default": {
+      "warm": 1200000,
+      "max-default": 900000,
+      "max-omb": 2500000,
+      "half": 2000,
+      "e2e1": 12000,
+      "ack1": 20000
+    },
+    "flush1": {
+      "warm": 600000,
+      "max-default": 220000,
+      "max-omb": 1500000,
+      "half": 500,
+      "e2e1": 6000,
+      "ack1": 12000
+    }
+  },
+  "redpanda": {
+    "fsync": {
+      "warm": 600000,
+      "max-default": 600000,
+      "max-omb": 2000000,
+      "half": 2000,
+      "e2e1": 10000,
+      "ack1": 20000
+    },
+    "wcache": {
+      "warm": 600000,
+      "max-default": 900000,
+      "max-omb": 2500000,
+      "half": 2000,
+      "e2e1": 12000,
+      "ack1": 20000
+    }
+  }
+}

@@ -1,0 +1,15 @@
+0	95.327107
+1000	1.648331
+2000	1.058902
+3000	1.051796
+4000	0.9783099999999999
+5000	0.842931
+6000	1.3002470000000002
+7000	0.821412
+8000	0.930842
+9000	0.88186
+10000	0.880308
+11000	0.9474170000000001
+Avg latency: 1.1890 ms
+Percentiles: 50th = 1, 99th = 4, 99.9th = 8
+[2026-11-06 23:38:59,285] WARN [Consumer clientId=consumer-test-group-1794008323948-1, groupId=test-group-1794008323948] Offset commit failed on partition te2e-15 at offset 0: This is not the correct coordinator. (org.apache.kafka.clients.consumer.internals.ConsumerCoordinator)
