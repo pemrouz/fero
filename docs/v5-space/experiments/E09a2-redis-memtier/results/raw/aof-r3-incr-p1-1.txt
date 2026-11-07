@@ -1,0 +1,24 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Incrs      116100.70         0.00         0.00         1.72235         1.51900         2.31900         3.80700         9.53500        39.16700      4365.24 
+Totals     116100.70         0.00         0.00         1.72235         1.51900         2.31900         3.80700         9.53500        39.16700      8730.48 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1_FULL_RUN_1.hgrm...
+Writing INCR command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1_INCR_command_run_1.txt...
+Writing INCR command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1_INCR_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   18.511s  (user 6.956s, sys 11.555s)
+  Wall time:        20.021s
+  Cores used:       0.925   (avg 23.1% across 4 worker threads)
+  Peak utilization: 96.7%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-r3-incr-p1-1.json
+Json file closed.

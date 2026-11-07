@@ -25,10 +25,28 @@
 (*    step. A request's content is fixed for a candidate's term (its log  *)
 (*    cannot change while it is a candidate), so this is the shipped      *)
 (*    per-member RequestVote steps taken back to back.                    *)
+(*                                                                         *)
+(*  EagerNet: while a message to an up server is in the network, the only *)
+(*    step (after Ready) is to deliver one, in any order. So no server    *)
+(*    acts, crashes or recovers while a message is in flight, and no      *)
+(*    message overtakes a later step. This one is a coarsening, not an    *)
+(*    exact reduction: it leaves out states where a message waits while   *)
+(*    other servers act. Why it keeps the liveness verdicts in this       *)
+(*    crash-only model is argued in the README, and it is checked against *)
+(*    the model without it on runs that finish both ways.                 *)
+(*                                                                         *)
+(*  DeadView: TLC tells states apart by a view that blanks variables no   *)
+(*    step can read before they are written again: the vote sets of a     *)
+(*    server that is not a candidate (only a timeout makes it one, and it *)
+(*    clears them), and the match indexes and sent-commit marks of a      *)
+(*    server that is not a leader (becoming leader resets match indexes,  *)
+(*    and a mark from an older term never equals the new term's). No      *)
+(*    invariant reads them. Two states with the same view behave the      *)
+(*    same, so this is exact.                                             *)
 (***************************************************************************)
 EXTENDS MCferoraft
 
-CONSTANTS EagerReady, BatchVote
+CONSTANTS EagerReady, BatchVote, EagerNet, DeadView
 
 \* planv: the healing plan is done (a second goal, read by tools/agef2.py).
 VARIABLE planv
@@ -108,12 +126,24 @@ LProgress == \/ LServerStep /\ UNCHANGED <<up, dead, faults>>
 
 ReadyStep == \E i \in up : Dirty(i) /\ Ready(i) /\ UNCHANGED <<up, dead, faults, sentCommit>>
 
+DeliverStep == Deliver /\ UNCHANGED <<up, dead, faults, sentCommit>>
+
+\* A message to an up server is in the network.
+Deliverable == \E m \in DOMAIN messages : m.mdest \in up
+
 LiveNext0 ==
     IF EagerReady /\ AnyDirty
     THEN ReadyStep
-    ELSE \/ LProgress
+    ELSE IF EagerNet /\ Deliverable
+    THEN DeliverStep
+    ELSE \/ LServerStep /\ UNCHANGED <<up, dead, faults>>
+         \/ ~EagerNet /\ DeliverStep
          \/ Fault /\ UNCHANGED sentCommit
          \/ \E i \in Server : Recover(i) /\ UNCHANGED sentCommit
+
+\* Checked in the calibration runs: EagerNet never leaves a state with a
+\* message in flight and no way to deliver it.
+EagerNetOK == (EagerNet /\ ~AnyDirty /\ Deliverable) => ENABLED DeliverStep
 
 ----
 \* The second goal: the scenario's healing plan is done, by a leader that
@@ -140,6 +170,15 @@ LiveNext == LiveNext0 /\ goalv' = (Goal)' /\ livev' = (LiveMajority)' /\ planv' 
 LiveInit == FeroInit /\ planv = PlanDone
 
 LiveSpec == LiveInit /\ [][LiveNext]_<<allvars, planv>>
+
+----
+\* DeadView (see the header). LView is E-14's FeroView with the dead
+\* variables blanked when DeadView holds.
+DVotes(v) == [i \in Server |-> IF DeadView /\ state[i] # Candidate THEN {} ELSE v[i]]
+DMatch == [i \in Server |-> IF DeadView /\ state[i] # Leader THEN [j \in Server |-> 0] ELSE matchIndex[i]]
+DSent == [i \in Server |-> IF DeadView /\ state[i] # Leader THEN [j \in Server |-> <<0, 0>>] ELSE sentCommit[i]]
+LView == <<LiveBag(messages), LiveBag(pendingMessages), serverVars, DVotes(votesResponded), DVotes(votesGranted),
+           DMatch, pendingConfChangeIndex, logVars, configVars, durableState, up, dead, faults, goalv, livev, DSent>>
 
 \* A state is "settled" when no up server is dirty; with EagerReady only
 \* settled states have more than one successor.

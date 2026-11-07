@@ -4,13 +4,18 @@ over few records? One Kafka cluster (SETUP), 900,000 x 1 KiB records written wit
 then kafka-share-consumer-perf-test (4 consumers, one new share group each time) RUNS times with per-second
 stats (--show-detailed-stats --reporting-interval 1000), and the classic consumer once for comparison.
 Run under $SP/bin/timing (it is a speed). Prints the tools' own lines; the README reads the steady part.
-Usage: python3 -I sharediag.py [SETUP] [RUNS]"""
+HB_MS (optional): set the brokers' share-group heartbeat interval (group.share.heartbeat.interval.ms and
+group.share.min.heartbeat.interval.ms, both 5000 by default) to test whether the start-up wait is one heartbeat.
+Usage: python3 -I sharediag.py [SETUP] [RUNS] [HB_MS]"""
 import importlib.util, os, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location('kbench', HERE + '/../kbench.py')
 kb = importlib.util.module_from_spec(spec); spec.loader.exec_module(kb)
 setup = sys.argv[1] if len(sys.argv) > 1 else 'default'
 runs = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+if len(sys.argv) > 3:
+    os.environ['KBENCH_BROKER_EXTRA'] = 'group.share.heartbeat.interval.ms=%s;group.share.min.heartbeat.interval.ms=%s' % (sys.argv[3], sys.argv[3])
+print('# broker extras:', os.environ.get('KBENCH_BROKER_EXTRA', '(none: Kafka defaults, share heartbeat 5000 ms)'), flush=True)
 N = 900000
 B = kb.boot('kafka')
 procs = kb.start('kafka', setup)

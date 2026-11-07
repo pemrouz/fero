@@ -11,6 +11,7 @@ Usage (run with python3 -I):
   bench.py smoke CONFIG...            one short unrecorded run each (plumbing check, not a result)
   bench.py list                       the config names
   bench.py table                      results/runs.jsonl -> results/tables.md (+ the comparison with E-09a)
+  bench.py tails                      the kept memtier JSON -> results/tails.md (where in a run the tail sits)
 
 Workload (PERF-02): 4 threads x 50 clients (200 connections), 100-byte values, uniform random keys over
 1..100,000 (each client its own seed), pipeline 1 or 16, 20 s per measured run. Tests: SET (--ratio 1:0),
@@ -61,6 +62,12 @@ def configs():
                 continue
             for p in (1, 16):
                 c['%s-%s-p%d-rb' % (s, t, p)] = dict(setup=s, test=t, pipe=p, tool='redis-benchmark')
+    # the bridge hold `b2`: the container restarted (a new boot of the VM) between the `default2` and the `r3`
+    # holds, and the new boot's fsync was much faster, so `aof`'s matched rows run again on the new boot beside
+    # `aof-r3` (the first boot's `aof` rows are kept as they are). Same setup and command; `same_as` names the row.
+    for n in ('aof-set-p1', 'aof-set-p16', 'aof-incr-p1', 'aof-incr-p16', 'aof-mix-p1', 'aof-mix-p16', 'aof-get-p16',
+              'aof-set-p1-rb', 'aof-set-p16-rb', 'aof-get-p16-rb'):
+        c['b2-' + n] = dict(c[n], same_as=n)
     # probe-only variants (never in a hold): the same 200 connections on fewer memtier threads, to see whether
     # Redis's idle time under memtier at pipeline 16 comes from sharing the 4 vCPUs with the client
     for th in (2, 1):
@@ -290,7 +297,7 @@ def run_one(name, run, record=True, secs=None, n=None):
         else:
             if c['setup'] != 'proto':
                 fill_rb(port)
-            cmd = rb_cmd(c, port, n or NREQ[name])
+            cmd = rb_cmd(c, port, n or NREQ[c.get('same_as', name)])
         la = loadavg()
         io0 = proc_io(procs[0].pid); sc0 = proc_sched(procs[0].pid)
         c0 = [proc_cpu(p.pid) for p in procs]; b0 = box_busy(); t0 = time.time(); ru0 = os.times()
@@ -450,7 +457,7 @@ def compare(rows):
         mt = [r for r in rows if r['config'] == n]
         if not mt:
             continue
-        e = [r for r in e9 if r['config'] == n] if c['setup'] != 'proto' else []
+        e = [r for r in e9 if r['config'] == c.get('same_as', n)] if c['setup'] != 'proto' else []
         h = [r for r in rows if r['config'] == n + '-rb']
         sm, se, sh = stat(mt, 'ops_s'), stat(e, 'ops_s'), stat(h, 'ops_s')
         lat = lambda rs: ('%.2f / %.2f' % (med([r.get('p50') for r in rs]), med([r.get('p99') for r in rs]))) if rs else '-'
@@ -466,13 +473,61 @@ def compare(rows):
         if c['tool'] != 'redis-benchmark' or c['setup'] == 'proto':
             continue
         h = [r for r in rows if r['config'] == n]
-        e = [r for r in e9 if r['config'] == n[:-3]]
+        e = [r for r in e9 if r['config'] == c.get('same_as', n)[:-3]]
         if not h:
             continue
         sh, se = stat(h, 'ops_s'), stat(e, 'ops_s')
         out.append('| %s | %s | %s | %s | %s | %s | %s |' % (n[:-3], fmt(sh), fmt(se), ('%.2f' % (sh['med'] / se['med'])) if se else '-',
                    agree(sh, se), fmt(stat(h, 'p99'), '%.3f'), fmt(stat(e, 'p99'), '%.3f')))
     return '\n'.join(out)
+
+
+def tails():
+    """Where memtier's tail sits inside a run, from the full JSON kept in $KEEP (memtier records each second's
+    count and percentiles): the second that holds the run's max (second 0 = the start, when 200 connections
+    open at once), and the median of the per-second p99.9 over the whole seconds (the first and last dropped)
+    beside the whole run's p99.9. A whole-run p99.9 well above the per-second median means a few bad seconds
+    carry the tail, not every second."""
+    rows = [json.loads(l) for l in open(RES + '/runs.jsonl')]
+    # per-second numbers of every memtier run: from $KEEP when it is there, else from results/persec.jsonl
+    # (written here, so the table can be rebuilt from the repo alone)
+    ps = {}
+    if os.path.exists(RES + '/persec.jsonl'):
+        for l in open(RES + '/persec.jsonl'):
+            j = json.loads(l); ps[(j['config'], j['run'])] = j['sec']
+    for r in rows:
+        f = '%s/%s-%d.json' % (KEEP, r['config'], r['run'])
+        if r['tool'] == 'memtier' and os.path.exists(f):
+            ts = json.load(open(f))['ALL STATS']['Totals']['Time-Serie']
+            ps[(r['config'], r['run'])] = [[int(k), ts[k]['Count'], ts[k].get('p50.00'), ts[k].get('p99.00'), ts[k].get('p99.90'),
+                                            ts[k].get('Max Latency')] for k in sorted(ts, key=int)]
+    with open(RES + '/persec.jsonl', 'w') as f:
+        for (n, k), sec in ps.items():
+            f.write(json.dumps({'config': n, 'run': k, 'cols': 'second, count, p50, p99, p99.9, max (ms)', 'sec': sec}) + '\n')
+    out = ['## Where memtier\'s tail sits (from results/persec.jsonl, per run)', '',
+           '"max in s0" = runs whose max latency fell in the first second (the start). Latency in ms.', '',
+           '| config | runs | max in s0 | max (median) | whole-run p99.9 (median) | per-second p99.9, median of the run medians | worst second\'s p99.9 (median) |',
+           '|---|---|---|---|---|---|---|']
+    for n, c in CONFIGS.items():
+        if c['tool'] != 'memtier':
+            continue
+        rs = [r for r in rows if r['config'] == n]
+        got = []
+        for r in rs:
+            sec = ps.get((n, r['run']))
+            if not sec:
+                continue
+            mx = max(sec, key=lambda x: x[5] or 0)
+            inner = [x[4] for x in sec[1:-1] if x[4] is not None]
+            got.append((mx[0] == sec[0][0], r.get('max_ms'), r.get('p999'), statistics.median(inner) if inner else None,
+                        max(inner) if inner else None))
+        if not got:
+            continue
+        out.append('| %s | %d | %d | %s | %s | %s | %s |' % (n, len(got), sum(1 for g in got if g[0]),
+                   '%.1f' % med([g[1] for g in got]), '%.3f' % med([g[2] for g in got]), '%.3f' % med([g[3] for g in got]),
+                   '%.3f' % med([g[4] for g in got])))
+    open(RES + '/tails.md', 'w').write('\n'.join(out) + '\n')
+    print('\n'.join(out))
 
 
 def main():
@@ -532,6 +587,8 @@ def main():
         return
     if a[0] == 'table':
         table(); return
+    if a[0] == 'tails':
+        tails(); return
     print(__doc__)
 
 

@@ -1,0 +1,7 @@
+# Kafka 4.4.0's own docs, shipped in the release (kafka_2.13-4.4.0/site-docs/kafka_2.13-4.4.0-site-docs.tgz), extracted 2026-11-07.
+# site-docs/generated/kafka_config.html, the share-group heartbeat and assignment settings (broker configs):
+group.share.heartbeat.interval.ms The heartbeat interval given to the members of a share group. Type: int Default: 5000 (5 seconds) Valid Values: [1,...] Importance: medium Update Mode: read-only
+group.share.min.heartbeat.interval.ms The minimum heartbeat interval for share group members. Type: int Default: 5000 (5 seconds) Valid Values: [1,...] Importance: medium Update Mode: read-only
+group.share.assignment.interval.ms The interval between assignment updates for a share group. Type: int Default: 1000 (1 second) Valid Values: [0,...] Importance: medium Update Mode: cluster-wide
+# site-docs/generated/group_config.html, the per-group setting (kafka-configs.sh --entity-type groups):
+share.heartbeat.interval.ms The heartbeat interval given to the members of a share group. Type: int Default: 5000 (5 seconds) Valid Values: [1,...] Importance: medium

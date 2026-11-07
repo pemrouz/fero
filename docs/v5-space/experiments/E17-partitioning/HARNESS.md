@@ -38,6 +38,9 @@ python3 harness/report.py > results/summary.md
 - `--warm-from X` starts from the rules `results/X-ablation.json` dropped. It is used only if every bound holds with them dropped; then pass 1, greedy and the final pass run as usual, so the result is still 1-minimal. `--warm-keep` and `--warm-drop` edit that list. Use it to try another greedy order (finding 5 in the README) or a sibling variant.
 - `--tag NAME` saves the result as `results/NAME-ablation.json` (the checkpoint stays `results/<option>-checkpoint.json`, shared by every run of that option, so run them one after the other, not at once).
 - `--no-mutants` skips the mutants (used for `rekey+giveup`, whose core mutants are already counted).
+- `--pin RULE` (repeatable, with `--tag`) pins these rules in place of the model's `GIVEUP` tuple. `slot+abort` uses it to price a give-up path with one decider: `--pin abort.append --pin import.append`.
+- `--reverse` runs the greedy drops in reverse model-text order (`slot-rev`, `rekey-rev`). Run it, with `--tag <name>-rev`, for every new option: the order can change which of two twin rules is kept (README finding 5).
+- `--seed-from X` copies `results/X-checkpoint.json`'s cache into a new tagged checkpoint, if that one does not exist yet. The cache holds runs keyed by the rules dropped, so it only saves time; it never changes a result. It must be a checkpoint of the same option (the runner checks).
 
 The command line re-runs itself with `PYTHONHASHSEED=0`, so state digests are the same from run to run (they decide whether a mutant is equivalent).
 

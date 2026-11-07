@@ -25,11 +25,11 @@ It models the protocol of DESIGN-V5 §4.2 as revised after the slot-move spike, 
   - rows: carry the rows and records; take `END(N)` once; export only a slot you hold;
   - dedup transfer: carry the outcomes;
   - fence transfer: carry the highest token;
-  - positions: carry the sequence;
+  - positions: carry the sequence (or, in the other greedy order, N in the fence: see below);
   - progress: the five appends of `exporting`, the fence, the final copy, its `END(N)` marker and `open`.
 - **Not needed by any property** under crash-only faults:
   - B's `importing` entry, the bulk copy and the ready report: they only shorten the unwritable window;
-  - N in the fence: the carried sequence does that job;
+  - N in the fence, **or** the carried sequence, but not both. B stamps its next write from the highest sequence it holds, so either one hands the sequence over (P2). In model-text order the ablation keeps the carried sequence (`final.seq`). In reverse order (`slot-rev`, [../../results/slot-rev-ablation.json](../../results/slot-rev-ablation.json)) it keeps N in the fence (`fence.N`) instead. Both sets have 26 rules, and both are 1-minimal;
   - every guard of the give-up path, because nothing has to give up when a group always gets a new leader.
 - **Mutants:** 35 of 46 are caught. The other 11 are equivalent: each swaps two field updates of one entry. None survived.
 - **The give-up path, priced** (`slot+giveup`, [../../results/slot+giveup-ablation.json](../../results/slot+giveup-ablation.json)): A's `cancel`, B's `abort` and B's `importing` (the entry an abort names) are pinned. The smallest set keeps **39 rules: the core 26, the 3 pinned appends, 8 rules the give-up needs, and 2 undecided** at the state limit (kept; so 37 to 39). The 8, each with a counterexample:
@@ -40,4 +40,9 @@ It models the protocol of DESIGN-V5 §4.2 as revised after the slot-move spike, 
   - **Not needed even with a give-up path:** N in the fence and in `unfenced` (the carried sequence does that job), the bulk copy, and every idempotence guard.
 - **The give-up path makes the model 57 to 261 times bigger** (smallest model: `deep` 5,036 states without it, 1,105,399 with it; `twice1` 487 and 127,129). The give-up branches, not the move, are what push a slot model toward DEV-03's 1-hour limit.
 - **Mutants of the model with its give-up path:** 56 (the pinned steps are not dropped: nothing asks for a give-up, so dropping one can never be caught). 43 caught, 11 equivalent swaps of one entry's fields, 2 undecided (dropping the 2 undecided rules), none survived. The full sweep of this model takes about 260 seconds, well inside DEV-03's hour.
-- **One decider** (`slot+abort`): GU_SLOT_ABORT
+- **One decider** (`slot+abort`, [../../results/slot+abort-ablation.json](../../results/slot+abort-ablation.json)): A never cancels; only B gives up, by `abort`, before or after A's fence. B's `abort` and `importing` are pinned, and the run starts from `slot+giveup`'s result without A's cancel path (`cancel.append`, `cancel.nofence`, `fence.nocancel`, `drop.cancom`, `drop.append`); every bound holds with them gone. The smallest set keeps **34 rules: the core 26, the 2 pinned appends, 5 rules the give-up needs, and 1 undecided** (`abort.imp`), so **33 to 34**. The 5 are the same as with two deciders, less A's half:
+  - **give up or finish, never both (2):** `abort.noopen` and `open.noabort` (P6 in 14 steps without either);
+  - **hand back (3):** `unfence.abcom` (P6 in 13 steps), `unfence.fen` (P6 in 17 steps), `unfence.append` (L5).
+  - If B aborts before A's fence, A needs no cancel: the ablation drops A's "cancel on B's abort" (`cancel_on_abort`) whole, and L5g still holds. A fences as usual, sees B's committed abort, and reopens with `unfenced`, so that one path covers both cases (model-checked: L5g holds on every bound). The same action is dropped with two deciders too.
+  - **So one decider saves 4 to 5 rules** (A's cancel, its two exclusions, and B's clean-up after a cancel). The model is also 2 to 3 times smaller than with two deciders (`deep` 331,073 states against 1,105,399; `twice1` 72,732 against 127,129).
+  - **The catch** (reasoned, not a model result): here B always gets a new leader, so it can always abort. A B that has lost its majority for good cannot. Then the source or `#meta` must decide in its place, which is still one decider if the rule is "whoever decides, decides once, in one log" (as re-key's catalog does). E-16's `cent-co` controller is that shape.

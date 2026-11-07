@@ -1,0 +1,14 @@
+# run three-1c-rb (three voters, one change of any kind, no fault, terms <= 4,
+# reductions R1 EagerReady and R2 BatchVote only), started 2026-11-07 04:33:54
+# in a heavy-lock hold. The container restarted at about 04:47 and killed it.
+# Its run folder was removed when the run was redefined; these are the last
+# progress lines of its TLC log (seg1.out), copied before removal.
+Progress(37) at 2026-11-07 04:34:59: 193,831 states generated (193,320 s/min), 59,301 distinct states found (59,007 ds/min), 9,607 states left on queue.
+Progress(44) at 2026-11-07 04:37:59: 761,270 states generated (180,905 s/min), 229,696 distinct states found (55,491 ds/min), 42,071 states left on queue.
+Progress(47) at 2026-11-07 04:41:59: 1,493,578 states generated (185,379 s/min), 440,375 distinct states found (52,115 ds/min), 77,819 states left on queue.
+Progress(50) at 2026-11-07 04:46:59: 2,565,266 states generated (232,645 s/min), 733,042 distinct states found (62,455 ds/min), 117,462 states left on queue.
+# Not finished: 733,042 distinct states at depth 50 after 13 minutes, the
+# queue still growing. A sample of 100,000 of its states (every 7th of the
+# first 700,000): 97% had at least one message in flight (most had 2 or 3),
+# and 46% had at least one message older than its receiver's term. This is
+# what led to R3 (DeadView) and R4 (EagerNet).

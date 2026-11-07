@@ -45,7 +45,12 @@ BASE = dict(ReconfigurationLimit=2, MaxTermLimit=5, RequestLimit=0, FaultLimit=1
             AllowRestart=False, AllowSnapshot=False, GhostReturn=False, CoarseAE=True, InitLeader=True,
             AllowDrop=True, AllowStepDown=True, LeaderLease=False, Plan='all', EagerApply=False,
             CrashLeaderOnly=False, InitR21=False, R6=True,
-            EagerReady=True, BatchVote=True)
+            EagerReady=True, BatchVote=True, EagerNet=True, DeadView=True)
+# The reductions (MCferolive.tla's header): R1 EagerReady, R2 BatchVote,
+# R3 DeadView (exact), R4 EagerNet (a coarsening). NONE turns all four off.
+NONE = dict(EagerReady=False, BatchVote=False, EagerNet=False, DeadView=False)
+RB = dict(EagerReady=True, BatchVote=True, EagerNet=False, DeadView=False)
+RBD = dict(EagerReady=True, BatchVote=True, EagerNet=False, DeadView=True)
 
 SAFETY = ['LogInv', 'MoreThanOneLeaderInv', 'ElectionSafetyInv', 'LogMatchingInv',
           'QuorumLogInvLive', 'MoreUpToDateCorrectInv', 'LeaderCompletenessInv',
@@ -81,21 +86,29 @@ run('four-voters-append', 'four-voters', Plan='demote', ReconfigurationLimit=1, 
 run('three-ghost', 'three', Plan='all', ReconfigurationLimit=1, AllowLoseDisk=True, GhostReturn=True, dot=False,
     **LIVE)
 run('three-disk-noghost', 'three', Plan='all', ReconfigurationLimit=1, AllowLoseDisk=True, dot=False, **LIVE)
-# E-14's R2-1 pair, on E-14b's model (a check that the reductions keep both verdicts)
-run('r21', 'four-voters', Plan='demote', ReconfigurationLimit=0, FaultLimit=0, InitR21=True, MaxTermLimit=4, **LIVE)
-run('r21-append', 'four-voters', Plan='demote', ReconfigurationLimit=0, FaultLimit=0, InitR21=True, OnAppend=True,
-    MaxTermLimit=4, **LIVE)
-# The same runs with no reduction (EagerReady and BatchVote off), on small
-# bounds, to measure what the reductions remove and that verdicts agree.
-run('r21-full', 'four-voters', Plan='demote', ReconfigurationLimit=0, FaultLimit=0, InitR21=True, MaxTermLimit=4,
-    EagerReady=False, BatchVote=False, **LIVE)
-run('r21-append-full', 'four-voters', Plan='demote', ReconfigurationLimit=0, FaultLimit=0, InitR21=True,
-    OnAppend=True, MaxTermLimit=4, EagerReady=False, BatchVote=False, **LIVE)
-run('three-1c', 'three', Plan='all', ReconfigurationLimit=1, FaultLimit=0, MaxTermLimit=4, **LIVE)
-run('three-1c-full', 'three', Plan='all', ReconfigurationLimit=1, FaultLimit=0, MaxTermLimit=4,
-    EagerReady=False, BatchVote=False, **LIVE)
-run('three-1c-ready', 'three', Plan='all', ReconfigurationLimit=1, FaultLimit=0, MaxTermLimit=4,
-    BatchVote=False, **LIVE)
+# E-14's R2-1 pair, on E-14b's model: with every reduction, with R1+R2 only
+# (the first runs), with R1-R3, and with none, to check the reductions keep
+# both verdicts.
+R21 = dict(Plan='demote', ReconfigurationLimit=0, FaultLimit=0, InitR21=True, MaxTermLimit=4, **LIVE)
+CAL = SAFETY + ['EagerNetOK']
+run('r21', 'four-voters', invs=CAL, **R21)
+run('r21-rb', 'four-voters', **dict(R21, **RB))
+run('r21-rbd', 'four-voters', **dict(R21, **RBD))
+run('r21-append', 'four-voters', invs=CAL, OnAppend=True, **R21)
+run('r21-append-rb', 'four-voters', OnAppend=True, **dict(R21, **RB))
+run('r21-append-none', 'four-voters', OnAppend=True, **dict(R21, **NONE))
+# Small whole scenarios, each with and without EagerNet (the coarsening):
+# three voters, one change of any kind, no fault / one crash.
+C3 = dict(Plan='all', ReconfigurationLimit=1, FaultLimit=0, MaxTermLimit=4, **LIVE)
+run('three-1c', 'three', invs=CAL, **C3)
+run('three-1c-rbd', 'three', **dict(C3, **RBD))
+run('three-1c-rb', 'three', **dict(C3, **RB))
+C3F = dict(C3, FaultLimit=1)
+run('three-1c1f', 'three', invs=CAL, **C3F)
+run('three-1c1f-rbd', 'three', **dict(C3F, **RBD))
+C2 = dict(Plan='stepback', ReconfigurationLimit=1, FaultLimit=1, MaxTermLimit=4, **LIVE)
+run('two-1c1f', 'two', invs=CAL, **C2)
+run('two-1c1f-rbd', 'two', **dict(C2, **RBD))
 
 
 def cfg_text(r):
@@ -131,7 +144,7 @@ def cfg_text(r):
               '    AppendEntriesResponse = "AppendEntriesResponse"']
     if r['sym']:
         lines.append('SYMMETRY Symmetry')
-    lines += ['VIEW FeroView', 'CHECK_DEADLOCK FALSE', 'INVARIANTS'] + ['    ' + i for i in r['invs']]
+    lines += ['VIEW LView', 'CHECK_DEADLOCK FALSE', 'INVARIANTS'] + ['    ' + i for i in r['invs']]
     return '\n'.join(lines) + '\n'
 
 

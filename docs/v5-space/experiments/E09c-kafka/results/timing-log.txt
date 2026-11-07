@@ -66,3 +66,7 @@ kafka:flush1:e2e1 run 3: {"avg_ms": 3.7816, "p50": 3.0, "p99": 8.0, "p999": 15.0
 kafka:flush1:ack1 run 3: {"count": 12000, "rate": 370.7, "p50": 2567, "p90": 3384, "p99": 5342, "p999": 10248, "max": 65504, "mean": 2693.6} {'n': 12000, 'rc': 0, 'wall_s': 38.39, 'server_cores': 0.87, 'client_cores': 0.31, 'other_cores': 0.23}
 === 04:30:02 end kafka flush1 lat --first 2 --runs 2 (load 2.91 3.46 2.38)
 === 04:30:02 start kafka sharediag (load 2.91 3.46 2.38)
+=== 04:49:56 note: the sharediag hold started at 04:30:02 was stopped by a container restart before it printed anything (results/sharediag.txt was empty); it is run again below (load 0.11 0.05 0.02)
+=== 04:49:56 start kafka sharediag (load 0.11 0.05 0.02)
+=== 04:51:40 end kafka sharediag (load 3.26 1.33 0.49)
+=== 04:52:59 start kafka sharediag-hb (load 4.05 2.04 0.81)

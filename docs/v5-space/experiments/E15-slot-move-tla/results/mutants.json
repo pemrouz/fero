@@ -1530,5 +1530,287 @@
    }
   },
   "verdict": "survived"
+ },
+ "m063": {
+  "by": "move: more than 474,570 states",
+  "desc": "drop guard: lmv[n].end = <<>>",
+  "id": 63,
+  "kind": "G",
+  "line": 276,
+  "runs": {
+   "move": {
+    "distinct": 474570,
+    "prop": "more than 474,570 states",
+    "secs": 197.3,
+    "verdict": "unbounded"
+   }
+  },
+  "verdict": "unbounded"
+ },
+ "m064": {
+  "by": "move: 7",
+  "desc": "drop guard: lmv[n].seen",
+  "id": 64,
+  "kind": "G",
+  "line": 278,
+  "runs": {
+   "move": {
+    "distinct": 7280,
+    "secs": 3.1,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 51,
+    "errors": [],
+    "secs": 4.4,
+    "stuck": 5
+   }
+  },
+  "verdict": "caught"
+ },
+ "m065": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: PLe(q, pos)",
+  "id": 65,
+  "kind": "G",
+  "line": 279,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.7,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 19.6,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m066": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~PLt(pos, p)",
+  "id": 66,
+  "kind": "G",
+  "line": 281,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.4,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m067": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: \\/ PLt(pos, q)                 \\/ end # <<>>",
+  "id": 67,
+  "kind": "G",
+  "line": 282,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 11.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.8,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m068": {
+  "by": "move: Inv9",
+  "desc": "drop guard: car[3] = Epoch(FG(sh))",
+  "id": 68,
+  "kind": "G",
+  "line": 284,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 9.5,
+    "steps": 21,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m069": {
+  "by": "move: Inv9",
+  "desc": "drop guard: ~VLt(ver, table.v)",
+  "id": 69,
+  "kind": "G",
+  "line": 291,
+  "runs": {
+   "move": {
+    "prop": "Inv9",
+    "secs": 4.7,
+    "steps": 15,
+    "verdict": "caught"
+   }
+  },
+  "verdict": "caught"
+ },
+ "m070": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: ~(/\\ ver = table.v           /\\ val # table.h)",
+  "id": 70,
+  "kind": "G",
+  "line": 292,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.0,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.7,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m071": {
+  "by": "move: 7",
+  "desc": "drop guard: ver = table.v",
+  "id": 71,
+  "kind": "G",
+  "line": 292,
+  "runs": {
+   "move": {
+    "distinct": 44448,
+    "secs": 12.2,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 172,
+    "errors": [],
+    "secs": 17.6,
+    "stuck": 22
+   }
+  },
+  "verdict": "caught"
+ },
+ "m072": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 37326
+  },
+  "desc": "drop guard: val # table.h",
+  "id": 72,
+  "kind": "G",
+  "line": 293,
+  "runs": {
+   "move": {
+    "distinct": 37326,
+    "secs": 9.8,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 15.2,
+    "stuck": 0
+   }
+  },
+  "verdict": "survived"
+ },
+ "m073": {
+  "by": "move: None",
+  "desc": "drop guard: n \\in DOMAIN mv",
+  "id": 73,
+  "kind": "G",
+  "line": 306,
+  "runs": {
+   "move": {
+    "errors": [
+     "Error: TLC threw an unexpected exception.",
+     "This was probably caused by an error in the spec or model.",
+     "The exception was a java.lang.RuntimeException"
+    ],
+    "prop": null,
+    "secs": 2.1,
+    "verdict": "ill-formed"
+   }
+  },
+  "verdict": "ill-formed"
+ },
+ "m074": {
+  "bounds": [
+   "move"
+  ],
+  "counts": {
+   "move": 47457
+  },
+  "desc": "drop guard: mv[n].tgt = tgt",
+  "id": 74,
+  "kind": "G",
+  "line": 307,
+  "runs": {
+   "move": {
+    "distinct": 47457,
+    "secs": 12.0,
+    "verdict": "holds"
+   },
+   "move-live": {
+    "calm": 205,
+    "errors": [],
+    "secs": 18.9,
+    "stuck": 0
+   }
+  },
+  "verdict": "equivalent"
+ },
+ "m075": {
+  "by": "move: more than 474,570 states",
+  "desc": "drop guard: ~mv[n].can",
+  "id": 75,
+  "kind": "G",
+  "line": 308,
+  "runs": {
+   "move": {
+    "distinct": 474570,
+    "prop": "more than 474,570 states",
+    "secs": 135.1,
+    "verdict": "unbounded"
+   }
+  },
+  "verdict": "unbounded"
  }
 }
