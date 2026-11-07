@@ -1,0 +1,27 @@
+# run par1 (one damage): 65 s wall incl. waiting for the lock, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 33 and seed 1548846068251810097 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 15467] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 10:30:01)
+Warning: The sets Perms(SymVoters)\cupPerms(InitLearners), and Perms(Joiners) have been defined to be a symmetry set but contain less than two elements.
+(Use the -nowarning option to disable this warning.)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 10:30:02.
+Progress(8) at 2026-11-07 10:30:05: 290 states generated (290 s/min), 190 distinct states found (190 ds/min), 72 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 3.2E-10
+  based on the actual fingerprints:  val = 1.5E-10
+158167 states generated, 62743 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 77.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 9 and the 95th percentile is 2).
+Finished in 01min 04s at (2026-11-07 10:31:04)
+
+# agef37.py (AG EF goal over progress steps)
+states 62743  edges 158166  initial 1
+goal states 26370  can reach goal 61407
+judged states (highest term <= 2) 1897
+stuck states 0  of which with a live majority 0  (not judged, near the term bound: 1336)
+DAMAGE 0 damaged: 802 judged live-majority states, 0 stuck; 1 damaged: 1095 judged live-majority states, 0 stuck; 0 still bad: 1396 judged live-majority states, 0 stuck; 1 still bad: 501 judged live-majority states, 0 stuck
+
+RESULT: PASS (no stuck state with a live majority)

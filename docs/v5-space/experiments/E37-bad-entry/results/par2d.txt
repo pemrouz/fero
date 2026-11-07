@@ -1,0 +1,35 @@
+# run par2d (two damages on two replicas at different offsets, no crash): 498 s wall incl. waiting for the lock, cap 600 s
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 28 and seed 5234566327329801268 with 2 workers on 4 cores with 3641MB heap and 64MB offheap memory [pid: 16942] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-07 10:31:51)
+Warning: The sets Perms(SymVoters)\cupPerms(InitLearners), and Perms(Joiners) have been defined to be a symmetry set but contain less than two elements.
+(Use the -nowarning option to disable this warning.)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-07 10:31:53.
+Progress(9) at 2026-11-07 10:31:56: 382 states generated (382 s/min), 205 distinct states found (205 ds/min), 57 states left on queue.
+Progress(49) at 2026-11-07 10:32:56: 171,109 states generated (170,727 s/min), 67,132 distinct states found (66,927 ds/min), 5,883 states left on queue.
+Progress(59) at 2026-11-07 10:33:56: 355,435 states generated (184,326 s/min), 137,727 distinct states found (70,595 ds/min), 9,142 states left on queue.
+Progress(66) at 2026-11-07 10:34:56: 563,129 states generated (207,694 s/min), 215,560 distinct states found (77,833 ds/min), 11,012 states left on queue.
+Progress(72) at 2026-11-07 10:35:56: 753,425 states generated (190,296 s/min), 287,867 distinct states found (72,307 ds/min), 11,826 states left on queue.
+Progress(78) at 2026-11-07 10:36:56: 914,811 states generated (161,386 s/min), 351,457 distinct states found (63,590 ds/min), 12,134 states left on queue.
+Progress(83) at 2026-11-07 10:37:56: 1,074,686 states generated (159,875 s/min), 417,256 distinct states found (65,799 ds/min), 10,779 states left on queue.
+Progress(89) at 2026-11-07 10:38:56: 1,233,141 states generated (158,455 s/min), 481,265 distinct states found (64,009 ds/min), 10,122 states left on queue.
+Progress(101) at 2026-11-07 10:39:56: 1,417,659 states generated (184,518 s/min), 551,857 distinct states found (70,592 ds/min), 3,208 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.7E-8
+  based on the actual fingerprints:  val = 1.1E-8
+1456826 states generated, 565222 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 118.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 7 and the 95th percentile is 2).
+Finished in 08min 16s at (2026-11-07 10:40:06)
+
+# agef37.py (AG EF goal over progress steps)
+states 565222  edges 1456825  initial 1
+goal states 151225  can reach goal 536022
+judged states (highest term <= 2) 1605
+stuck states 0  of which with a live majority 0  (not judged, near the term bound: 29200)
+DAMAGE 0 damaged: 234 judged live-majority states, 0 stuck; 1 damaged: 1095 judged live-majority states, 0 stuck; 2 damaged: 276 judged live-majority states, 0 stuck; 0 still bad: 902 judged live-majority states, 0 stuck; 1 still bad: 639 judged live-majority states, 0 stuck; 2 still bad: 64 judged live-majority states, 0 stuck
+
+RESULT: PASS (no stuck state with a live majority)

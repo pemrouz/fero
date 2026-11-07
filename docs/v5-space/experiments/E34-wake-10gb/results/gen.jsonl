@@ -1,0 +1,2 @@
+{"exp":"E-34","part":"gen","file":"s5m.snap","rows":5000000,"shape":"small","bytes":640634650,"gb":0.64,"bytes_per_row":128,"seconds":32.986}
+{"exp":"E-34","part":"gen","file":"b10g.snap","rows":5000000,"shape":"big","bytes":10195634650,"gb":10.2,"bytes_per_row":2039,"seconds":116.542}
