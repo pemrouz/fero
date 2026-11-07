@@ -1,0 +1,45 @@
+{
+ "SlotMove-write0": {
+  "calm": 1725,
+  "errors": [],
+  "failed": [],
+  "secs": 61.8,
+  "states": 191617,
+  "stuck": 0
+ },
+ "SlotMoveFixed-dedup": {
+  "calm": 5694,
+  "errors": [],
+  "failed": [],
+  "same_as_slot_move_py": true,
+  "secs": 296.9,
+  "states": 351262,
+  "stuck": 0
+ },
+ "SlotMoveFixed-deep": {
+  "calm": 16923,
+  "errors": [],
+  "failed": [],
+  "same_as_slot_move_py": true,
+  "secs": 209.7,
+  "states": 308274,
+  "stuck": 0
+ },
+ "SlotMoveFixed-move": {
+  "calm": 205,
+  "errors": [],
+  "failed": [],
+  "same_as_slot_move_py": true,
+  "secs": 32.0,
+  "states": 47457,
+  "stuck": 0
+ },
+ "SlotMoveFixed-write0": {
+  "calm": 1725,
+  "errors": [],
+  "failed": [],
+  "secs": 88.2,
+  "states": 191617,
+  "stuck": 0
+ }
+}

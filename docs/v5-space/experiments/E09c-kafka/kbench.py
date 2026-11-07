@@ -2,7 +2,7 @@
 """E-09c (Kafka 4.4.0) and E-09d (Redpanda 26.2.6), driven by Kafka's own perf tools.
 
 Usage (run with python3 -I):
-  kbench.py run SYSTEM SETUP PHASE [--runs 3] [--results DIR]   timed runs, each on a freshly started cluster
+  kbench.py run SYSTEM SETUP PHASE [--runs 3] [--first 1] [--results DIR]   timed runs (numbered from --first), each on a fresh cluster
   kbench.py smoke SYSTEM SETUP PHASE [--scale 0.2]               one short unrecorded run (plumbing check)
   kbench.py table [--results DIR]                                runs.jsonl -> tables.md
 
@@ -558,6 +558,9 @@ def main():
     runs = 3
     if '--runs' in a:
         i = a.index('--runs'); runs = int(a[i + 1]); del a[i:i + 2]
+    first = 1  # number of the first run (to finish a phase whose later runs were cut off)
+    if '--first' in a:
+        i = a.index('--first'); first = int(a[i + 1]); del a[i:i + 2]
     scale = 0.2
     if '--scale' in a:
         i = a.index('--scale'); scale = float(a[i + 1]); del a[i:i + 2]
@@ -569,7 +572,7 @@ def main():
     if a[0] == 'smoke':
         run_phase(system, setup, phase, 0, results, record=False, scale=scale)
     elif a[0] == 'run':
-        for r in range(1, runs + 1):
+        for r in range(first, first + runs):
             run_phase(system, setup, phase, r, results)
 
 

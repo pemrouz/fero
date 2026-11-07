@@ -1,0 +1,27 @@
+# Planted bug 2 (leaderlocal): a node that believes it leads answers reads from its own state.
+# Made by tools/bug2_evidence.sh. A run with no results.edn is one whose Knossos search was stopped by hand:
+# here stale5-s2, stopped at 2026-11-07T01:11:04Z after 20 min 40 s (18 min of it searching key 9) to free the shared lock.
+=== stale3-s1
+Knossos (in Maelstrom): :failures [] ; Maelstrom: Everything looks good!
+summary: 9 times a node became a deposed acting leader; 18 reads answered by a deposed leader; 0 of them differ from the last finished write
+Porcupine: summary: 13 keys, not linearizable [], unknown [] 
+0 reads that no linearization can explain
+=== stale3-s2
+Knossos (in Maelstrom): :failures [] ; Maelstrom: Everything looks good!
+summary: 9 times a node became a deposed acting leader; 30 reads answered by a deposed leader; 0 of them differ from the last finished write
+Porcupine: summary: 12 keys, not linearizable [], unknown [] 
+0 reads that no linearization can explain
+=== stale5-s1
+Knossos (in Maelstrom): :failures [] ; Maelstrom: Everything looks good!
+summary: 13 times a node became a deposed acting leader; 16 reads answered by a deposed leader; 0 of them differ from the last finished write
+Porcupine: summary: 20 keys, not linearizable [], unknown [] 
+0 reads that no linearization can explain
+=== stale5-s2
+Knossos (in Maelstrom): did not finish; last search report: INFO [2026-11-07 00:52:26,265] knossos reporter - knossos.search {:linear {:space 1160, :cost 9.39E+13, :op {:process 3, :type :ok, :f :read, :value 0, :index 5133, :time 54853077946}}, :wgl [:WGL]}
+deposed n3 (acting leader in term 8, newest leader term 9) read key 9 -> 0; last finished write before the read: 3 via n0, 1387 ms before  DIFFERS (a hint only: overlapping writes may explain it; Porcupine decides)
+deposed n3 (acting leader in term 8, newest leader term 9) read key 9 -> 0; last finished write before the read: 3 via n0, 1495 ms before  DIFFERS (a hint only: overlapping writes may explain it; Porcupine decides)
+deposed n3 (acting leader in term 8, newest leader term 9) read key 9 -> 0; last finished write before the read: 3 via n2, 51 ms before  DIFFERS (a hint only: overlapping writes may explain it; Porcupine decides)
+summary: 11 times a node became a deposed acting leader; 12 reads answered by a deposed leader; 3 of them differ from the last finished write
+Porcupine: key 9: 135 ops, ILLEGAL, 0.478 s summary: 21 keys, not linearizable [9], unknown [] 
+key 9: read by process 3 sent at 54.8523 s returned 0; the last-called op that finished before it: write 3 by process 187, called 54.7852 s, done 54.8012 s; ops that could have written 0 and finished after 54.7852 s or never answered, called before the read answered: 0
+1 reads that no linearization can explain

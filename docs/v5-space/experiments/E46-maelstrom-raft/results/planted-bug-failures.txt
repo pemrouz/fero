@@ -1,0 +1,84 @@
+# Planted bug 1 (batch D, E46_READ=buggy): for each key Knossos rejected, the op it could not place and the last ok op it could.
+# Made by tools/lin_failures.py from each run's results.edn. Times are completion times, in s since the test start.
+bug3-nofault-s1: 1 keys not linearizable: 0
+  key 0: ok read 4 (process 0, done at 4.932 s) after ok cas [4 2] (process 4, done at 4.928 s), 3.7 ms later
+      knossos: can't read 4 from register 2
+bug3-s1: 4 keys not linearizable: 0 4 7 10
+  key 0: ok read 4 (process 0, done at 5.821 s) after ok cas [4 3] (process 29, done at 5.810 s), 11.4 ms later
+      knossos: can't read 4 from register 3
+  key 4: ok read 0 (process 1, done at 31.058 s) after ok write 1 (process 89, done at 31.041 s), 16.4 ms later
+      knossos: can't read 0 from register 1
+      knossos: can't read 0 from register 2
+  key 7: ok read 4 (process 2, done at 68.025 s) after ok read 0 (process 0, done at 67.972 s), 52.8 ms later
+      knossos: can't read 4 from register 0
+      knossos: can't read 4 from register 3
+  key 10: ok read 4 (process 1, done at 95.670 s) after ok read 1 (process 0, done at 95.616 s), 53.4 ms later
+      knossos: can't read 4 from register 1
+bug3-s2: 4 keys not linearizable: 0 4 7 10
+  key 0: ok read 1 (process 0, done at 13.262 s) after ok read 0 (process 1, done at 13.066 s), 195.5 ms later
+      knossos: can't read 1 from register 3
+      knossos: can't read 1 from register 4
+  key 4: ok read 4 (process 0, done at 29.235 s) after ok write 0 (process 100, done at 29.136 s), 99.1 ms later
+      knossos: can't read 4 from register 0
+      knossos: can't read 4 from register 1
+  key 7: ok read 1 (process 0, done at 44.377 s) after ok write 4 (process 124, done at 44.363 s), 14.8 ms later
+      knossos: can't read 1 from register 3
+      knossos: can't read 1 from register 4
+  key 10: ok read 4 (process 2, done at 96.446 s) after ok cas [4 3] (process 244, done at 96.427 s), 19.2 ms later
+      knossos: can't read 4 from register 0
+      knossos: can't read 4 from register 3
+bug3-s3: 4 keys not linearizable: 0 4 7 10
+  key 0: ok read 3 (process 0, done at 11.709 s) after ok write 4 (process 16, done at 11.637 s), 71.2 ms later
+      knossos: can't read 3 from register 0
+      knossos: can't read 3 from register 4
+  key 4: ok read 1 (process 2, done at 38.555 s) after ok read 3 (process 1, done at 38.534 s), 21.3 ms later
+      knossos: can't read 1 from register 3
+  key 7: ok read 0 (process 0, done at 64.779 s) after ok cas [1 0] (process 124, done at 64.778 s), 1.0 ms later
+      knossos: can't read 0 from register 1
+      knossos: can't read 0 from register 2
+      knossos: can't read 0 from register 4
+  key 10: ok read 0 (process 2, done at 92.454 s) after ok read 3 (process 0, done at 92.430 s), 23.8 ms later
+      knossos: can't read 0 from register 3
+bug5-nofault-s1: 1 keys not linearizable: 0
+  key 0: ok read 2 (process 1, done at 24.730 s) after ok write 1 (process 5, done at 24.719 s), 10.3 ms later
+      knossos: can't read 2 from register 1
+bug5-s1: 4 keys not linearizable: 0 4 10 13
+  key 0: ok read 1 (process 0, done at 11.136 s) after ok cas [1 0] (process 7, done at 11.124 s), 11.2 ms later
+      knossos: can't read 1 from register 0
+  key 4: ok read 2 (process 0, done at 45.753 s) after ok write 4 (process 46, done at 45.712 s), 40.3 ms later
+      knossos: can't read 2 from register 0
+      knossos: can't read 2 from register 1
+      knossos: can't read 2 from register 4
+  key 10: ok read 1 (process 0, done at 80.552 s) after ok cas [1 0] (process 166, done at 80.487 s), 64.9 ms later
+      knossos: can't read 1 from register 0
+      knossos: can't read 1 from register 2
+  key 13: ok read 2 (process 0, done at 92.064 s) after ok write 1 (process 206, done at 92.047 s), 16.8 ms later
+      knossos: can't read 2 from register 1
+bug5-s2: 7 keys not linearizable: 0 3 6 9 12 15 18
+  key 0: ok read 2 (process 2, done at 7.979 s) after ok read 0 (process 1, done at 7.939 s), 39.8 ms later
+      knossos: can't read 0 from register 4
+      knossos: can't read 2 from register 4
+  key 3: ok read 4 (process 0, done at 15.039 s) after ok write 0 (process 66, done at 15.036 s), 2.9 ms later
+      knossos: can't read 4 from register 0
+  key 6: ok read 0 (process 1, done at 20.339 s) after ok write 2 (process 89, done at 20.335 s), 4.0 ms later
+      knossos: can't read 0 from register 1
+      knossos: can't read 0 from register 2
+      knossos: can't read 0 from register 4
+  key 9: ok read 2 (process 0, done at 29.989 s) after ok read 1 (process 4, done at 29.933 s), 55.6 ms later
+      knossos: can't read 2 from register 1
+  key 12: ok read 1 (process 0, done at 50.116 s) after ok write 3 (process 186, done at 50.073 s), 43.4 ms later
+      knossos: can't read 1 from register 3
+  key 15: ok read 0 (process 3, done at 59.018 s) after ok read 1 (process 2, done at 59.009 s), 9.3 ms later
+      knossos: can't read 0 from register 1
+      knossos: can't read 0 from register 2
+  key 18: ok read 2 (process 0, done at 77.824 s) after ok read 4 (process 2, done at 77.763 s), 60.6 ms later
+      knossos: can't read 2 from register 4
+bug5-s3: 4 keys not linearizable: 0 10 12 15
+  key 0: ok read 3 (process 1, done at 7.089 s) after ok read 2 (process 0, done at 7.070 s), 18.3 ms later
+      knossos: can't read 3 from register 2
+  key 10: ok read 3 (process 0, done at 48.076 s) after ok write 2 (process 226, done at 48.044 s), 32.1 ms later
+      knossos: can't read 3 from register 2
+  key 12: ok read 1 (process 0, done at 64.248 s) after ok write 2 (process 266, done at 64.246 s), 1.9 ms later
+      knossos: can't read 1 from register 2
+  key 15: ok read 1 (process 0, done at 92.835 s) after ok cas [1 4] (process 188, done at 92.825 s), 9.5 ms later
+      knossos: can't read 1 from register 4

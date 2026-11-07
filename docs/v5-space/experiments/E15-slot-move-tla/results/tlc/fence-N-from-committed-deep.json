@@ -1,0 +1,28 @@
+{
+ "bound": "deep",
+ "calm_states": 24413,
+ "complete": true,
+ "distinct_total": 435723,
+ "errors": [],
+ "failed": [
+  2,
+  3,
+  4,
+  6,
+  7
+ ],
+ "kind": "mutant",
+ "live_edges": 37536,
+ "live_stuck": 1436,
+ "secs": 96.9,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 411310,
+ "steps": {
+  "2": 21,
+  "3": 18,
+  "4": 18,
+  "6": 12
+ },
+ "variant": "fence-N-from-committed",
+ "workers": 2
+}

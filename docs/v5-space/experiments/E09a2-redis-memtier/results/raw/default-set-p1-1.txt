@@ -1,0 +1,26 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sets       146756.88          ---          ---         1.36186         1.25500         1.88700         2.75100         4.60700         8.19100     20908.37 
+Gets            0.00         0.00         0.00             ---             ---             ---             ---             ---             ---         0.00 
+Waits           0.00          ---          ---             ---             ---             ---             ---             ---             ---          --- 
+Totals     146756.88         0.00         0.00         1.36186         1.25500         1.88700         2.75100         4.60700         8.19100     20908.37 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1_FULL_RUN_1.hgrm...
+Writing SET command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1_SET_command_run_1.txt...
+Writing SET command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1_SET_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   27.927s  (user 10.576s, sys 17.351s)
+  Wall time:        20.010s
+  Cores used:       1.396   (avg 34.9% across 4 worker threads)
+  Peak utilization: 148.9%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/default-set-p1-1.json
+Json file closed.

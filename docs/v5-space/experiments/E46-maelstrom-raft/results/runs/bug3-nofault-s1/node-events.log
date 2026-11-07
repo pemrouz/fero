@@ -1,0 +1,44 @@
+n0 12 INIT n0 raft=1 of 3 read=buggy seed=1 tick=50 compact=0
+n0 645 ROLE term=1 StateFollower lead=3
+n0 5017 STATS applied=175 term=1 {"prop":120,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":47,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 10018 STATS applied=364 term=1 {"prop":230,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":111,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 15019 STATS applied=553 term=1 {"prop":347,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":162,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 20021 STATS applied=739 term=1 {"prop":454,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":208,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 25021 STATS applied=934 term=1 {"prop":567,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":260,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 30021 STATS applied=1122 term=1 {"prop":686,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":309,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 35022 STATS applied=1318 term=1 {"prop":807,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":361,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 40025 STATS applied=1509 term=1 {"prop":920,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":411,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 45026 STATS applied=1705 term=1 {"prop":1037,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":463,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 50027 STATS applied=1863 term=1 {"prop":1142,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":519,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 55027 STATS applied=2066 term=1 {"prop":1256,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":570,"snapSent":0,"snapApplied":0,"compactions":0}
+n0 60027 STATS applied=2245 term=1 {"prop":1367,"propDropped":20,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":616,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 14 INIT n1 raft=2 of 3 read=buggy seed=1 tick=50 compact=0
+n1 661 ROLE term=1 StateFollower lead=3
+n1 5020 STATS applied=175 term=1 {"prop":46,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":4,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 10019 STATS applied=364 term=1 {"prop":96,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":7,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 15021 STATS applied=552 term=1 {"prop":141,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":10,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 20021 STATS applied=738 term=1 {"prop":187,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":11,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 25023 STATS applied=934 term=1 {"prop":240,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":14,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 30025 STATS applied=1122 term=1 {"prop":285,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":17,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 35025 STATS applied=1318 term=1 {"prop":333,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":23,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 40025 STATS applied=1509 term=1 {"prop":378,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":25,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 45025 STATS applied=1705 term=1 {"prop":428,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":31,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 50025 STATS applied=1863 term=1 {"prop":456,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":38,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 55027 STATS applied=2065 term=1 {"prop":501,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":42,"snapSent":0,"snapApplied":0,"compactions":0}
+n1 60028 STATS applied=2244 term=1 {"prop":543,"propDropped":4,"ri":0,"riNoLeader":0,"riServed":0,"logReads":0,"localReads":47,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 14 INIT n2 raft=3 of 3 read=buggy seed=1 tick=50 compact=0
+n2 620 ROLE term=0 StatePreCandidate lead=0
+n2 640 ROLE term=1 StateCandidate lead=0
+n2 649 ROLE term=1 StateLeader lead=3
+n2 5015 STATS applied=175 term=1 {"prop":34,"propDropped":2,"ri":3,"riNoLeader":0,"riServed":3,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 10018 STATS applied=364 term=1 {"prop":62,"propDropped":2,"ri":8,"riNoLeader":0,"riServed":8,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 15019 STATS applied=553 term=1 {"prop":89,"propDropped":2,"ri":12,"riNoLeader":0,"riServed":12,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 20019 STATS applied=738 term=1 {"prop":122,"propDropped":2,"ri":19,"riNoLeader":0,"riServed":19,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 25021 STATS applied=934 term=1 {"prop":151,"propDropped":2,"ri":23,"riNoLeader":0,"riServed":23,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 30021 STATS applied=1122 term=1 {"prop":175,"propDropped":2,"ri":30,"riNoLeader":0,"riServed":30,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 35021 STATS applied=1318 term=1 {"prop":204,"propDropped":2,"ri":33,"riNoLeader":0,"riServed":33,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 40023 STATS applied=1509 term=1 {"prop":235,"propDropped":2,"ri":41,"riNoLeader":0,"riServed":41,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 45025 STATS applied=1705 term=1 {"prop":264,"propDropped":2,"ri":45,"riNoLeader":0,"riServed":45,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 50025 STATS applied=1863 term=1 {"prop":290,"propDropped":2,"ri":49,"riNoLeader":0,"riServed":49,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 55025 STATS applied=2065 term=1 {"prop":333,"propDropped":2,"ri":53,"riNoLeader":0,"riServed":53,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}
+n2 60026 STATS applied=2245 term=1 {"prop":359,"propDropped":2,"ri":57,"riNoLeader":0,"riServed":57,"logReads":0,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":0}

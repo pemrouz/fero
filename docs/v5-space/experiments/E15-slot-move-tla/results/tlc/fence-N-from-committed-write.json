@@ -1,0 +1,26 @@
+{
+ "bound": "write",
+ "calm_states": 2085,
+ "complete": true,
+ "distinct_total": 1354635,
+ "errors": [],
+ "failed": [
+  3,
+  4,
+  6,
+  7
+ ],
+ "kind": "mutant",
+ "live_edges": 2917,
+ "live_stuck": 53,
+ "secs": 252.8,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1352550,
+ "steps": {
+  "3": 18,
+  "4": 18,
+  "6": 12
+ },
+ "variant": "fence-N-from-committed",
+ "workers": 2
+}

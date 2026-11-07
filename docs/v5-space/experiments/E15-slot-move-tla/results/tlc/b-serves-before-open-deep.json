@@ -1,0 +1,25 @@
+{
+ "bound": "deep",
+ "calm_states": 17539,
+ "complete": true,
+ "distinct_total": 339709,
+ "errors": [],
+ "failed": [
+  2,
+  4,
+  6
+ ],
+ "kind": "mutant",
+ "live_edges": 27608,
+ "live_stuck": 0,
+ "secs": 89.7,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 322170,
+ "steps": {
+  "2": 23,
+  "4": 15,
+  "6": 18
+ },
+ "variant": "b-serves-before-open",
+ "workers": 2
+}

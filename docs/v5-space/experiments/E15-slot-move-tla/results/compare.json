@@ -1,0 +1,1665 @@
+[
+ {
+  "variant": "design",
+  "bound": "move",
+  "kind": "design",
+  "py_states": 47754,
+  "py_live": 175,
+  "py": "1 (20), 9 (15)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 47754,
+  "tlc_live": 175,
+  "tlc": "1 (20), 9 (15)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 11.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "move",
+  "kind": "design",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 10.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-resumes",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 71784,
+  "py_live": 205,
+  "py": "9 (19)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 71784,
+  "tlc_live": 205,
+  "tlc": "9 (19)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 21.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-by-writer",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 24474,
+  "py_live": 175,
+  "py": "9 (16)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 24474,
+  "tlc_live": 175,
+  "tlc": "9 (16)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 10.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-unfence-at-old-epoch",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 45837,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 45837,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 13.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-reads-table-only",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 48981,
+  "py_live": 205,
+  "py": "9 (15)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 48981,
+  "tlc_live": 205,
+  "tlc": "9 (15)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 13.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-fence-ignores-incarnation",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 55197,
+  "py_live": 205,
+  "py": "1 (23), 9 (21)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 55197,
+  "tlc_live": 205,
+  "tlc": "1 (23), 9 (21)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 16.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-unversioned",
+  "bound": "move",
+  "kind": "reading",
+  "py_states": 31713,
+  "py_live": 188,
+  "py": "1 (19), 9 (15)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 31713,
+  "tlc_live": 188,
+  "tlc": "1 (19), 9 (15)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 10.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "table-after-open",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 43134,
+  "py_live": 180,
+  "py": "9 (14)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 43134,
+  "tlc_live": 180,
+  "tlc": "9 (14)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 10.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "recovery-trusts-table",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 48861,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 48861,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 13.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "abort-keeps-table",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 23547,
+  "py_live": 167,
+  "py": "1 (18), 9 (16)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 23547,
+  "tlc_live": 167,
+  "tlc": "1 (18), 9 (16)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 5.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "a-unfences-alone",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 183068,
+  "py_live": 1789,
+  "py": "1 (17), 9 (16)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 183068,
+  "tlc_live": 1789,
+  "tlc": "1 (17), 9 (16)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 50.6,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-exporting",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 35743,
+  "py_live": 270,
+  "py": "7 (3)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 35743,
+  "tlc_live": 270,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 7.6,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "ready-before-copy-commits",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 57608,
+  "py_live": 309,
+  "py": "7 (9)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 57608,
+  "tlc_live": 309,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 10.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fence-without-ready",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 79020,
+  "py_live": 249,
+  "py": "7 (4)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 79020,
+  "tlc_live": 249,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 19.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "stream-before-fence-commits",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 106679,
+  "py_live": 461,
+  "py": "1 (14), 7 (12), 9 (12)",
+  "py_failed": [
+   1,
+   7,
+   9
+  ],
+  "tlc_states": 106679,
+  "tlc_live": 461,
+  "tlc": "1 (14), 7, 9 (12)",
+  "tlc_failed": [
+   1,
+   7,
+   9
+  ],
+  "tlc_secs": 27.6,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open-commits",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 14.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 17.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fence-N-from-committed",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 16.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "stamp-from-committed",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 61876,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 61876,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 17.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-sequence",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 15.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-outcomes",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 10.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-max-merge",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 47457,
+  "py_live": 205,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 47457,
+  "tlc_live": 205,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 12.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "unfence-on-appended-abort",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 70462,
+  "py_live": 340,
+  "py": "1 (17), 7 (13), 9 (16)",
+  "py_failed": [
+   1,
+   7,
+   9
+  ],
+  "tlc_states": 70462,
+  "tlc_live": 340,
+  "tlc": "1 (17), 7, 9 (16)",
+  "tlc_failed": [
+   1,
+   7,
+   9
+  ],
+  "tlc_secs": 14.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-aborts-after-open",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 48384,
+  "py_live": 210,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 48384,
+  "tlc_live": 210,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 13.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "guards-on-committed",
+  "bound": "move",
+  "kind": "mutant",
+  "py_states": 50453,
+  "py_live": 256,
+  "py": "1 (20), 9 (18)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 50453,
+  "tlc_live": 256,
+  "tlc": "1 (20), 9 (18)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 14.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "design",
+  "bound": "moves",
+  "kind": "design",
+  "py_states": 530385,
+  "py_live": 2354,
+  "py": "1 (20), 9 (15)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 530385,
+  "tlc_live": 2354,
+  "tlc": "1 (20), 9 (15)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 189.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "moves",
+  "kind": "design",
+  "py_states": 898312,
+  "py_live": 3694,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 898312,
+  "tlc_live": 3694,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 262.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-resumes",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 1175418,
+  "py_live": 3694,
+  "py": "1 (32), 9 (19)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 1175418,
+  "tlc_live": 3694,
+  "tlc": "1 (32), 9 (19)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 201.3,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-by-writer",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 309780,
+  "py_live": 2354,
+  "py": "9 (16)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 309780,
+  "tlc_live": 2354,
+  "tlc": "9 (16)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 48.3,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-unfence-at-old-epoch",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 869816,
+  "py_live": 3694,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 869816,
+  "tlc_live": 3694,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 128.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-reads-table-only",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 948381,
+  "py_live": 3694,
+  "py": "9 (15)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 948381,
+  "tlc_live": 3694,
+  "tlc": "9 (15)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 142.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-fence-ignores-incarnation",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 1088268,
+  "py_live": 3694,
+  "py": "1 (23), 9 (21)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 1088268,
+  "tlc_live": 3694,
+  "tlc": "1 (23), 9 (21)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 166.0,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-unversioned",
+  "bound": "moves",
+  "kind": "reading",
+  "py_states": 598753,
+  "py_live": 2749,
+  "py": "1 (19), 9 (15)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 598753,
+  "tlc_live": 2749,
+  "tlc": "1 (19), 9 (15)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 215.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-exporting",
+  "bound": "moves",
+  "kind": "mutant",
+  "py_states": 14724097,
+  "py_live": 31798,
+  "py": "1 (20), 6 (24), 7 (3), 9 (18)",
+  "py_failed": [
+   1,
+   6,
+   7,
+   9
+  ]
+ },
+ {
+  "variant": "design",
+  "bound": "write",
+  "kind": "design",
+  "py_states": 1251562,
+  "py_live": 1484,
+  "py": "1 (20), 6 (26), 9 (15)",
+  "py_failed": [
+   1,
+   6,
+   9
+  ],
+  "tlc_states": 1251562,
+  "tlc_live": 1484,
+  "tlc": "1 (20), 6 (26), 9 (15)",
+  "tlc_failed": [
+   1,
+   6,
+   9
+  ],
+  "tlc_secs": 301.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "write",
+  "kind": "design",
+  "py_states": 1107824,
+  "py_live": 1725,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1107824,
+  "tlc_live": 1725,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 258.3,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-resumes",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 1835310,
+  "py_live": 1725,
+  "py": "9 (19)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 1835310,
+  "tlc_live": 1725,
+  "tlc": "9 (19)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 429.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-by-writer",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 579576,
+  "py_live": 1484,
+  "py": "9 (16)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 579576,
+  "tlc_live": 1484,
+  "tlc": "9 (16)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 98.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-unfence-at-old-epoch",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 1069440,
+  "py_live": 1725,
+  "py": "6 (25)",
+  "py_failed": [
+   6
+  ],
+  "tlc_states": 1069440,
+  "tlc_live": 1725,
+  "tlc": "6 (25)",
+  "tlc_failed": [
+   6
+  ],
+  "tlc_secs": 158.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-recovery-reads-table-only",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 1158978,
+  "py_live": 1725,
+  "py": "9 (15)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 1158978,
+  "tlc_live": 1725,
+  "tlc": "9 (15)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 490.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-fence-ignores-incarnation",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 1318048,
+  "py_live": 1725,
+  "py": "1 (23), 9 (21)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 1318048,
+  "tlc_live": 1725,
+  "tlc": "1 (23), 9 (21)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 450.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed-but-table-unversioned",
+  "bound": "write",
+  "kind": "reading",
+  "py_states": 746372,
+  "py_live": 1564,
+  "py": "1 (19), 9 (15)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 746372,
+  "tlc_live": 1564,
+  "tlc": "1 (19), 9 (15)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 278.3,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "table-after-open",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1006920,
+  "py_live": 1580,
+  "py": "9 (14)",
+  "py_failed": [
+   9
+  ],
+  "tlc_states": 1006920,
+  "tlc_live": 1580,
+  "tlc": "9 (14)",
+  "tlc_failed": [
+   9
+  ],
+  "tlc_secs": 149.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "recovery-trusts-table",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1168836,
+  "py_live": 1725,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1168836,
+  "tlc_live": 1725,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 597.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "abort-keeps-table",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 554754,
+  "py_live": 1436,
+  "py": "1 (18), 9 (16)",
+  "py_failed": [
+   1,
+   9
+  ],
+  "tlc_states": 554754,
+  "tlc_live": 1436,
+  "tlc": "1 (18), 9 (16)",
+  "tlc_failed": [
+   1,
+   9
+  ],
+  "tlc_secs": 326.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "a-unfences-alone",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 3085583,
+  "py_live": 9720,
+  "py": "1 (17), 2 (24), 4 (21), 5 (24), 6 (24), 9 (16)",
+  "py_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   9
+  ],
+  "tlc_states": 3085583,
+  "tlc_live": 9720,
+  "tlc": "1 (17), 2 (24), 4 (21), 5 (24), 6 (24), 9 (16)",
+  "tlc_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   9
+  ],
+  "tlc_secs": 1296.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-exporting",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 787217,
+  "py_live": 1768,
+  "py": "7 (3)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 787217,
+  "tlc_live": 1768,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 413.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "ready-before-copy-commits",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1395852,
+  "py_live": 2089,
+  "py": "7 (9)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 1395852,
+  "tlc_live": 2089,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 705.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fence-without-ready",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1628278,
+  "py_live": 1991,
+  "py": "7 (4)",
+  "py_failed": [
+   7
+  ],
+  "tlc_states": 1628278,
+  "tlc_live": 1991,
+  "tlc": "7",
+  "tlc_failed": [
+   7
+  ],
+  "tlc_secs": 643.0,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "stream-before-fence-commits",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 2795712,
+  "py_live": 6289,
+  "py": "1 (14), 2 (21), 3 (18), 4 (17), 5 (21), 6 (21), 7 (12), 9 (12)",
+  "py_failed": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   9
+  ],
+  "tlc_states": 2795712,
+  "tlc_live": 6289,
+  "tlc": "1 (14), 2 (21), 3 (18), 4 (17), 5 (21), 6 (21), 7, 9 (12)",
+  "tlc_failed": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   9
+  ],
+  "tlc_secs": 1318.6,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open-commits",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1114166,
+  "py_live": 1728,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1114166,
+  "tlc_live": 1728,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 399.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1151124,
+  "py_live": 1778,
+  "py": "2 (23), 4 (15), 5 (22), 6 (18)",
+  "py_failed": [
+   2,
+   4,
+   5,
+   6
+  ],
+  "tlc_states": 1151124,
+  "tlc_live": 1778,
+  "tlc": "2 (23), 4 (15), 5 (22), 6 (18)",
+  "tlc_failed": [
+   2,
+   4,
+   5,
+   6
+  ],
+  "tlc_secs": 340.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fence-N-from-committed",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1352550,
+  "py_live": 2085,
+  "py": "3 (18), 4 (18), 6 (12), 7 (13)",
+  "py_failed": [
+   3,
+   4,
+   6,
+   7
+  ],
+  "tlc_states": 1352550,
+  "tlc_live": 2085,
+  "tlc": "3 (18), 4 (18), 6 (12), 7",
+  "tlc_failed": [
+   3,
+   4,
+   6,
+   7
+  ],
+  "tlc_secs": 252.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "stamp-from-committed",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1378740,
+  "py_live": 1725,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1378740,
+  "tlc_live": 1725,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 234.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-sequence",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1107824,
+  "py_live": 1725,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1107824,
+  "tlc_live": 1725,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 246.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-outcomes",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1116592,
+  "py_live": 1737,
+  "py": "5 (21)",
+  "py_failed": [
+   5
+  ],
+  "tlc_states": 1116592,
+  "tlc_live": 1737,
+  "tlc": "5 (21)",
+  "tlc_failed": [
+   5
+  ],
+  "tlc_secs": 240.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-max-merge",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1107824,
+  "py_live": 1725,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 1107824,
+  "tlc_live": 1725,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 217.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "unfence-on-appended-abort",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1678551,
+  "py_live": 3122,
+  "py": "1 (17), 2 (25), 4 (22), 5 (25), 6 (25), 7 (13), 9 (16)",
+  "py_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   7,
+   9
+  ],
+  "tlc_states": 1678551,
+  "tlc_live": 3122,
+  "tlc": "1 (17), 2 (25), 4 (22), 5 (25), 6 (25), 7, 9 (16)",
+  "tlc_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   7,
+   9
+  ],
+  "tlc_secs": 341.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-aborts-after-open",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1137728,
+  "py_live": 1755,
+  "py": "4 (20)",
+  "py_failed": [
+   4
+  ],
+  "tlc_states": 1137728,
+  "tlc_live": 1755,
+  "tlc": "4 (20)",
+  "tlc_failed": [
+   4
+  ],
+  "tlc_secs": 245.4,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "guards-on-committed",
+  "bound": "write",
+  "kind": "mutant",
+  "py_states": 1517866,
+  "py_live": 2697,
+  "py": "1 (20), 2 (21), 4 (18), 5 (21), 6 (17), 9 (18)",
+  "py_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   9
+  ],
+  "tlc_states": 1517866,
+  "tlc_live": 2697,
+  "tlc": "1 (20), 2 (21), 4 (18), 5 (21), 6 (17), 9 (18)",
+  "tlc_failed": [
+   1,
+   2,
+   4,
+   5,
+   6,
+   9
+  ],
+  "tlc_secs": 340.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "design",
+  "bound": "dedup",
+  "kind": "design",
+  "py_states": 327308,
+  "py_live": 5050,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 327308,
+  "tlc_live": 5050,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 81.0,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "dedup",
+  "kind": "design",
+  "py_states": 351262,
+  "py_live": 5694,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 351262,
+  "tlc_live": 5694,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 354.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-outcomes",
+  "bound": "dedup",
+  "kind": "mutant",
+  "py_states": 353390,
+  "py_live": 5730,
+  "py": "5 (21)",
+  "py_failed": [
+   5
+  ],
+  "tlc_states": 353390,
+  "tlc_live": 5730,
+  "tlc": "5 (21)",
+  "tlc_failed": [
+   5
+  ],
+  "tlc_secs": 83.5,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-max-merge",
+  "bound": "dedup",
+  "kind": "mutant",
+  "py_states": 352750,
+  "py_live": 5721,
+  "py": "5 (24)",
+  "py_failed": [
+   5
+  ],
+  "tlc_states": 352750,
+  "tlc_live": 5721,
+  "tlc": "5 (24)",
+  "tlc_failed": [
+   5
+  ],
+  "tlc_secs": 82.2,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open-commits",
+  "bound": "dedup",
+  "kind": "mutant",
+  "py_states": 355204,
+  "py_live": 5697,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 355204,
+  "tlc_live": 5697,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 104.3,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "design",
+  "bound": "deep",
+  "kind": "design",
+  "py_states": 286188,
+  "py_live": 14733,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 286188,
+  "tlc_live": 14733,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 97.1,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "deep",
+  "kind": "design",
+  "py_states": 308274,
+  "py_live": 16923,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 308274,
+  "tlc_live": 16923,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 71.0,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fence-N-from-committed",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 411310,
+  "py_live": 24413,
+  "py": "2 (21), 3 (18), 4 (18), 6 (12), 7 (13)",
+  "py_failed": [
+   2,
+   3,
+   4,
+   6,
+   7
+  ],
+  "tlc_states": 411310,
+  "tlc_live": 24413,
+  "tlc": "2 (21), 3 (18), 4 (18), 6 (12), 7",
+  "tlc_failed": [
+   2,
+   3,
+   4,
+   6,
+   7
+  ],
+  "tlc_secs": 96.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "stamp-from-committed",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 500268,
+  "py_live": 26681,
+  "py": "3 (22), 4 (22), 6 (7)",
+  "py_failed": [
+   3,
+   4,
+   6
+  ],
+  "tlc_states": 500268,
+  "tlc_live": 26681,
+  "tlc": "3 (22), 4 (22), 6 (7)",
+  "tlc_failed": [
+   3,
+   4,
+   6
+  ],
+  "tlc_secs": 114.8,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "no-carried-sequence",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 308274,
+  "py_live": 16923,
+  "py": "2 (21), 6 (21)",
+  "py_failed": [
+   2,
+   6
+  ],
+  "tlc_states": 308274,
+  "tlc_live": 16923,
+  "tlc": "2 (21), 6 (21)",
+  "tlc_failed": [
+   2,
+   6
+  ],
+  "tlc_secs": 68.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 322170,
+  "py_live": 17539,
+  "py": "2 (23), 4 (15), 6 (18)",
+  "py_failed": [
+   2,
+   4,
+   6
+  ],
+  "tlc_states": 322170,
+  "tlc_live": 17539,
+  "tlc": "2 (23), 4 (15), 6 (18)",
+  "tlc_failed": [
+   2,
+   4,
+   6
+  ],
+  "tlc_secs": 89.7,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "b-serves-before-open-commits",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 309016,
+  "py_live": 16961,
+  "py": "all hold",
+  "py_failed": [],
+  "tlc_states": 309016,
+  "tlc_live": 16961,
+  "tlc": "all hold",
+  "tlc_failed": [],
+  "tlc_secs": 71.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "guards-on-committed",
+  "bound": "deep",
+  "kind": "mutant",
+  "py_states": 526891,
+  "py_live": 31856,
+  "py": "1 (20), 2 (21), 4 (18), 6 (17), 9 (18)",
+  "py_failed": [
+   1,
+   2,
+   4,
+   6,
+   9
+  ],
+  "tlc_states": 526891,
+  "tlc_live": 31856,
+  "tlc": "1 (20), 2 (21), 4 (18), 6 (17), 9 (18)",
+  "tlc_failed": [
+   1,
+   2,
+   4,
+   6,
+   9
+  ],
+  "tlc_secs": 136.9,
+  "tlc_complete": true,
+  "same_verdict": true,
+  "same_states": true,
+  "same_steps": true
+ },
+ {
+  "variant": "fixed",
+  "bound": "three",
+  "kind": "design",
+  "py_states": 7510764,
+  "py_live": 17819,
+  "py": "all hold",
+  "py_failed": []
+ },
+ {
+  "variant": "no-exporting",
+  "bound": "three",
+  "kind": "mutant",
+  "py_states": 6554885,
+  "py_live": 1198769,
+  "py": "7 (3), 9 (18)",
+  "py_failed": [
+   7,
+   9
+  ]
+ }
+]

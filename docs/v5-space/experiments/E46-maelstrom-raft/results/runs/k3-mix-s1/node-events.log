@@ -1,0 +1,193 @@
+n0 24 INIT n0 raft=1 of 3 read=mixed seed=1 tick=50 compact=20
+n0 715 ROLE term=1 StateFollower lead=2
+n0 3987 ROLE term=1 StatePreCandidate lead=0
+n0 4593 ROLE term=2 StateCandidate lead=0
+n0 4604 ROLE term=2 StateLeader lead=1
+n0 4607 SNAP_SENT to=3 idx=101
+n0 5032 STATS applied=125 term=2 {"prop":108,"propDropped":23,"ri":13,"riNoLeader":3,"riServed":13,"logReads":19,"localReads":0,"snapSent":1,"snapApplied":0,"compactions":6}
+n0 5521 SNAP_SENT to=2 idx=121
+n0 10033 STATS applied=320 term=2 {"prop":248,"propDropped":23,"ri":41,"riNoLeader":3,"riServed":41,"logReads":45,"localReads":0,"snapSent":2,"snapApplied":0,"compactions":15}
+n0 15717 STATS applied=510 term=2 {"prop":379,"propDropped":23,"ri":69,"riNoLeader":3,"riServed":69,"logReads":71,"localReads":0,"snapSent":2,"snapApplied":0,"compactions":25}
+n0 19599 ROLE term=3 StateFollower lead=3
+n0 19615 SNAP_APPLIED idx=603 term=3 keys=3 h=e87bed84
+n0 20597 STATS applied=661 term=3 {"prop":447,"propDropped":23,"ri":72,"riNoLeader":3,"riServed":72,"logReads":82,"localReads":0,"snapSent":2,"snapApplied":1,"compactions":29}
+n0 21512 ROLE term=4 StateFollower lead=0
+n0 21526 ROLE term=4 StateFollower lead=2
+n0 25601 STATS applied=787 term=4 {"prop":528,"propDropped":23,"ri":86,"riNoLeader":3,"riServed":86,"logReads":100,"localReads":0,"snapSent":2,"snapApplied":1,"compactions":36}
+n0 25636 ROLE term=5 StateFollower lead=0
+n0 25659 ROLE term=5 StateFollower lead=3
+n0 30603 STATS applied=953 term=5 {"prop":626,"propDropped":23,"ri":107,"riNoLeader":3,"riServed":107,"logReads":121,"localReads":0,"snapSent":2,"snapApplied":1,"compactions":44}
+n0 33352 ROLE term=5 StatePreCandidate lead=0
+n0 35633 ROLE term=5 StateFollower lead=3
+n0 35637 STATS applied=1030 term=5 {"prop":748,"propDropped":88,"ri":115,"riNoLeader":11,"riServed":115,"logReads":137,"localReads":0,"snapSent":2,"snapApplied":1,"compactions":48}
+n0 35646 SNAP_APPLIED idx=1084 term=5 keys=4 h=c4b4e25f
+n0 38400 ROLE term=6 StateFollower lead=0
+n0 38416 ROLE term=6 StateFollower lead=2
+n0 40659 STATS applied=1267 term=6 {"prop":851,"propDropped":88,"ri":132,"riNoLeader":11,"riServed":132,"logReads":158,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":57}
+n0 42777 ROLE term=7 StateFollower lead=0
+n0 42789 ROLE term=7 StateFollower lead=3
+n0 45677 STATS applied=1430 term=7 {"prop":962,"propDropped":88,"ri":146,"riNoLeader":11,"riServed":146,"logReads":179,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":65}
+n0 50677 STATS applied=1599 term=7 {"prop":1078,"propDropped":88,"ri":164,"riNoLeader":11,"riServed":164,"logReads":199,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":73}
+n0 51863 ROLE term=8 StateFollower lead=0
+n0 51876 ROLE term=8 StateFollower lead=2
+n0 55677 STATS applied=1755 term=8 {"prop":1174,"propDropped":88,"ri":183,"riNoLeader":11,"riServed":182,"logReads":212,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":81}
+n0 61515 SNAP_APPLIED idx=2010 term=8 keys=6 h=a3de76ba
+n0 65526 STATS applied=2185 term=8 {"prop":1378,"propDropped":88,"ri":202,"riNoLeader":11,"riServed":201,"logReads":248,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":98}
+n0 70529 STATS applied=2380 term=8 {"prop":1488,"propDropped":88,"ri":225,"riNoLeader":11,"riServed":223,"logReads":269,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":108}
+n0 71409 ROLE term=8 StatePreCandidate lead=0
+n0 72972 ROLE term=8 StateFollower lead=2
+n0 75534 STATS applied=2493 term=8 {"prop":1590,"propDropped":122,"ri":233,"riNoLeader":13,"riServed":232,"logReads":282,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":113}
+n0 79272 ROLE term=8 StatePreCandidate lead=0
+n0 79276 ROLE term=9 StateCandidate lead=0
+n0 79503 ROLE term=9 StateLeader lead=1
+n0 80544 STATS applied=2639 term=9 {"prop":1672,"propDropped":122,"ri":254,"riNoLeader":13,"riServed":252,"logReads":295,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":120}
+n0 85560 STATS applied=2811 term=9 {"prop":1788,"propDropped":122,"ri":269,"riNoLeader":13,"riServed":267,"logReads":320,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":129}
+n0 87089 SNAP_SENT to=2 idx=2843
+n0 87116 SNAP_SENT to=2 idx=2843
+n0 88902 ROLE term=10 StateFollower lead=3
+n0 88940 SNAP_APPLIED idx=2879 term=10 keys=9 h=e3e7d632
+n0 89856 ROLE term=10 StatePreCandidate lead=0
+n0 89885 ROLE term=11 StateCandidate lead=0
+n0 89920 ROLE term=11 StateLeader lead=1
+n0 90908 STATS applied=2936 term=11 {"prop":1873,"propDropped":122,"ri":283,"riNoLeader":13,"riServed":280,"logReads":338,"localReads":0,"snapSent":4,"snapApplied":4,"compactions":133}
+n0 91567 SNAP_SENT to=3 idx=2959
+n0 95916 STATS applied=3113 term=11 {"prop":2003,"propDropped":122,"ri":305,"riNoLeader":13,"riServed":302,"logReads":361,"localReads":0,"snapSent":5,"snapApplied":4,"compactions":142}
+n0 96252 ROLE term=11 StateFollower lead=0
+n0 96907 ROLE term=11 StatePreCandidate lead=0
+n0 99787 ROLE term=12 StateFollower lead=0
+n0 99804 ROLE term=12 StateFollower lead=3
+n1 15 INIT n1 raft=2 of 3 read=mixed seed=1 tick=50 compact=20
+n1 718 ROLE term=0 StatePreCandidate lead=0
+n1 741 ROLE term=1 StateCandidate lead=0
+n1 778 ROLE term=1 StateLeader lead=2
+n1 4305 ROLE term=1 StateFollower lead=0
+n1 4807 ROLE term=1 StatePreCandidate lead=0
+n1 5043 STATS applied=109 term=1 {"prop":51,"propDropped":13,"ri":3,"riNoLeader":4,"riServed":3,"logReads":8,"localReads":0,"snapSent":0,"snapApplied":0,"compactions":5}
+n1 5572 ROLE term=2 StateFollower lead=1
+n1 5593 SNAP_APPLIED idx=121 term=2 keys=2 h=eaec7522
+n1 10047 STATS applied=318 term=2 {"prop":85,"propDropped":20,"ri":6,"riNoLeader":4,"riServed":6,"logReads":12,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":14}
+n1 15050 STATS applied=482 term=2 {"prop":116,"propDropped":20,"ri":9,"riNoLeader":4,"riServed":9,"logReads":17,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":23}
+n1 17444 ROLE term=3 StateFollower lead=0
+n1 17450 ROLE term=3 StateFollower lead=3
+n1 20052 STATS applied=635 term=3 {"prop":178,"propDropped":20,"ri":18,"riNoLeader":4,"riServed":17,"logReads":27,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":30}
+n1 21555 ROLE term=3 StatePreCandidate lead=0
+n1 21569 ROLE term=4 StateCandidate lead=0
+n1 21584 ROLE term=4 StateLeader lead=2
+n1 23853 SNAP_SENT to=3 idx=722
+n1 25084 STATS applied=786 term=4 {"prop":225,"propDropped":20,"ri":24,"riNoLeader":4,"riServed":23,"logReads":35,"localReads":0,"snapSent":1,"snapApplied":1,"compactions":38}
+n1 27721 ROLE term=5 StateFollower lead=3
+n1 27737 SNAP_APPLIED idx=844 term=5 keys=3 h=a4f2c0cf
+n1 30724 STATS applied=956 term=5 {"prop":254,"propDropped":20,"ri":32,"riNoLeader":4,"riServed":30,"logReads":38,"localReads":0,"snapSent":1,"snapApplied":2,"compactions":43}
+n1 35732 STATS applied=1096 term=5 {"prop":306,"propDropped":20,"ri":40,"riNoLeader":4,"riServed":38,"logReads":45,"localReads":0,"snapSent":1,"snapApplied":2,"compactions":50}
+n1 38452 ROLE term=5 StatePreCandidate lead=0
+n1 38466 ROLE term=6 StateCandidate lead=0
+n1 38486 ROLE term=6 StateLeader lead=2
+n1 40745 STATS applied=1267 term=6 {"prop":361,"propDropped":20,"ri":45,"riNoLeader":4,"riServed":43,"logReads":52,"localReads":0,"snapSent":1,"snapApplied":2,"compactions":58}
+n1 40824 SNAP_SENT to=3 idx=1268
+n1 44616 ROLE term=7 StateFollower lead=3
+n1 45596 ROLE term=7 StatePreCandidate lead=0
+n1 45615 STATS applied=1322 term=7 {"prop":382,"propDropped":20,"ri":48,"riNoLeader":4,"riServed":45,"logReads":55,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":61}
+n1 48204 ROLE term=7 StateFollower lead=3
+n1 48220 SNAP_APPLIED idx=1488 term=7 keys=6 h=734e0f11
+n1 50616 STATS applied=1595 term=7 {"prop":440,"propDropped":52,"ri":54,"riNoLeader":6,"riServed":51,"logReads":60,"localReads":0,"snapSent":2,"snapApplied":3,"compactions":66}
+n1 51900 ROLE term=7 StatePreCandidate lead=0
+n1 51919 ROLE term=8 StateCandidate lead=0
+n1 51944 ROLE term=8 StateLeader lead=2
+n1 53172 SNAP_SENT to=3 idx=1648
+n1 53175 SNAP_SENT to=3 idx=1648
+n1 53178 SNAP_SENT to=3 idx=1648
+n1 55616 STATS applied=1749 term=8 {"prop":479,"propDropped":52,"ri":60,"riNoLeader":6,"riServed":57,"logReads":66,"localReads":0,"snapSent":5,"snapApplied":3,"compactions":74}
+n1 60621 STATS applied=1974 term=8 {"prop":568,"propDropped":52,"ri":69,"riNoLeader":6,"riServed":66,"logReads":87,"localReads":0,"snapSent":5,"snapApplied":3,"compactions":85}
+n1 61584 SNAP_SENT to=1 idx=2010
+n1 61587 SNAP_SENT to=1 idx=2010
+n1 65622 STATS applied=2186 term=8 {"prop":647,"propDropped":52,"ri":77,"riNoLeader":6,"riServed":74,"logReads":91,"localReads":0,"snapSent":7,"snapApplied":3,"compactions":95}
+n1 70161 SNAP_SENT to=3 idx=2353
+n1 70169 SNAP_SENT to=3 idx=2353
+n1 70172 SNAP_SENT to=3 idx=2353
+n1 70625 STATS applied=2380 term=8 {"prop":709,"propDropped":52,"ri":85,"riNoLeader":6,"riServed":82,"logReads":105,"localReads":0,"snapSent":10,"snapApplied":3,"compactions":105}
+n1 75040 STATS applied=2466 term=8 {"prop":744,"propDropped":52,"ri":90,"riNoLeader":6,"riServed":87,"logReads":111,"localReads":0,"snapSent":10,"snapApplied":3,"compactions":109}
+n1 76066 SNAP_SENT to=3 idx=2497
+n1 79994 ROLE term=9 StateFollower lead=1
+n1 80996 STATS applied=2653 term=9 {"prop":797,"propDropped":52,"ri":98,"riNoLeader":6,"riServed":95,"logReads":116,"localReads":0,"snapSent":11,"snapApplied":3,"compactions":118}
+n1 84011 ROLE term=9 StatePreCandidate lead=0
+n1 85002 STATS applied=2744 term=9 {"prop":827,"propDropped":61,"ri":102,"riNoLeader":6,"riServed":98,"logReads":117,"localReads":0,"snapSent":11,"snapApplied":3,"compactions":122}
+n1 87154 ROLE term=9 StateFollower lead=1
+n1 87180 SNAP_APPLIED idx=2843 term=9 keys=8 h=6acc5b9e
+n1 87804 ROLE term=10 StateFollower lead=0
+n1 87820 ROLE term=10 StateFollower lead=3
+n1 89975 ROLE term=10 StatePreCandidate lead=0
+n1 89981 ROLE term=11 StateFollower lead=0
+n1 89993 ROLE term=11 StateFollower lead=1
+n1 90013 STATS applied=2900 term=11 {"prop":876,"propDropped":79,"ri":109,"riNoLeader":6,"riServed":105,"logReads":125,"localReads":0,"snapSent":11,"snapApplied":4,"compactions":124}
+n1 95028 STATS applied=3100 term=11 {"prop":908,"propDropped":79,"ri":116,"riNoLeader":6,"riServed":112,"logReads":131,"localReads":0,"snapSent":11,"snapApplied":4,"compactions":134}
+n1 96048 ROLE term=11 StatePreCandidate lead=0
+n1 99707 ROLE term=11 StateFollower lead=0
+n1 99874 ROLE term=12 StateFollower lead=3
+n1 100029 STATS applied=3130 term=12 {"prop":941,"propDropped":104,"ri":116,"riNoLeader":9,"riServed":112,"logReads":133,"localReads":0,"snapSent":11,"snapApplied":4,"compactions":136}
+n2 65 INIT n2 raft=3 of 3 read=mixed seed=1 tick=50 compact=20
+n2 679 ROLE term=0 StatePreCandidate lead=0
+n2 992 ROLE term=1 StateFollower lead=0
+n2 1021 ROLE term=1 StateFollower lead=2
+n2 4507 ROLE term=1 StatePreCandidate lead=0
+n2 4903 ROLE term=2 StateFollower lead=0
+n2 4907 ROLE term=2 StateFollower lead=1
+n2 4913 SNAP_APPLIED idx=101 term=1 keys=2 h=b90a1908
+n2 5804 STATS applied=139 term=2 {"prop":28,"propDropped":10,"ri":1,"riNoLeader":1,"riServed":1,"logReads":3,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":3}
+n2 10804 STATS applied=342 term=2 {"prop":53,"propDropped":10,"ri":2,"riNoLeader":1,"riServed":2,"logReads":5,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":14}
+n2 14760 ROLE term=2 StatePreCandidate lead=0
+n2 15025 ROLE term=2 StateFollower lead=1
+n2 15805 STATS applied=501 term=2 {"prop":71,"propDropped":10,"ri":5,"riNoLeader":1,"riServed":5,"logReads":7,"localReads":0,"snapSent":0,"snapApplied":1,"compactions":21}
+n2 17642 ROLE term=2 StatePreCandidate lead=0
+n2 17662 ROLE term=3 StateCandidate lead=0
+n2 17675 ROLE term=3 StateLeader lead=3
+n2 19910 SNAP_SENT to=1 idx=603
+n2 19916 SNAP_SENT to=1 idx=603
+n2 20810 STATS applied=658 term=3 {"prop":105,"propDropped":10,"ri":6,"riNoLeader":1,"riServed":5,"logReads":12,"localReads":0,"snapSent":2,"snapApplied":1,"compactions":29}
+n2 21784 ROLE term=3 StateFollower lead=0
+n2 22545 ROLE term=3 StatePreCandidate lead=0
+n2 24081 ROLE term=4 StateFollower lead=2
+n2 24115 SNAP_APPLIED idx=722 term=4 keys=3 h=43ac0f7
+n2 25814 STATS applied=787 term=4 {"prop":135,"propDropped":21,"ri":9,"riNoLeader":2,"riServed":6,"logReads":15,"localReads":0,"snapSent":2,"snapApplied":2,"compactions":33}
+n2 25923 ROLE term=4 StatePreCandidate lead=0
+n2 25926 ROLE term=5 StateCandidate lead=0
+n2 25951 ROLE term=5 StateLeader lead=3
+n2 27966 SNAP_SENT to=2 idx=844
+n2 27967 SNAP_SENT to=2 idx=844
+n2 30866 STATS applied=952 term=5 {"prop":178,"propDropped":21,"ri":19,"riNoLeader":2,"riServed":16,"logReads":25,"localReads":0,"snapSent":4,"snapApplied":2,"compactions":41}
+n2 35898 STATS applied=1096 term=5 {"prop":214,"propDropped":21,"ri":26,"riNoLeader":2,"riServed":23,"logReads":30,"localReads":0,"snapSent":4,"snapApplied":2,"compactions":48}
+n2 35945 SNAP_SENT to=1 idx=1084
+n2 41051 ROLE term=6 StateFollower lead=2
+n2 41056 SNAP_APPLIED idx=1268 term=6 keys=5 h=c4350b09
+n2 43016 ROLE term=6 StatePreCandidate lead=0
+n2 43026 ROLE term=7 StateCandidate lead=0
+n2 43086 ROLE term=7 StateLeader lead=3
+n2 45066 STATS applied=1400 term=7 {"prop":279,"propDropped":21,"ri":32,"riNoLeader":2,"riServed":29,"logReads":38,"localReads":0,"snapSent":5,"snapApplied":3,"compactions":59}
+n2 48445 SNAP_SENT to=2 idx=1488
+n2 50071 STATS applied=1557 term=7 {"prop":309,"propDropped":21,"ri":38,"riNoLeader":2,"riServed":35,"logReads":41,"localReads":0,"snapSent":6,"snapApplied":3,"compactions":67}
+n2 53398 ROLE term=8 StateFollower lead=2
+n2 53408 SNAP_APPLIED idx=1648 term=8 keys=6 h=4d494901
+n2 55398 STATS applied=1737 term=8 {"prop":337,"propDropped":21,"ri":41,"riNoLeader":2,"riServed":37,"logReads":44,"localReads":0,"snapSent":6,"snapApplied":4,"compactions":74}
+n2 60400 STATS applied=1954 term=8 {"prop":369,"propDropped":21,"ri":44,"riNoLeader":2,"riServed":40,"logReads":49,"localReads":0,"snapSent":6,"snapApplied":4,"compactions":85}
+n2 65401 STATS applied=2168 term=8 {"prop":400,"propDropped":21,"ri":46,"riNoLeader":2,"riServed":42,"logReads":51,"localReads":0,"snapSent":6,"snapApplied":4,"compactions":95}
+n2 70375 STATS applied=2319 term=8 {"prop":420,"propDropped":21,"ri":47,"riNoLeader":2,"riServed":43,"logReads":53,"localReads":0,"snapSent":6,"snapApplied":4,"compactions":103}
+n2 70395 SNAP_APPLIED idx=2353 term=8 keys=6 h=89b169a5
+n2 71516 ROLE term=8 StatePreCandidate lead=0
+n2 75386 STATS applied=2380 term=8 {"prop":458,"propDropped":52,"ri":48,"riNoLeader":6,"riServed":44,"logReads":56,"localReads":0,"snapSent":6,"snapApplied":5,"compactions":104}
+n2 76244 ROLE term=8 StateFollower lead=2
+n2 76314 SNAP_APPLIED idx=2497 term=8 keys=8 h=984130fc
+n2 79783 ROLE term=8 StatePreCandidate lead=0
+n2 79794 ROLE term=9 StateFollower lead=0
+n2 79805 ROLE term=9 StateFollower lead=1
+n2 80422 STATS applied=2621 term=9 {"prop":492,"propDropped":55,"ri":50,"riNoLeader":6,"riServed":45,"logReads":58,"localReads":0,"snapSent":6,"snapApplied":6,"compactions":110}
+n2 85429 STATS applied=2795 term=9 {"prop":527,"propDropped":55,"ri":57,"riNoLeader":6,"riServed":52,"logReads":61,"localReads":0,"snapSent":6,"snapApplied":6,"compactions":118}
+n2 88017 ROLE term=9 StatePreCandidate lead=0
+n2 88026 ROLE term=10 StateCandidate lead=0
+n2 88044 ROLE term=10 StateLeader lead=3
+n2 89228 SNAP_SENT to=1 idx=2879
+n2 91832 ROLE term=11 StateFollower lead=1
+n2 91873 SNAP_APPLIED idx=2959 term=11 keys=9 h=f1e8b1f
+n2 95833 STATS applied=3113 term=11 {"prop":577,"propDropped":55,"ri":61,"riNoLeader":6,"riServed":54,"logReads":66,"localReads":0,"snapSent":7,"snapApplied":7,"compactions":131}
+n2 97200 ROLE term=11 StatePreCandidate lead=0
+n2 100071 ROLE term=12 StateCandidate lead=0
+n2 100089 ROLE term=12 StateLeader lead=3
+n2 100833 STATS applied=3140 term=12 {"prop":595,"propDropped":69,"ri":61,"riNoLeader":9,"riServed":54,"logReads":67,"localReads":0,"snapSent":7,"snapApplied":7,"compactions":132}

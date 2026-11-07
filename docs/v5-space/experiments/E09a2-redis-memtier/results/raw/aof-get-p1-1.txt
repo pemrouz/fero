@@ -1,0 +1,26 @@
+4         Threads
+50        Connections per thread
+20        Seconds
+ALL STATS
+============================================================================================================================================================
+Type         Ops/sec     Hits/sec   Misses/sec    Avg. Latency     p50 Latency     p90 Latency     p99 Latency   p99.9 Latency  p99.99 Latency       KB/sec 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sets            0.00          ---          ---             ---             ---             ---             ---             ---             ---         0.00 
+Gets       148368.88    148368.88         0.00         1.34678         1.23900         1.85500         2.76700         4.79900        17.40700     20413.58 
+Waits           0.00          ---          ---             ---             ---             ---             ---             ---             ---          --- 
+Totals     148368.88    148368.88         0.00         1.34678         1.23900         1.85500         2.76700         4.79900        17.40700     20413.58 
+Json file /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1.json created...
+Writing results to stdout
+[RUN #1] Preparing benchmark client...
+[RUN #1] Launching threads now...
+Writing Full Run command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1_FULL_RUN_1.txt...
+Writing Full Run command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1_FULL_RUN_1.hgrm...
+Writing GET command HDR latency histogram results to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1_GET_command_run_1.txt...
+Writing GET command HDR latency histogram results in HistogramLogProcessor format to /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1_GET_command_run_1.hgrm...
+CPU Utilization Summary
+  Total CPU time:   27.832s  (user 10.613s, sys 17.219s)
+  Wall time:        20.011s
+  Cores used:       1.391   (avg 34.8% across 4 worker threads)
+  Peak utilization: 146.7%
+Saving JSON output file: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e09a2/keep/aof-get-p1-1.json
+Json file closed.

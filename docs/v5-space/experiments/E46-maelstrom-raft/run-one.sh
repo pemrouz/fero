@@ -3,6 +3,8 @@
 # Usage: run-one.sh <name> <nodes> <read: readindex|log|mixed|buggy> <seed> <seconds> <nemesis: partition|none> <pause: 0|1> [compact] [rate] [concurrency]
 # Writes the run to $E46_RUNS/<name>/ (Maelstrom's store, the pauser log) and one JSON line to $E46_RUNS/summary.jsonl.
 # Run it under the heavy lock: $SP/bin/heavy run-one.sh ...
+# E46_TIMEOUT (s, default 0 = none) stops Maelstrom, checker included, after that long; the history
+# is written before the checker starts, so tools/porcupine can still check it.
 set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 SP="${SP:-/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad}"
@@ -29,7 +31,7 @@ fi
 start=$(date +%s)
 set +e
 E46_READ="$read" E46_SEED="$seed" E46_PIDDIR="$dir/pids" E46_COMPACT="$compact" \
-  java -Xmx3g -Djava.awt.headless=true -jar "$MAELSTROM_JAR" test -w lin-kv \
+  timeout "${E46_TIMEOUT:-0}" java -Xmx3g -Djava.awt.headless=true -jar "$MAELSTROM_JAR" test -w lin-kv \
   --bin "$HERE/node/run-node.sh" --node-count "$nodes" --time-limit "$secs" \
   --concurrency "$conc" --rate "$rate" "${lat[@]}" "${nem[@]}" > maelstrom.out 2>&1
 code=$?

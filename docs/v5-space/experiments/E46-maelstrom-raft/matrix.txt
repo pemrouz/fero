@@ -38,3 +38,14 @@ E stale3-s1 3 leaderlocal 1 100 partition 1 0
 E stale3-s2 3 leaderlocal 2 100 partition 1 0
 E stale5-s1 5 leaderlocal 1 100 partition 1 0
 E stale5-s2 5 leaderlocal 2 100 partition 1 0
+# Clean runs with --concurrency 2n. With 4n, Jepsen splits the clients into two groups of 2n per key, and its
+# gen/reserve gives reads only to threads 0..n-1, so the second group's keys get no reads at all (see README).
+# With 2n there is one group, so every key gets reads.
+F r3-mix-s4 3 mixed 4 100 partition 1 0 2n
+F r3-mix-s5 3 mixed 5 100 partition 1 0 2n
+F r5-mix-s4 5 mixed 4 100 partition 1 0 2n
+F r5-mix-s5 5 mixed 5 100 partition 1 0 2n
+# Planted bug 2 again with five times the load (--rate 250), so more reads and writes fall in the short
+# window where a deposed leader still answers reads (batch E's 4 runs at --rate 50 were not caught; see README).
+G stale3-hot-s1 3 leaderlocal 1 100 partition 1 0 4n 250
+G stale5-hot-s1 5 leaderlocal 1 100 partition 1 0 4n 250

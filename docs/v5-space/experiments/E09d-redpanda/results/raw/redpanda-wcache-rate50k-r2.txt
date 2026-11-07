@@ -1,0 +1,15 @@
+Warmup first 250000 records. Steady state results will print after the complete test summary.
+249774 records sent, 49954.8 records/sec (48.78 MB/sec), 18.6 ms avg latency, 417.0 ms max latency.
+In steady state.
+249951 records sent, 49970.2 records/sec (48.80 MB/sec), 2.2 ms avg latency, 20.0 ms max latency.
+250126 records sent, 50025.2 records/sec (48.85 MB/sec), 1.9 ms avg latency, 57.0 ms max latency.
+249924 records sent, 49984.8 records/sec (48.81 MB/sec), 1.9 ms avg latency, 42.0 ms max latency.
+250101 records sent, 50010.2 records/sec (48.84 MB/sec), 2.3 ms avg latency, 92.0 ms max latency.
+250100 records sent, 50010.0 records/sec (48.84 MB/sec), 1.7 ms avg latency, 8.0 ms max latency.
+1750000 records sent, 49978.580608 records/sec (48.81 MB/sec), 4.32 ms avg latency, 417.00 ms max latency, 2 ms 50th, 5 ms 95th, 93 ms 99th, 173 ms 99.9th.
+1500000 steady state records sent, 49958.368027 records/sec (48.79 MB/sec), 1.94 ms avg latency, 92.00 ms max latency, 2 ms 50th, 3 ms 95th, 6 ms 99th, 42 ms 99.9th.
+[2026-11-07 01:58:41,900] WARN [Producer clientId=perf-producer-client] Got error produce response with correlation id 13415 on topic-partition thalf-13, retrying (2147483646 attempts left). Error: NOT_LEADER_OR_FOLLOWER (org.apache.kafka.clients.producer.internals.Sender)
+[2026-11-07 01:58:41,905] WARN [Producer clientId=perf-producer-client] Received invalid metadata error in produce request on partition thalf-13 due to org.apache.kafka.common.errors.NotLeaderOrFollowerException: For requests intended only for the leader, this error indicates that the broker is not the current leader. For requests intended for any replica, this error indicates that the broker is not a replica of the topic partition. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender)
+
+--- e2e consumer ---
+{"count":1500000,"skipped":250000,"p50":2,"p90":3,"p99":8,"p999":45,"max":110,"mean":2.185}

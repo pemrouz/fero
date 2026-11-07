@@ -1,0 +1,7 @@
+Check of tools/segments.py's method (stop TLC after a checkpoint, resume with -recover,
+merge the outputs), run 2026-11-06 21:37 in $SP/e15/cktest2 (test.sh there):
+`design moves` stopped after 100 s (checkpoint every minute), then resumed to the end.
+
+segmented: 532739 distinct, calm 2354, states 530385, fails {9: 15, 1: 20}, stuck 0
+unbroken : 532739 distinct, calm 2354, states 530385, fails {1: 20, 9: 15}, stuck 0
+(unbroken = results/tlc/design-moves.json; merge re-done 2026-11-07 with tlcrun.parse and agef.check)

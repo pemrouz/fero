@@ -17,6 +17,11 @@ conjunct, drop each update, flip each comparison (< <=, > >=), swap each
 pair of updates inside one action. A mutant that no bound catches is
 EQUIVALENT if every bound's reachable state set (count, steps and digest)
 equals the unmutated model's; otherwise it SURVIVED.
+
+The state limit (LIMIT): a run that stops there with no counterexample is
+undecided. In the ablation the rule stays (it is reported as undecided); on
+the verify bound nothing is put back (the result says 'verify_undecided');
+a mutant stopped there is 'undecided', never counted as caught.
 """
 
 import importlib.util
@@ -186,13 +191,13 @@ class Work:
         self.ex.shutdown(wait=True)
 
 
-def ablate(name, path, jobs=2, bounds=SWEEP, budget=None, mutate=True, log=print, pinned=(), warm=()):
+def ablate(name, path, jobs=2, bounds=SWEEP, budget=None, mutate=True, log=print, pinned=(), warm=(), reverse=False):
     """The whole procedure (see the module docstring). Raises OutOfTime when
     the budget runs out; call again to continue. Pinned rules are never
     dropped (the '+giveup' run pins the give-up path)."""
     wk = Work(name, path, jobs, budget, log)
     try:
-        return _ablate(wk, name, bounds, mutate, log, tuple(pinned), tuple(warm))
+        return _ablate(wk, name, bounds, mutate, log, tuple(pinned), tuple(warm), reverse)
     finally:
         wk.close()
 
@@ -209,10 +214,12 @@ def _all(wk, mkey, bounds, full=False):
     return per
 
 
-def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
+def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=(), reverse=False):
     """warm: rules to drop before pass 1 (a warm start from a sibling option's
     result). Used only if the model holds every bound with them dropped; the
-    final pass still proves the set left is 1-minimal."""
+    final pass still proves the set left is 1-minimal.
+    reverse: the greedy drops go in reverse model-text order (another
+    1-minimal set; pass 1 is the same, so its cache is shared)."""
     rl = rule_list(name)
     ids = [r.id for r in rl]
     assert all(p in ids for p in pinned), pinned
@@ -246,7 +253,8 @@ def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
     for i in removed:
         res1[i], nec1[i] = {}, None
     log(f'  pass 1: {sum(1 for i in ids1 if nec1[i])} of {len(ids1)} rules necessary alone')
-    for i in ids:
+    out['order'] = 'reverse' if reverse else 'text'
+    for i in (list(reversed(ids)) if reverse else ids):
         if nec1[i] or i in pinned or i in removed:
             continue
         per = _all(wk, Mutation(drop=removed + [i]).key(), bounds)
@@ -261,6 +269,8 @@ def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
         fin = wk.run([(Mutation(drop=removed + [i]).key(), tuple(bounds), False) for i in remaining])
         fin = dict(zip(remaining, fin))
         extra = [i for i in remaining if first_fail(fin[i]) is None and i not in pinned]
+        if reverse:
+            extra.reverse()
         if not extra:
             break
         # the rules the final pass found unnecessary: drop them greedily, each
@@ -279,6 +289,13 @@ def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
         if not first_fail(vr):
             break
         ff = first_fail(vr)
+        if ff[1] == 'LIMIT':
+            # too big to decide: no counterexample up to the state limit.
+            # Putting a rule back cannot settle that, so nothing goes back;
+            # the result says the verify is undecided.
+            out['verify_undecided'] = ff
+            log(f'  verify undecided: {ff[0]} stopped at the state limit with no counterexample')
+            break
         fixed = None
         for r in reversed(removed):
             trial = [x for x in removed if x != r]
@@ -321,7 +338,7 @@ def _ablate(wk, name, bounds, mutate, log, pinned=(), warm=()):
         rows.append(row)
     out['rules'] = rows
     if mutate:
-        out['mutants'] = _mutants(wk, name, removed, minimal, bounds, log)
+        out['mutants'] = _mutants(wk, name, removed, minimal, bounds, log, pinned)
     return out
 
 
@@ -332,13 +349,18 @@ def _trace_of(per, ff):
     return per[b]['fail'][p][1]
 
 
-def _mutants(wk, name, removed, base_minimal, bounds, log):
-    """DEV-10 (d) on the smallest model: drop, flip, swap."""
+def _mutants(wk, name, removed, base_minimal, bounds, log, pinned=()):
+    """DEV-10 (d) on the smallest model: drop, flip, swap. A pinned rule
+    (a give-up step) is not dropped: no property asks for a give-up, so
+    dropping one can never be caught, and it is a design choice, not a rule
+    the checker must defend."""
     rl = [r for r in rule_list(name) if r.id not in removed]
     cls, _ = load(name)
     acts = cls(BOUNDS['grow']).actions()
     muts = []
     for r in rl:
+        if r.id in pinned:
+            continue
         muts.append(('drop', r.id, Mutation(drop=list(removed) + [r.id])))
     for r in rl:
         if hasattr(r, 'op') and r.is_cmp():
@@ -355,12 +377,22 @@ def _mutants(wk, name, removed, base_minimal, bounds, log):
     for (kind, what, m), per in zip(muts, res):
         ff = first_fail(per)
         row = {'kind': kind, 'rule': what}
-        if ff:
+        if ff and ff[1] == 'LIMIT':
+            # stopped at the state limit with no counterexample: undecided,
+            # never counted as caught
+            row['caught'] = None
+            row['undecided'] = ff
+        elif ff:
             row['caught'] = ff
             row['trace'] = _trace_of(per, ff)
         else:
             vp = _all(wk, m.key(), list(VERIFY), True)
             vf = first_fail(vp)
+            if vf and vf[1] == 'LIMIT':
+                row['caught'] = None
+                row['undecided'] = vf
+                rows.append(row)
+                continue
             if vf:
                 row['caught'] = vf
                 row['trace'] = _trace_of(vp, vf)
@@ -374,7 +406,9 @@ def _mutants(wk, name, removed, base_minimal, bounds, log):
         rows.append(row)
     caught = sum(1 for r in rows if r['caught'])
     eq = sum(1 for r in rows if not r['caught'] and r.get('equivalent'))
-    log(f'  mutants: {len(rows)}; caught {caught}; equivalent {eq}; survived {len(rows) - caught - eq}')
+    und = sum(1 for r in rows if r.get('undecided'))
+    log(f'  mutants: {len(rows)}; caught {caught}; equivalent {eq}; undecided {und}; '
+        f'survived {len(rows) - caught - eq - und}')
     return rows
 
 

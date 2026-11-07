@@ -1,7 +1,7 @@
 #!/bin/sh
 # E-09c: Kafka 4.4.0 (KRaft, 3 nodes) driven by Kafka's own perf tools on this box.
 #   sh run.sh all            build, then two timing holds (one per setup: max phase, then lat phase), then the tables
-#   sh run.sh <hold>         one of: build | calibrate | checks | default | flush1 | default-max | flush1-max | default-lat | flush1-lat | table
+#   sh run.sh <hold>         one of: build | calibrate | checks | default | flush1 | default-max | flush1-max | default-lat | flush1-lat | sharediag | table
 # Every timed hold runs under $SP/bin/timing (the box alone); checks run under $SP/bin/heavy.
 # A max phase must run before its lat phase: `half` runs at half of max-omb's median rate.
 set -e
@@ -29,15 +29,20 @@ default|flush1)
   "$SP/bin/timing" sh -c "$B run kafka $1 max && $B run kafka $1 lat" 2>&1 | grep -v '^\[20' | tee -a "$HERE/results/timing-log.txt"
   log "end kafka $1" ;;
 default-max|flush1-max|default-lat|flush1-lat)
-  # one phase alone (to re-run a phase)
-  set -- $(echo "$1" | tr - ' ')
-  log "start kafka $1 $2"
-  "$SP/bin/timing" $B run kafka "$1" "$2" 2>&1 | grep -v '^\[20' | tee -a "$HERE/results/timing-log.txt"
-  log "end kafka $1 $2" ;;
+  # one phase alone (to re-run a phase); extra arguments go to kbench.py, e.g. `sh run.sh flush1-lat --first 2 --runs 2`
+  h=$1; shift; x="$*"; set -- $(echo "$h" | tr - ' ')
+  log "start kafka $1 $2 $x"
+  "$SP/bin/timing" $B run kafka "$1" "$2" $x 2>&1 | grep -v '^\[20' | tee -a "$HERE/results/timing-log.txt"
+  log "end kafka $1 $2 $x" ;;
+sharediag)
+  # the share-group diagnostic (tools/sharediag.py): per-second share-consumer stats, timed, the box alone
+  log "start kafka sharediag"
+  "$SP/bin/timing" python3 -I "$HERE/tools/sharediag.py" default 3 2>&1 | grep -v '^\[20' | tee "$HERE/results/sharediag.txt"
+  log "end kafka sharediag" ;;
 table)
   $B table ;;
 all)
-  for h in build default flush1 table; do sh "$0" $h; done ;;
+  for h in build default flush1 sharediag table; do sh "$0" $h; done ;;
 *)
-  echo "usage: sh run.sh all|build|calibrate|checks|default|flush1|default-max|flush1-max|default-lat|flush1-lat|table"; exit 2 ;;
+  echo "usage: sh run.sh all|build|calibrate|checks|default|flush1|default-max|flush1-max|default-lat|flush1-lat|sharediag|table"; exit 2 ;;
 esac

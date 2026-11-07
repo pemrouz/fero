@@ -1,0 +1,21 @@
+{
+ "bound": "write",
+ "calm_states": 1737,
+ "complete": true,
+ "distinct_total": 1118329,
+ "errors": [],
+ "failed": [
+  5
+ ],
+ "kind": "mutant",
+ "live_edges": 2463,
+ "live_stuck": 0,
+ "secs": 240.9,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1116592,
+ "steps": {
+  "5": 21
+ },
+ "variant": "no-carried-outcomes",
+ "workers": 2
+}

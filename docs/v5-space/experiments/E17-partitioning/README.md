@@ -10,8 +10,8 @@ All counts are **model-checked here** on one harness, at the same bounds, as REQ
 |---|---|---|---|---|---|---|
 | fixN | 14 | **13** | 0 | none to give up | 17 of 18 (1; 0) | 28 / 28 |
 | slot moves | 69 | **26** | 13 | GU_SLOT | 35 of 46 (11; 0) | 22,797 / 1,086 |
-| fixN + re-key (`rekey`, CELL as written: old cursors refused) | 57 | **35** (ALT_REKEY) | 22 | GU_REKEY | 44 of 53 (8; 1) | 312,298 / 4,417 |
-| fixN + re-key with carried positions (`rekey-carry`) | 51 | **29** | 16 | as `rekey` | 38 of 45 (7; 0) | 312,298 / 4,417 |
+| fixN + re-key (`rekey`, CELL as written: old cursors refused) | 57 | **35** (34 in another greedy order) | 22 (21) | GU_REKEY | 44 of 53 (8; 1) | 312,298 / 4,417 |
+| fixN + re-key with carried positions (`rekey-carry`) | 51 | **29** (28 in another greedy order) | 16 (15) | as `rekey` | 38 of 45 (7; 0) | 312,298 / 4,417 |
 
 - **fixN is the floor: 13 rules.** Every option pays them: one route, two dedup, two lock-token, one stamping, two answer and five reader rules. fixN meets no scale requirement (SC-03, SC-04), by definition.
 - **Slot moves need 13 rules beyond the floor.** The smallest move that keeps every property is: A commits `exporting`; A fences (and from the moment the fence is in its log takes no write); once the fence commits, B takes one final copy carrying the rows and records, the dedup outcomes, the highest lock token, the sequence and `END(N)`; B opens. B's `importing` entry, the bulk copy, the ready report and N in the fence are not needed by any property here. They serve the unwritable window, the give-up path and unclean recovery.
@@ -60,8 +60,11 @@ All counts are **model-checked here** on one harness, at the same bounds, as REQ
 3. The rules found unnecessary are dropped one by one (greedy, in model-text order), each kept dropped only if everything still holds.
 4. A final pass drops each remaining rule once more; any that is now unnecessary is dropped greedily, and the pass repeats until dropping any one rule left breaks a property (1-minimal). Then the smallest model runs on the verify bound (`twice1`); a failure there would put rules back (none was needed).
 5. Mutants of the smallest model: drop each guard, drop each update, flip each `<`/`<=`/`>`/`>=`, swap each pair of updates in one action. A mutant no bound catches is **equivalent** if its state graph is the same as the model's on every bound, else it **survived**.
-6. Two variants of the procedure. **`+giveup`** pins an option's give-up steps (never dropped), to price a working give-up path. A **warm start** (`rekey-carry`, and the re-key alternative) begins from a sibling's dropped set, used only if every bound holds with it; steps 2 to 5 then run as usual, so the result is still 1-minimal.
-7. A run stops at 1.5 million states. If it found no counterexample by then, the result is `LIMIT` (undecided) and the rule stays. Every `LIMIT` in pass 1 was settled in the final pass, where the model is smaller. No smallest set below keeps an undecided rule.
+6. Variants of the procedure, each saved under its own name:
+   - **`+giveup`** pins an option's give-up steps (never dropped), to price a working give-up path. **`slot+abort`** pins only B's abort, to price a give-up with one decider.
+   - A **warm start** begins from a sibling's dropped set, used only if every bound holds with it; steps 2 to 5 then run as usual, so the result is still 1-minimal. `rekey-carry` starts from `rekey`'s result.
+   - **Other greedy orders** (finding 5): `rekey-alt` and `rekey-carry-alt` keep one guard in place of its twin; `slot-rev`, `rekey-rev` and `rekey-carry-rev` run greedy in reverse model-text order; `rekey+giveup-alt` drops the bulk-copy path as a whole.
+7. A run stops at 1.5 million states. If it found no counterexample by then, the result is `LIMIT` (undecided): the rule stays and is marked undecided, a `LIMIT` on the verify bound puts nothing back, and a mutant stopped there is never counted as caught. **No core set keeps an undecided rule**: every `LIMIT` in pass 1 was settled in the final pass, where the model is smaller. The give-up sets do keep some, because a give-up path makes the model 30 to 260 times bigger; a give-up count is then a range.
 8. A log never holds the same entry twice (an exact repeat is ignored), so a guard that only stops an exact repeat is not counted as a rule. That holds for every option.
 
 Every count below is **model-checked here**, from the files in [results/](results). Claims marked **reasoned** are not model results.
@@ -88,13 +91,24 @@ Each cell lists the rules of the smallest set whose removal breaks that property
 | P4, cursors (**lineage / cursor refusal**) | nothing: records travel with their `(slot, seq)` | **cursor refusal**, 6 rules: refuse a cursor of another generation (`read.gen`); restart from a snapshot of a newer, flipped cell that holds the partition (`restart.route`, `.newer`, `.live`, `.take`, `.cursor`) | nothing: records travel with their positions, which compare across generations |
 | L5b and L7, the change happens | `exporting`, the fence, the final copy and its `END(N)` marker, `open` (5 appends) | `rk`, the cut-over, the freeze, the final copy and its `fin` marker, the flip (6 appends), plus "freeze only for a committed catalog decision" (`freeze.cutcom`; without it an old cell can freeze for a re-key the catalog then loses, and stay frozen) | as `rekey` |
 
-**The state each option adds** (log entry kinds in the smallest model): fixN none; slot moves 4 (`exp`, `fen`, `cp`, `open`); `rekey` 5 (`rk`, `cut`, `frz`, `cp`, `flip`), or 4 without `cut` (ALT_REKEY_SHORT).
+**The state each option adds** (log entry kinds in the smallest model): fixN none; slot moves 4 (`exp`, `fen`, `cp`, `open`); `rekey` 5 (`rk`, `cut`, `frz`, `cp`, `flip`), or 4 without `cut` in the other greedy order (`rekey-alt`).
 
 ### The give-up path
 
 A move or re-key may be given up: slot's A cancels before its fence, or B aborts after it; re-key's catalog abandons before the flip. **Under crash-only faults no property needs a give-up at all**: a group always gets a new leader, so every move can finish. The core counts above have no give-up path. To price one that works, the give-up steps are pinned (never dropped), and property L5g asks that a given-up change hands the partition back to its source.
 
-GIVEUP_TEXT
+| Option | Core | Give-up steps pinned | Rules the give-up needs (each with a counterexample) | Undecided at the state limit (kept) | **With a working give-up** | States, `shrink` / `deep` |
+|---|---|---|---|---|---|---|
+| slot moves, two deciders (`slot+giveup`) | 26 | 3: A's `cancel`, B's `abort`, B's `importing` (what an abort names) | 8 | 2 | **37 to 39** | 178,515 / 1,105,399 |
+| slot moves, one decider (`slot+abort`) | 26 | 2: B's `abort` and `importing` | {SLOT_ABORT_NEED} | {SLOT_ABORT_UND} | **{SLOT_ABORT}** | {SLOT_ABORT_ST} |
+| `rekey` (`rekey+giveup-alt`) | 35 | 1: the catalog's `abandon` | 4 | 1 | **40 to 41** | 597,624 / 89,539 |
+| `rekey-carry` (`rekey-carry+giveup`) | 29 | 1 | {CARRY_GU_NEED} | {CARRY_GU_UND} | **{CARRY_GU}** | {CARRY_GU_ST} |
+
+What a give-up needs is the same idea in every option, the two halves of a two-phase commit:
+- **Give up or finish, never both.** Each decider refuses to finish once its give-up is in its log, and refuses to give up once its finish is. Slot moves have **two deciders** (A may cancel before its fence; B may abort after it), so they write this twice (4 rules: `cancel.nofence`, `fence.nocancel`, `abort.noopen`, `open.noabort`) and B must clean up after A's cancel (`drop.append`). Re-key has **one decider**, the catalog (2 rules: `flip.noab`, `abandon.noflip`).
+- **Hand back only on a committed give-up.** The source reopens only once the give-up has committed (`unfence.abcom`, `thaw.abcom`), with an entry that says so (`unfence.append`, `thaw.append`). Slot moves also check that the abort names a move A fenced (`unfence.fen`): a move named by a log position can be lost in a crash and a later move take its place. Re-key's generations never repeat, so it needs no such check.
+- The first `rekey+giveup` run (greedy in text order) kept 45 rules with 6 undecided: it met the bulk copy before the cut-over's guard and could not settle either. Dropping the bulk-copy path as a whole settled 5 of the 6 ([options/rekey](options/rekey/README.md)).
+- **A give-up path makes the model 30 to 260 times bigger** (slot `deep`: 5,036 states without, 1,105,399 with). Each full sweep still finishes in minutes, but every `twice1` verify of re-key with a give-up path passed 1.5 million states undecided, so re-key's give-up was checked on the six sweep bounds only.
 
 ### Mutants
 
@@ -129,7 +143,7 @@ Seconds are wall time on a box shared with other agents' jobs (load 2 to 14), wi
 2. **Re-key's broken cursors are optional.** Carrying each record's original position in the copy keeps old cursors working, and it costs no rule: `rekey-carry` drops the 6 cursor-refusal rules. The price is data: the copy carries the records (or their segment names), not just the rows, as slot moves already do. CELL's "cursors break" (SPACE §4.2) should be restated. *Moves: CELL up on P-07 and SC-08(d), down nowhere.*
 3. **Re-key shrinks with the same rules.** The `shrink` bound (two cells into one) holds with the same 35 rules. CELL's "never shrinks" is not a rule limit. What re-key cannot meet is SC-08(f) and SC-08(b) (whole-resource copy, resource-wide freeze), and that holds for growing and shrinking alike.
 4. **Giving up is where the slot move's extra rules live.** The core move needs no give-up path. Pricing one that works: GIVEUP_FINDING
-5. **1-minimal is not minimum, and the greedy order matters.** Re-key's set depends on which of two equivalent guards greedy keeps: `freeze.rkcom` or `freeze.cutcom` ("freeze only for a committed catalog decision"). Keeping `rkcom` makes the cut-over entry unnecessary too, giving ALT_REKEY_FINDING. Rule counts from one ablation can differ by 1 or 2 with the order. DEV-10's judging rule treats a difference under 2 as a tie, which fits. Part 2 and the re-run agent should try the obvious alternative orders too.
+5. **1-minimal is not minimum, and the greedy order matters.** Re-key's set depends on which of two equivalent guards greedy keeps: `freeze.rkcom` or `freeze.cutcom` ("freeze only for a committed catalog decision"). Keeping `rkcom` makes the cut-over entry unnecessary too: `rekey-alt` keeps **34** rules (21 beyond fixN) and `rekey-carry-alt` **28** (15 beyond fixN), each 1-minimal (every rule necessary alone), with mutants 43 of 52 and 37 of 44 caught (8 and 7 equivalent swaps; 1 and 0 survivors). Rule counts from one ablation can differ by 1 or 2 with the order. DEV-10's judging rule treats a difference under 2 as a tie, which fits. Part 2 and the re-run agent should try the obvious alternative orders too.
 6. **Re-key is harder to check.** As written, its state spaces are 1.7 to 180 times slot's at the same bounds, because every re-key copies every partition into new groups. Its two-change bound with one crash was about 1.3 million states, against a few thousand for slots. DEV-03 still holds (every sweep run here finished in minutes), but at larger bounds re-key reaches the 1-hour limit first.
 7. **Four modelling traps, now written into [HARNESS.md](HARNESS.md).** Each one first made a result wrong, and the ablation itself showed it:
    - **A trigger hidden in the parameters.** The fence enumerated B's copies, so "fence on B's ready report" could not be ablated, and the bulk copy looked necessary.
@@ -154,7 +168,8 @@ Seconds are wall time on a box shared with other agents' jobs (load 2 to 14), wi
 ## What the model leaves out
 
 - **Unclean recovery** (a committed log cut back). The harness keeps no message set: a report is a fact in the sender's log, which is sound only while a committed entry never goes away. Under unclean recovery every option needs more rules. slot_move.py found five for slot moves. Re-key's catalog and generations would need their own, and they are not counted here.
-- **Groups that die for good.** A crashed leader is always replaced. So no move ever has to be given up, which is why the give-up paths are priced separately.
+- **Groups that die for good.** A crashed leader is always replaced. So no move ever has to be given up, which is why the give-up paths are priced separately. It also means a give-up decided by B alone (`slot+abort`) looks safe here because B always comes back; in a real cluster a B that has lost its majority for good cannot abort, so the source, or `#meta`, must be able to decide too (reasoned). Re-key's decider is the catalog, which is `#meta` in fero.
+- **Exact give-up counts.** A few give-up rules stay undecided at 1.5 million states, so the give-up counts are ranges, and the two-change-with-a-crash bound (`twice1`) of re-key with a give-up path is undecided (no counterexample up to the limit). The core counts have no undecided rule.
 - **Membership, elections, leases and clocks.** A group is an abstract Raft group (E-14 checks Raft). Timers are free choices, and liveness forbids them.
 - **Routing.** A client's copy may reach any group at any time (any stale route), so routing tables, `moved` answers and the `#meta` slot table play no part.
 - **The windows.** How long a partition is unwritable, and how much is copied, are not modelled (E-13, E-18). Rules that only shorten the window (bulk copy, ready report, cut-over) are marked `perf`.

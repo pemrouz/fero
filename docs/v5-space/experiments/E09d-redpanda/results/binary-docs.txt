@@ -1,0 +1,6 @@
+# Property descriptions embedded in the Redpanda 26.2.6 broker binary (strings /opt/redpanda/libexec/redpanda), 2026-11-07.
+# Used as the primary source for what write caching and the flush metric mean; docs.redpanda.com was not reachable from this session.
+Bypass fsync(), may result in data loss. Use for testing on consumer drives
+Number of disk fsync calls from segment appenders.
+The default write caching mode to apply to user topics. Write caching acknowledges a message as soon as it is received and acknowledged on a majority of brokers, without waiting for it to be written to disk. With `acks=all`, this provides lower latency while still ensuring that a majority of brokers acknowledge the write. Fsyncs follow `raft_replica_max_pending_flush_bytes` and `raft_replica_max_flush_delay_ms`, whichever is reached first. The `write_caching_default` cluster property can be overridden with the `write.caching` topic property. Setting `disabled` takes precedence over topic overrides and disables write caching for the entire cluster.
+Use Linux aio for fsync() calls. This reduces latency; requires Linux 4.18 or later.

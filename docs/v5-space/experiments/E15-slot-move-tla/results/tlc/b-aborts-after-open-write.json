@@ -1,0 +1,21 @@
+{
+ "bound": "write",
+ "calm_states": 1755,
+ "complete": true,
+ "distinct_total": 1139483,
+ "errors": [],
+ "failed": [
+  4
+ ],
+ "kind": "mutant",
+ "live_edges": 2477,
+ "live_stuck": 0,
+ "secs": 245.4,
+ "spec_sha256": "eb71db78a4a9eb088e7e429c02978a9f61d0a54a49d636dd7c6c6c4873b0f27d",
+ "states": 1137728,
+ "steps": {
+  "4": 20
+ },
+ "variant": "b-aborts-after-open",
+ "workers": 2
+}

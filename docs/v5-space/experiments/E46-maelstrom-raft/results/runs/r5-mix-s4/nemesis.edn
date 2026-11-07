@@ -1,0 +1,64 @@
+{:index 1, :time 93661995, :type :info, :process :nemesis, :f :start-partition, :value :one}
+{:index 4, :time 147864572, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n0" #{"n2" "n1" "n4" "n3"}, "n2" #{"n0"}, "n1" #{"n0"}, "n4" #{"n0"}, "n3" #{"n0"}}]}
+{:index 390, :time 4208538214, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 391, :time 4209889051, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 695, :time 7412641286, :type :info, :process :nemesis, :f :start-partition, :value :majorities-ring}
+{:index 700, :time 7436329535, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n4" #{"n2" "n1"}, "n0" #{"n2" "n3"}, "n1" #{"n4" "n3"}, "n2" #{"n4" "n0"}, "n3" #{"n1" "n0"}}]}
+{:index 1010, :time 11139845560, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 1011, :time 11140308019, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 1272, :time 13957816575, :type :info, :process :nemesis, :f :start-partition, :value :majorities-ring}
+{:index 1276, :time 13972668755, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n0" #{"n4" "n3"}, "n2" #{"n1" "n3"}, "n4" #{"n1" "n0"}, "n3" #{"n2" "n0"}, "n1" #{"n2" "n4"}}]}
+{:index 1449, :time 15889159751, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 1450, :time 15889555288, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 1652, :time 17878354336, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 1655, :time 17904226249, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n4" #{"n2" "n1" "n0"}, "n3" #{"n2" "n1" "n0"}, "n2" #{"n4" "n3"}, "n1" #{"n4" "n3"}, "n0" #{"n4" "n3"}}]}
+{:index 2240, :time 23853994959, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 2241, :time 23854435008, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 2327, :time 24833195288, :type :info, :process :nemesis, :f :start-partition, :value :majorities-ring}
+{:index 2328, :time 24840267677, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n0" #{"n2" "n4"}, "n3" #{"n2" "n1"}, "n4" #{"n1" "n0"}, "n2" #{"n0" "n3"}, "n1" #{"n4" "n3"}}]}
+{:index 2870, :time 30696248968, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 2871, :time 30696795326, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 3257, :time 34606793803, :type :info, :process :nemesis, :f :start-partition, :value :minority-third}
+{:index 3258, :time 34616746477, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n2" #{"n1" "n4" "n0" "n3"}, "n1" #{"n2"}, "n4" #{"n2"}, "n0" #{"n2"}, "n3" #{"n2"}}]}
+{:index 3715, :time 39416073096, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 3716, :time 39416469104, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 3833, :time 40686965887, :type :info, :process :nemesis, :f :start-partition, :value :minority-third}
+{:index 3836, :time 40710842810, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n4" #{"n2" "n1" "n0" "n3"}, "n2" #{"n4"}, "n1" #{"n4"}, "n0" #{"n4"}, "n3" #{"n4"}}]}
+{:index 4012, :time 42424145211, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 4013, :time 42427164842, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 4163, :time 43700187968, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 4167, :time 43716160818, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n2" #{"n1" "n4" "n0"}, "n3" #{"n1" "n4" "n0"}, "n1" #{"n2" "n3"}, "n4" #{"n2" "n3"}, "n0" #{"n2" "n3"}}]}
+{:index 4316, :time 46105310966, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 4317, :time 46105698988, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 4850, :time 51683775856, :type :info, :process :nemesis, :f :start-partition, :value :majorities-ring}
+{:index 4852, :time 51699533299, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n1" #{"n2" "n0"}, "n3" #{"n2" "n4"}, "n0" #{"n1" "n4"}, "n2" #{"n1" "n3"}, "n4" #{"n0" "n3"}}]}
+{:index 5376, :time 57038275486, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 5377, :time 57039216101, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 5421, :time 57422624736, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 5423, :time 57439475385, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n4" #{"n2" "n1" "n3"}, "n0" #{"n2" "n1" "n3"}, "n2" #{"n4" "n0"}, "n1" #{"n4" "n0"}, "n3" #{"n4" "n0"}}]}
+{:index 5510, :time 59046650851, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 5511, :time 59047010492, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 5686, :time 61436806686, :type :info, :process :nemesis, :f :start-partition, :value :minority-third}
+{:index 5687, :time 61456329745, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n2" #{"n1" "n4" "n0" "n3"}, "n1" #{"n2"}, "n4" #{"n2"}, "n0" #{"n2"}, "n3" #{"n2"}}]}
+{:index 6212, :time 67183138693, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 6213, :time 67183559390, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 6288, :time 67847459588, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 6291, :time 67872223070, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n4" #{"n2" "n1" "n3"}, "n0" #{"n2" "n1" "n3"}, "n2" #{"n4" "n0"}, "n1" #{"n4" "n0"}, "n3" #{"n4" "n0"}}]}
+{:index 6758, :time 73361235356, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 6759, :time 73361596882, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 7017, :time 75907871206, :type :info, :process :nemesis, :f :start-partition, :value :one}
+{:index 7019, :time 75913295306, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n3" #{"n2" "n1" "n4" "n0"}, "n2" #{"n3"}, "n1" #{"n3"}, "n4" #{"n3"}, "n0" #{"n3"}}]}
+{:index 7434, :time 80949080163, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 7435, :time 80949429516, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 7509, :time 81696974107, :type :info, :process :nemesis, :f :start-partition, :value :minority-third}
+{:index 7515, :time 81728173750, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n3" #{"n2" "n1" "n4" "n0"}, "n2" #{"n3"}, "n1" #{"n3"}, "n4" #{"n3"}, "n0" #{"n3"}}]}
+{:index 7642, :time 83115616110, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 7643, :time 83116356955, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 7985, :time 87325612564, :type :info, :process :nemesis, :f :start-partition, :value :majority}
+{:index 7988, :time 87343417843, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n1" #{"n2" "n4" "n0"}, "n3" #{"n2" "n4" "n0"}, "n2" #{"n1" "n3"}, "n4" #{"n1" "n3"}, "n0" #{"n1" "n3"}}]}
+{:index 8299, :time 90515159538, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 8300, :time 90515487166, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
+{:index 8618, :time 93805885765, :type :info, :process :nemesis, :f :start-partition, :value :one}
+{:index 8619, :time 93812235493, :type :info, :process :nemesis, :f :start-partition, :value [:isolated {"n2" #{"n1" "n4" "n0" "n3"}, "n1" #{"n2"}, "n4" #{"n2"}, "n0" #{"n2"}, "n3" #{"n2"}}]}
+{:index 9030, :time 97843924456, :type :info, :process :nemesis, :f :stop-partition, :value nil}
+{:index 9031, :time 97844204998, :type :info, :process :nemesis, :f :stop-partition, :value :network-healed}
