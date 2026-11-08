@@ -4,15 +4,18 @@
 # checkpoints; then the hunt for missed and extra rules. Nothing in
 # ../E17-partitioning is changed; it is only copied (and its results read).
 #
-#   ./run.sh              # the default: cheap cores variants warm verify extra table compare
+#   ./run.sh              # the default: cheap cores variants warm orders verify extra table compare
 #   ./run.sh cheap        # fixN, split (all variants), pslot-fused (all variants): full re-runs
 #   ./run.sh cores        # slot, rekey, rekey-carry, lanes, lanes-carry, pslot: full re-runs, with mutants
 #                         # (cores1 and cores2 are its two halves, run here as two chains side by side)
 #   ./run.sh variants     # the counting probes in models/ (slotkey, slotprobe-trig, slotprobe-atfence)
 #   ./run.sh warm         # rekey-alt and rekey-carry-alt: full re-runs (warm starts, cheap)
-#   ./run.sh verify       # the other orders and the give-up prices: the original smallest set
-#                         # checked fresh (holds, same states, 1-minimal, same first failures; verify.py)
-#   ./run.sh orders       # NOT in the default: the other greedy orders re-derived in full
+#   ./run.sh orders       # the other greedy orders (-rev) re-derived in full, seeded from this
+#                         # re-run's own core checkpoints (pslot-rev waits for pslot)
+#   ./run.sh verify       # the one-decider give-up prices: the original smallest set checked
+#                         # fresh (holds, same states, 1-minimal, same first failures; verify.py)
+#   ./run.sh verify2      # NOT in the default: the same for slot+giveup (two deciders) and the
+#                         # first rekey+giveup (superseded by rekey+giveup-alt)
 #   ./run.sh giveups      # NOT in the default: the give-up prices re-derived in full
 #   ./run.sh extra        # the hunt (hunt.py) on this re-run's sets -> results/hunt.txt
 #   ./run.sh table        # the table of options (table.py) -> results/table.md
@@ -34,7 +37,7 @@ VAR=${VAR:-$SP/e17c/variants}
 HEAVY=${HEAVY:-$SP/bin/heavy}
 [ -x "$HEAVY" ] || HEAVY=
 JOBS=${JOBS:-2}
-PHASES=${*:-cheap cores variants warm verify extra table compare}
+PHASES=${*:-cheap cores variants warm orders verify extra table compare}
 
 [ -n "$FRESH" ] && rm -rf "$WORK" "$VAR"
 if [ ! -d "$WORK/harness" ]; then
@@ -125,20 +128,25 @@ for ph in $PHASES; do
           --warm-drop cut.append --tag rekey-alt --seed-from rekey
       run rekey-carry-alt rekey-carry --warm-from rekey-alt --tag rekey-carry-alt --seed-from rekey-carry ;;
     verify)
-      for n in slot-rev rekey-rev rekey-carry-rev lanes-rev pslot-rev \
-               slot+abort pslot+abort lanes+abort rekey+giveup-alt rekey-carry+giveup slot+giveup rekey+giveup; do
+      for n in slot+abort pslot+abort lanes+abort rekey-carry+giveup rekey+giveup-alt; do
+        check "$n"
+      done ;;
+    verify2)
+      for n in slot+giveup rekey+giveup; do
         check "$n"
       done ;;
     orders)
+      # (rekey-alt and rekey-carry-alt are the 'warm' phase)
       run slot-rev slot --reverse --tag slot-rev --seed-from slot --no-mutants
-      run rekey-alt rekey --warm-from rekey --warm-keep freeze.rkcom --warm-drop freeze.cutcom \
-          --warm-drop cut.append --tag rekey-alt --seed-from rekey
-      run rekey-carry-alt rekey-carry --warm-from rekey-alt --tag rekey-carry-alt --seed-from rekey-carry
       run rekey-rev rekey --reverse --tag rekey-rev --seed-from rekey --no-mutants
       run rekey-carry-rev rekey-carry --reverse --warm-from rekey-rev --tag rekey-carry-rev \
           --seed-from rekey-carry --no-mutants
       run lanes-rev lanes --reverse --tag lanes-rev --seed-from lanes --no-mutants
-      run pslot-rev pslot --reverse --tag pslot-rev --seed-from pslot --no-mutants ;;
+      if [ -f "$WORK/results/pslot-ablation.json" ]; then
+        run pslot-rev pslot --reverse --tag pslot-rev --seed-from pslot --no-mutants
+      else
+        echo "wait pslot-rev: pslot is not done yet (run ./run.sh orders again after it)"
+      fi ;;
     giveups)
       run slot+giveup slot --giveup
       run slot+abort slot --pin abort.append --pin import.append --tag slot+abort --seed-from slot --no-mutants \
