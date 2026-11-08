@@ -270,8 +270,11 @@ def first_fail(per):
 
 
 class Ablation:
-    def __init__(self, cls, bounds, verify=(), limit=1_500_000, log=print, cache_path=None):
+    def __init__(self, cls, bounds, verify=(), limit=1_500_000, log=print, cache_path=None, vlimit=None):
         self.cls, self.bounds, self.verify, self.limit, self.log = cls, bounds, list(verify), limit, log
+        # the verify bound may take a larger state limit than the sweep (its
+        # runs are few); a cached sweep run keeps the limit it was run with
+        self.vlimit = vlimit or limit
         self.cache = {}
         self.cache_path = cache_path
         if cache_path and os.path.exists(cache_path):
@@ -291,7 +294,13 @@ class Ablation:
         if key in self.cache:
             return self.cache[key]
         model = self.cls(self.bounds_all()[bname])
-        r = explore(model, m, stop_first=not full, limit=self.limit)
+        lim = self.vlimit if bname in self.verify_map else self.limit
+        # On a verify bound a run stops at its first failure. The ablation's
+        # decisions read only whether a run fails (first_fail), so they are
+        # the same; a run that would stop at the state limit anyway saves
+        # the time it would spend after its first failure.
+        stop = (not full) or bname in self.verify_map
+        r = explore(model, m, stop_first=stop, limit=lim)
         out = {'states': r.states, 'secs': round(r.secs, 2), 'complete': r.complete,
                'fail': {p: [d, [list(map(str, x)) if isinstance(x, tuple) else [str(x)] for x in tr][:60]]
                         for p, (d, tr) in r.fail.items()},
@@ -441,7 +450,12 @@ class Ablation:
                 row['trace'] = _trace_of(per, ff)
             else:
                 vf = first_fail(self.per(m, vn, True)) if vn else None
-                if vf and vf[1] != 'LIMIT':
+                if vf and vf[1] == 'LIMIT':
+                    # stopped at the state limit on the verify bound with no
+                    # counterexample: undecided, as E-17's runner.py says
+                    row['caught'] = None
+                    row['undecided'] = vf
+                elif vf:
                     row['caught'] = vf
                 else:
                     fp = self.per(m, bn, True)

@@ -38,3 +38,23 @@
 {"exp":"E-05","part":"hash","rows":1000000,"way":"json-xx","thread":"main","ms":714.9,"ms_min":646.3,"ms_max":797.5,"digest":"a0b9e24b95f71cb7"}
 {"run":2,"loadavg":"2.13 1.70 1.67 1/150 4081","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 encode-only"}
 {"exp":"E-05","part":"hash","rows":1000000,"way":"encode-only","thread":"main","ms":1667.3,"ms_min":1618.3,"ms_max":1670.8,"digest":"123401670"}
+{"run":3,"loadavg":"1.89 2.10 1.75 1/128 8260","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 100000 xx-sum"}
+{"exp":"E-05","part":"hash","rows":100000,"way":"xx-sum","thread":"main","ms":184.5,"ms_min":178.8,"ms_max":193.6,"digest":"261c3c4b3c568875"}
+{"run":3,"loadavg":"1.89 2.10 1.75 1/128 8274","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 100000 sha-sorted"}
+{"exp":"E-05","part":"hash","rows":100000,"way":"sha-sorted","thread":"main","ms":244.7,"ms_min":244.1,"ms_max":253.1,"digest":"887c5854b146fec4"}
+{"run":3,"loadavg":"1.82 2.08 1.75 1/128 8299","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 100000 md5-each"}
+{"exp":"E-05","part":"hash","rows":100000,"way":"md5-each","thread":"main","ms":264.5,"ms_min":262.6,"ms_max":300.4,"digest":"97588e3dcd63596"}
+{"run":3,"loadavg":"1.82 2.08 1.75 2/128 8311","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 100000 json-xx"}
+{"exp":"E-05","part":"hash","rows":100000,"way":"json-xx","thread":"main","ms":65.3,"ms_min":58.4,"ms_max":67.4,"digest":"d12be1f21b60cd4"}
+{"run":3,"loadavg":"1.82 2.08 1.75 1/128 8342","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 100000 encode-only"}
+{"exp":"E-05","part":"hash","rows":100000,"way":"encode-only","thread":"main","ms":169.8,"ms_min":154.8,"ms_max":202.9,"digest":"12040170"}
+{"run":3,"loadavg":"1.75 2.07 1.74 1/128 8418","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 xx-sum"}
+{"exp":"E-05","part":"hash","rows":1000000,"way":"xx-sum","thread":"main","ms":1919.4,"ms_min":1620.2,"ms_max":2107.5,"digest":"6ec1f9a9d307b0e"}
+{"run":3,"loadavg":"2.06 2.11 1.76 2/130 8471","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 sha-sorted"}
+{"exp":"E-05","part":"hash","rows":1000000,"way":"sha-sorted","thread":"main","ms":2926.6,"ms_min":2749.6,"ms_max":3105.9,"digest":"c10e28c67a09b53b"}
+{"run":3,"loadavg":"2.34 2.17 1.79 2/130 8527","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 md5-each"}
+{"exp":"E-05","part":"hash","rows":1000000,"way":"md5-each","thread":"main","ms":3365.9,"ms_min":3286.1,"ms_max":3762.8,"digest":"31fb435c8133969a"}
+{"run":3,"loadavg":"2.66 2.26 1.83 2/130 8584","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 json-xx"}
+{"exp":"E-05","part":"hash","rows":1000000,"way":"json-xx","thread":"main","ms":802.4,"ms_min":754,"ms_max":807,"digest":"a0b9e24b95f71cb7"}
+{"run":3,"loadavg":"2.55 2.25 1.83 2/137 8627","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/hash.mjs 1000000 encode-only"}
+{"exp":"E-05","part":"hash","rows":1000000,"way":"encode-only","thread":"main","ms":1718.3,"ms_min":1608.9,"ms_max":1763.5,"digest":"123401670"}

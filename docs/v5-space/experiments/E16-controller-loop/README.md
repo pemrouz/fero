@@ -73,37 +73,43 @@ The ablation sweeps the one-fault bounds and verifies on `two-a` (E-17's SWEEP a
 
 Machine: 4 vCPU, 15 GB, shared with other agents; Python 3.13, standard library ([results/versions.txt](results/versions.txt)). Raw output: [results/design-self.txt](results/design-self.txt), [results/design-cent-co.txt](results/design-cent-co.txt), [results/design-rlog.txt](results/design-rlog.txt), [results/design-extra.txt](results/design-extra.txt); the ablations in `results/*-ablation.json` and [results/summary.md](results/summary.md). All model-checked here.
 
-### 1. Both options are safe and live at these bounds
+### 1. Both options are safe; both are live where the check finishes
+
+P5 and P8 give "states that cannot reach the goal" of the states judged (`self` / `cent-co`). "Stopped" means the run reached its state limit: every state it explored was checked for safety (P2, P3, P9), but AG EF needs the whole graph, so liveness is not judged there.
 
 | Bound | `self`: states | `cent-co`: states | P2, P3, P9 | P5: stuck with a live majority | P8: healing cannot finish |
 |---|---|---|---|---|---|
-| `three1` | 1,917 | 9,885 | hold in both | 0 of 1,345 / 0 of 6,777 | 0 / 0 |
-| `four1` | 1,553 | 4,752 | hold in both | 0 / 0 | 0 / 0 |
-| `meta1` | 3,978 | 10,282 | hold in both | 0 / 0 | 0 / 0 |
-| `two-a` | 15,534 | 347,262 | hold in both | 0 of 8,801 / 0 of 236,582 | 0 / 0 |
-EXTRA-ROWS
+| `three1` | 2,213 | 22,839 | hold in both | 0 of 1,473 / 0 of 14,355 | 0 of 1,473 / 0 of 14,338 |
+| `four1` | 1,673 | 6,578 | hold in both | 0 of 1,282 / 0 of 4,602 | 0 of 1,282 / 0 of 4,563 |
+| `meta1` | 4,762 | 23,236 | hold in both | 0 of 3,162 / 0 of 14,752 | 0 of 3,162 / 0 of 14,337 |
+| `two-a` | 33,939 | stopped at 4,000,001 (386 s, 4.1 GB) | hold in both | 0 of 16,163 / not judged | 0 of 16,163 / not judged |
+| `two-b` | 99,802 | stopped at 900,001 | hold in both | 0 of 62,676 / not judged | 0 of 62,676 / not judged |
+| `two-c` | 58,570 | stopped at 900,001 | hold in both | 0 of 38,701 / not judged | 0 of 38,701 / not judged |
+| `three2` | 296,018 | stopped at 1,668,878 (every state up to 18 steps) | hold in both | 0 of 160,194 / not judged | 0 of 160,194 / not judged |
 
-`cent-co` has 3 to 22 times the states of `self` at the same bounds: its commands are state of their own (decided, live, timed out, done), on top of the group's.
+`cent-co` has 4 to 10 times the states of `self` with one fault, and more than 100 times with two (`two-a`: over 4,000,000 against 33,939). Its commands are state of their own (decided, live, stale, timed out, done), on top of the group's, and stale commands pile up while faults change the epoch. So at two faults `cent-co` is checked for safety only, to 18 steps (`three2`, [results/verify-probes.txt](results/verify-probes.txt)), while `self` is checked completely, liveness included. That is a cost in itself: DEV-03 asks that the model finish within 1 h on this box at stated bounds, and `cent-co`'s does so only with one fault.
 
 ### 2. Where `self` heals and `cent-co` waits
 
-WAIT counts the states with a live majority while `#meta` is down or cut off from that majority, from which healing cannot finish until `#meta` returns:
+WAIT counts the states with a live majority while `#meta` is down or cut off from that majority (judged), from which healing cannot finish until `#meta` returns:
 
 | Bound | `self` | `cent-co` |
 |---|---|---|
-| `meta1` (`#meta` down from the start, one member fault) | 0 of 1,327 | **210 of 415** |
-| `two-a` | 0 of 277 | **234 of 1,058** |
-WAIT-EXTRA
+| `meta1` (`#meta` down from the start, one member fault) | 0 of 1,455 | **210 of 415** |
+| `three1`, `four1` (`#meta` may fail as the one fault) | 0 of 17 / 0 of 17 | 0 of 17 / 0 of 39 |
+| `two-a`, `two-b`, `two-c`, `three2` | 0 of 513, 4,402, 3,346 and 11,838 | not judged (the runs stop) |
+
+In `three1` and `four1` the one fault is `#meta` itself, so no member is gone and nothing needs healing while it is down. `meta1` adds the member fault: in half of those states `cent-co` cannot finish healing until `#meta` returns; `self` always can.
 
 For example (`meta1`): `#meta` has no majority; voter 1 crashes; `evict.after` passes. `self`'s leader adds spare 3, lets it catch up, promotes it and removes 1. `cent-co` has no controller, so the group stays at two live voters of three until `#meta` returns; one more crash then stops its writes. Once `#meta` is back, healing finishes in every state (P8 holds with `#meta` up), so the wait is a delay, not a stuck state. Its length is the `#meta` outage.
 
 ### 3. What the model found on the way (each a rule the design needs)
 
-- **`cent-co` must re-check "gone" on the group's own links before a removal.** The first `cent-co` model ran a removal whenever the epoch matched, and the search found (P2, 15 steps, in that earlier version; the ablation below shows the same rule needed in the final one): voter 1 crashes and is replaced by a swap (4 voters); `#meta`'s leader is cut off from the group's side, so to it voter 0 looks gone; it decides "remove 0" at the current epoch; the cut heals; the group's leader runs the command, since the epoch still matches, and removes voter 0, which is up, while voter 1 is still down: two answering voters hold the commit offset where there were three. The epoch check protects against a changed config, not against a changed view of who is alive. The fix is DESIGN-V5's own planner rule ("a leader whose link to that life is up ignores it"), here `exec.gone`.
+- **`cent-co` must re-check "gone" on the group's own links before a removal.** The first `cent-co` model ran a removal whenever the epoch matched, and the search found (P2; 14 steps on `two-b` in the final model with `exec.gone` dropped, [results/verify-probes.txt](results/verify-probes.txt)): voter 1 crashes and is replaced by a swap (4 voters); `#meta`'s leader is cut off from the group's side, so to it voter 0 looks gone; it decides "remove 0" at the current epoch; the cut heals; the group's leader runs the command, since the epoch still matches, and removes voter 0, which is up, while voter 1 is still down: two answering voters hold the commit offset where there were three. The epoch check protects against a changed config, not against a changed view of who is alive. The fix is DESIGN-V5's own planner rule ("a leader whose link to that life is up ignores it"), here `exec.gone`.
 - **`cent-co` needs an operator lifecycle.** With one command per epoch (PD's one operator per region) and no timeout, a command the group refuses (the voter came back) blocks the controller for that epoch for ever (P8, 13 steps, in an earlier version: the group sits at four voters). PD cancels such operators on a timeout; here `c_expire`.
-- **A surplus removal must wait until the voters left answer**, not only hold the commit offset (P2, 12 steps, in both options): a voter that crashed but was not yet evicted still "holds" the offset on its disk.
+- **A surplus removal must wait until the voters left answer**, not only hold the commit offset (P2, 12 steps for `cent-co` on `two-a`, 9 for `self`, with the guard dropped): a voter that crashed but was not yet evicted still "holds" the offset on its disk.
 - **A member back with a new disk must be addable as a new replica while its old replica is still a voter** (P8, 3 steps, in both options, in an earlier version that compared members, not replicas): the leader loses its disk, a spare crashes, the old leader comes back empty; the only live candidate is the old leader's new replica, and "not already in the config" must mean that replica, as DESIGN-V5 4.1 says ("adds it back as a learner and removes the old one"). Counting a learner as a candidate in P8 is what exposed it: an earlier P8 counted only members outside the config, and a model that added everyone as a learner and never promoted passed it.
-- **A second fault during a swap can stop writes, in both options (SWAP).** On commit (E-14), a promotion from three voters to four commits on the old majority; if the new voter (or another) then fails, the four-voter config has two of four down, and no leader can commit until one returns: `two-a` has 120 such states for `self` and 624 for `cent-co` (`three2`: 3,024 for `self`). healing.py did not judge these (on append, the four-voter config is in force at once, and it has no live majority). E-14b found the same window when growing from two voters to three. Joint consensus (CockroachDB's atomic replication changes) would not have it (reasoned). It is the same for both options, so it does not decide this axis; it is a stated limit of single-step swaps.
+- **A second fault during a swap can stop writes, in both options (SWAP).** On commit (E-14), a promotion from three voters to four commits on the old majority; if the new voter (or another) then fails, the four-voter config has two of four down, and no leader can commit until one returns: for `self`, 224 of the 12,317 states with a change pending on `two-a` (608 on `two-b`, 304 on `two-c`, 1,840 of 103,288 on `three2`); none with one fault. `cent-co`'s two-fault runs stop before liveness can be judged; it runs the same swap steps on the same world, so it has the same window (reasoned). healing.py did not judge these (on append, the four-voter config is in force at once, and it has no live majority). E-14b found the same window when growing from two voters to three. Joint consensus (CockroachDB's atomic replication changes) would not have it (reasoned). It is the same for both options, so it does not decide this axis; it is a stated limit of single-step swaps.
 
 ABLATION-PENDING
 
@@ -114,4 +120,5 @@ ABLATION-PENDING
 - **Groups start at three voters**: no growth from one voter, no two-to-one step back (healing.py's `one` and `two`), no log replicas or witnesses.
 - **Raft is an abstract group**: elections, commits and catch-up are atomic steps; messages are not modelled one by one. E-14 and E-14b check etcd's Raft itself.
 - **Time is only order**: `evict.after` passing is a step, CheckQuorum is a step, the operator timeout is a step that always fires in the end.
-- **Bounds**: 4 members, 1 or 2 faults, one data group. `cent-co` on `two-b`, `two-c` and `three2` did not finish within 900,000 states (memory); safety held in every state explored.
+- **Properties left out**: healing.py's P1 (Raft's own safety: one leader per term, no committed entry lost) holds by construction here, since elections and commits are atomic steps (E-14 and E-14b check it on etcd's spec); P6 (a leave never removes a paused voter) and P7 (no step adds a retiring member) need leave, pause and retire, which this world does not have.
+- **Bounds**: 4 members, 1 or 2 faults, one data group. `cent-co` does not finish any two-fault bound on this box (over 4,000,000 states on `two-a`, about 1 KB a state): with two faults it is checked for safety to 18 steps, not for liveness, and its ablation verifies the same way. `self` finishes every bound, liveness included.

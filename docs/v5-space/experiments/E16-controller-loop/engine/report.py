@@ -41,6 +41,21 @@ def one(path):
     dropped = [r for r in rows if not r['kept'] and not r.get('pinned')]
     print(f"\n**{len(kept)} rules needed** of {len(rows) - len(pinned)} written; by role: " +
           ', '.join(f'{k} {v}' for k, v in sorted(Counter(r['role'] for r in kept).items())) + '.\n')
+    # The same guard written in several actions of one actor (the leader's
+    # healing routine; the controller's decisions; exec) is one check in
+    # code: counted once here, beside DEV-10's count of guard conjuncts.
+    def actor(act):
+        if act.startswith('c_') and act != 'c_expire':
+            return 'controller'
+        if act in ('exec', 'c_expire'):
+            return act
+        return 'leader' if act in ('add', 'promote', 'remove', 'surplus', 'dropl') else act
+    distinct = {(actor(r['id'].split('.')[0]), r['id'].split('.', 1)[1]) if r['kind'] == 'guard' else r['id']
+                for r in kept}
+    raft = sum(1 for r in kept if r['role'] == 'raft')
+    print(f'Distinct checks (one guard repeated in several actions of one actor counted once): '
+          f'**{len(distinct)}**; Raft\'s own guards (role raft: a working leader, one change at a time) '
+          f'among the {len(kept)}: {raft}.\n')
     print('| rule | kind | role | removing it breaks |')
     print('|---|---|---|---|')
     for r in kept:

@@ -178,3 +178,93 @@
 {"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"set","us_wall":17.241,"us_cpu":37.99,"wall_min":16.511,"wall_max":20.97,"per_round":5632,"rounds":5,"fill_ms":6287}
 {"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"insert","us_wall":2.252,"us_cpu":8.037,"wall_min":1.839,"wall_max":2.763,"per_round":6144,"rounds":5,"fill_ms":6287,"chunk":6144}
 {"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"delete","us_wall":15.465,"us_cpu":33.953,"wall_min":12.588,"wall_max":18.572,"per_round":6144,"rounds":5,"fill_ms":6287,"chunk":6144}
+{"run":3,"loadavg":"1.00 1.34 1.25 2/138 6511","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 none rec"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"rec","kind":"field","us_wall":0.993,"us_cpu":1.403,"wall_min":0.702,"wall_max":1.102,"per_round":17920,"rounds":5,"fill_ms":29}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"rec","kind":"set","us_wall":0.692,"us_cpu":0.97,"wall_min":0.523,"wall_max":0.933,"per_round":100000,"rounds":5,"fill_ms":29}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"rec","kind":"insert","us_wall":0.756,"us_cpu":2.205,"wall_min":0.692,"wall_max":0.909,"per_round":33024,"rounds":5,"fill_ms":29,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"rec","kind":"delete","us_wall":0.768,"us_cpu":2.274,"wall_min":0.697,"wall_max":0.948,"per_round":33024,"rounds":5,"fill_ms":29,"chunk":1000}
+{"run":3,"loadavg":"1.00 1.34 1.25 1/130 6558","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 none b256"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"b256","kind":"field","us_wall":0.247,"us_cpu":0.349,"wall_min":0.208,"wall_max":0.274,"per_round":100000,"rounds":5,"fill_ms":31}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"b256","kind":"set","us_wall":0.219,"us_cpu":0.347,"wall_min":0.209,"wall_max":0.254,"per_round":100000,"rounds":5,"fill_ms":31}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"b256","kind":"insert","us_wall":0.289,"us_cpu":0.385,"wall_min":0.281,"wall_max":0.314,"per_round":100000,"rounds":5,"fill_ms":31,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"none","mode":"b256","kind":"delete","us_wall":0.293,"us_cpu":0.39,"wall_min":0.262,"wall_max":0.309,"per_round":100000,"rounds":5,"fill_ms":31,"chunk":1000}
+{"run":3,"loadavg":"1.44 1.42 1.28 1/128 6595","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 group rec"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"rec","kind":"field","us_wall":12.231,"us_cpu":13.667,"wall_min":10.674,"wall_max":13.839,"per_round":7424,"rounds":5,"fill_ms":23}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"rec","kind":"set","us_wall":10.937,"us_cpu":11.368,"wall_min":9.634,"wall_max":11.217,"per_round":11008,"rounds":5,"fill_ms":23}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"rec","kind":"insert","us_wall":10.602,"us_cpu":12.483,"wall_min":10.215,"wall_max":11.442,"per_round":14336,"rounds":5,"fill_ms":23,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"rec","kind":"delete","us_wall":10.821,"us_cpu":12.603,"wall_min":9.572,"wall_max":11.802,"per_round":14336,"rounds":5,"fill_ms":23,"chunk":1000}
+{"run":3,"loadavg":"1.41 1.41 1.28 1/127 6609","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 group b256"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"b256","kind":"field","us_wall":1.083,"us_cpu":1.226,"wall_min":0.974,"wall_max":1.387,"per_round":42496,"rounds":5,"fill_ms":21}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"b256","kind":"set","us_wall":1.049,"us_cpu":1.406,"wall_min":0.951,"wall_max":1.446,"per_round":88832,"rounds":5,"fill_ms":21}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"b256","kind":"insert","us_wall":2.278,"us_cpu":4.263,"wall_min":2.057,"wall_max":2.743,"per_round":23040,"rounds":5,"fill_ms":21,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"group","mode":"b256","kind":"delete","us_wall":1.705,"us_cpu":3.508,"wall_min":1.564,"wall_max":2.05,"per_round":23040,"rounds":5,"fill_ms":21,"chunk":1000}
+{"run":3,"loadavg":"1.70 1.47 1.30 1/130 6626","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 filter100 rec"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"rec","kind":"field","us_wall":7.62,"us_cpu":8.476,"wall_min":6.588,"wall_max":11.508,"per_round":4608,"rounds":5,"fill_ms":27}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"rec","kind":"set","us_wall":6.872,"us_cpu":7.396,"wall_min":6.267,"wall_max":10.104,"per_round":7424,"rounds":5,"fill_ms":27}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"rec","kind":"insert","us_wall":5.67,"us_cpu":7.583,"wall_min":5.212,"wall_max":6.057,"per_round":11776,"rounds":5,"fill_ms":27,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"rec","kind":"delete","us_wall":7.499,"us_cpu":9.155,"wall_min":6.43,"wall_max":7.928,"per_round":11776,"rounds":5,"fill_ms":27,"chunk":1000}
+{"run":3,"loadavg":"1.64 1.46 1.29 1/130 6640","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000 filter100 b256"}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"b256","kind":"field","us_wall":2.662,"us_cpu":3.023,"wall_min":2.606,"wall_max":3.793,"per_round":15872,"rounds":5,"fill_ms":23}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"b256","kind":"set","us_wall":2.581,"us_cpu":2.827,"wall_min":2.047,"wall_max":3.361,"per_round":24064,"rounds":5,"fill_ms":23}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"b256","kind":"insert","us_wall":1.067,"us_cpu":2.788,"wall_min":0.99,"wall_max":1.182,"per_round":38144,"rounds":5,"fill_ms":23,"chunk":1000}
+{"exp":"E-05","part":"fold","rows":1000,"views":"filter100","mode":"b256","kind":"delete","us_wall":3.233,"us_cpu":5.352,"wall_min":3.043,"wall_max":3.544,"per_round":38144,"rounds":5,"fill_ms":23,"chunk":1000}
+{"run":3,"loadavg":"1.59 1.46 1.29 1/130 6657","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 none rec"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"rec","kind":"field","us_wall":1.515,"us_cpu":2.375,"wall_min":1.382,"wall_max":2.026,"per_round":21248,"rounds":5,"fill_ms":614}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"rec","kind":"set","us_wall":1.093,"us_cpu":1.332,"wall_min":1.06,"wall_max":1.288,"per_round":100000,"rounds":5,"fill_ms":614}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"rec","kind":"insert","us_wall":1.102,"us_cpu":1.748,"wall_min":1.037,"wall_max":1.581,"per_round":39168,"rounds":5,"fill_ms":614,"chunk":39168}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"rec","kind":"delete","us_wall":0.717,"us_cpu":1.281,"wall_min":0.508,"wall_max":1.338,"per_round":39168,"rounds":5,"fill_ms":614,"chunk":39168}
+{"run":3,"loadavg":"1.86 1.52 1.31 1/131 6672","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 none b256"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"b256","kind":"field","us_wall":1.016,"us_cpu":1.509,"wall_min":0.889,"wall_max":1.2,"per_round":61696,"rounds":5,"fill_ms":657}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"b256","kind":"set","us_wall":0.582,"us_cpu":0.823,"wall_min":0.482,"wall_max":0.611,"per_round":100000,"rounds":5,"fill_ms":657}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"b256","kind":"insert","us_wall":0.532,"us_cpu":0.891,"wall_min":0.446,"wall_max":0.656,"per_round":100000,"rounds":5,"fill_ms":657,"chunk":100000}
+{"exp":"E-05","part":"fold","rows":100000,"views":"none","mode":"b256","kind":"delete","us_wall":0.604,"us_cpu":0.967,"wall_min":0.532,"wall_max":0.797,"per_round":100000,"rounds":5,"fill_ms":657,"chunk":100000}
+{"run":3,"loadavg":"2.05 1.56 1.33 1/128 6688","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 group rec"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"rec","kind":"field","us_wall":2775.151,"us_cpu":2991.359,"wall_min":2396.608,"wall_max":2989.567,"per_round":64,"rounds":5,"fill_ms":555}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"rec","kind":"set","us_wall":2721.623,"us_cpu":2934.594,"wall_min":2488.08,"wall_max":3048.602,"per_round":64,"rounds":5,"fill_ms":555}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"rec","kind":"insert","us_wall":1163.572,"us_cpu":1396.563,"wall_min":992.753,"wall_max":1241.072,"per_round":64,"rounds":5,"fill_ms":555,"chunk":64}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"rec","kind":"delete","us_wall":1230.753,"us_cpu":1439.656,"wall_min":1047.35,"wall_max":1440.938,"per_round":64,"rounds":5,"fill_ms":555,"chunk":64}
+{"run":3,"loadavg":"1.97 1.56 1.33 1/127 6702","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 group b256"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"b256","kind":"field","us_wall":173.15,"us_cpu":184.47,"wall_min":160.577,"wall_max":175.167,"per_round":1536,"rounds":5,"fill_ms":621}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"b256","kind":"set","us_wall":165.789,"us_cpu":177.615,"wall_min":150.657,"wall_max":168.191,"per_round":1536,"rounds":5,"fill_ms":621}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"b256","kind":"insert","us_wall":76.421,"us_cpu":85.278,"wall_min":68.007,"wall_max":79,"per_round":4096,"rounds":5,"fill_ms":621,"chunk":4096}
+{"exp":"E-05","part":"fold","rows":100000,"views":"group","mode":"b256","kind":"delete","us_wall":73.006,"us_cpu":83.87,"wall_min":68.725,"wall_max":78.441,"per_round":4096,"rounds":5,"fill_ms":621,"chunk":4096}
+{"run":3,"loadavg":"1.82 1.54 1.32 1/129 6721","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 filter100 rec"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"rec","kind":"field","us_wall":19.856,"us_cpu":26.174,"wall_min":19.48,"wall_max":22.979,"per_round":2816,"rounds":5,"fill_ms":602}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"rec","kind":"set","us_wall":21.004,"us_cpu":22.95,"wall_min":20.465,"wall_max":21.565,"per_round":5888,"rounds":5,"fill_ms":602}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"rec","kind":"insert","us_wall":6.818,"us_cpu":9.64,"wall_min":5.888,"wall_max":7.948,"per_round":5632,"rounds":5,"fill_ms":602,"chunk":5632}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"rec","kind":"delete","us_wall":17.798,"us_cpu":20.088,"wall_min":15.288,"wall_max":22.333,"per_round":5632,"rounds":5,"fill_ms":602,"chunk":5632}
+{"run":3,"loadavg":"2.07 1.59 1.34 1/130 6736","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 100000 filter100 b256"}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"b256","kind":"field","us_wall":8.814,"us_cpu":10.09,"wall_min":8.48,"wall_max":9.277,"per_round":12544,"rounds":5,"fill_ms":592}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"b256","kind":"set","us_wall":8.533,"us_cpu":10.107,"wall_min":8.385,"wall_max":8.696,"per_round":12800,"rounds":5,"fill_ms":592}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"b256","kind":"insert","us_wall":1.625,"us_cpu":2.821,"wall_min":1.489,"wall_max":1.747,"per_round":13824,"rounds":5,"fill_ms":592,"chunk":13824}
+{"exp":"E-05","part":"fold","rows":100000,"views":"filter100","mode":"b256","kind":"delete","us_wall":7.345,"us_cpu":8.557,"wall_min":6.334,"wall_max":10.722,"per_round":13824,"rounds":5,"fill_ms":592,"chunk":13824}
+{"run":3,"loadavg":"2.31 1.65 1.36 1/128 6751","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 none rec"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"rec","kind":"field","us_wall":2.371,"us_cpu":8.851,"wall_min":2.213,"wall_max":3.523,"per_round":15360,"rounds":5,"fill_ms":6400}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"rec","kind":"set","us_wall":2.364,"us_cpu":4.705,"wall_min":1.949,"wall_max":2.645,"per_round":52736,"rounds":5,"fill_ms":6400}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"rec","kind":"insert","us_wall":1.841,"us_cpu":6.974,"wall_min":1.057,"wall_max":3.206,"per_round":23296,"rounds":5,"fill_ms":6400,"chunk":23296}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"rec","kind":"delete","us_wall":1.12,"us_cpu":4.516,"wall_min":0.761,"wall_max":1.788,"per_round":23296,"rounds":5,"fill_ms":6400,"chunk":23296}
+{"run":3,"loadavg":"2.59 1.76 1.41 1/137 6815","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 none b256"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"b256","kind":"field","us_wall":1.775,"us_cpu":4.001,"wall_min":1.659,"wall_max":2.074,"per_round":53504,"rounds":5,"fill_ms":5998}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"b256","kind":"set","us_wall":1.402,"us_cpu":2.606,"wall_min":1.12,"wall_max":1.723,"per_round":100000,"rounds":5,"fill_ms":5998}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"b256","kind":"insert","us_wall":0.995,"us_cpu":2.296,"wall_min":0.707,"wall_max":1.467,"per_round":100000,"rounds":5,"fill_ms":5998,"chunk":100000}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"none","mode":"b256","kind":"delete","us_wall":0.4,"us_cpu":1.531,"wall_min":0.33,"wall_max":0.69,"per_round":100000,"rounds":5,"fill_ms":5998,"chunk":100000}
+{"run":3,"loadavg":"3.23 1.98 1.49 1/141 6861","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 group rec"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"rec","kind":"field","us_wall":40094.562,"us_cpu":41721,"wall_min":38004.993,"wall_max":43125.727,"per_round":64,"rounds":3,"fill_ms":6304}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"rec","kind":"set","us_wall":40945.359,"us_cpu":42636.594,"wall_min":40639.622,"wall_max":42984.828,"per_round":64,"rounds":3,"fill_ms":6304}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"rec","kind":"insert","us_wall":18979.806,"us_cpu":20984.688,"wall_min":18936.551,"wall_max":19404.124,"per_round":64,"rounds":3,"fill_ms":6304,"chunk":64}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"rec","kind":"delete","us_wall":18391.762,"us_cpu":20416.047,"wall_min":18031.935,"wall_max":19177.897,"per_round":64,"rounds":3,"fill_ms":6304,"chunk":64}
+{"run":3,"loadavg":"2.14 1.90 1.49 1/138 6925","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 group b256"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"b256","kind":"field","us_wall":2523.346,"us_cpu":2915.586,"wall_min":2380.555,"wall_max":2582.056,"per_round":256,"rounds":5,"fill_ms":5872}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"b256","kind":"set","us_wall":2469.487,"us_cpu":2919.488,"wall_min":2206.847,"wall_max":2638.502,"per_round":256,"rounds":5,"fill_ms":5872}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"b256","kind":"insert","us_wall":1157.289,"us_cpu":1670.438,"wall_min":1001.135,"wall_max":1343.294,"per_round":256,"rounds":5,"fill_ms":5872,"chunk":256}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"group","mode":"b256","kind":"delete","us_wall":1101.312,"us_cpu":1578.516,"wall_min":1044.178,"wall_max":1173.72,"per_round":256,"rounds":5,"fill_ms":5872,"chunk":256}
+{"run":3,"loadavg":"2.37 2.00 1.55 1/136 7057","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 filter100 rec"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"rec","kind":"field","us_wall":38.441,"us_cpu":100.943,"wall_min":36.691,"wall_max":49.431,"per_round":1792,"rounds":5,"fill_ms":6123}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"rec","kind":"set","us_wall":38.497,"us_cpu":75.152,"wall_min":35.506,"wall_max":42.929,"per_round":3072,"rounds":5,"fill_ms":6123}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"rec","kind":"insert","us_wall":7.69,"us_cpu":30.579,"wall_min":6.679,"wall_max":11.837,"per_round":3840,"rounds":5,"fill_ms":6123,"chunk":3840}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"rec","kind":"delete","us_wall":35.178,"us_cpu":62.255,"wall_min":33.231,"wall_max":37.487,"per_round":3840,"rounds":5,"fill_ms":6123,"chunk":3840}
+{"run":3,"loadavg":"2.49 2.05 1.58 1/142 7137","cmd":"/home/user/fero/docs/v5-space/experiments/E05-fold-cost/bench/fold.mjs 1000000 filter100 b256"}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"field","us_wall":17.935,"us_cpu":39.401,"wall_min":16.31,"wall_max":23.486,"per_round":5376,"rounds":5,"fill_ms":6244}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"set","us_wall":18.146,"us_cpu":35.48,"wall_min":16.174,"wall_max":21.358,"per_round":6400,"rounds":5,"fill_ms":6244}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"insert","us_wall":3.132,"us_cpu":12.33,"wall_min":2.015,"wall_max":5.783,"per_round":6400,"rounds":5,"fill_ms":6244,"chunk":6400}
+{"exp":"E-05","part":"fold","rows":1000000,"views":"filter100","mode":"b256","kind":"delete","us_wall":11.506,"us_cpu":29.032,"wall_min":10.936,"wall_max":12.518,"per_round":6400,"rounds":5,"fill_ms":6244,"chunk":6400}
