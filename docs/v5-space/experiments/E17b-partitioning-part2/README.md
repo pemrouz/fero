@@ -49,7 +49,7 @@ All counts are **model-checked here**, on part 1's harness and bounds, with cras
 
 **Box and versions.** Linux 6.18 (Firecracker VM), 4 vCPU, 15 GB; Python 3.13.17, standard library only ([results/machine.txt](results/machine.txt)). Every model run went through `$SP/bin/heavy` with two worker processes, in pieces of about 20 minutes, except a few runs of seconds while the models were written (see "What the model leaves out"). Seconds below come from a shared box: rough sizes, not timings.
 
-**Reproduce.** `./run.sh` runs everything in the order reported and writes [results/summary.md](results/summary.md) and [results/extra.txt](results/extra.txt); `./run.sh split` one option; `FRESH=1 ./run.sh split` ignores the checkpoints (a re-run by a second agent). One run: `python3 ../E17-partitioning/harness/cli.py --option split --bound shrink --drop merged.gen`. A bigger bound: `python3 extra.py --option split --minimal split --bound readback --repair`.
+**Reproduce.** `./run.sh` runs everything in the order reported and writes [results/summary.md](results/summary.md) and [results/extra.txt](results/extra.txt); `./run.sh split` one option; `FRESH=1 ./run.sh split` ignores the checkpoints (a re-run by a second agent). One run: `python3 ../E17-partitioning/harness/cli.py --option split --bound shrink --drop merged.gen`. A bigger bound: `python3 extra.py --option split --minimal split --bound readback --repair`. The re-check of 2026-11-08 (below): `./run.sh recheck`.
 
 ## Results
 
@@ -142,6 +142,14 @@ See finding 6 below and [results/extra.txt](results/extra.txt): `readback` needs
    - Nothing else: fixN, slot (text order), `pslot` (text order), `rekey-carry`, `lanes-carry` and `pslot-fused` hold all three bounds; of the give-up sets, `slot+abort` and `pslot-fused+abort` hold `readback` and `bothread`, and `split+giveup` needs `merged.base` back as its core does (`pslot+abort` and `lanes+abort` hold `readback` and `bothread` too; `readback1` with a give-up path passes 1.5 million states, undecided, so it was left out for those sets).
    
    So on the bigger bounds the counts are: slot 26 to 27, `pslot` 30 to 31, lanes 29, split + merge 34, `lanes-carry` 26, `pslot-fused` 24. The gaps between options do not change by more than 1. *Moves: none between candidates; the shared sweep (part 1's `bounds.py`) should gain `readback` before a third agent re-runs the ablations, and DESIGN-V5 §4.2's move should say "a move is fenced once" in words.*
+
+## Re-check after the restarts (2026-11-08)
+
+**Why.** The container restarted several times while part 2 ran. The harness caches each finished run by which rules were dropped, not by the model's text (part 3 points this out). If a model file was edited after some of its runs were cached, a cached run of the older text could in principle have slipped into a result.
+
+**What.** [recheck.py](recheck.py) runs, fresh and with no cache, every part-2 result's model as written and its smallest model on every sweep bound (and the smallest on `twice1`), and compares each state count and state-set digest with the stored one. All 13 results: `pslot`, `pslot-rev`, `pslot+abort`, `split`, `split-rev`, `split+giveup`, `lanes`, `lanes-rev`, `lanes+abort`, `lanes-carry`, `pslot-fused`, `pslot-fused-rev`, `pslot-fused+abort`.
+
+**Result (model-checked here).** All 169 checks give the same states and the same digest, with no property failing ([results/recheck.txt](results/recheck.txt)). So the model files as they stand are exactly the ones the results describe. This check does not re-derive the smallest sets or re-run the mutants; part 3's fresh re-run ([../E17c-partitioning-rerun](../E17c-partitioning-rerun/README.md)) does that.
 
 ## Requirements: which options can meet SC-03, SC-04 and SC-08
 

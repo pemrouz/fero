@@ -58,9 +58,13 @@ if rew:
     for d in rew:
         g[(d['rows'], d['method'], d['K'], d['view'])].append(d)
     order = {'snap': 0, 'imm': 1, 'immfloor': 2, 'undo': 3}
+    # kept_heap_mb is the net heap change over the whole tape walk (heap after minus before, both after a full
+    # collection), so it also holds the source's own churn; a negative median means the kept states cost less
+    # than that noise, and is printed as such rather than as a size
+    kept = lambda v: (lambda m: f'< noise (net {m:.1f})' if m < 0 else ms([x['kept_heap_mb'] for x in v]))(statistics.median([x['kept_heap_mb'] for x in v]))
     for k, v in sorted(g.items(), key=lambda k: (k[0][0], k[0][3], order[k[0][1]], k[0][2])):
         f = lambda key: ms([x[key] for x in v])
-        print(f"| {k[0]:,} | {k[1]} | {k[2] or '-'} | {'group' if k[3] else 'none'} | {f('rerun_ms_median')} | {f('rerun_ms_p90')} | {f('rerun_ms_max')} | {int(statistics.median([x['replayed_inputs_median'] for x in v]))} | {v[0]['snapshots']} | {f('take_ms_median')} | {f('kept_heap_mb')} | {f('keep_us_per_record')} | {len(v)} |")
+        print(f"| {k[0]:,} | {k[1]} | {k[2] or '-'} | {'group' if k[3] else 'none'} | {f('rerun_ms_median')} | {f('rerun_ms_p90')} | {f('rerun_ms_max')} | {int(statistics.median([x['replayed_inputs_median'] for x in v]))} | {v[0]['snapshots']} | {f('take_ms_median')} | {kept(v)} | {f('keep_us_per_record')} | {len(v)} |")
     print('\n' + loadline(rl) + '\n')
 if chk:
     print('### undo checks\n')

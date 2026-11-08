@@ -48,6 +48,7 @@ def main():
     ap.add_argument('--ablate')
     ap.add_argument('--no-mutants', action='store_true')
     ap.add_argument('--limit', type=int, default=1_500_000)
+    ap.add_argument('--vlimit', type=int, default=None, help='state limit on the VERIFY bounds (default: --limit)')
     ap.add_argument('--all-fails', action='store_true', help='explore everything, list every property broken')
     a = ap.parse_args()
     mod = load(a.model)
@@ -61,7 +62,7 @@ def main():
         t0 = time.time()
         ab = engine.Ablation(cls, [(b, mod.BOUNDS[b]) for b in mod.SWEEP],
                              verify=[(b, mod.BOUNDS[b]) for b in mod.VERIFY], limit=a.limit,
-                             cache_path=a.ablate + '.cache')
+                             cache_path=a.ablate + '.cache', vlimit=a.vlimit)
         out = ab.run(mutate=not a.no_mutants, pinned=tuple(getattr(mod, 'PINNED', {}).get(a.option, ())))
         out['option'] = a.option
         out['secs'] = round(time.time() - t0)

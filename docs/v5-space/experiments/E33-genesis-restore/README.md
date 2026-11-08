@@ -41,7 +41,7 @@ Bounds: `any1` (one fault), `any2` (two faults), `any3` (three faults, crash and
 
 ### 2. Founding on one box, and the stale folder ([models/onebox.py](models/onebox.py))
 
-Three processes of one project's run on one box. The run folder holds the `cluster-id` file and one dir per process; a dir is locked while its process is up. Actions: **create** (the first process: an exclusive create of `cluster-id`; it is `#meta`'s only voter), **join** (through a member of the file's cluster), **stale** (after `connect.wait` with no member reached: if no dir it can read holds the cluster's `#meta`, none is locked by a live process, and no dir is unreadable, rename the file aside and found a new id), **write**. Faults: a crash (dir kept, unlocked), a wipe of a stopped process's dir, a dir briefly unreadable (it becomes readable again with time). Properties G1 and G2 (from every state where every process is up and every dir readable).
+Four processes of one project's run on one box (`#meta` grows to three voters as they arrive; the fourth holds no `#meta` replica). The run folder holds the `cluster-id` file and one dir per process; a dir is locked while its process is up. Actions: **create** (the first process: an exclusive create of `cluster-id`; it is `#meta`'s only voter), **join** (through a member of the file's cluster), **stale** (after `connect.wait` with no member reached: if no dir it can read holds the cluster's `#meta`, none is locked by a live process, and no dir is unreadable, rename the file aside and found a new id), **write**. Faults: a crash (dir kept, unlocked), a wipe of a stopped process's dir, a dir briefly unreadable (it becomes readable again with time). Properties G1 and G2 (from every state where every process is up and every dir readable).
 
 ### 3. A restore to a past position ([models/restore.py](models/restore.py))
 
@@ -80,7 +80,7 @@ Now the project has two clusters, each with acknowledged writes. X's only copy i
 
 ### 2. Founding on one box: holds
 
-`draft` on one box (exclusive create of `cluster-id`, join through a member, the stale-folder rule) holds G1 and G2 at one, two and three faults (200, 572 and 1,248 states). The guard "a dir it cannot read may hold `#meta`, so the file is not stale" is needed (DEV-10 below).
+`draft` on one box (exclusive create of `cluster-id`, join through a member, the stale-folder rule) holds G1 and G2 at one, two and three faults (784, 2,584 and 6,592 states; G2 here asks that every process of the run can write). The guard "a dir it cannot read may hold `#meta`, so the file is not stale" is needed (DEV-10 below).
 
 ### 3. A restore: positions, tokens, retries and cursors stay honest
 

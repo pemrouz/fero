@@ -35,6 +35,9 @@
 #                 its other order, and its one-decider give-up price
 #   extra         every smallest set on three bounds outside the shared sweep
 #                 (extra.py), and which dropped rule each failure needs back
+#   recheck       (only as ./run.sh recheck; added 2026-11-08) every result's
+#                 model as written and smallest model, run fresh with no cache;
+#                 states and digests must equal the stored ones (recheck.py)
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 H=$HERE/../E17-partitioning
@@ -100,6 +103,11 @@ for o in $OPTS; do
       piece pslot-fused --pin abort.append --tag pslot-fused+abort --seed-from pslot-fused --no-mutants ;;
     extra)
       "$HERE/extra.sh" > "$HERE/results/extra.txt" ;;
+    recheck)
+      { $HEAVY python3 -B "$HERE/recheck.py" split split-rev split+giveup pslot-fused pslot-fused-rev pslot-fused+abort
+        $HEAVY python3 -B "$HERE/recheck.py" pslot pslot-rev pslot+abort lanes lanes-rev lanes+abort lanes-carry
+      } > "$HERE/results/recheck.txt"
+      exit 0 ;;
   esac
 done
 python3 "$HERE/report2.py" > "$HERE/results/summary.md"

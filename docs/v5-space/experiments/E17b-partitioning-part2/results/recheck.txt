@@ -1,0 +1,189 @@
+# recheck.py, 2026-11-08, after the container restarts. Box: Linux 6.18.44-fc-v310, 4 vCPU, Python 3.13.17. Each batch ran under $SP/bin/heavy with 2 worker processes; it first waited behind other agents' timing holds (E-06, E-05), so 'real' is mostly waiting. Load average before and after each batch is the first and last line of the batch.
+# One line per check: result, base (the model as written) or min (the smallest model), bound, states, failures, and 'same' if the state count and state-set digest equal the stored ones.
+
+## batch 1: python3 recheck.py split split-rev split+giveup pslot-fused pslot-fused-rev pslot-fused+abort
+1.88 2.17 1.37 3/133 5558
+split                base grow    states      234 fail - same
+split                min  grow    states      234 fail - same
+split                base shrink  states     1616 fail - same
+split                min  shrink  states      468 fail - same
+split                base both    states      398 fail - same
+split                min  both    states      398 fail - same
+split                base read    states      532 fail - same
+split                min  read    states      532 fail - same
+split                base deep    states      540 fail - same
+split                min  deep    states      540 fail - same
+split                base twice   states      153 fail - same
+split                min  twice   states       72 fail - same
+split                min  twice1  states      209 fail - same
+split-rev            base grow    states      234 fail - same
+split-rev            min  grow    states      234 fail - same
+split-rev            base shrink  states     1616 fail - same
+split-rev            min  shrink  states      468 fail - same
+split-rev            base both    states      398 fail - same
+split-rev            min  both    states      398 fail - same
+split-rev            base read    states      532 fail - same
+split-rev            min  read    states      532 fail - same
+split-rev            base deep    states      540 fail - same
+split-rev            min  deep    states      540 fail - same
+split-rev            base twice   states      153 fail - same
+split-rev            min  twice   states       72 fail - same
+split-rev            min  twice1  states      209 fail - same
+split+giveup         base grow    states      234 fail - same
+split+giveup         min  grow    states      234 fail - same
+split+giveup         base shrink  states     1616 fail - same
+split+giveup         min  shrink  states     1672 fail - same
+split+giveup         base both    states      398 fail - same
+split+giveup         min  both    states      398 fail - same
+split+giveup         base read    states      532 fail - same
+split+giveup         min  read    states      532 fail - same
+split+giveup         base deep    states      540 fail - same
+split+giveup         min  deep    states      540 fail - same
+split+giveup         base twice   states      153 fail - same
+split+giveup         min  twice   states      153 fail - same
+split+giveup         min  twice1  states      531 fail - same
+pslot-fused          base grow    states     1799 fail - same
+pslot-fused          min  grow    states      234 fail - same
+pslot-fused          base shrink  states     1799 fail - same
+pslot-fused          min  shrink  states      234 fail - same
+pslot-fused          base both    states     3541 fail - same
+pslot-fused          min  both    states      398 fail - same
+pslot-fused          base read    states     4121 fail - same
+pslot-fused          min  read    states      532 fail - same
+pslot-fused          base deep    states     4241 fail - same
+pslot-fused          min  deep    states      540 fail - same
+pslot-fused          base twice   states      102 fail - same
+pslot-fused          min  twice   states       44 fail - same
+pslot-fused          min  twice1  states      115 fail - same
+pslot-fused-rev      base grow    states     1799 fail - same
+pslot-fused-rev      min  grow    states      234 fail - same
+pslot-fused-rev      base shrink  states     1799 fail - same
+pslot-fused-rev      min  shrink  states      234 fail - same
+pslot-fused-rev      base both    states     3541 fail - same
+pslot-fused-rev      min  both    states      398 fail - same
+pslot-fused-rev      base read    states     4121 fail - same
+pslot-fused-rev      min  read    states      532 fail - same
+pslot-fused-rev      base deep    states     4241 fail - same
+pslot-fused-rev      min  deep    states      540 fail - same
+pslot-fused-rev      base twice   states      102 fail - same
+pslot-fused-rev      min  twice   states       44 fail - same
+pslot-fused-rev      min  twice1  states      115 fail - same
+pslot-fused+abort    base grow    states     1799 fail - same
+pslot-fused+abort    min  grow    states     1799 fail - same
+pslot-fused+abort    base shrink  states     1799 fail - same
+pslot-fused+abort    min  shrink  states     1799 fail - same
+pslot-fused+abort    base both    states     3541 fail - same
+pslot-fused+abort    min  both    states     3541 fail - same
+pslot-fused+abort    base read    states     4121 fail - same
+pslot-fused+abort    min  read    states     4121 fail - same
+pslot-fused+abort    base deep    states     4241 fail - same
+pslot-fused+abort    min  deep    states     4241 fail - same
+pslot-fused+abort    base twice   states      102 fail - same
+pslot-fused+abort    min  twice   states      102 fail - same
+pslot-fused+abort    min  twice1  states      443 fail - same
+ALL SAME
+
+real	11m22.356s
+user	0m2.031s
+sys	0m0.028s
+3.09 2.23 1.65 5/136 7223
+
+## batch 2: python3 recheck.py pslot pslot-rev pslot+abort lanes lanes-rev lanes+abort lanes-carry
+2.02 2.21 1.37 2/135 5452
+pslot                base grow    states    22797 fail - same
+pslot                min  grow    states     1086 fail - same
+pslot                base shrink  states    22797 fail - same
+pslot                min  shrink  states     1086 fail - same
+pslot                base both    states    39409 fail - same
+pslot                min  both    states     2262 fail - same
+pslot                base read    states    62653 fail - same
+pslot                min  read    states     2625 fail - same
+pslot                base deep    states    53644 fail - same
+pslot                min  deep    states     5036 fail - same
+pslot                base twice   states     1318 fail - same
+pslot                min  twice   states      154 fail - same
+pslot                min  twice1  states      487 fail - same
+pslot-rev            base grow    states    22797 fail - same
+pslot-rev            min  grow    states     1086 fail - same
+pslot-rev            base shrink  states    22797 fail - same
+pslot-rev            min  shrink  states     1086 fail - same
+pslot-rev            base both    states    39409 fail - same
+pslot-rev            min  both    states     2262 fail - same
+pslot-rev            base read    states    62653 fail - same
+pslot-rev            min  read    states     2625 fail - same
+pslot-rev            base deep    states    53644 fail - same
+pslot-rev            min  deep    states     5036 fail - same
+pslot-rev            base twice   states     1318 fail - same
+pslot-rev            min  twice   states      203 fail - same
+pslot-rev            min  twice1  states      660 fail - same
+pslot+abort          base grow    states    22797 fail - same
+pslot+abort          min  grow    states    94242 fail - same
+pslot+abort          base shrink  states    22797 fail - same
+pslot+abort          min  shrink  states    94242 fail - same
+pslot+abort          base both    states    39409 fail - same
+pslot+abort          min  both    states   201410 fail - same
+pslot+abort          base read    states    62653 fail - same
+pslot+abort          min  read    states   239041 fail - same
+pslot+abort          base deep    states    53644 fail - same
+pslot+abort          min  deep    states   331073 fail - same
+pslot+abort          base twice   states     1318 fail - same
+pslot+abort          min  twice   states     6661 fail - same
+pslot+abort          min  twice1  states    72732 fail - same
+lanes                base grow    states    22797 fail - same
+lanes                min  grow    states     1086 fail - same
+lanes                base shrink  states    22797 fail - same
+lanes                min  shrink  states     1086 fail - same
+lanes                base both    states    39409 fail - same
+lanes                min  both    states     2262 fail - same
+lanes                base read    states    62653 fail - same
+lanes                min  read    states     2625 fail - same
+lanes                base deep    states    53644 fail - same
+lanes                min  deep    states     5036 fail - same
+lanes                base twice   states     1318 fail - same
+lanes                min  twice   states      203 fail - same
+lanes                min  twice1  states      660 fail - same
+lanes-rev            base grow    states    22797 fail - same
+lanes-rev            min  grow    states     1086 fail - same
+lanes-rev            base shrink  states    22797 fail - same
+lanes-rev            min  shrink  states     1086 fail - same
+lanes-rev            base both    states    39409 fail - same
+lanes-rev            min  both    states     2262 fail - same
+lanes-rev            base read    states    62653 fail - same
+lanes-rev            min  read    states     2625 fail - same
+lanes-rev            base deep    states    53644 fail - same
+lanes-rev            min  deep    states     5036 fail - same
+lanes-rev            base twice   states     1318 fail - same
+lanes-rev            min  twice   states      203 fail - same
+lanes-rev            min  twice1  states      660 fail - same
+lanes+abort          base grow    states    22797 fail - same
+lanes+abort          min  grow    states    94242 fail - same
+lanes+abort          base shrink  states    22797 fail - same
+lanes+abort          min  shrink  states    94242 fail - same
+lanes+abort          base both    states    39409 fail - same
+lanes+abort          min  both    states   201410 fail - same
+lanes+abort          base read    states    62653 fail - same
+lanes+abort          min  read    states   239041 fail - same
+lanes+abort          base deep    states    53644 fail - same
+lanes+abort          min  deep    states   331073 fail - same
+lanes+abort          base twice   states     1318 fail - same
+lanes+abort          min  twice   states     6661 fail - same
+lanes+abort          min  twice1  states    72732 fail - same
+lanes-carry          base grow    states    22797 fail - same
+lanes-carry          min  grow    states     1086 fail - same
+lanes-carry          base shrink  states    22797 fail - same
+lanes-carry          min  shrink  states     1086 fail - same
+lanes-carry          base both    states    39409 fail - same
+lanes-carry          min  both    states     2262 fail - same
+lanes-carry          base read    states    62653 fail - same
+lanes-carry          min  read    states     2625 fail - same
+lanes-carry          base deep    states    53644 fail - same
+lanes-carry          min  deep    states     5036 fail - same
+lanes-carry          base twice   states     1318 fail - same
+lanes-carry          min  twice   states      154 fail - same
+lanes-carry          min  twice1  states      487 fail - same
+ALL SAME
+
+real	13m5.738s
+user	2m51.808s
+sys	0m0.866s
+3.02 2.42 1.77 2/125 7392

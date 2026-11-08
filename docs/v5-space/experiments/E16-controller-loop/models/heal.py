@@ -591,19 +591,23 @@ BOUNDS = {
     # #meta down from the start, then one member fault: self heals, cent-co waits
     'meta1': dict(members=4, voters=(0, 1, 2), faults=1, meta_down=True,
                   fault_kinds=('crash', 'lose', 'cut')),
-    # three voters and one spare; two faults of any kind (self only: too big
-    # for cent-co's commands)
+    # three voters and one spare; two faults of any kind (the verify bound;
+    # cent-co does not finish it: capped, see VERIFY)
     'three2': dict(members=4, voters=(0, 1, 2), faults=2),
     # two faults among crashes, lost disks and #meta losing its majority
     'two-a': dict(members=4, voters=(0, 1, 2), faults=2, fault_kinds=('crash', 'lose', 'metadown')),
     # two faults among crashes and cuts of a member or of #meta's leader
-    # (cent-co: more than 900,000 states, not run to the end)
+    # (cent-co does not finish two-a, two-b or two-c: more than 900,000
+    # states each, and more than 4,000,000 on two-a)
     'two-b': dict(members=4, voters=(0, 1, 2), faults=2, fault_kinds=('crash', 'cut', 'metacut')),
     # two faults among cuts of a member and of #meta's leader: views that
     # differ (#meta's side against the group's side)
     'two-c': dict(members=4, voters=(0, 1, 2), faults=2, fault_kinds=('cut', 'metacut')),
 }
 # The ablation sweeps the one-fault bounds (seconds each) and verifies the
-# smallest model, and every mutant they miss, on two faults (E-17's VERIFY).
+# smallest model, and every mutant they miss, on two faults of any kind
+# (E-17's VERIFY). `self` finishes three2 (296,018 states); cent-co does not
+# (more than 4,000,000 states on two-a alone), so run.sh caps its verify runs
+# at 2,000,000 states: every trace up to 18 steps, safety only.
 SWEEP = ('three1', 'four1', 'meta1')
-VERIFY = ('two-a',)
+VERIFY = ('three2',)
