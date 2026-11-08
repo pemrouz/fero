@@ -1,24 +1,20 @@
-self three1: 1,917 states, 0.1s: all hold
-    P5: 1,345 judged states, 0 cannot reach the goal
-    P8: 1,345 judged states, 0 cannot reach the goal
-    SWAP: 572 judged states, 0 cannot reach the goal
+self three1: 2,213 states, 0.2s: all hold
+    P5: 1,473 judged states, 0 cannot reach the goal
+    P8: 1,473 judged states, 0 cannot reach the goal
+    SWAP: 740 judged states, 0 cannot reach the goal
     WAIT: 17 judged states, 0 cannot reach the goal
-self four1: 1,553 states, 0.1s: all hold
-    P5: 1,226 judged states, 0 cannot reach the goal
-    P8: 1,226 judged states, 0 cannot reach the goal
-    SWAP: 327 judged states, 0 cannot reach the goal
+self four1: 1,673 states, 0.1s: all hold
+    P5: 1,282 judged states, 0 cannot reach the goal
+    P8: 1,282 judged states, 0 cannot reach the goal
+    SWAP: 391 judged states, 0 cannot reach the goal
     WAIT: 17 judged states, 0 cannot reach the goal
-self meta1: 3,978 states, 0.2s: all hold
-    P5: 2,798 judged states, 0 cannot reach the goal
-    P8: 2,798 judged states, 0 cannot reach the goal
-    SWAP: 1,180 judged states, 0 cannot reach the goal
-    WAIT: 1,327 judged states, 0 cannot reach the goal
-self two-a: 15,534 states, 1.9s: P8 (3 steps)
-    P5: 8,801 judged states, 0 cannot reach the goal
-    P8: 8,801 judged states, 192 cannot reach the goal
-    SWAP: 4,221 judged states, 120 cannot reach the goal
-    WAIT: 277 judged states, 0 cannot reach the goal
-  P8: shortest trace, 3 steps
-     1. lose-disk 0
-     2. crash 3
-     3. recover 0
+self meta1: 4,762 states, 0.4s: all hold
+    P5: 3,162 judged states, 0 cannot reach the goal
+    P8: 3,162 judged states, 0 cannot reach the goal
+    SWAP: 1,600 judged states, 0 cannot reach the goal
+    WAIT: 1,455 judged states, 0 cannot reach the goal
+self two-a: 33,939 states, 3.6s: all hold
+    P5: 16,163 judged states, 0 cannot reach the goal
+    P8: 16,163 judged states, 0 cannot reach the goal
+    SWAP: 12,317 judged states, 224 cannot reach the goal
+    WAIT: 513 judged states, 0 cannot reach the goal
