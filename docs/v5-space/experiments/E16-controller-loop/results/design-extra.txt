@@ -1,22 +1,17 @@
-self two-b: 99,802 states, 9.1s: all hold
+self two-b: 99,802 states, 6.6s: all hold
     P5: 62,676 judged states, 0 cannot reach the goal
     P8: 62,676 judged states, 0 cannot reach the goal
     SWAP: 30,088 judged states, 608 cannot reach the goal
     WAIT: 4,402 judged states, 0 cannot reach the goal
-self two-c: 58,570 states, 6.4s: all hold
+self two-c: 58,570 states, 4.1s: all hold
     P5: 38,701 judged states, 0 cannot reach the goal
     P8: 38,701 judged states, 0 cannot reach the goal
     SWAP: 19,030 judged states, 304 cannot reach the goal
     WAIT: 3,346 judged states, 0 cannot reach the goal
-self three2: 180,832 states, 23.3s: P8 (3 steps)
-    P5: 109,413 judged states, 0 cannot reach the goal
-    P8: 109,413 judged states, 1,024 cannot reach the goal
-    SWAP: 52,344 judged states, 1,224 cannot reach the goal
-    WAIT: 7,826 judged states, 0 cannot reach the goal
-  P8: shortest trace, 3 steps
-     1. lose-disk 0
-     2. crash 3
-     3. recover 0
-cent-co two-b: 900,001 states, 96.7s: all hold (STOPPED AT THE STATE LIMIT)
-cent-co two-c: 900,001 states, 76.6s: all hold (STOPPED AT THE STATE LIMIT)
-cent-co three2: 900,001 states, 69.4s: all hold (STOPPED AT THE STATE LIMIT)
+self three2: 296,018 states, 20.3s: all hold
+    P5: 160,194 judged states, 0 cannot reach the goal
+    P8: 160,194 judged states, 0 cannot reach the goal
+    SWAP: 103,288 judged states, 1,840 cannot reach the goal
+    WAIT: 11,838 judged states, 0 cannot reach the goal
+cent-co two-b: 900,001 states, 76.1s: all hold (STOPPED AT THE STATE LIMIT)
+cent-co two-c: 900,001 states, 78.4s: all hold (STOPPED AT THE STATE LIMIT)

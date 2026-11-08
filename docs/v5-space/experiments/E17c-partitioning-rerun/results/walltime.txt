@@ -11,3 +11,4 @@ lanes 2728 s wall
 lanes-carry 1997 s wall
 rekey-carry 3069 s wall
 rekey-alt 1930 s wall
+rekey-carry-alt 2092 s wall
