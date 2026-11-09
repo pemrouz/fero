@@ -1,0 +1,4 @@
+{"exp":"E-40","part":"bundle","name":"data-all","esbuild":"0.25.12","modules":25,"raw_bytes":96832,"gzip9_bytes":26621,"brotli_bytes":23523}
+{"exp":"E-40","part":"bundle","name":"data-used","esbuild":"0.25.12","modules":25,"raw_bytes":76501,"gzip9_bytes":20189,"brotli_bytes":17986}
+{"exp":"E-40","part":"bundle","name":"codec","esbuild":"0.25.12","modules":3,"raw_bytes":17651,"gzip9_bytes":7243,"brotli_bytes":6388}
+{"exp":"E-40","part":"bundle","name":"client","esbuild":"0.25.12","modules":28,"raw_bytes":95866,"gzip9_bytes":27877,"brotli_bytes":24790}

@@ -1,0 +1,6 @@
+v22.22.0
+chromium (Chrome for Testing) 153.0.8010.12, Playwright 1.63.0 (/opt/node-tools/node_modules/playwright)
+esbuild 0.25.12
+data 63fea66, fero a08ac53 (kernel/codec.ts)
+openssl 3.5.4
+6.18.44-fc-v310
