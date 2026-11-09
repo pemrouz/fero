@@ -1,0 +1,52 @@
+# saga: every option on every bound, 2026-11-09T12:34:19Z, Python 3.13.17, 4 vCPU, load 0.66 1.78 2.13
+draft one: 80,588 states, 5.2s: all hold
+    L1: 80,588 judged states, 0 cannot reach the goal
+draft two: 10,551 states, 0.6s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
+  A2: shortest trace, 17 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. begin (('h', 0),)
+     5. claim (('h', 1),)
+     6. claim (('h', 1),)
+     7. begin (('h', 1),)
+     8. step (('h', 0),)
+     9. step (('h', 1),)
+    10. step (('h', 1),)
+    11. close (('h', 1),)
+    12. lapse a2
+    13. claim (('h', 2),)
+    14. claim (('h', 2),)
+    15. adopt (('h', 2),)
+    16. step (('h', 2),)
+    17. step (('h', 2),)
+draft sub: 54,493 states, 3.5s: all hold
+    L1: 54,493 judged states, 0 cannot reach the goal
+draft three: 3,000,001 states, 226.9s: all hold (STOPPED AT THE STATE LIMIT)
+draft one2: 3,000,001 states, 222.5s: all hold (STOPPED AT THE STATE LIMIT)
+draft two-f: 1,199,605 states, 93.0s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
+  A2: shortest trace, 17 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. begin (('h', 0),)
+     5. claim (('h', 1),)
+     6. claim (('h', 1),)
+     7. begin (('h', 1),)
+     8. step (('h', 0),)
+     9. step (('h', 1),)
+    10. step (('h', 1),)
+    11. crash a2
+    12. lapse a2
+    13. claim (('h', 2),)
+    14. claim (('h', 2),)
+    15. adopt (('h', 2),)
+    16. step (('h', 2),)
+    17. step (('h', 2),)
+draft sub-f: 3,000,001 states, 241.8s: all hold (STOPPED AT THE STATE LIMIT)
+owned one: 80,588 states, 5.4s: all hold
+    L1: 80,588 judged states, 0 cannot reach the goal
+owned two: 24,760 states, 1.7s: all hold
+    L1: 24,760 judged states, 0 cannot reach the goal
+owned sub: 66,975 states, 4.8s: all hold
+    L1: 66,975 judged states, 0 cannot reach the goal
