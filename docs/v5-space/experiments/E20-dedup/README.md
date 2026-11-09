@@ -44,4 +44,51 @@ Time constants are the smallest that leave no slack (R = B = H = S = 1 tick), so
 
 **Bounds** ([models/dedup.py](models/dedup.py), `BOUNDS`): `lost` (two attempts on s1, three copies each, one crash, one lost message: lost answers, failover mid-retry, a refusal then a stale copy); `move` (an attempt on s2 and one on s1, the move mid-retry, one crash on either side); `restart` (a restart with the old life's copies in flight, the new life runs the plan again); `expire` (time passes: forgetting by writer time with late copies); `exprst` (expiry after a restart, the old life's copies landing late); and the verify bound `mvexp` (a move and expiry together).
 
-__RESULTS_LONG__
+## Results
+
+Machine: 4 vCPU, 15 GB, shared with other agents (every run under the heavy lock); Python 3.13, standard library; Node 22.22.0 for the memory probe. Every model run is complete (every reachable state) unless a table says otherwise. Raw output: [results/summary.md](results/summary.md) (generated), `results/*-ablation.json` (each option's ablation and mutants, with traces), [results/design.txt](results/design.txt), [results/memory.txt](results/memory.txt). All model-checked here unless marked.
+
+### 1. Rules each option needs (DEV-10)
+
+__TABLE1__
+
+__ROLES__
+
+### 2. What the rules are for
+
+__WHATFOR__
+
+### 3. Does `fwd` need a rule that `smart` does not?
+
+__FWD__
+
+### 4. Memory per client (measured here)
+
+The writer's dedup state in Node 22, one shard, after a full GC ([mem.mjs](mem.mjs), [results/memory.txt](results/memory.txt)):
+
+| State | Bytes per client at 1e4 | at 1e6 | Total at 1e6 |
+|---|---|---|---|
+| `win`: per issuer, the highest id and one outcome (W bounds them) | 366 | 349 | 332 MB |
+| `sess`: per session, the floor and one outcome | 327 | 309 | 295 MB |
+| `sess` split per slot (each client writes 4 slots), so a move carries its part | 1,305 | 1,237 | 1.18 GB |
+| `pid`: per (producer, partition), 4 partitions per producer, Kafka's 5 cached batches | 2,201 | 2,133 | 2.0 GB |
+| `keys`: per key (not per client) | 240 | 221 | 211 MB per million keys |
+
+`keys` holds one entry per write for its TTL, so its size is the write rate times the TTL: at 1e5 writes a second, 6e7 keys (13 GB) for a 10-minute TTL, 8.6e9 keys (1.9 TB) for Stripe's 24 hours. `win` and `sess` hold one entry per active client; `pid` one per (client, partition).
+
+Both `win` and `sess` must carry each issuer's (session's) floor when a slot moves (the `fence.hi` and `fence.floor` rules above). Carried whole, that is one entry per active client per move (about 16 bytes each on the wire: 16 MB a move at 1e6 clients); kept per slot instead, it is the third row (1.18 GB at 1e6 clients writing 4 slots each).
+
+## What the model leaves out
+
+- **Unclean recovery** (a committed log cut back): the groups are crash-only, as in E-17 (slot_move.py shows a move needs five more rules under it).
+- **Real elections, leases and clocks**: a group is abstract Raft (E-14 checks Raft); writer time is one global clock (E-21 owns skew and jumps).
+- **The follow lag of `#s`**: `sess`'s writers read `#s`'s committed log directly. Reasoned: a writer that has not yet seen an expiry still holds the session's outcomes (it drops them only when it sees the expiry), so lag delays forgetting and never causes a fresh judgement.
+- **Keyed calls (TEST-03) are not modelled apart.** A call's re-run issues the same attempt ids as the first run (DESIGN-V5 4.5), so to the writer it is a late resend from the same issuer, which bounds `lost`, `expire` and `exprst` already cover. Reasoned: under `sess` the call needs a session of its own (registered with its `#calls` claim, renewed by whoever runs it), one rule; under `win` the issuer is the call key, one rule; under both, a re-run after the session or issuer is gone ends `unknown`.
+- **Transport duplication.** A copy is delivered at most once (TCP). Under `fwd` a relay may forward a copy again only if the rule `forward.once` is dropped; an answer reaches the client from any delivery (the model does not tie an answer to the link it came back on), see section 3.
+- **Small bounds**: two attempts, two or three copies each, one or two faults, W = 1, time up to 2 ticks, one slot move. A count is a count at these bounds.
+- **One agent.** DEV-10 (e) asks two agents to count; this is one agent's count. A second order of greedy drops (`./run.sh rev`) was not run (CPU budget and the shared box).
+
+## Verdict
+
+__VERDICT__
+

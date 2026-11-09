@@ -6,8 +6,8 @@
 #
 #   ./run.sh            everything: design runs, ablations + mutants, summary, memory
 #   ./run.sh check      only the design runs (every option on every bound)
-#   ./run.sh ablate     DEV-10: the four smart options in full; each fwd option from its smart
-#                       option's smallest model (delta.py)
+#   ./run.sh ablate     DEV-10 (ablate20.py): the four smart options in full; each fwd option
+#                       from its smart option's smallest model (what the relay adds)
 #   ./run.sh variants   the two append-every-refusal variants (sess-fwd-all, win-fwd-all)
 #   ./run.sh rev [OPTION ...]       the same, greedy drops in reverse model-text order
 #   ./run.sh report     results/summary.md from the ablation files
@@ -34,37 +34,32 @@ if [ "$STEP" = all ] || [ "$STEP" = check ]; then
   } > results/design.txt 2>&1 || true
 fi
 
-ablate() {   # $1 option, $2 tag suffix, $3 model file
-  o="$1"; out="results/$o$2-ablation.json"
-  for piece in 1 2 3 4 5 6 7 8; do
-    if "$HEAVY" timeout 1500 python3 "$CLI" "$3" "$o" --ablate "$out" >> "results/$o$2-ablation.log" 2>&1; then
-      return 0
-    fi
-    echo "piece $piece of $o$2 stopped at 25 minutes; carrying on from the cache" >> "results/$o$2-ablation.log"
-  done
-}
-
-delta() {   # $1 fwd option, $2 the smart option it starts from
-  for piece in 1 2 3 4; do
-    if "$HEAVY" timeout 1500 python3 delta.py "$1" "results/$2-ablation.json" "results/$1-ablation.json" \
-        >> "results/$1-ablation.log" 2>&1; then return 0; fi
-    echo "piece $piece of $1 stopped at 25 minutes; carrying on from the cache" >> "results/$1-ablation.log"
+ablate() {   # $1 option, then ablate20.py's flags (pieces of 25 minutes, resumed from the cache)
+  o="$1"; shift
+  for piece in 1 2 3 4 5 6; do
+    [ -f "results/$o-ablation.json" ] && return 0
+    "$HEAVY" timeout 1500 python3 ablate20.py "$o" "results/$o-ablation.json" "$@" >> "results/$o-ablation.log" 2>&1 && return 0
+    echo "piece $piece of $o stopped at 25 minutes; carrying on from the cache" >> "results/$o-ablation.log"
   done
 }
 
 if [ "$STEP" = all ] || [ "$STEP" = ablate ]; then
-  # the four smart options in full (DEV-10), then each fwd option from its
-  # smart option's smallest model (delta.py: what the relay adds)
-  for o in win-smart sess-smart pid-smart keys-smart; do ablate "$o" "" models/dedup.py; done
-  for d in win sess pid keys; do delta "$d-fwd" "$d-smart"; done
+  # the four smart options in full (DEV-10); each fwd option from its smart
+  # option's smallest model (what the relay adds)
+  for o in win-smart sess-smart pid-smart keys-smart; do ablate "$o"; done
+  for d in win sess pid keys; do ablate "$d-fwd" --from "results/$d-smart-ablation.json"; done
 fi
 if [ "$STEP" = all ] || [ "$STEP" = variants ]; then
   # every refusal appended: is a fwd hop rule still needed?
-  delta sess-fwd-all sess-smart
-  delta win-fwd-all win-smart
+  ablate sess-fwd-all --from results/sess-smart-ablation.json
+  ablate win-fwd-all --from results/win-smart-ablation.json
 fi
 if [ "$STEP" = rev ]; then
-  for o in $OPTS; do ablate "$o" "-rev" models/dedup_rev.py; done
+  # the same with the greedy drops in reverse model-text order (a second order)
+  for o in $OPTS; do
+    "$HEAVY" timeout 1500 python3 ablate20.py "$o" "results/$o-rev-ablation.json" --model models/dedup_rev.py \
+      >> "results/$o-rev-ablation.log" 2>&1 || true
+  done
 fi
 if [ "$STEP" = all ] || [ "$STEP" = report ]; then
   python3 report.py results/*-ablation.json > results/summary.md
