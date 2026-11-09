@@ -5,7 +5,8 @@
 // at each event (move-leader, kill -9); the client stamps them on the same monotonic clock.
 //
 // Output (stdout, at the end): one JSON object with the marks and, per logical write,
-// [first try µs, ack µs, attempts], µs since the client started.
+// [first try µs, ack µs, attempts, client index], µs since the client started. With -pin, each worker
+// keeps to one endpoint (client index = endpoint index); without it, one client balances over all.
 package main
 
 import (
@@ -29,18 +30,33 @@ func main() {
 	dur := flag.Duration("dur", 20*time.Second, "how long to write")
 	val := flag.Int("val", 256, "value bytes")
 	timeout := flag.Duration("timeout", 2*time.Second, "per-attempt timeout")
+	pin := flag.Bool("pin", false, "pin worker w to endpoint w % len(endpoints) (one client per endpoint), so a member that cannot reach the leader stalls only its own workers")
 	flag.Parse()
 
-	cli, err := clientv3.New(clientv3.Config{Endpoints: strings.Split(*eps, ","), DialTimeout: 5 * time.Second})
-	if err != nil {
-		panic(err)
+	epl := strings.Split(*eps, ",")
+	clis := []*clientv3.Client{}
+	if *pin {
+		for _, e := range epl {
+			c, err := clientv3.New(clientv3.Config{Endpoints: []string{e}, DialTimeout: 5 * time.Second})
+			if err != nil {
+				panic(err)
+			}
+			defer c.Close()
+			clis = append(clis, c)
+		}
+	} else {
+		c, err := clientv3.New(clientv3.Config{Endpoints: epl, DialTimeout: 5 * time.Second})
+		if err != nil {
+			panic(err)
+		}
+		defer c.Close()
+		clis = append(clis, c)
 	}
-	defer cli.Close()
 	t0 := time.Now()
 	us := func() int64 { return time.Since(t0).Microseconds() }
 	value := strings.Repeat("v", *val)
 
-	type rec struct{ First, Ack int64; Tries int }
+	type rec struct{ First, Ack int64; Tries, Ep int }
 	var mu sync.Mutex
 	recs := make([][]rec, *workers)
 	marks := map[string]int64{}
@@ -61,6 +77,7 @@ func main() {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
+			cli := clis[w%len(clis)]
 			next := t0.Add(time.Duration(w) * period / time.Duration(*workers))
 			for k := 0; ; k++ {
 				if d := time.Until(next); d > 0 {
@@ -83,17 +100,17 @@ func main() {
 					mu.Lock(); errs[e]++; mu.Unlock()
 					time.Sleep(time.Millisecond)
 				}
-				recs[w] = append(recs[w], rec{first, us(), tries})
+				recs[w] = append(recs[w], rec{first, us(), tries, w % len(clis)})
 				next = next.Add(period)
 				if time.Until(next) < -period { next = time.Now() } // fell behind: do not burst
 			}
 		}(w)
 	}
 	wg.Wait()
-	all := [][3]int64{}
+	all := [][4]int64{}
 	for _, rs := range recs {
 		for _, r := range rs {
-			all = append(all, [3]int64{r.First, r.Ack, int64(r.Tries)})
+			all = append(all, [4]int64{r.First, r.Ack, int64(r.Tries), int64(r.Ep)})
 		}
 	}
 	mu.Lock()
