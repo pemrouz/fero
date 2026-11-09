@@ -1,1 +1,117 @@
 # ramp: every option on every bound, 2026-11-09T19:04:05Z, Python 3.13.17, 4 vCPU, load 6.13 4.10 3.44
+ramp two: 3,344 states, 0.3s: all hold
+    L: 3,344 judged states, 0 cannot reach the goal
+    V: 3,344 judged states, 0 cannot reach the goal
+    W: 3,344 judged states, 0 cannot reach the goal
+ramp fol: 5,114 states, 0.5s: all hold
+    L: 5,114 judged states, 0 cannot reach the goal
+    V: 5,114 judged states, 0 cannot reach the goal
+    W: 5,114 judged states, 0 cannot reach the goal
+ramp gc: 845 states, 0.0s: all hold
+    L: 845 judged states, 0 cannot reach the goal
+    V: 845 judged states, 0 cannot reach the goal
+    W: 845 judged states, 0 cannot reach the goal
+ramp move: 1,008 states, 0.0s: all hold
+    L: 1,008 judged states, 0 cannot reach the goal
+    V: 1,008 judged states, 0 cannot reach the goal
+    W: 1,008 judged states, 0 cannot reach the goal
+ramp fol-move: 294,450 states, 44.1s: all hold
+    L: 294,450 judged states, 0 cannot reach the goal
+    V: 294,450 judged states, 0 cannot reach the goal
+    W: 294,450 judged states, 0 cannot reach the goal
+ramp gc-move: 20,730 states, 2.0s: all hold
+    L: 20,730 judged states, 0 cannot reach the goal
+    V: 20,730 judged states, 0 cannot reach the goal
+    W: 20,730 judged states, 0 cannot reach the goal
+noserve two: 3,072 states, 0.2s: L (4 steps), V (9 steps)
+    L: 3,072 judged states, 124 cannot reach the goal
+    V: 3,072 judged states, 46 cannot reach the goal
+    W: 3,072 judged states, 0 cannot reach the goal
+  L: shortest trace, 4 steps
+     1. prepare (('t', 2), ('x', 'p'))
+     2. prepare (('t', 2), ('x', 'q'))
+     3. commit (('t', 2), ('x', 'p'))
+     4. crash 2
+  V: shortest trace, 9 steps
+     1. prepare (('t', 2), ('x', 'p'))
+     2. prepare (('t', 2), ('x', 'q'))
+     3. commit (('t', 2), ('x', 'p'))
+     4. crash 2
+     5. r1 (('r', 'ldr'), ('x', 'p'))
+     6. r1 (('r', 'ldr'), ('x', 'q'))
+     7. plan ()
+     8. r2 (('r', 'ldr'), ('x', 'q'))
+     9. finish ()
+noserve fol: 4,715 states, 0.3s: L (5 steps), V (9 steps)
+    L: 4,715 judged states, 103 cannot reach the goal
+    V: 4,715 judged states, 55 cannot reach the goal
+    W: 4,715 judged states, 0 cannot reach the goal
+  L: shortest trace, 5 steps
+     1. prepare (('t', 1), ('x', 'p'))
+     2. prepare (('t', 1), ('x', 'q'))
+     3. commit (('t', 1), ('x', 'q'))
+     4. crash 1
+     5. r1 (('r', 'ldr'), ('x', 'q'))
+  V: shortest trace, 9 steps
+     1. prepare (('t', 1), ('x', 'p'))
+     2. prepare (('t', 1), ('x', 'q'))
+     3. commit (('t', 1), ('x', 'q'))
+     4. crash 1
+     5. r1 (('r', 'ldr'), ('x', 'p'))
+     6. r1 (('r', 'ldr'), ('x', 'q'))
+     7. plan ()
+     8. r2 (('r', 'ldr'), ('x', 'p'))
+     9. finish ()
+noserve gc: 819 states, 0.0s: all hold
+    L: 819 judged states, 0 cannot reach the goal
+    V: 819 judged states, 0 cannot reach the goal
+    W: 819 judged states, 0 cannot reach the goal
+noserve move: 1,008 states, 0.0s: V (9 steps)
+    L: 1,008 judged states, 0 cannot reach the goal
+    V: 1,008 judged states, 6 cannot reach the goal
+    W: 1,008 judged states, 0 cannot reach the goal
+  V: shortest trace, 9 steps
+     1. prepare (('t', 1), ('x', 'p'))
+     2. prepare (('t', 1), ('x', 'q'))
+     3. commit (('t', 1), ('x', 'q'))
+     4. crash 1
+     5. r1 (('r', 'ldr'), ('x', 'p'))
+     6. r1 (('r', 'ldr'), ('x', 'q'))
+     7. plan ()
+     8. r2 (('r', 'ldr'), ('x', 'p'))
+     9. finish ()
+noserve fol-move: 263,520 states, 39.6s: L (4 steps), V (9 steps)
+    L: 263,520 judged states, 7,356 cannot reach the goal
+    V: 263,520 judged states, 3,354 cannot reach the goal
+    W: 263,520 judged states, 0 cannot reach the goal
+  L: shortest trace, 4 steps
+     1. prepare (('t', 3), ('x', 'p'))
+     2. prepare (('t', 3), ('x', 'q'))
+     3. commit (('t', 3), ('x', 'p'))
+     4. crash 3
+  V: shortest trace, 9 steps
+     1. prepare (('t', 3), ('x', 'p'))
+     2. prepare (('t', 3), ('x', 'q'))
+     3. commit (('t', 3), ('x', 'p'))
+     4. crash 3
+     5. r1 (('r', 'ldr'), ('x', 'p'))
+     6. r1 (('r', 'ldr'), ('x', 'q'))
+     7. plan ()
+     8. r2 (('r', 'ldr'), ('x', 'q'))
+     9. finish ()
+noserve gc-move: 20,002 states, 2.4s: V (9 steps)
+    L: 20,002 judged states, 0 cannot reach the goal
+    V: 20,002 judged states, 72 cannot reach the goal
+    W: 20,002 judged states, 0 cannot reach the goal
+  V: shortest trace, 9 steps
+     1. prepare (('t', 2), ('x', 'p'))
+     2. prepare (('t', 2), ('x', 'q'))
+     3. commit (('t', 2), ('x', 'q'))
+     4. crash 2
+     5. r1 (('r', 'ldr'), ('x', 'p'))
+     6. r1 (('r', 'ldr'), ('x', 'q'))
+     7. plan ()
+     8. r2 (('r', 'ldr'), ('x', 'p'))
+     9. finish ()
+# ramp: gc-fol, which does not finish, on the chosen option (a partial check), 2026-11-09T19:37:24Z, Python 3.13.17, 4 vCPU, load 5.74 3.14 2.77
+ramp gc-fol: 3,000,002 states, 169.5s: all hold (STOPPED AT THE STATE LIMIT)

@@ -1,0 +1,4 @@
+ramp-f00: 18000 read transactions, 6 fractured, in 5 histories
+ramp-f15: 18000 read transactions, 4 fractured, in 3 histories
+rampv-f00: 18000 read transactions, 0 fractured, in 0 histories
+rampv-f15: 18000 read transactions, 0 fractured, in 0 histories

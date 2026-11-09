@@ -193,3 +193,29 @@ raise two-f: 1,348,312 states, 121.6s: all hold
 fullundo sub-f: 801,204 states, 94.3s: all hold
     L1: 801,204 judged states, 0 cannot reach the goal
 # saga: sub-f on the other options, 2026-11-09T19:06:51Z, Python 3.13.17, 4 vCPU
+draft sub-f: 28,456 states, 2.6s: A1 (9 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 9 steps
+     1. claim (('h', 1),)
+     2. lapse a2
+     3. claim (('h', 3),)
+     4. begin (('h', 3),)
+     5. adopt (('h', 1),)
+     6. fail (('h', 3),)
+     7. step (('h', 1),)
+     8. decide (('h', 3),)
+     9. close (('h', 3),)
+owned sub-f: 29,131 states, 2.7s: A1 (9 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 9 steps
+     1. claim (('h', 1),)
+     2. lapse a2
+     3. claim (('h', 3),)
+     4. begin (('h', 3),)
+     5. adopt (('h', 1),)
+     6. fail (('h', 3),)
+     7. step (('h', 1),)
+     8. decide (('h', 3),)
+     9. close (('h', 3),)
+bump sub-f: 1,101,025 states, 114.1s: all hold
+    L1: 1,101,025 judged states, 0 cannot reach the goal
+raise sub-f: 700,411 states, 62.1s: all hold
+    L1: 700,411 judged states, 0 cannot reach the goal
