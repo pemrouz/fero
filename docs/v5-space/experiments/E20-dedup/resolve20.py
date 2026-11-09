@@ -48,6 +48,8 @@ def main():
     ap.add_argument('--model', default=os.path.join(HERE, 'models', 'dedup.py'))
     ap.add_argument('--limit', type=int, default=2_500_000)
     ap.add_argument('--order', default='restart,move,expire,exprst,mvexp,lost')
+    ap.add_argument('--small-only', default='', help='mutant kinds (e.g. swap) run on every bound but the last of '
+                    '--order (unless that run is cached); one none of them catches stays undecided, with that reason')
     a = ap.parse_args()
     spec = importlib.util.spec_from_file_location('e20model', a.model)
     M = importlib.util.module_from_spec(spec)
@@ -100,12 +102,18 @@ def main():
         if not row.get('undecided'):
             continue
         m = muts[(row['kind'], row['rule'])]
-        per = ab.per(m, order)
+        # a kind in --small-only skips the last bound unless that run is already in this script's cache
+        last_key = json.dumps([list(m.key()[0]), list(m.key()[1]), [list(x) for x in m.key()[2]], order[-1], False])
+        small = row['kind'] in a.small_only.split(',') and last_key not in ab.cache
+        per = ab.per(m, order[:-1] if small else order)
         ff = FF(per)
         for k in ('undecided', 'caught', 'trace', 'equivalent'):
             row.pop(k, None)
         row['resolved_by'] = f'resolve20.py: bounds in the order {",".join(order)}, limit {a.limit}'
-        if ff and ff[1] == 'LIMIT':
+        if small and not ff:
+            row['caught'] = None
+            row['undecided'] = [order[-1], 'NOT RUN', 0, [f'not caught on {",".join(order[:-1])}; {order[-1]} not run']]
+        elif ff and ff[1] == 'LIMIT':
             row['caught'] = None
             row['undecided'] = ff
         elif ff:

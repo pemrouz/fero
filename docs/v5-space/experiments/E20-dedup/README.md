@@ -4,7 +4,13 @@
 
 **Threshold.** The option with the fewest rules that holds F-02 and TEST-03 in every scenario wins. If `sess` holds them only with session state copied per slot, its memory at 1e6 clients is priced. If `sess` under `fwd` needs any hop rule that `smart` does not, that rule is counted for every `fwd` row; if not, Y is decided on latency alone.
 
-__RESULTS_SHORT__
+**In short** (model-checked here, every reachable state at small bounds; [results/summary.md](results/summary.md), [results/design.txt](results/design.txt), [results/memory.txt](results/memory.txt)):
+- **Every option holds exactly once (F-02) in every scenario as designed**, under `smart` and `fwd`: lost answers, failover mid-retry, a slot move mid-retry, a refusal then a stale copy, a client restart with old copies in flight, and expiry by the writer's time. `pid` did so only after two fixes found here (below).
+- **Rules needed (DEV-10), sent straight to the writer (`smart`):** `keys` 12, `sess` 13, `pid` 16, `win` (the draft) 17.
+- **`sess` needs no time rule at all.** The client's lowest unacknowledged id, sent with every copy, does the work of `win`'s window, per-copy budgets and stop-retry horizon: a late copy falls below it and is answered `stale`.
+- **Memory decides between the two smallest.** `keys` keeps one entry per write for its TTL (221 B each: 13 GB at 1e5 writes a second for a 10-minute TTL); `sess` keeps one per active client (309 B: 295 MB at 1e6 clients), plus one floor per client carried with a moving slot (16 MB a move at 1e6 clients).
+- **`fwd` costs hop rules in every option** (model-checked): `win` and `keys` 2 (`forward.age`: a relay subtracts the time it held a copy from the copy's budget; `forward.once`: a relay forwards a copy only once), `pid` 1 (`forward.age`), `sess` 1 (`forward.once`). Appending every refusal to the log removes `forward.once` (and two answer rules) for one log entry per refused first send.
+- **`pid` as first written (Kafka's KIP-98 rules) could stall a partition for ever**: after a give-up, the next sequence leaves a gap the writer never fills. Kafka's fix (KIP-360, an epoch bump that restarts the sequence) cures it; so does dropping the "unknown producer starts at 0" check, because fero's per-copy budget already stops a late copy, which is what the smallest model found.
 
 ## Words used here
 
@@ -35,7 +41,7 @@ One exhaustive model in plain Python, [models/dedup.py](models/dedup.py), on E-1
 |---|---|---|
 | `win` | attempt id (issuer, call id), issuer = process + life; per issuer the highest id and the outcomes above the floor (W = 1); the issuer's window (span below W); a resend's refusal appended, a first send's not; forget after H silent; a copy's budget; stop retrying R after the first send; the fence carries outcomes and highest ids, merged by max | DESIGN-V5 4.3 |
 | `sess` | a session registered in `#s` and renewed by the client; per session the outcomes at or above the client's lowest unacknowledged id L (sent with each copy); expiry in `#s` by `#s`'s writer time; an expired session is answered `unknown`, never judged afresh; the fence carries outcomes and floors | Raft thesis 6.3; LogCabin |
-| `pid` | a producer id from `#s`; per (producer, partition) a gapless sequence; accept the next, absorb duplicates, refuse out of order; an unknown producer only at sequence 0; one attempt in flight per partition; every refusal appended (else the sequence would gap); forget after P; budgets and stop-retry as `win` | KIP-98, KIP-360, KIP-854 |
+| `pid` | a producer id from `#s`; per (producer, partition) a gapless sequence; accept the next, absorb duplicates, refuse out of order; an unknown producer only at sequence 0; one attempt in flight per partition; every refusal appended (else the sequence would gap); forget after P; budgets and stop-retry as `win`; added here after the first runs failed: after an attempt ends `unknown`, bump the epoch and restart the sequence (KIP-360), and answer "unknown producer" only once the forget has committed | KIP-98, KIP-360, KIP-854 |
 | `keys` | a unique key per write; the writer keeps each key's outcome for TTL; budgets and stop-retry as `win`; no window, no floor | Stripe, SQS dedup ids |
 
 Time constants are the smallest that leave no slack (R = B = H = S = 1 tick), so a comparison flipped by one (`<` to `<=`) can show.
@@ -50,17 +56,60 @@ Machine: 4 vCPU, 15 GB, shared with other agents (every run under the heavy lock
 
 ### 1. Rules each option needs (DEV-10)
 
-__TABLE1__
+| option | rules needed | of written | by role | mutants caught / that change behaviour | memory the writer keeps (Node 22, at 1e6) |
+|---|---|---|---|---|---|
+| `keys-smart` | **12** | 15 | answer 1, carry 2, dedup 4, hop 2, time 3 | 16 / 18 (two comparison flips survive) | 221 B per key, for its TTL: write rate x TTL keys |
+| `keys-fwd` | **14** | 18 | as smart, + hop 2 (`forward.age`, `forward.once`) | 3 / 3 (the relay's) | as smart |
+| `sess-smart` | **13** | 24 | answer 1, carry 4, dedup 8 | 14 / 17 (two comparison flips survive; one swap, the mirror of one found equivalent, was not run on `lost`) | 309 B per active client (1,237 B if kept per slot) |
+| `sess-fwd` | **14** | 25 | as smart, + hop 1 (`forward.once`) | 1 / 1 (`forward.once` dropped on the full design) | as smart |
+| `pid-smart` | **16** | 26 | carry 2, dedup 9, hop 2, time 3 | 22 / 23 (one flip survives) | 2,133 B per producer (4 partitions, Kafka's 5 cached batches) |
+| `pid-fwd` | **17** | 29 | as smart, + hop 1 (`forward.age`) | 1 / 1 (the relay's) | as smart |
+| `win-smart` | **17** | 23 | answer 1, carry 4, dedup 7, hop 2, time 3 | 22 / 25 (three comparison flips survive) | 349 B per active issuer |
+| `win-fwd` | **19** | 26 | as smart, + hop 2 (`forward.age`, `forward.once`) | 3 / 3 (the relay's) | as smart |
+| `win-fwd-all` | **16** | 21 | carry 4, dedup 6, hop 3, time 3 | 1 / 1 | as smart, + one log entry per refused first send |
 
-__ROLES__
+Every option holds as designed on every bound (`results/design.txt`; the largest design space is `sess-fwd`'s `lost`, 462,506 states). No rule of any option is a Raft guard. The `fwd` rows of `win`, `pid` and `keys` start from the `smart` option's smallest model and add the relay (E-17's procedure); `sess` under `fwd` could not be run that way: `sess-smart`'s smallest model already needs 2,298,773 states on `lost`, and with the relay it would need well over the 2.5 million limit. So its one relay rule (`forward.once`; `sess` has no budgets, so it has no `forward.age`) was dropped alone on the full `sess-fwd` and `sess-fwd-all` designs ([results/sess-fwd-relay.txt](results/sess-fwd-relay.txt)), and its count is `sess-smart`'s 13 plus what that shows. That the relay keeps every `smart` rule needed is reasoned for `sess`, and model-checked for `win`, `pid` and `keys`.
+
+`sess-smart`'s own ablation ran at a 2.5 million state limit, because its smallest model needs 2,298,773 states on `lost`. Ten of its mutants first stopped at the default 1.5 million limit on `lost`; [resolve20.py](resolve20.py) settled them by trying the small bounds first (`restart`, `move`, `expire`, `exprst`, `mvexp`) and `lost` at 2.5 million only where none of those caught the mutant. Each of the 13 kept rules breaks a property when dropped from the smallest model (6 of them on `restart` or `move` this way); one swap of two updates was not run on `lost` (8 minutes a run here) because its mirror on the fence side is equivalent.
+
+What the counts are made of:
+- **`sess` (13):** one answer rule (`recv.latest`: take only the answer to the latest copy), eight dedup rules (apply only when not among the session's outcomes, above its floor, and while the session lives; a resend's refusal only when not among the outcomes; a first send only may be refused outside the log; a copy at or below the floor is answered `stale`; answer `unknown` only once the expiry has committed in `#s`; a restarted process takes a new session), and four carry rules (the fence and the open each carry the outcomes and the floors). No time rule and no budget: the floor does that work.
+- **`win` (17):** the same shape, plus the issuer's window (`send.window`), a budget on each judged copy (2), stop retrying after R and give up after it (2), forget an issuer silent for H (1); it has no session to expire, so no `live` or `dead` rule.
+- **`keys` (12):** no floor and no window, so fewer dedup and carry rules (the fence carries outcomes only), but the same budgets and horizons as `win`.
+- **`pid` (16):** Kafka's checks that survive (state known and sequence above the last, for the next write; no state, for a new producer), each in both the apply and the refuse paths (6), one attempt in flight per partition, answer "unknown producer" only once the forget has committed (new, below), a new producer id per life, budgets (2), the stop-retry horizon (2), forgetting (1), and carry (2).
 
 ### 2. What the rules are for
 
-__WHATFOR__
+The rules fall into six jobs. Each row names the rules that do the job in each option and what breaks without them (the shortest counterexample, from the ablation files).
+
+| job | `win` | `sess` | `pid` | `keys` | without it |
+|---|---|---|---|---|---|
+| spot a duplicate | `apply.notin`, `refuse_r.notin`, `apply.floor`, `stale.floor` | the same four | `known`, `after`, `unknown` (x apply, refuse) | `apply.notin`, `refuse_r.notin` | REFUSED on `lost`: a copy refused, then applied by a later copy |
+| stop a late copy | budgets (2), `resend.horizon`, `giveup.late` | the floor (above), `apply.live` | budgets (2), `resend.horizon`, `giveup.late` | budgets (2), `resend.horizon`, `giveup.late` | ONCE on `expire`: a copy lands after the writer forgot its attempt |
+| answer honestly | `recv.latest`, `refuse_f.first` | the same two | (every refusal is appended) | the same two | REFUSED on `lost`: the client takes an old copy's refusal for a later copy that applied |
+| forget safely | `forget.silent` | `expired.dead` | `forget.silent`, `unknownpid.forgotten` | `forget.ttl` | REFUSED on `lost`, or L7: `unknown` before the design allows it |
+| a new life is a new issuer | `restart.life` | `restart.life` | `restart.life` | `restart.life` | TRUE on `restart`: a new life's id matches an old life's outcome |
+| carry state on a move | outcomes and highest ids, out and in (4) | outcomes and floors (4) | producer state, out and in (2) | outcomes, out and in (2) | ONCE on `move`: the new group applies a copy the old one already applied |
+
+Two fixes were found in `pid` as first written (KIP-98's rules, as `models/dedup.py` had them):
+- **A partition could stall for ever.** If an attempt's copies never landed and the client gave up (after R), the next attempt carried sequence 1 to a writer that never saw 0, and every later write there was refused as "unknown producer". The design run failed L7 on `expire` in 5 steps. Kafka hit the same and fixed it with KIP-360 (bump the epoch, restart the sequence at 0); the model now has that bump (`giveup.bump`, `recv.bump`).
+- **`unknown` from an uncommitted forget.** The writer answered "unknown producer" from a forget still in its uncommitted tail, so the client heard `unknown` for an attempt the design still covered (L7 on `expire`, 11 steps). The guard `unknownpid.forgotten` (answer only once the forget has committed) is `sess`'s `expired.dead` for producers.
+
+The ablation then dropped the bump, and Kafka's "an unknown producer starts at 0" and "no gap" checks with it: fero's per-copy budget already stops a late copy before the writer can forget its producer, so a gap is harmless. Kafka has no writer-side budget, so it needs them. A different drop order could keep the bump and the zero check instead of dropping both (18 rules); 16 is a 1-minimal set, not the only one.
 
 ### 3. Does `fwd` need a rule that `smart` does not?
 
-__FWD__
+Yes, in every option, but how much depends on whether any answer comes from outside the log:
+
+| option | rules only `fwd` needs | why |
+|---|---|---|
+| `win` | `forward.age`, `forward.once` | `forward.age`: a relay subtracts the time it held a copy from its budget; without it a copy lands after the writer forgot its attempt (ONCE on `expire`, 11 steps). `forward.once`: a relay forwards a copy once; without it one copy reaches the writer twice, is refused the first time with an answer that is not in the log, and applied the second time (REFUSED on `lost`, 7 steps) |
+| `keys` | `forward.age`, `forward.once` | the same two, the same traces |
+| `pid` | `forward.age` | the same budget rule as `win` (ONCE on `expire`, 10 steps). `forward.once` is not needed: `pid` appends every refusal (else its sequence would gap), so no answer comes from outside the log, and a copy delivered twice is a plain duplicate |
+| `sess` | `forward.once` | `sess` has no budgets, so no `forward.age`. Without `forward.once` a relay forwards one copy twice: the first delivery is refused (a first send's refusal, which is not in the log), the client takes that answer, and the second delivery applies (REFUSED in 9 steps, on every bound). With every refusal appended (`sess-fwd-all`), dropping it breaks nothing (every bound; `expire` and `mvexp` to the 1.5 million limit) |
+| `win-fwd-all` (every refusal appended) | `forward.age` only | with no answer outside the log, a second delivery of a copy is a plain duplicate; `recv.latest` and `refuse_f.first` go too (16 rules, against `win-fwd`'s 19), for one log entry per refused first send |
+
+So the threshold's rule applies: `fwd` needs one or two hop rules in every option, `sess` included (`forward.once`), so they are counted in every `fwd` row, and Y is not decided on latency alone: `smart` saves one rule under `sess` and two under `win` and `keys`. Browsers stay `fwd` (SPACE.md, axis Y), so these rules are written and tested in any case; `smart` only takes them off the path of server clients.
 
 ### 4. Memory per client (measured here)
 
@@ -90,5 +139,7 @@ Both `win` and `sess` must carry each issuer's (session's) floor when a slot mov
 
 ## Verdict
 
-__VERDICT__
+Every option holds exactly once in every scenario modelled, so the count and the memory decide. By the count alone `keys` (12) is one rule ahead of `sess` (13), and both are well ahead of the draft's `win` (17) and `pid` (16). `keys` keeps one entry per write for its TTL, so its memory grows with the write rate: 13 GB for one busy writer (1e5 writes a second) at a 10-minute TTL, measured at 221 B a key. `sess` keeps one entry per active client, whatever the rate (295 MB at 1e6 clients), and needs no time rule at all, because the client's floor stops late copies. So `sess` is the default for fero's own retries, and `keys` is right where the user brings a key and its TTL is short (TEST-03's keyed calls, Stripe-style idempotency). `sess` does not need its state copied per slot: the fence carries the moving slot's outcomes and every session's floor, about 16 bytes per active client per move (16 MB at 1e6 clients); kept per slot it would be 1.18 GB at 1e6 clients writing 4 slots, which is not needed. Under `fwd`, `sess` needs one more rule (`forward.once`, 14), or none if every refusal is appended to the log (one log entry per refused first send); `smart` takes it off the path of server clients, and browsers keep `fwd`.
+
+Q-20: `sess` (client sessions, Raft thesis 6.3): 13 rules, no time rule, 309 B per active client, against the draft's `win` at 17; `keys` has 12 but memory per write (13 GB per busy writer at a 10-minute TTL), so it serves user keys only; under `fwd` `sess` adds `forward.once` (14 rules), or none if every refusal is appended. Moves: `sess` rows (MIN and its family, CELL, OBJ) up on F-02, DEV-01 and DEV-10; Y `smart` up by one hop rule over `fwd` (two under `win` and `keys`), counted in every `fwd` row; `win` rows (DRAFT, LANE, SPLIT, SLOG) down on DEV-10 (4 more rules) unless they switch D to `sess`; ISR's `pid` down on DEV-10 and memory (16 rules, 2.1 KB per producer); `keys` up on TEST-03 only.
 

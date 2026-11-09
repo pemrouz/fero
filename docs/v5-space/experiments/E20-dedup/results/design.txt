@@ -95,3 +95,27 @@ keys-fwd exprst: 1,000 states, 0.0s: all hold
     L7: 724 judged states, 0 cannot reach the goal
 keys-fwd mvexp: 39,448 states, 1.7s: all hold
     L7: 23,789 judged states, 0 cannot reach the goal
+sess-fwd-all lost: 440,612 states, 69.8s: all hold
+    L7: 98,720 judged states, 0 cannot reach the goal
+sess-fwd-all move: 131,767 states, 13.9s: all hold
+    L7: 30,762 judged states, 0 cannot reach the goal
+sess-fwd-all restart: 8,051 states, 0.7s: all hold
+    L7: 3,203 judged states, 0 cannot reach the goal
+sess-fwd-all expire: 416,313 states, 46.0s: all hold
+    L7: 234,776 judged states, 0 cannot reach the goal
+sess-fwd-all exprst: 44,897 states, 3.6s: all hold
+    L7: 42,510 judged states, 0 cannot reach the goal
+sess-fwd-all mvexp: 474,731 states, 40.5s: all hold
+    L7: 327,183 judged states, 0 cannot reach the goal
+win-fwd-all lost: 24,886 states, 3.0s: all hold
+    L7: 9,958 judged states, 0 cannot reach the goal
+win-fwd-all move: 17,000 states, 1.3s: all hold
+    L7: 6,702 judged states, 0 cannot reach the goal
+win-fwd-all restart: 5,611 states, 0.5s: all hold
+    L7: 1,971 judged states, 0 cannot reach the goal
+win-fwd-all expire: 51,930 states, 3.6s: all hold
+    L7: 28,186 judged states, 0 cannot reach the goal
+win-fwd-all exprst: 1,148 states, 0.1s: all hold
+    L7: 884 judged states, 0 cannot reach the goal
+win-fwd-all mvexp: 46,629 states, 2.4s: all hold
+    L7: 31,287 judged states, 0 cannot reach the goal
