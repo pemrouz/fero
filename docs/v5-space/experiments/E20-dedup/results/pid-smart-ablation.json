@@ -1,0 +1,161 @@
+{
+ "option": "pid-smart",
+ "bounds": [
+  "lost",
+  "move",
+  "restart",
+  "expire",
+  "exprst"
+ ],
+ "verify": [
+  "mvexp"
+ ],
+ "pinned": [
+  "apply_first.append",
+  "apply_first.eat",
+  "apply_next.append",
+  "apply_next.eat",
+  "dup.eat",
+  "dup.known",
+  "dup.seen",
+  "fence.append",
+  "forget.append",
+  "giveup.status",
+  "learn.status",
+  "ooo.eat",
+  "ooo.gap",
+  "ooo.known",
+  "open.append",
+  "recv.eat",
+  "recv.status",
+  "refuse_first.append",
+  "refuse_first.eat",
+  "refuse_next.append",
+  "refuse_next.eat",
+  "register.append",
+  "resend.emit",
+  "resend.k",
+  "restart.reset",
+  "send.emit",
+  "send.status",
+  "unknownpid.eat",
+  "unknownpid.emit",
+  "unknownpid.nonzero",
+  "unknownpid.unknown"
+ ],
+ "base": {
+  "lost": {
+   "states": 10540,
+   "secs": 1.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    10540,
+    40903,
+    3972457134576996591
+   ],
+   "judged": {
+    "L7": [
+     5206,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 41517,
+   "secs": 2.95,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    41517,
+    135482,
+    10566828894151024677
+   ],
+   "judged": {
+    "L7": [
+     9835,
+     0
+    ]
+   }
+  },
+  "restart": {
+   "states": 3531,
+   "secs": 0.25,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3531,
+    9347,
+    9972220719803204660
+   ],
+   "judged": {
+    "L7": [
+     1628,
+     0
+    ]
+   }
+  },
+  "expire": {
+   "states": 19888,
+   "secs": 0.92,
+   "complete": true,
+   "fail": {
+    "L7": [
+     5,
+     [
+      [
+       "tick",
+       "1"
+      ],
+      [
+       "register",
+       "()"
+      ],
+      [
+       "commit",
+       "#s",
+       "('pid', ('p', 0))"
+      ],
+      [
+       "send",
+       "(('n', 0),)"
+      ],
+      [
+       "tick",
+       "2"
+      ]
+     ]
+    ]
+   },
+   "digest": [
+    19888,
+    57360,
+    16890464785810725742
+   ],
+   "judged": {
+    "L7": [
+     11930,
+     1854
+    ]
+   }
+  },
+  "exprst": {
+   "states": 1219,
+   "secs": 0.06,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1219,
+    2904,
+    2855668402528712969
+   ],
+   "judged": {
+    "L7": [
+     1069,
+     0
+    ]
+   }
+  }
+ },
+ "error": "the model as designed fails or does not finish: {'lost': ([], True), 'move': ([], True), 'restart': ([], True), 'expire': (['L7'], True), 'exprst': ([], True)}"
+}

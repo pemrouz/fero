@@ -1,0 +1,1687 @@
+{
+ "option": "win-fwd-all",
+ "bounds": [
+  "lost",
+  "move",
+  "restart",
+  "expire",
+  "exprst"
+ ],
+ "verify": [
+  "mvexp"
+ ],
+ "pinned": [
+  "apply.append",
+  "apply.eat",
+  "dup.eat",
+  "dup.in",
+  "fence.append",
+  "forget.append",
+  "forward.emit",
+  "giveup.status",
+  "learn.status",
+  "open.append",
+  "recv.eat",
+  "recv.status",
+  "refuse_r.append",
+  "refuse_r.eat",
+  "resend.emit",
+  "resend.k",
+  "restart.reset",
+  "send.emit",
+  "send.status",
+  "stale.eat",
+  "stale.emit"
+ ],
+ "base": {
+  "lost": {
+   "states": 24886,
+   "secs": 4.51,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    24886,
+    128809,
+    14411117536607340348
+   ],
+   "judged": {
+    "L7": [
+     9958,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 17000,
+   "secs": 2.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    17000,
+    52709,
+    18042152646807009526
+   ],
+   "judged": {
+    "L7": [
+     6702,
+     0
+    ]
+   }
+  },
+  "restart": {
+   "states": 5611,
+   "secs": 0.67,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5611,
+    18262,
+    18201698406278052363
+   ],
+   "judged": {
+    "L7": [
+     1971,
+     0
+    ]
+   }
+  },
+  "expire": {
+   "states": 51930,
+   "secs": 6.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    51930,
+    159866,
+    4477843414703541987
+   ],
+   "judged": {
+    "L7": [
+     28186,
+     0
+    ]
+   }
+  },
+  "exprst": {
+   "states": 1148,
+   "secs": 0.06,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1148,
+    2646,
+    12588772062343372863
+   ],
+   "judged": {
+    "L7": [
+     884,
+     0
+    ]
+   }
+  }
+ },
+ "from": "win-smart-ablation.json",
+ "start_removed": [
+  "refuse_r.floor",
+  "stale.notin"
+ ],
+ "greedy": [
+  [
+   "send.window",
+   "kept: with the others dropped it breaks REFUSED on lost in 11 steps"
+  ],
+  [
+   "resend.horizon",
+   "kept: with the others dropped it breaks ONCE on expire in 11 steps"
+  ],
+  [
+   "giveup.late",
+   "kept: with the others dropped it breaks L7 on lost in 2 steps"
+  ],
+  [
+   "recv.latest",
+   "dropped"
+  ],
+  [
+   "forward.budget",
+   "dropped"
+  ],
+  [
+   "forward.age",
+   "kept: with the others dropped it breaks ONCE on expire in 11 steps"
+  ],
+  [
+   "forward.once",
+   "dropped"
+  ],
+  [
+   "restart.life",
+   "kept: with the others dropped it breaks TRUE on restart in 7 steps"
+  ],
+  [
+   "apply.notin",
+   "kept: with the others dropped it breaks REFUSED on lost in 8 steps"
+  ],
+  [
+   "apply.floor",
+   "kept: with the others dropped it breaks REFUSED on lost in 12 steps"
+  ],
+  [
+   "apply.budget",
+   "kept: with the others dropped it breaks ONCE on expire in 10 steps"
+  ],
+  [
+   "refuse_r.notin",
+   "kept: with the others dropped it breaks REFUSED on lost in 8 steps"
+  ],
+  [
+   "refuse_r.budget",
+   "kept: with the others dropped it breaks REFUSED on expire in 11 steps"
+  ],
+  [
+   "stale.floor",
+   "kept: with the others dropped it breaks REFUSED on lost in 7 steps"
+  ],
+  [
+   "forget.silent",
+   "kept: with the others dropped it breaks REFUSED on lost in 10 steps"
+  ],
+  [
+   "fence.outs",
+   "kept: with the others dropped it breaks ONCE on move in 11 steps"
+  ],
+  [
+   "fence.hi",
+   "kept: with the others dropped it breaks ONCE on move in 16 steps"
+  ],
+  [
+   "open.outs",
+   "kept: with the others dropped it breaks ONCE on move in 11 steps"
+  ],
+  [
+   "open.hi",
+   "kept: with the others dropped it breaks ONCE on move in 16 steps"
+  ]
+ ],
+ "removed": [
+  "refuse_r.floor",
+  "stale.notin",
+  "recv.latest",
+  "forward.budget",
+  "forward.once"
+ ],
+ "put_back": [],
+ "minimal": {
+  "lost": {
+   "states": 111263,
+   "secs": 13.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    111263,
+    907172,
+    7452723934501756356
+   ],
+   "judged": {
+    "L7": [
+     59159,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 60071,
+   "secs": 5.49,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    60071,
+    324962,
+    15080856324409827756
+   ],
+   "judged": {
+    "L7": [
+     32447,
+     0
+    ]
+   }
+  },
+  "restart": {
+   "states": 20800,
+   "secs": 1.65,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    20800,
+    105852,
+    16053223096515787403
+   ],
+   "judged": {
+    "L7": [
+     9668,
+     0
+    ]
+   }
+  },
+  "expire": {
+   "states": 213673,
+   "secs": 17.91,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    213673,
+    1043518,
+    11227825955798616949
+   ],
+   "judged": {
+    "L7": [
+     133113,
+     0
+    ]
+   }
+  },
+  "exprst": {
+   "states": 1224,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1224,
+    3905,
+    1408246880170099471
+   ],
+   "judged": {
+    "L7": [
+     1008,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "mvexp": {
+   "states": 69720,
+   "secs": 3.93,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    69720,
+    258567,
+    7461807419191712862
+   ],
+   "judged": {
+    "L7": [
+     50420,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "send.window",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "issuer window: ids span less than W",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "id": "send.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "send.emit",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "resend.horizon",
+   "kind": "guard",
+   "role": "time",
+   "note": "stop retrying R (half the horizon) after the first send",
+   "cmp": "<",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "expire",
+    "ONCE",
+    11,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 2, 1, 1, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "resend.k",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "resend.emit",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "giveup.late",
+   "kind": "guard",
+   "role": "time",
+   "note": "after R the attempt ends unknown",
+   "cmp": ">=",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "L7",
+    2,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "giveup.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "recv.latest",
+   "kind": "guard",
+   "role": "answer",
+   "note": "accept only the answer to the latest copy",
+   "cmp": ">=",
+   "pinned": false,
+   "kept": false,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "recv.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "recv.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "learn.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "forward.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "a relay forwards only within the budget",
+   "cmp": "<",
+   "pinned": false,
+   "kept": false,
+   "alone": null,
+   "fwd_only": true
+  },
+  {
+   "id": "forward.age",
+   "kind": "update",
+   "role": "hop",
+   "note": "a relay subtracts the time it held the copy",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": true,
+   "final": [
+    "expire",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "forward.emit",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": true
+  },
+  {
+   "id": "forward.once",
+   "kind": "update",
+   "role": "hop",
+   "note": "a relay forwards a copy once (only over the link it had)",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null,
+   "fwd_only": true
+  },
+  {
+   "id": "restart.life",
+   "kind": "update",
+   "role": "dedup",
+   "note": "a restarted process takes a new issuer id (its life)",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "restart",
+    "TRUE",
+    7,
+    [
+     "TRUE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ]
+   ]
+  },
+  {
+   "id": "restart.reset",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "apply.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes (log end)",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    8,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "above the floor (highest - W)",
+   "cmp": ">",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    12,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "the copy's budget is not spent",
+   "cmp": "<",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "expire",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "apply.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "refuse_r.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes (log end)",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    8,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_r.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "above the floor (highest - W)",
+   "cmp": ">",
+   "pinned": false,
+   "kept": false,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "refuse_r.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "the copy's budget is not spent",
+   "cmp": "<",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "expire",
+    "REFUSED",
+    11,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_r.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "refuse_r.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "stale.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "stale.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "at or below the floor",
+   "cmp": "<=",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "id": "stale.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "stale.emit",
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "dup.in",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "dup.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "forget.silent",
+   "kind": "guard",
+   "role": "time",
+   "note": "forget an issuer silent for the horizon",
+   "cmp": ">=",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 0)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "forget.append",
+   "kind": "update",
+   "role": "mem",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "fence.outs",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries the slot's outcomes",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "move",
+    "ONCE",
+    11,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "fence.hi",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries each issuer's highest id",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "move",
+    "ONCE",
+    16,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset())"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset())),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "fence.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  },
+  {
+   "id": "open.outs",
+   "kind": "update",
+   "role": "carry",
+   "note": "open takes the carried outcomes",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "move",
+    "ONCE",
+    11,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "open.hi",
+   "kind": "update",
+   "role": "carry",
+   "note": "open takes the carried highest ids (merged by max)",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false,
+   "final": [
+    "move",
+    "ONCE",
+    16,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "open.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null,
+   "fwd_only": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "forward.age",
+   "caught": [
+    "expire",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forward",
+     "(('m', ('x', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  }
+ ],
+ "secs": 737
+}
