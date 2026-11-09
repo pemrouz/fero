@@ -19,6 +19,9 @@ LOAD = SP + '/e13/e13load'
 WORK = SP + '/e13/etcd'
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = HERE + '/results'
+LOGLEVEL = 'error'
+TIMEOUT = '2s'      # the load client's per-attempt timeout (--timeout); the first runs used 2 s
+SUFFIX = ''         # results file suffix for runs with another timeout (--tag)
 MEMBERS = [('m1', 33379, 33380), ('m2', 33479, 33480), ('m3', 33579, 33580), ('m4', 33679, 33680)]
 
 
@@ -44,7 +47,7 @@ def start_member(m, cluster, state, extra, procs):
            '--listen-client-urls', 'http://127.0.0.1:%d' % c, '--advertise-client-urls', 'http://127.0.0.1:%d' % c,
            '--listen-peer-urls', 'http://127.0.0.1:%d' % p, '--initial-advertise-peer-urls', 'http://127.0.0.1:%d' % p,
            '--initial-cluster', cluster, '--initial-cluster-token', 'e13', '--initial-cluster-state', state,
-           '--log-level', 'error', '--pre-vote=true'] + extra
+           '--log-level', LOGLEVEL, '--pre-vote=true'] + extra
     procs[n] = subprocess.Popen(cmd, stdout=open(WORK + '/logs/%s.log' % n, 'a'), stderr=subprocess.STDOUT)
 
 
@@ -97,7 +100,7 @@ def member_ids(eps):
 
 
 def start_load(eps, dur):
-    p = subprocess.Popen([LOAD, '-endpoints', ','.join(eps), '-rate', '2000', '-workers', '16', '-dur', '%ds' % dur],
+    p = subprocess.Popen([LOAD, '-endpoints', ','.join(eps), '-rate', '2000', '-workers', '16', '-dur', '%ds' % dur, '-timeout', TIMEOUT],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     p.stderr.readline()  # ready
     return p
@@ -135,6 +138,21 @@ def analyse(out, names, window_s=8.0):
     return res, base
 
 
+def elected_after(t0):
+    """ms from t0 (wall clock) to the first 'became leader at term' line any member logged after it (needs --log-level info)"""
+    from datetime import datetime
+    best = None
+    for n, _, _ in MEMBERS:
+        try: lines = open(WORK + '/logs/%s.log' % n, errors='replace').readlines()
+        except OSError: continue
+        for line in lines:
+            if 'became leader at term' not in line: continue
+            try: ts = datetime.fromisoformat(json.loads(line)['ts'].replace('Z', '+00:00')).timestamp()
+            except Exception: continue
+            if t0 < ts < t0 + 30 and (best is None or ts < best): best = ts
+    return round((best - t0) * 1000, 1) if best else None
+
+
 def run_move(runs):
     for r in range(runs):
         la = loadavg(); procs, eps = start_cluster([])
@@ -154,8 +172,8 @@ def run_move(runs):
         out = json.loads(load.communicate(timeout=60)[0])
         stop_cluster(procs)
         ev, base = analyse(out, names, window_s=3.0)
-        rec = {'exp': 'E-13', 'part': 'move', 'run': r, 'loadavg': la, 'events': ev, 'baseline': base, 'writes': len(out['writes']), 'errors': out['errors']}
-        open(RES + '/etcd-move.jsonl', 'a').write(json.dumps(rec) + '\n')
+        rec = {'exp': 'E-13', 'part': 'move', 'client_timeout': TIMEOUT, 'run': r, 'loadavg': la, 'events': ev, 'baseline': base, 'writes': len(out['writes']), 'errors': out['errors']}
+        open(RES + '/etcd-move%s.jsonl' % SUFFIX, 'a').write(json.dumps(rec) + '\n')
         print(json.dumps({k: rec[k] for k in ('run', 'events', 'baseline', 'errors')}), flush=True)
 
 
@@ -167,13 +185,14 @@ def run_kill(runs, election):
         time.sleep(2); mark(load, 'quiet0'); time.sleep(3); mark(load, 'quiet1')
         lead_ep, lead_id = leader_of(eps)
         name = [n for n, c, _ in MEMBERS if '127.0.0.1:%d' % c == lead_ep][0]
-        mark(load, 'kill'); procs[name].send_signal(signal.SIGKILL)
+        mark(load, 'kill'); t_kill = time.time(); procs[name].send_signal(signal.SIGKILL)
         out = json.loads(load.communicate(timeout=60)[0])
         stop_cluster(procs)
         ev, base = analyse(out, ['kill'], window_s=8.0)
-        rec = {'exp': 'E-13', 'part': 'kill', 'election_ms': election, 'heartbeat_ms': hb, 'run': r, 'loadavg': la, 'events': ev, 'baseline': base,
+        ev[0]['new_leader_after_ms'] = elected_after(t_kill)
+        rec = {'exp': 'E-13', 'part': 'kill', 'client_timeout': TIMEOUT, 'election_ms': election, 'heartbeat_ms': hb, 'run': r, 'loadavg': la, 'events': ev, 'baseline': base,
                'writes': len(out['writes']), 'errors': out['errors']}
-        open(RES + '/etcd-kill.jsonl', 'a').write(json.dumps(rec) + '\n')
+        open(RES + '/etcd-kill%s.jsonl' % SUFFIX, 'a').write(json.dumps(rec) + '\n')
         print(json.dumps({k: rec[k] for k in ('run', 'election_ms', 'events', 'baseline')}), flush=True)
 
 
@@ -230,8 +249,8 @@ def table():
         xs = [x for x in xs if x is not None]
         return (statistics.median(xs), min(xs), max(xs)) if xs else (None, None, None)
     f = lambda t: '-' if t[0] is None else '%.1f (%.1f-%.1f)' % t
-    lines = ['| part | setting | events | longest gap between acks, ms | first new write acked after the event, ms | longest logical write (retries in), ms | quiet-window gap, ms | quiet p99, ms |', '|---|---|---|---|---|---|---|---|']
-    for part, fn in (('move', 'etcd-move.jsonl'), ('kill', 'etcd-kill.jsonl')):
+    lines = ['| part | setting | events | longest gap between acks, ms | first new write acked after the event, ms | longest logical write (retries in), ms | quiet-window gap, ms | quiet p99, ms | new leader elected after the kill (members\' logs), ms |', '|---|---|---|---|---|---|---|---|---|']
+    for part, fn in (('move', 'etcd-move.jsonl'), ('kill', 'etcd-kill.jsonl'), ('move, client timeout 100 ms', 'etcd-move-t100.jsonl'), ('kill, client timeout 100 ms', 'etcd-kill-t100.jsonl')):
         p = RES + '/' + fn
         if not os.path.exists(p): continue
         rows = [json.loads(l) for l in open(p)]
@@ -240,9 +259,9 @@ def table():
             rs = [r for r in rows if r.get('election_ms', 0) == k]
             evs = [e for r in rs for e in r['events']]
             setting = 'election %d ms' % k if k else 'election 1000 ms'
-            lines.append('| %s | %s | %d events in %d runs | %s | %s | %s | %s | %s |' % (part, setting, len(evs), len(rs), f(med([e['gap_ms'] for e in evs])),
+            lines.append('| %s | %s | %d events in %d runs | %s | %s | %s | %s | %s | %s |' % (part, setting, len(evs), len(rs), f(med([e['gap_ms'] for e in evs])),
                 f(med([e['first_new_ack_ms'] for e in evs])), f(med([e['max_write_ms'] for e in evs])),
-                f(med([r['baseline']['gap_ms'] for r in rs if r['baseline']])), f(med([r['baseline']['p99_ms'] for r in rs if r['baseline']]))))
+                f(med([r['baseline']['gap_ms'] for r in rs if r['baseline']])), f(med([r['baseline']['p99_ms'] for r in rs if r['baseline']])), f(med([e.get('new_leader_after_ms') for e in evs]))))
     p = RES + '/etcd-join.jsonl'
     if os.path.exists(p):
         rows = [json.loads(l) for l in open(p)]
@@ -260,6 +279,7 @@ if __name__ == '__main__':
     def opt(k, d):
         return a[a.index(k) + 1] if k in a else d
     os.makedirs(RES, exist_ok=True)
+    TIMEOUT = opt('--timeout', '2s'); SUFFIX = opt('--tag', ''); LOGLEVEL = 'info' if SUFFIX else 'error'
     if a[0] == 'move': run_move(int(opt('--runs', 3)))
     elif a[0] == 'kill': run_kill(int(opt('--runs', 3)), int(opt('--election', 1000)))
     elif a[0] == 'join': run_join(int(opt('--runs', 3)), opt('--mode', 'log'), float(opt('--gb', 1)))

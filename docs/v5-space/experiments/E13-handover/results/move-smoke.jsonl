@@ -1,0 +1,1 @@
+{"exp":"E-13","part":"slot-move","tag":"ts/s3/r2000","impl":"ts","stages":3,"rate":2000,"loadavg":"3.61 2.09 1.09 6/146 4867","moves_started":268,"moves_done":194,"moves_skipped":0,"move_p50":20.032,"move_p90":44.16,"move_p99":67.84,"move_max":76.032,"write_p50":[5.168,6.096,5.712],"write_p99":[26.304,38.016,36.992],"cores":[0.169,0.163,0.164],"commits_s":1999.6}
