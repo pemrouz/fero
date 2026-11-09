@@ -189,16 +189,22 @@
  "put_back": [],
  "minimal": {
   "lost": {
-   "states": 1500001,
-   "secs": 114.77,
-   "complete": false,
+   "states": 2298773,
+   "secs": 492.96,
+   "complete": true,
    "fail": {},
    "digest": [
-    1500001,
-    8219492,
-    16569950131025928304
+    2298773,
+    14025424,
+    1480347321470717113
    ],
-   "judged": {}
+   "judged": {
+    "L7": [
+     681266,
+     0
+    ]
+   },
+   "resolved_by": "resolve20.py: the complete run of the same rule set"
   },
   "move": {
    "states": 978289,
@@ -498,14 +504,41 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500001,
+    "restart",
+    "TRUE",
+    6,
     [
-     "LIMIT"
+     "TRUE"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "restart.reset",
@@ -1057,14 +1090,28 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500003,
+    "restart",
+    "L7",
+    3,
     [
-     "LIMIT"
+     "L7"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "expired",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'x', (0, 0), 1)),)"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "expired.eat",
@@ -1150,14 +1197,60 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500001,
+    "move",
+    "ONCE",
+    10,
     [
-     "LIMIT"
+     "ONCE"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "fence.floor",
@@ -1176,14 +1269,77 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500001,
+    "move",
+    "ONCE",
+    14,
     [
-     "LIMIT"
+     "ONCE"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 1), (0, 1), 's1', 1, 0, 0, 1)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 1), 's1', 0, (0, 1), 1)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset())"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset())),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "fence.append",
@@ -1212,14 +1368,60 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500001,
+    "move",
+    "ONCE",
+    10,
     [
-     "LIMIT"
+     "ONCE"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset({((('s', 0, 0), 0), 'w')}), frozenset({(('s', 0, 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset({((('s', 0, 0), 0), 'w')}), frozenset({(('s', 0, 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "open.floor",
@@ -1238,14 +1440,77 @@
     ]
    ],
    "final": [
-    "lost",
-    "LIMIT",
-    1500001,
+    "move",
+    "ONCE",
+    14,
     [
-     "LIMIT"
+     "ONCE"
     ]
    ],
-   "final_trace": null
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 1), (0, 1), 's1', 1, 0, 0, 1)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 1), 's1', 0, (0, 1), 1)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 1)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 1)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ]
+   ],
+   "final_resolved_by": "resolve20.py (see the drop mutant of the same rule)"
   },
   {
    "id": "open.append",
@@ -1301,13 +1566,40 @@
   {
    "kind": "drop",
    "rule": "restart.life",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "restart",
+    "TRUE",
+    6,
     [
-     "LIMIT"
+     "TRUE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
     ]
    ]
   },
@@ -1599,93 +1891,313 @@
   {
    "kind": "drop",
    "rule": "expired.dead",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500003,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "restart",
+    "L7",
+    3,
     [
-     "LIMIT"
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "expired",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'x', (0, 0), 1)),)"
     ]
    ]
   },
   {
    "kind": "drop",
    "rule": "fence.outs",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "move",
+    "ONCE",
+    10,
     [
-     "LIMIT"
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
     ]
    ]
   },
   {
    "kind": "drop",
    "rule": "fence.floor",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "move",
+    "ONCE",
+    14,
     [
-     "LIMIT"
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 1), (0, 1), 's1', 1, 0, 0, 1)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 1), 's1', 0, (0, 1), 1)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset())"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset())),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
     ]
    ]
   },
   {
    "kind": "drop",
    "rule": "open.outs",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "move",
+    "ONCE",
+    10,
     [
-     "LIMIT"
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset({((('s', 0, 0), 0), 'w')}), frozenset({(('s', 0, 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset({((('s', 0, 0), 0), 'w')}), frozenset({(('s', 0, 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('s', 0, 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
     ]
    ]
   },
   {
    "kind": "drop",
    "rule": "open.floor",
-   "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
+   "caught": [
+    "move",
+    "ONCE",
+    14,
     [
-     "LIMIT"
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('s', 0, 0), 1), (0, 1), 's1', 1, 0, 0, 1)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('s', 0, 0), 1), 's1', 0, (0, 1), 1)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 1)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('s', 0, 0), 1)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 2, 1, 0, 0)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)"
     ]
    ]
   },
   {
    "kind": "flip",
    "rule": "recv.latest",
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
    "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
-    [
-     "LIMIT"
-    ]
-   ]
+   "equivalent": false
   },
   {
    "kind": "flip",
    "rule": "apply.floor",
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
    "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
-    [
-     "LIMIT"
-    ]
-   ]
+   "equivalent": false
   },
   {
    "kind": "flip",
@@ -1729,29 +2241,25 @@
   {
    "kind": "swap",
    "rule": "fence: outs <-> floor",
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
    "caught": null,
-   "undecided": [
-    "lost",
-    "LIMIT",
-    1500001,
-    [
-     "LIMIT"
-    ]
-   ]
+   "equivalent": true
   },
   {
    "kind": "swap",
    "rule": "open: outs <-> floor",
+   "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
    "caught": null,
    "undecided": [
     "lost",
-    "LIMIT",
-    1500001,
+    "NOT RUN",
+    0,
     [
-     "LIMIT"
+     "not caught on restart,move,expire,exprst,mvexp; lost not run"
     ]
    ]
   }
  ],
- "secs": 377
+ "secs": 377,
+ "resolve_secs": 0
 }

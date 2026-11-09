@@ -1,0 +1,77 @@
+# E-20 relay rule under sess: forward.once dropped alone on the full sess-fwd and sess-fwd-all designs, 2026-11-09T19:39:00Z, load 5.87 3.91 3.08
+sess-fwd lost: 1,523 states, 0.1s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)
+sess-fwd move: 1,854 states, 0.1s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)
+sess-fwd restart: 527 states, 0.0s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)
+sess-fwd expire: 2,654 states, 0.1s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)
+sess-fwd exprst: 2,445 states, 0.1s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's1', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's1', 0, (0, 0), 0)
+sess-fwd mvexp: 6,925 states, 0.2s: REFUSED (9 steps) (STOPPED AT THE STATE LIMIT)
+  REFUSED: shortest trace, 9 steps
+     1. register ()
+     2. commit #s ('ren', ('s', 0, 0), 0)
+     3. send (('n', 0),)
+     4. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)),)
+     5. refuse_f (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))
+     6. recv (('m', ('a', 'r', (0, 0), 1)),)
+     7. forward (('m', ('x', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)),)
+     8. apply (('g', 0), ('m', ('c', (('s', 0, 0), 0), (0, 0), 's2', 1, 0, 0, 0)))
+     9. commit g0 ('w', (('s', 0, 0), 0), 's2', 0, (0, 0), 0)
+sess-fwd-all lost: 954,182 states, 124.8s: all hold
+    L7: 302,918 judged states, 0 cannot reach the goal
+sess-fwd-all move: 293,346 states, 30.5s: all hold
+    L7: 88,982 judged states, 0 cannot reach the goal
+sess-fwd-all restart: 24,146 states, 2.2s: all hold
+    L7: 11,718 judged states, 0 cannot reach the goal
+sess-fwd-all expire: 1,500,001 states, 106.1s: all hold (STOPPED AT THE STATE LIMIT)
+sess-fwd-all exprst: 228,467 states, 22.8s: all hold
+    L7: 219,207 judged states, 0 cannot reach the goal
+sess-fwd-all mvexp: 1,500,002 states, 107.2s: all hold (STOPPED AT THE STATE LIMIT)
