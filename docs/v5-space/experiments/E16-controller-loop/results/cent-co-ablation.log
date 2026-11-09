@@ -1,2 +1,39 @@
 piece 0 start 22:46:33 1.91 2.12 1.74 5/128 8038
   pass 1: 16 of 37 rules necessary alone
+piece 0 exit 124 23:14:13
+piece 1 start 23:14:13 8.90 8.63 6.85 9/167 12763
+  pass 1: 16 of 37 rules necessary alone
+--- loop restarted after the tool's background limit stopped it (2026-11-08)
+piece 0 start 23:19:27 5.72 7.72 7.05 5/140 13300
+--- stopped 23:2x to add the stale-command reduction (2026-11-08)
+--- cache set aside: the model gained the stale-command reduction and exec.live (2026-11-08)
+--- fresh start on the reduced model with exec.live (2026-11-08)
+piece 0 start 23:47:50 0.88 1.77 2.70 2/163 16490
+  pass 1: 16 of 38 rules necessary alone
+piece 0 exit 124 00:14:22
+piece 1 start 00:14:22 3.71 2.31 2.45 1/178 18918
+  pass 1: 16 of 38 rules necessary alone
+piece 1 exit 124 00:46:21
+piece 2 start 00:46:21 1.20 1.96 2.54 4/133 21768
+  pass 1: 16 of 38 rules necessary alone
+--- stopped 00:5x: c_expire must read the mutated exec guards (2026-11-09)
+--- restart on the fixed model; cache purged of runs that mutate exec guards (2026-11-09)
+piece 0 start 01:07:23 1.61 2.49 2.82 2/139 23784
+  pass 1: 16 of 38 rules necessary alone
+piece 0 exit 124 02:20:10
+piece 1 start 02:20:10 2.09 3.57 4.41 3/132 29478
+  pass 1: 16 of 38 rules necessary alone
+piece 1 exit 124 03:09:00
+piece 2 start 03:09:00 1.00 1.03 1.50 2/127 4824
+  pass 1: 16 of 38 rules necessary alone
+piece 2 exit 124 04:03:27
+piece 3 start 04:03:27 1.00 1.02 1.32 2/130 11136
+  pass 1: 16 of 38 rules necessary alone
+  verify pass 1: 7 put back, 1 undecided
+piece 3 exit 124 04:57:02
+piece 4 start 04:57:02 1.00 1.08 1.36 2/124 16458
+  pass 1: 16 of 38 rules necessary alone
+  verify pass 1: 7 put back, 1 undecided
+  mutants: 21; caught 12; equivalent 0; undecided 9; survived 0
+cent-co: 18 rules kept of 38; error: None
+piece 4 exit 0 05:22:43

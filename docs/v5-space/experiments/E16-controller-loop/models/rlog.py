@@ -151,7 +151,9 @@ class Rlog:
         def w_append(w, st, b, d):
             s = b['s']
             d.f['log'] = st[IX['log']] + (('w', s, st[IX['wep']][s], st[IX['fold']][s]),)
-            d.f['nw'] = st[IX['nw']] + 1            # a bound counter, not a rule
+
+        def w_count(w, st, b, d):
+            d.f['nw'] = st[IX['nw']] + 1            # a bound counter (pinned), not a rule
 
         def w_fold(w, st, b, d):
             fold = list(d.f['fold'])
@@ -161,6 +163,8 @@ class Rlog:
         return [
             # the controller hands the writer role over
             Action('handover', 'deliver', handover_servers, [
+                Cmp('bound', lambda w, st, b: w.cur(st)[1], '<', lambda w, st, b: w.b.get('epochs', 5), role='bound',
+                    note='at most a few writer epochs (a bound, pinned)'),
                 Guard('gone', lambda w, st, b: not (st[0][w.cur(st)[0]][0] and st[0][w.cur(st)[0]][1]),
                       role='decide', note='the current writer is gone to the controller'),
                 Guard('alive', lambda w, st, b: st[0][b['s']][0] and st[0][b['s']][1], role='decide',
@@ -181,7 +185,8 @@ class Rlog:
                       note='it believes it holds a writer epoch'),
                 Guard('epoch', lambda w, st, b: st[IX['wep']][b['s']] == w.cur(st)[1], role='epoch',
                       note="the log's leader takes the append only with the latest committed writer epoch"),
-            ], [Update('append', w_append, role='step'), Update('fold', w_fold, role='fold')]),
+            ], [Update('append', w_append, role='step'), Update('fold', w_fold, role='fold'),
+                Update('count', w_count, role='bound')]),
         ]
 
 
@@ -192,4 +197,7 @@ BOUNDS = {
 }
 SWEEP = ('r1', 'r2')
 VERIFY = ()
-PINNED = {'rlog': ('write.bound',)}
+# Pinned: the bounds (a write attempt counts toward `writes` whether or not it
+# lands; at most a few writer epochs). Without them a dropped rule can make a
+# counter grow for ever, and the run never ends.
+PINNED = {'rlog': ('write.bound', 'write.count', 'handover.bound')}

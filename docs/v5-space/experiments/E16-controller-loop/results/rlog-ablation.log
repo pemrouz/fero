@@ -1,0 +1,14 @@
+piece 0 start 22:57:17 7.43 6.16 3.91 7/145 10909
+  pass 1: 10 of 12 rules necessary alone
+  mutants: 11; caught 6; equivalent 2; undecided 3; survived 0
+rlog: 10 rules kept of 12; error: None
+piece 0 exit 0 23:07:13
+--- rerun with pinned bounds write.count and handover.bound (2026-11-08)
+piece 0 start 23:08:47 7.85 7.15 5.73 9/168 12289
+  pass 1: 11 of 14 rules necessary alone
+--- restarted detached (2026-11-08)
+piece 0 start 23:47:04 1.14 1.97 2.81 2/141 16331
+  pass 1: 11 of 14 rules necessary alone
+  mutants: 11; caught 9; equivalent 2; undecided 0; survived 0
+rlog: 12 rules kept of 14; error: None
+piece 0 exit 0 23:55:41

@@ -69,6 +69,8 @@ class Compiled:
         self.model = model
         self.err = None
         m = mutation
+        if hasattr(model, 'mutated'):
+            model.mutated(m)      # a model may adapt a state reduction to the mutation
         self.acts = []
         for a in model.actions():
             gs = []
@@ -270,8 +272,10 @@ def first_fail(per):
 
 
 class Ablation:
-    def __init__(self, cls, bounds, verify=(), limit=1_500_000, log=print, cache_path=None, vlimit=None):
+    def __init__(self, cls, bounds, verify=(), limit=1_500_000, log=print, cache_path=None, vlimit=None,
+                 verify_pass1=False):
         self.cls, self.bounds, self.verify, self.limit, self.log = cls, bounds, list(verify), limit, log
+        self.verify_pass1 = verify_pass1
         # the verify bound may take a larger state limit than the sweep (its
         # runs are few); a cached sweep run keeps the limit it was run with
         self.vlimit = vlimit or limit
@@ -367,6 +371,26 @@ class Ablation:
                     removed.append(i)
                     greedy.append([i, 'dropped in the final pass'])
         back = []
+        if vn and self.verify_pass1:
+            # Pass 1 on the verify bound (opt-in, E-16): the design without
+            # one dropped rule, for each rule the sweep dropped. A rule whose
+            # removal alone breaks a property there is put back, as pass 1
+            # keeps a rule necessary alone on the sweep. Each such run stays
+            # near the design's size, where the reverse-order loop below
+            # would run models with many rules dropped (much larger, and a
+            # deep counterexample: hours). A run stopped at the state limit
+            # is undecided and puts nothing back.
+            und = []
+            for r in list(removed):
+                ff = first_fail(self.per(Mutation(drop=[r]), vn))
+                if ff and ff[1] != 'LIMIT':
+                    removed = [x for x in removed if x != r]
+                    back.append([r, f'put back: alone on {ff[0]} it breaks {ff[1]} in {ff[2]} steps'])
+                    greedy.append(back[-1])
+                elif ff:
+                    und.append([r, ff])
+            out['verify_pass1_undecided'] = und
+            self.log(f'  verify pass 1: {len(back)} put back, {len(und)} undecided')
         while vn:
             vr = self.per(Mutation(drop=removed), vn, True)
             ff = first_fail(vr)
@@ -388,6 +412,26 @@ class Ablation:
             removed = [x for x in removed if x != fixed]
             back.append([fixed, f'put back: without it the smallest model breaks {ff[1]} on {ff[0]} in {ff[2]} steps'])
             greedy.append(back[-1])
+        if back and self.verify_pass1:
+            # After rules were put back, prove the set 1-minimal again, on the
+            # sweep and the verify bound together (E-17's final pass, which
+            # ran before the verify): a rule put back alone against the
+            # design may be needed no longer once other rules are gone (for
+            # example the guards of an action whose update was dropped).
+            while True:
+                extra = None
+                for i in ids:
+                    if i in removed or i in pinned:
+                        continue
+                    trial = removed + [i]
+                    if first_fail(self.per(Mutation(drop=trial), bn)) is None and \
+                            first_fail(self.per(Mutation(drop=trial), vn)) is None:
+                        extra = i
+                        break
+                if extra is None:
+                    break
+                removed.append(extra)
+                greedy.append([extra, 'dropped in the final pass after the verify'])
         out['greedy'] = greedy
         out['removed'] = removed
         out['put_back'] = back

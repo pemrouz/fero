@@ -1,16 +1,20 @@
-cent-co three1: 22,839 states, 2.6s: all hold
-    P5: 14,355 judged states, 0 cannot reach the goal
-    P8: 14,338 judged states, 0 cannot reach the goal
-    SWAP: 8,484 judged states, 0 cannot reach the goal
+cent-co three1: 4,315 states, 0.3s: all hold
+    P5: 2,547 judged states, 0 cannot reach the goal
+    P8: 2,530 judged states, 0 cannot reach the goal
+    SWAP: 1,768 judged states, 0 cannot reach the goal
     WAIT: 17 judged states, 0 cannot reach the goal
-cent-co four1: 6,578 states, 0.7s: all hold
-    P5: 4,602 judged states, 0 cannot reach the goal
-    P8: 4,563 judged states, 0 cannot reach the goal
-    SWAP: 1,976 judged states, 0 cannot reach the goal
+cent-co four1: 3,193 states, 0.3s: all hold
+    P5: 2,249 judged states, 0 cannot reach the goal
+    P8: 2,210 judged states, 0 cannot reach the goal
+    SWAP: 944 judged states, 0 cannot reach the goal
     WAIT: 39 judged states, 0 cannot reach the goal
-cent-co meta1: 23,236 states, 2.6s: all hold
-    P5: 14,752 judged states, 0 cannot reach the goal
-    P8: 14,337 judged states, 0 cannot reach the goal
-    SWAP: 8,484 judged states, 0 cannot reach the goal
+cent-co meta1: 4,712 states, 0.3s: all hold
+    P5: 2,944 judged states, 0 cannot reach the goal
+    P8: 2,529 judged states, 0 cannot reach the goal
+    SWAP: 1,768 judged states, 0 cannot reach the goal
     WAIT: 415 judged states, 210 cannot reach the goal
-cent-co two-a: 900,001 states, 70.5s: all hold (STOPPED AT THE STATE LIMIT)
+cent-co two-a: 86,875 states, 6.4s: all hold
+    P5: 35,767 judged states, 0 cannot reach the goal
+    P8: 35,182 judged states, 0 cannot reach the goal
+    SWAP: 34,903 judged states, 812 cannot reach the goal
+    WAIT: 585 judged states, 360 cannot reach the goal

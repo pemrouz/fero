@@ -1,0 +1,14 @@
+cent-co two-a: 86,875 states, 7.3s: P8 (8 steps)
+    P5: 35,767 judged states, 0 cannot reach the goal
+    P8: 35,182 judged states, 92 cannot reach the goal
+    SWAP: 34,903 judged states, 812 cannot reach the goal
+    WAIT: 585 judged states, 360 cannot reach the goal
+  P8: shortest trace, 8 steps
+     1. lose-disk 1
+     2. recover 1
+     3. c_add (('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))
+     4. exec (('ep', 0), ('op', 'add'), ('r', (1, 1)))
+     5. commit cfg
+     6. catchup (1, 1)
+     7. c_promote (('ep', 1), ('lrn', frozenset({(1, 1)})), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))
+     8. crash 1

@@ -1,0 +1,2244 @@
+{
+ "bounds": [
+  "three1",
+  "four1",
+  "meta1"
+ ],
+ "verify": [
+  "three2"
+ ],
+ "pinned": [],
+ "base": {
+  "three1": {
+   "states": 2213,
+   "secs": 0.15,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2213,
+    4336,
+    17985388132437729883
+   ],
+   "judged": {
+    "P5": [
+     1473,
+     0
+    ],
+    "P8": [
+     1473,
+     0
+    ],
+    "SWAP": [
+     740,
+     0
+    ],
+    "WAIT": [
+     17,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 1673,
+   "secs": 0.1,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1673,
+    3458,
+    3169919592731118156
+   ],
+   "judged": {
+    "P5": [
+     1282,
+     0
+    ],
+    "P8": [
+     1282,
+     0
+    ],
+    "SWAP": [
+     391,
+     0
+    ],
+    "WAIT": [
+     17,
+     0
+    ]
+   }
+  },
+  "meta1": {
+   "states": 4762,
+   "secs": 0.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4762,
+    11337,
+    13883685189334092249
+   ],
+   "judged": {
+    "P5": [
+     3162,
+     0
+    ],
+    "P8": [
+     3162,
+     0
+    ],
+    "SWAP": [
+     1600,
+     0
+    ],
+    "WAIT": [
+     1455,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "add.leader",
+   "dropped"
+  ],
+  [
+   "add.idle",
+   "dropped"
+  ],
+  [
+   "add.need",
+   "dropped"
+  ],
+  [
+   "promote.leader",
+   "dropped"
+  ],
+  [
+   "promote.idle",
+   "dropped"
+  ],
+  [
+   "promote.live",
+   "dropped"
+  ],
+  [
+   "promote.caught",
+   "dropped"
+  ],
+  [
+   "promote.need",
+   "kept: with the others dropped it breaks P9 on three1 in 18 steps"
+  ],
+  [
+   "remove.leader",
+   "dropped"
+  ],
+  [
+   "remove.idle",
+   "dropped"
+  ],
+  [
+   "remove.voter",
+   "dropped"
+  ],
+  [
+   "remove.newok",
+   "dropped"
+  ],
+  [
+   "surplus.leader",
+   "dropped"
+  ],
+  [
+   "surplus.idle",
+   "dropped"
+  ],
+  [
+   "surplus.voter",
+   "dropped"
+  ],
+  [
+   "surplus.nogone",
+   "dropped"
+  ],
+  [
+   "surplus.last",
+   "dropped"
+  ],
+  [
+   "dropl.leader",
+   "dropped"
+  ],
+  [
+   "dropl.idle",
+   "dropped"
+  ],
+  [
+   "dropl.append",
+   "dropped"
+  ],
+  [
+   "remove.append",
+   "dropped in the final pass"
+  ],
+  [
+   "dropl.learner",
+   "dropped in the final pass"
+  ],
+  [
+   "dropl.gone",
+   "dropped in the final pass"
+  ],
+  [
+   "add.cand",
+   "dropped in the final pass"
+  ],
+  [
+   "remove.gone",
+   "dropped in the final pass"
+  ],
+  [
+   "remove.four",
+   "dropped in the final pass"
+  ],
+  [
+   "remove.voter",
+   "put back: alone on three2 it breaks P9 in 23 steps"
+  ],
+  [
+   "remove.append",
+   "put back: alone on three2 it breaks P8 in 1 steps"
+  ],
+  [
+   "dropl.learner",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "dropl.gone",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "add.cand",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "remove.gone",
+   "put back: alone on three2 it breaks P2 in 8 steps"
+  ],
+  [
+   "remove.four",
+   "put back: alone on three2 it breaks P3 in 4 steps"
+  ],
+  [
+   "surplus.last",
+   "put back: without it the smallest model breaks P9 on three2 in 29 steps"
+  ],
+  [
+   "add.cand",
+   "dropped in the final pass after the verify"
+  ],
+  [
+   "dropl.learner",
+   "dropped in the final pass after the verify"
+  ],
+  [
+   "dropl.gone",
+   "dropped in the final pass after the verify"
+  ]
+ ],
+ "removed": [
+  "add.leader",
+  "add.idle",
+  "add.need",
+  "promote.leader",
+  "promote.idle",
+  "promote.live",
+  "promote.caught",
+  "remove.leader",
+  "remove.idle",
+  "remove.newok",
+  "surplus.leader",
+  "surplus.idle",
+  "surplus.voter",
+  "surplus.nogone",
+  "dropl.leader",
+  "dropl.idle",
+  "dropl.append",
+  "add.cand",
+  "dropl.learner",
+  "dropl.gone"
+ ],
+ "put_back": [
+  [
+   "remove.voter",
+   "put back: alone on three2 it breaks P9 in 23 steps"
+  ],
+  [
+   "remove.append",
+   "put back: alone on three2 it breaks P8 in 1 steps"
+  ],
+  [
+   "dropl.learner",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "dropl.gone",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "add.cand",
+   "put back: alone on three2 it breaks P9 in 20 steps"
+  ],
+  [
+   "remove.gone",
+   "put back: alone on three2 it breaks P2 in 8 steps"
+  ],
+  [
+   "remove.four",
+   "put back: alone on three2 it breaks P3 in 4 steps"
+  ],
+  [
+   "surplus.last",
+   "put back: without it the smallest model breaks P9 on three2 in 29 steps"
+  ]
+ ],
+ "minimal": {
+  "three1": {
+   "states": 8471,
+   "secs": 0.5,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    8471,
+    23140,
+    668591710170280621
+   ],
+   "judged": {
+    "P5": [
+     4399,
+     0
+    ],
+    "P8": [
+     4399,
+     0
+    ],
+    "SWAP": [
+     3884,
+     0
+    ],
+    "WAIT": [
+     85,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 3510,
+   "secs": 0.2,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3510,
+    7591,
+    13120504349598406290
+   ],
+   "judged": {
+    "P5": [
+     2129,
+     0
+    ],
+    "P8": [
+     2129,
+     0
+    ],
+    "SWAP": [
+     1321,
+     0
+    ],
+    "WAIT": [
+     17,
+     0
+    ]
+   }
+  },
+  "meta1": {
+   "states": 18559,
+   "secs": 1.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    18559,
+    57329,
+    6355091937421836493
+   ],
+   "judged": {
+    "P5": [
+     9548,
+     0
+    ],
+    "P8": [
+     9548,
+     0
+    ],
+    "SWAP": [
+     8562,
+     0
+    ],
+    "WAIT": [
+     4309,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "three2": {
+   "states": 1545198,
+   "secs": 113.5,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1545198,
+    5644254,
+    2032227461692068854
+   ],
+   "judged": {
+    "P5": [
+     519818,
+     0
+    ],
+    "P8": [
+     519818,
+     0
+    ],
+    "SWAP": [
+     665063,
+     6716
+    ],
+    "WAIT": [
+     41244,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "add.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "only a working leader proposes",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "one change at a time (etcd)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.cand",
+   "kind": "guard",
+   "role": "target",
+   "note": "a live member the leader reaches, not gone",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.new",
+   "kind": "guard",
+   "role": "target",
+   "note": "this replica is not already in the config (a member back with a new disk is a new replica: DESIGN-V5 4.1)",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "LIMIT",
+    900003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "add.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "a voter is gone to the leader (a replacement is needed)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "promote.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.live",
+   "kind": "guard",
+   "role": "target",
+   "note": "a candidate: not gone to the leader",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.caught",
+   "kind": "guard",
+   "role": "swap",
+   "note": "its log reaches the commit offset exactly",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.odd",
+   "kind": "guard",
+   "role": "target",
+   "note": "promote only from three voters (to four, for the swap)",
+   "cmp": "<",
+   "alone": [
+    "three1",
+    "P3",
+    12,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P3",
+    11,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "remove.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "remove.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "the voter is gone to the leader",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    7,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "remove.four",
+   "kind": "guard",
+   "role": "swap",
+   "note": "a swap promotes first, then removes",
+   "cmp": ">=",
+   "alone": [
+    "three1",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "remove.newok",
+   "kind": "guard",
+   "role": "swap",
+   "note": "the new voter holds the commit offset again (its own promotion included)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.four",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": ">=",
+   "alone": [
+    "three1",
+    "P2",
+    1,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    1,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.nogone",
+   "kind": "guard",
+   "role": "target",
+   "note": "no voter is gone: the gone one came back",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.last",
+   "kind": "guard",
+   "role": "target",
+   "note": "the voter the ring ranks last",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three2",
+    "P9",
+    29,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "lose-disk",
+     "3"
+    ],
+    [
+     "recover",
+     "3"
+    ],
+    [
+     "add",
+     "(('r', (3, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 1)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 1)),)"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 0)"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.allheld",
+   "kind": "guard",
+   "role": "swap",
+   "note": "the voters left answer and hold the commit offset",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P2",
+    9,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    7,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    8,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    7,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "recover",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "dropl.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "add.new",
+   "caught": null,
+   "undecided": [
+    "three1",
+    "LIMIT",
+    900003,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.append",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.learner",
+   "caught": [
+    "three1",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.need",
+   "caught": [
+    "three1",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.odd",
+   "caught": [
+    "three1",
+    "P3",
+    11,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.append",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.voter",
+   "caught": [
+    "three1",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.gone",
+   "caught": [
+    "three1",
+    "P2",
+    7,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.four",
+   "caught": [
+    "three1",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.append",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.four",
+   "caught": [
+    "three1",
+    "P2",
+    1,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.last",
+   "caught": [
+    "three2",
+    "P9",
+    29,
+    [
+     "P9"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.allheld",
+   "caught": [
+    "three1",
+    "P2",
+    7,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.append",
+   "caught": [
+    "three1",
+    "P8",
+    7,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "recover",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "promote.odd",
+   "caught": [
+    "three1",
+    "P3",
+    11,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "remove.four",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "surplus.four",
+   "caught": [
+    "three1",
+    "P8",
+    7,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "recover",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "option": "self",
+ "secs": 1066
+}

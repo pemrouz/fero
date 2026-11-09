@@ -1,0 +1,65 @@
+# Verify-bound probes on the model BEFORE the stale-command reduction (2026-11-08): cent-co did not finish two-a in 4,000,000 states. Kept as a record; see verify-probes.txt for the current model.
+start 22:21:36 2.65 1.35 0.56 2/141 2511
+cent-co two-a [] 4,000,001 states, 386.0s: all hold (STOPPED AT THE STATE LIMIT) judged {} peak RSS MB 4098
+end 22:37:37
+
+hold1 start 22:42:47 3.09 2.23 1.65 5/140 7195
+  depth 1: 9 new, 10 total, 0s
+  depth 2: 63 new, 73 total, 0s
+  depth 3: 226 new, 299 total, 0s
+  depth 4: 527 new, 826 total, 0s
+  depth 5: 988 new, 1,814 total, 0s
+  depth 6: 1,783 new, 3,597 total, 0s
+  depth 7: 3,251 new, 6,848 total, 0s
+  depth 8: 5,384 new, 12,232 total, 1s
+  depth 9: 7,493 new, 19,725 total, 1s
+  depth 10: 9,128 new, 28,853 total, 2s
+  depth 11: 11,155 new, 40,008 total, 2s
+  depth 12: 14,775 new, 54,783 total, 3s
+  depth 13: 19,710 new, 74,493 total, 4s
+  depth 14: 24,944 new, 99,437 total, 6s
+cent-co two-b drop ['exec.gone'] states 99437 levels 14 complete False first failure ('P2', 14) 6s peak RSS MB 69
+  depth 1: 9 new, 10 total, 0s
+  depth 2: 51 new, 61 total, 0s
+  depth 3: 136 new, 197 total, 0s
+  depth 4: 275 new, 472 total, 0s
+  depth 5: 489 new, 961 total, 0s
+  depth 6: 989 new, 1,950 total, 0s
+  depth 7: 1,903 new, 3,853 total, 0s
+  depth 8: 2,673 new, 6,526 total, 0s
+  depth 9: 3,201 new, 9,727 total, 0s
+  depth 10: 4,647 new, 14,374 total, 1s
+  depth 11: 8,303 new, 22,677 total, 1s
+  depth 12: 12,826 new, 35,503 total, 2s
+cent-co two-a drop ['exec.allheld'] states 35503 levels 12 complete False first failure ('P2', 12) 2s peak RSS MB 32
+  depth 1: 9 new, 10 total, 0s
+  depth 2: 51 new, 61 total, 0s
+  depth 3: 132 new, 193 total, 0s
+  depth 4: 247 new, 440 total, 0s
+  depth 5: 529 new, 969 total, 0s
+  depth 6: 892 new, 1,861 total, 0s
+  depth 7: 1,197 new, 3,058 total, 0s
+  depth 8: 1,390 new, 4,448 total, 0s
+  depth 9: 1,711 new, 6,159 total, 0s
+self two-a drop ['surplus.allheld'] states 6159 levels 9 complete False first failure ('P2', 9) 0s peak RSS MB 15
+  depth 1: 14 new, 15 total, 0s
+  depth 2: 127 new, 142 total, 0s
+  depth 3: 482 new, 624 total, 0s
+  depth 4: 1,205 new, 1,829 total, 0s
+  depth 5: 2,347 new, 4,176 total, 0s
+  depth 6: 4,385 new, 8,561 total, 0s
+  depth 7: 8,224 new, 16,785 total, 1s
+  depth 8: 13,867 new, 30,652 total, 1s
+  depth 9: 20,090 new, 50,742 total, 2s
+  depth 10: 26,831 new, 77,573 total, 4s
+  depth 11: 37,918 new, 115,491 total, 6s
+  depth 12: 57,854 new, 173,345 total, 9s
+  depth 13: 86,609 new, 259,954 total, 13s
+  depth 14: 122,756 new, 382,710 total, 21s
+  depth 15: 173,152 new, 555,862 total, 31s
+  depth 16: 251,312 new, 807,174 total, 47s
+  depth 17: 362,967 new, 1,170,141 total, 71s
+  depth 18: 498,737 new, 1,668,878 total, 103s
+  depth 19: 649,036 new, 2,317,914 total, 150s
+cent-co three2 drop [] states 2317914 levels 19 complete False first failure None 150s peak RSS MB 1258
+hold1 end 22:45:29

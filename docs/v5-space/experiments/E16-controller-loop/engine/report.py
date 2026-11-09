@@ -63,6 +63,18 @@ def one(path):
     if pinned:
         print('\nPinned (bounds and world steps written as rules, never dropped or mutated): ' +
               ', '.join(f'`{r["id"]}`' for r in pinned) + '.')
+    pb = o.get('put_back') or []
+    if pb:
+        rem = set(o.get('removed', []))
+        print('\nPut back by the verify bound: ' + '; '.join(
+            f'`{r}` ({why}' + ('; dropped again in the final pass after the verify)' if r in rem else ')')
+            for r, why in pb) + '.')
+    if o.get('verify_pass1_undecided'):
+        print('\nUndecided on the verify bound (stopped at the state limit, so not put back): ' +
+              ', '.join(f'`{r}`' for r, _ in o['verify_pass1_undecided']) + '.')
+    if o.get('verify_undecided'):
+        print('\nThe smallest model on the verify bound: stopped at the state limit with no counterexample '
+              f'({o["verify_undecided"][2]:,} states).')
     if dropped:
         print('\nDropped (no property breaks without them, given the rules kept): ' +
               ', '.join(f'`{r["id"]}`' for r in dropped) + '.')

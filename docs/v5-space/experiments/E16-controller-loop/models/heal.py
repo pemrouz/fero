@@ -69,7 +69,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'engine'))
-from engine import Action, Guard, Cmp, Update   # noqa: E402
+from engine import Action, Guard, Cmp, Update, FLIP   # noqa: E402
 
 FIELDS = ('mem', 'gone', 'meta', 'vot', 'lrn', 'ep', 'newv', 'tail', 'ldr', 'held', 'got',
           'rep', 'cmds', 'chg', 'faults')
@@ -86,6 +86,7 @@ class World:
     CALM = ('deliver', 'time', 'tick')
     INFO = ('WAIT', 'SWAP')
     MODE = None
+    gc_stale = False
 
     def __init__(self, bound):
         self.b = bound
@@ -190,6 +191,12 @@ class World:
                 if tail[0] == 'cfg':
                     _, nv, nl, nn = tail
                     d['vot'], d['lrn'], d['newv'], d['ep'] = nv, nl, nn, ep + 1
+                    if self.gc_stale:
+                        # every command names the epoch it was decided at,
+                        # so after this commit none can run (exec.epoch) and
+                        # none blocks a decision ('one' reads the current
+                        # epoch): dead state, cleared (see CentCo.mutated)
+                        d['cmds'] = E
                     d['chg'] = chg + 1
                     if ldr not in nv:
                         d['ldr'] = None
@@ -452,6 +459,18 @@ class CentCo(World):
     """One controller loop on #meta's leader; commands carry the group's
     config epoch, and the group's leader checks it."""
     MODE = 'cent'
+    gc_stale = True
+
+    def mutated(self, m):
+        """A state reduction, not a rule (engine.Compiled calls this with the
+        mutation of the run). While exec.epoch is in force, a command whose
+        epoch is past can never run and never blocks a decision, so the
+        commit that raises the epoch clears them: the same behaviours with
+        fewer states (a timeout would remove them anyway; nothing reads
+        them). A run without exec.epoch keeps them, since there they can
+        still run."""
+        self.gc_stale = not (m is not None and 'exec.epoch' in m.drop)
+        self.mut = m      # c_expire asks what the group, as mutated, would run
 
     def actions(self):
         M = lambda w, st: st[IX['meta']][1]          # the controller's side
@@ -547,9 +566,22 @@ class CentCo(World):
             d.f['cmds'] = st[IX['cmds']] - {(b['op'], b['r'], b['ep'])}
 
         def runnable(w, st, b):
-            """The group's leader would run this command now."""
-            return w.leader_ok(st) and w.lside(st) == st[IX['meta']][1] and all(
-                g.test(w, st, b) for g in exec_guards)
+            """The group's leader would run this command now: exec's own
+            topology filter (it reads #meta from #meta's side) and exec's
+            guards as this run has them (exec.leader is the working leader)."""
+            return w.lside(st) == st[IX['meta']][1] and all(
+                exec_test(w, st, b, g) for g in exec_guards)
+
+        def exec_test(w, st, b, g):
+            # the exec guard as this run has it: a mutant that drops or
+            # flips an exec guard changes what the group would run, and the
+            # timeout must see the same (else it hides the mutant)
+            m = getattr(w, 'mut', None)
+            if m is not None and g.id in m.drop:
+                return True
+            if m is not None and g.id in m.flip and g.op:
+                return g.test(w, st, b, FLIP[g.op])
+            return g.test(w, st, b)
 
         acts.append(Action('c_expire', 'tick', lambda w, st: ({'op': c[0], 'r': c[1], 'ep': c[2]}
                                                                for c in sorted(st[IX['cmds']])), [
@@ -573,6 +605,10 @@ class CentCo(World):
             Guard('gone', lambda w, st, b: b['op'] not in ('remove', 'dropl') or w.gone_to(st, w.lside(st), b['r']),
                   role='view', note="a removal of a gone replica runs only if the leader's own links agree "
                                     "(DESIGN-V5's planner rule: a leader whose link to that life is up ignores it)"),
+            Guard('live', lambda w, st, b: b['op'] != 'promote' or not w.gone_to(st, w.lside(st), b['r']),
+                  role='view', note="a promotion runs only if the learner is not gone to the leader's own links "
+                                    "(found by P8 on two-a: a promotion decided before the learner died stays "
+                                    "runnable, so it never times out, and it blocks every other decision)"),
         ]
         acts.append(Action('exec', 'deliver', cmds, exec_guards,
                            [Update('append', exec_upd, role='step'),
@@ -611,3 +647,10 @@ BOUNDS = {
 # at 2,000,000 states: every trace up to 18 steps, safety only.
 SWEEP = ('three1', 'four1', 'meta1')
 VERIFY = ('three2',)
+# Before E-17's reverse-order put-back, each rule the sweep dropped is checked
+# alone on the verify bound (the design without it) and put back if that
+# breaks a property (engine.Ablation, verify_pass1). Without this step the
+# one-fault sweep drops rules that only two faults need (`surplus.voter`:
+# P9 in 29 steps with a crash and a lost disk), and models with many rules
+# dropped are too large to verify at two faults.
+VERIFY_PASS1 = True

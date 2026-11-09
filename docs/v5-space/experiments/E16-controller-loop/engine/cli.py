@@ -62,7 +62,8 @@ def main():
         t0 = time.time()
         ab = engine.Ablation(cls, [(b, mod.BOUNDS[b]) for b in mod.SWEEP],
                              verify=[(b, mod.BOUNDS[b]) for b in mod.VERIFY], limit=a.limit,
-                             cache_path=a.ablate + '.cache', vlimit=a.vlimit)
+                             cache_path=a.ablate + '.cache', vlimit=a.vlimit,
+                             verify_pass1=getattr(mod, 'VERIFY_PASS1', False))
         out = ab.run(mutate=not a.no_mutants, pinned=tuple(getattr(mod, 'PINNED', {}).get(a.option, ())))
         out['option'] = a.option
         out['secs'] = round(time.time() - t0)
