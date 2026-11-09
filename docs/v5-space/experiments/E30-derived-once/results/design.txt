@@ -1,0 +1,153 @@
+# E-30 design runs, 2026-11-09T07:45:38Z, Python 3.13.17, 4 vCPU, load 3.11 3.21 3.08
+srchi short: 64,897 states, 5.7s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srchi gcrash: 337,773 states, 32.1s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srchi drop: 136,078 states, 9.5s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srchi long: 194,691 states, 14.6s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srchi deep: 12,019 states, 0.6s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srcpos short: 64,897 states, 4.6s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srcpos gcrash: 337,773 states, 19.2s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srcpos drop: 136,078 states, 8.0s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srcpos long: 194,691 states, 11.5s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srcpos deep: 12,019 states, 0.4s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+win short: 322,785 states, 27.1s: all hold
+    DONE: 56,965 judged states, 0 cannot reach the goal
+win gcrash: 1,500,001 states, 120.2s: all hold (STOPPED AT THE STATE LIMIT)
+win drop: 681,779 states, 66.0s: all hold
+    DONE: 118,535 judged states, 0 cannot reach the goal
+win long: 1,500,004 states, 60.2s: ONCE (12 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 0), 0, 0)))
+     6. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 0, None)
+     7. tick 1
+     8. emit (('o', 0),)
+     9. forget (('g', 0), ('k', ('d', 'a1')), ('t', 0))
+    10. commit b0 ('fg', ('d', 'a1'), 1)
+    11. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 1, ('a1', 0, 0), 0, 1)))
+    12. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 1, None)
+win deep: 160,579 states, 14.6s: all hold
+    DONE: 33,037 judged states, 0 cannot reach the goal
+sess short: 322,791 states, 28.2s: all hold
+    DONE: 56,971 judged states, 0 cannot reach the goal
+sess gcrash: 1,500,001 states, 121.2s: all hold (STOPPED AT THE STATE LIMIT)
+sess drop: 681,785 states, 62.2s: all hold
+    DONE: 118,541 judged states, 0 cannot reach the goal
+sess long: 1,500,002 states, 72.4s: ONCE (13 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 13 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. tick 1
+     5. emit (('o', 0),)
+     6. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 0), 0, None)
+     8. expire (('sid', ('s', 0)), ('t', 0))
+     9. commit gc ('exp', ('s', 0))
+    10. newsess ()
+    11. resend (('o', 0),)
+    12. apply (('g', 0), ('m', ('c', (('s', 1), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+    13. commit b0 ('w', (('s', 1), ('a1', 0)), ('a1', 0, 0), 0, None)
+sess deep: 163,109 states, 12.4s: all hold
+    DONE: 35,607 judged states, 0 cannot reach the goal
+pid short: 588,677 states, 42.8s: DONE (4 steps), ONCE (9 steps)
+    DONE: 36,886 judged states, 33,633 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None)
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None)
+pid gcrash: 1,500,002 states, 96.7s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None)
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None)
+pid drop: 1,370,797 states, 108.5s: DONE (4 steps), ONCE (9 steps)
+    DONE: 89,716 judged states, 81,632 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None)
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None)
+pid long: 1,500,001 states, 105.9s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None)
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None)
+pid deep: 1,500,002 states, 89.8s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None)
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None)
+keys short: 64,897 states, 4.0s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+keys gcrash: 337,773 states, 20.8s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+keys drop: 136,078 states, 9.0s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+keys long: 1,500,001 states, 57.1s: ONCE (12 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     6. commit b0 ('w', ('k', 'a1', 0, 0), ('a1', 0, 0), 0, None)
+     7. tick 1
+     8. emit (('o', 0),)
+     9. forget (('g', 0), ('k', ('k', 'a1', 0, 0)), ('t', 0))
+    10. commit b0 ('fg', ('k', 'a1', 0, 0), 1)
+    11. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 0), 0, ('a1', 0, 0), 0, 1)))
+    12. commit b0 ('w', ('k', 'a1', 0, 0), ('a1', 0, 0), 1, None)
+keys deep: 12,019 states, 0.5s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
