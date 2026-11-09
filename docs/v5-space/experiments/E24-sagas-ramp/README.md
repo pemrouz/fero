@@ -92,7 +92,63 @@ Then a seeded simulation writes list-append histories with concurrent readers, a
 
 A seeded random simulation, built from the rules the models check: units over 2 or 3 of three partitions, under locks taken in key order and owned by the unit until it ends; a holder may crash between any two steps and a later holder finishes or undoes the unit; a step's condition may fail (then every step is undone, as `fullundo`). Three readers read 2 or 3 partitions per transaction, one partition per step, so writes land between their reads. Two visibility modes: `plain` (each step visible at once: the saga as DESIGN-V5 5.3 builds it) and `ramp` (each step is a RAMP prepare; once every prepare is acked the unit gets a timestamp and commit markers go out one by one; readers do RAMP-Fast's two rounds). 100 histories for each mode at a failure rate of 0 and of 0.15 per step. Each unit is one Elle transaction of appends (`:ok` if it ended done, `:fail` if undone or aborted); each read is one transaction of reads. Real Elle 0.2.8 (`elle.list-append`) checks each history at `:read-committed` (P-15's MUST: no G0, G1a, G1b, G1c, lost or doubled element) and at `:serializable` (which adds G-single, the fractured read).
 
-@@RESULTS@@
+## Results
+
+### 1. The saga: which designs hold (model-checked here, [results/design-saga.txt](results/design-saga.txt))
+
+| Option | one | two | sub | three | one2 | two-f | sub-f |
+|---|---|---|---|---|---|---|---|
+| `draft` | A1, 11 steps | A2, 17 steps | A1 | A1 | A1 | A1 | A1 |
+| `owned` | A1, 11 steps | holds | A1 | A1 | A1 | A1 | A1 |
+| `bump` | holds | holds | holds | holds | holds | holds | holds |
+| `fullundo` | holds | holds | holds | holds | holds | holds | holds |
+| `raise` | holds | holds | holds | holds | holds | holds | holds |
+
+@@STATES@@
+
+**The draft's write cycle (A2, G0), 17 steps: E-22's finding, now exhaustive.** Holder a1 claims p and q and begins unit 1, then pauses (its lease lapses). Holder a2 claims both locks (tokens 2) and begins unit 2; the draft does not look at unit 1. a1, still paused in its own mind, appends 1 at p with token 1: p's writer has not yet followed `#locks` to version 2 and has seen no token for p, so it accepts. a2 appends 2 at p and at q and ends. Later holder b1 (tokens 3) finds unit 1 unfinished and finishes it: 1 goes to q. Now p is [1, 2] and q is [2, 1]: unit 1 is before unit 2 on p and after it on q.
+
+**The paused holder's write after an undo (A1), 11 steps: it breaks both `draft` and `owned`.**
+1. a1 claims p and q (tokens 1), and pauses; its lease lapses.
+2. b1 (the app retrying the same saga id) claims both (tokens 2) and begins the unit.
+3. a1 wakes, reads `#sagas`, finds the unit running, and continues it.
+4. b1's step at p is refused by its condition. A refused write commits nothing, so p's writer never sees token 2.
+5. a1 appends at p with token 1. p's fence is 0 and p's writer has not yet followed `#locks` to version 2, so it accepts.
+6. b1 records `undo`; its failed step was the first, so it has nothing to undo, and it records `undone`.
+7. The unit is `undone`, yet its id is in p's list.
+
+The draft's answer to this is "every shard's writer follows `#locks`" (DESIGN-V5 5.3), with the claim that "the holder's lease margin (a round trip plus `skew.max`) covers" the follow lag. In this model the lag is any length, as it is for a paused process: a pause can outlast any margin, and a write can sit in a socket buffer. So **following `#locks` is not enough** without a bound on message delay. It is also **not needed**: `bump`, `fullundo` and `raise` hold on every bound with no following at all. All three make the same thing true: **whoever ends a unit has written every one of its partitions with its own token**, so a paused holder's later write is refused by that partition's own fence table.
+- `fullundo` gets it free on the happy path: a forward run writes every partition anyway, and an undo now undoes every step, applied or not.
+- `bump` pays one extra write per partition on every saga.
+- `raise` needs a kernel change (a refusal that commits a fence record).
+
+@@ABLATION@@
+
+### 2. RAMP-Fast (model-checked here, [results/design-ramp.txt](results/design-ramp.txt))
+
+| Option | two | fol | gc | move | fol-move | gc-move | gc-fol |
+|---|---|---|---|---|---|---|---|
+| `ramp` | holds | holds | holds | holds | holds | holds | @@GCFOL@@ |
+| `noserve` | L, V | L, V | holds | V | L, V | V | @@GCFOL2@@ |
+
+@@RAMPSTATES@@
+
+- **Read atomicity (RA), at most two rounds (R2), monotonic reads (MONO) and KEEP hold** on every bound, with a client crash between prepares and markers, a lagging follower, garbage collection and a slot move (register semantics: a version is its unit's value; see 3 for operations).
+- **A crashed client leaves its unit half committed, and a reader can see it.** `noserve` fails L in 4 steps and V in 9: unit 2 prepares at p and q, commits at p, and its client crashes. A reader sees 2 at p and fetches q's pending version 2 in round 2, as RAMP says. But q's lastCommit stays at 0 forever, so the same process's next read of q (which must not go back, fero's read rule) waits forever (L), and any other reader of q alone sees the older value (V: what one reader saw is undone for the next). RAMP's paper leaves completing a failed client's commit to recovery; here, **a round-2 fetch of a pending version commits it at the writer** (two updates: the marker and lastCommit), and every property holds.
+
+@@RAMPABL@@
+
+### 3. Elle (real Elle 0.2.8, [results/elle.md](results/elle.md), [results/elle-sim.txt](results/elle-sim.txt))
+
+| Histories | n | read committed valid (MUST) | serializable valid | anomalies (histories with it: cases) | reads needing a second round |
+|---|---|---|---|---|---|
+@@ELLETABLE@@
+
+- **The plain saga meets the MUST and not the SHOULD, as expected.** With no failed conditions, every history is valid at read committed: no G0 between units, no lost or doubled element. But readers see units half done (G-single) in nearly every history. With failed conditions, readers also see appends that are later undone (G1a, an aborted read) and lists that lose an element (incompatible order): a saga's undo is visible, which is what "readers can see the intermediate states" means (E-22 saw the same).
+- **RAMP-Fast removes almost every fractured read, but not all.** Real Elle found one G-single in 200 RAMP histories ([results/ramp-f00-069.edn](results/ramp-f00-069.edn)). It is real, and it is a property of RAMP-Fast, not of the simulation: unit 9 appended to keys 0 and 1, then unit 6 appended to keys 1 and 2. A reader got key 1 at unit 6's version, whose list is [2, 3, 9, 6]: it includes unit 9's append. RAMP-Fast's metadata on that version names only unit 6's siblings (keys 1 and 2), so the reader never asks for key 0 at unit 9, and it returns key 0 as [3], without 9. RAMP assumes a version is only its writer's value (a register). fero's operations (`push`, `incr`, `merge`, `max`, `min`) make a row's value carry every earlier unit's effect, so the version names more units than its writer. A direct count over 1,000 histories per row ([elle/fractured.py](elle/fractured.py)): @@FRACT@@
+- **The fix, `rampv`: each version carries, for each sibling partition, the newest unit it includes that also wrote there** (a small vector, one entry per partition co-written with this one), and the reader repeats round 2 until nothing more is needed. Elle finds nothing in its 200 histories, and the direct count finds no fractured read in 36,000. It costs one more novel mechanism (the vector), and the read is no longer bounded at two rounds: a fetched version can name a newer unit at a third partition (a chain through one partition). None of 36,000 reads needed a third round here, but the bound is the length of such a chain, not 2.
+
+
 
 ## What the models leave out
 
