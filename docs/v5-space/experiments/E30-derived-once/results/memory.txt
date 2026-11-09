@@ -1,3 +1,6 @@
-# E-30 memory probe, 2026-11-09T18:52:52Z, 4 vCPU, load 1.37 2.35 3.02
+# E-30 memory probe, 2026-11-09T19:36:21Z, 4 vCPU, load 3.35 2.22 2.46
 v22.22.0
-{"design":"srcpos","n":10000,"entries":10000,"bytes_per_entry":102,"total_mb":1}
+{"design":"srcpos","n":10000,"entries":10000,"bytes_per_entry":103,"total_mb":1}
+{"design":"srcpos","n":1000000,"entries":1000000,"bytes_per_entry":85,"total_mb":85}
+{"design":"srchi","n":10000,"entries":10000,"bytes_per_entry":46,"total_mb":0}
+{"design":"srchi","n":1000000,"entries":1000000,"bytes_per_entry":29,"total_mb":29}

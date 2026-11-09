@@ -72,20 +72,22 @@ def history(model, trace):
             v = o + 1
             key = D.GN[model.outs[o][2]]
             if o not in opened and cs1[2][o] == D.SENT and cs0[2][o] != D.SENT and not s1[IX['down']]:
-                opened[o] = cs1[0]
-                ops.append({'type': 'invoke', 'f': 'txn', 'value': [['append', key, v]], 'process': cs1[0]})
+                # one process per (life, output): the consumer sends a record's
+                # outputs in parallel, and a Jepsen process has one open op
+                opened[o] = (cs1[0], cs1[0] * 10 + o)
+                ops.append({'type': 'invoke', 'f': 'txn', 'value': [['append', key, v]], 'process': opened[o][1]})
             if o in opened and o not in closed:
-                p = opened[o]
-                if cs1[2][o] == D.DONE and cs0[2][o] != D.DONE and cs1[0] == p and not s1[IX['down']]:
+                life, p = opened[o]
+                if cs1[2][o] == D.DONE and cs0[2][o] != D.DONE and cs1[0] == life and not s1[IX['down']]:
                     ops.append({'type': 'ok', 'f': 'txn', 'value': [['append', key, v]], 'process': p})
                     closed.add(o)
-                elif s1[IX['down']] and not s0[IX['down']] and life0 == p:
+                elif s1[IX['down']] and not s0[IX['down']] and life0 == life:
                     ops.append({'type': 'info', 'f': 'txn', 'value': [['append', key, v]], 'process': p})
                     closed.add(o)
     for o in opened:
         if o not in closed:
             key = D.GN[model.outs[o][2]]
-            ops.append({'type': 'info', 'f': 'txn', 'value': [['append', key, o + 1]], 'process': opened[o]})
+            ops.append({'type': 'info', 'f': 'txn', 'value': [['append', key, o + 1]], 'process': opened[o][1]})
     last = trace[-1][1]
     reads = []
     for g in D.BGROUPS:

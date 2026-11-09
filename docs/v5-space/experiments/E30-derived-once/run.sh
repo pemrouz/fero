@@ -9,6 +9,7 @@
 #   ./run.sh check      the design runs (every option on every bound, every property broken listed)
 #   ./run.sh ablate     DEV-10 ablation + mutants of the options that hold (srchi-slot, srcpos)
 #   ./run.sh elle       random walks of the model as list-append histories, checked by real Elle
+#   ./run.sh mem        Node memory per entry of srcpos's key table and srchi-slot's marks
 #   ./run.sh report     results/summary.md
 # Every model and JVM run is under $SP/bin/heavy, each hold under 25 minutes.
 set -eu
@@ -48,9 +49,13 @@ if [ "$STEP" = all ] || [ "$STEP" = elle ]; then
   # dom-top (an Elle dependency) writes classes at run time: keep them out of the repo
   ( cd "$H" && $HEAVY timeout 1500 java -Djava.awt.headless=true -Dclojure.compile.path="$H/classes" -Xmx3g \
       -XX:ActiveProcessorCount=2 -cp "$HERE/clj:$JARS" clojure.main "$HERE/clj/elle_e30.clj" "$H/elle.jsonl" "$H"/*.edn )
-  { python3 elle_report.py "$H/index.jsonl" "$H/elle.jsonl"; echo; head "run"; java -version 2>&1 | head -1; } > results/elle.md
+  { python3 elle_report.py "$H/index.jsonl" "$H/elle.jsonl"; echo; head "run"; java -version 2>&1 | grep -v JAVA_TOOL_OPTIONS | sed -n 1p; } > results/elle.md
   cp "$H/index.jsonl" results/elle-index.jsonl
   cp "$H/elle.jsonl" results/elle-verdicts.jsonl
+fi
+if [ "$STEP" = all ] || [ "$STEP" = mem ]; then
+  { head "E-30 memory probe"; node --version; for d in srcpos srchi; do for n in 10000 1000000; do
+      $HEAVY node --expose-gc mem.mjs "$d" "$n"; done; done; } > results/memory.txt 2>&1
 fi
 if [ "$STEP" = all ] || [ "$STEP" = report ]; then
   python3 ../E20-dedup/report.py results/srchi-slot-ablation.json results/srcpos-ablation.json > results/summary.md
