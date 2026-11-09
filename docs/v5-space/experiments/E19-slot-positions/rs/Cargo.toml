@@ -1,0 +1,10 @@
+[package]
+name = "e19header"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
