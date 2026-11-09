@@ -1,0 +1,74 @@
+# settle.py: re-key with a step taken twice, on the bounds hunt.py C uses, up to 1,500,000 states a run
+
+Each line is one bound. A run stops at the first property that fails; a LIMIT (undecided) does not stop it.
+
+rekey-carry: the C set (its smallest set with the 3 once guards put back):
+    grow 5,133 states 0s: holds
+    shrink 16,385 states 1s: holds
+    both 6,017 states 0s: holds
+    read 11,535 states 1s: holds
+    deep 7,696 states 1s: holds
+    twice 4,091 states 0s: holds
+    twice1 24,761 states 2s: holds
+    readback 24,832 states 3s: holds
+    readback1 246,273 states 28s: holds
+    bothread 8,572 states 0s: holds
+rekey-carry: the C set without freeze.once:
+    grow 25,251 states 2s: holds
+    shrink 213,857 states 17s: holds
+    both 27,295 states 2s: holds
+    read 57,529 states 5s: holds
+    deep 36,596 states 3s: holds
+    twice 221,179 states 25s: holds
+    twice1 1,500,001 states 142s: LIMIT (undecided)
+    readback 1,358,131 states 175s: holds
+    readback1 1,500,001 states 123s: LIMIT (undecided)
+    bothread 41,068 states 3s: holds
+rekey-carry: the C set without final.once:
+    grow 8,897 states 0s: P1 in 16 steps
+rekey-carry: the C set without flip.once:
+    grow 10,642 states 1s: holds
+    shrink 27,403 states 2s: holds
+    both 11,978 states 1s: holds
+    read 24,942 states 2s: holds
+    deep 15,840 states 1s: holds
+    twice 41,986 states 4s: holds
+    twice1 571,633 states 50s: holds
+    readback 279,537 states 32s: holds
+    readback1 1,500,001 states 144s: LIMIT (undecided)
+    bothread 17,480 states 1s: holds
+rekey: the C set (its smallest set with the 3 once guards put back):
+    grow 5,133 states 0s: holds
+    shrink 16,385 states 2s: holds
+    both 6,017 states 0s: holds
+    read 13,027 states 1s: holds
+    deep 7,696 states 1s: holds
+    twice 8,393 states 1s: holds
+    twice1 24,761 states 3s: holds
+    readback 43,630 states 6s: holds
+    readback1 433,913 states 65s: holds
+    bothread 9,760 states 1s: holds
+rekey: the C set without freeze.once:
+    grow 25,251 states 3s: holds
+    shrink 213,857 states 23s: holds
+    both 27,295 states 3s: holds
+    read 67,389 states 8s: holds
+    deep 36,596 states 3s: holds
+    twice 555,979 states 87s: holds
+    twice1 1,500,001 states 187s: LIMIT (undecided)
+    readback 1,500,001 states 210s: LIMIT (undecided)
+    readback1 1,500,003 states 160s: LIMIT (undecided)
+    bothread 48,936 states 6s: holds
+rekey: the C set without final.once:
+    grow 8,897 states 1s: P1 in 16 steps
+rekey: the C set without flip.once:
+    grow 10,642 states 1s: holds
+    shrink 27,403 states 2s: holds
+    both 11,978 states 1s: holds
+    read 32,140 states 3s: holds
+    deep 15,840 states 1s: holds
+    twice 98,052 states 13s: holds
+    twice1 571,633 states 68s: holds
+    readback 554,917 states 77s: holds
+    readback1 1,500,001 states 146s: LIMIT (undecided)
+    bothread 23,234 states 2s: holds

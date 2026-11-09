@@ -9,6 +9,8 @@ shared sweep, so the shared counts stay comparable.
     python3 hunt.py --work $SP/e17c/work others     # L8 and F8 (below), as written and smallest
     python3 hunt.py --work $SP/e17c/work repeat     # a log that does NOT ignore an exact repeat
     python3 hunt.py --work $SP/e17c/work bigger     # part 2's three bounds + three groups
+    python3 hunt.py --work $SP/e17c/work combined   # R and B together (runs repeat and bigger first)
+    python3 hunt.py --work $SP/e17c/work stats      # the entry kinds each smallest model adds
     python3 hunt.py --work $SP/e17c/work all
 
 The smallest sets are this re-run's (WORK/results/<name>-ablation.json).
@@ -31,8 +33,11 @@ Checks:
       Which smallest sets still hold, and which dropped rule comes back?
   B   bigger bounds: part 2's readback, readback1 and bothread (extra.py),
       and two with a THIRD group, which no shared bound has: chain3 (p moves
-      G0 -> G1 -> G2 with the reader on) and fork3 (p and q leave G0 for G1
-      and G2 in one change).
+      G0 -> G1 -> G2 with the reader on; chain3c the same with one crash and
+      one write) and fork3 (p and q leave G0 for G1 and G2 in one change).
+  C   R and B together: each core set with every rule R or B put back, on
+      every bound at once with a step taken twice, and each rule put back
+      dropped again alone (it must break a bound).
 """
 
 import argparse
@@ -48,7 +53,7 @@ if os.environ.get('PYTHONHASHSEED') != '0':
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--work', required=True)
-ap.add_argument('what', nargs='+', choices=('others', 'repeat', 'bigger', 'stats', 'all'))
+ap.add_argument('what', nargs='+', choices=('others', 'repeat', 'bigger', 'combined', 'stats', 'all'))
 ap.add_argument('--only', action='append', default=[], help='only these result names')
 ap.add_argument('--limit', type=int, default=1_500_000)
 ap.add_argument('--res', help='where the smallest sets are (default WORK/results)')
@@ -78,10 +83,20 @@ def option_of(name):
     return base
 
 
+ORIG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'E17-partitioning', 'results')
+SOURCE = {}
+
+
 def removed(name):
+    """This re-run's smallest set; for a result it did not re-derive (the
+    give-up prices, checked fresh by verify.py instead), the original's."""
     p = os.path.join(RES, f'{name}-ablation.json')
+    SOURCE[name] = 're-run'
     if not os.path.exists(p):
-        return None
+        p = os.path.join(ORIG, f'{name}-ablation.json')
+        SOURCE[name] = 'the original set (parts 1 and 2), which this re-run checks fresh with verify.py (compare.md)'
+        if not os.path.exists(p):
+            return None
     return json.load(open(p))['removed']
 
 
@@ -278,6 +293,8 @@ def first_bad(rs):
 
 
 RLIMIT = 300_000     # states per run in the repeat check and its repairs
+PUTBACK_R = {}       # name -> rules R put back (None: not repaired)
+PUTBACK_B = {}       # name -> rules the bigger bounds put back
 
 
 def repair(opt, drop, bounds, limit=None):
@@ -299,7 +316,7 @@ def repair(opt, drop, bounds, limit=None):
             if first_bad(check(opt, trial, bounds, limit=limit)) is None:
                 singles.append(rule)
         if singles:
-            return f'repair: put back any one of {singles}'
+            return f'repair: put back any one of {singles}', singles[:1]
     order = list(bounds)
 
     def score(fb):
@@ -331,8 +348,8 @@ def repair(opt, drop, bounds, limit=None):
                 if first_bad(check(opt, trial, bounds, limit=limit)) is None:
                     back.remove(rule)
                     cur = trial
-            return f'repair: put back all of {back} (greedy, then each checked still needed)'
-    return f'repair: no set of up to 6 rules found (tried {back})'
+            return f'repair: put back all of {back} (greedy, then each checked still needed)', back
+    return f'repair: no set of up to 6 rules found (tried {back})', None
 
 
 def repair_all(opt, drop, bounds, limit=None):
@@ -398,12 +415,18 @@ def run_repeat():
                 print(f'{name} ({opt}): holds every bound with a step taken twice ({sizes}; {time.time() - t0:.0f}s)')
             elif fb[1] == 'LIMIT':
                 print(f'{name} ({opt}): undecided: {fb[0]} passed {RLIMIT:,} states with no counterexample ({sizes})')
-                print('    ' + repair_all(opt, drop, bounds, limit=RLIMIT)[0])
+                txt, back = repair_all(opt, drop, bounds, limit=RLIMIT)
+                print('    ' + txt)
+                PUTBACK_R[name] = back
             else:
                 b, p, d, tr = fb
                 print(f'{name} ({opt}): FAILS {p} on {b} in {d} steps with a step taken twice ({sizes}):')
                 print(show(tr))
-                print('    ' + repair_all(opt, drop, bounds, limit=RLIMIT)[0])
+                txt, back = repair_all(opt, drop, bounds, limit=RLIMIT)
+                print('    ' + txt)
+                PUTBACK_R[name] = back
+            if fb is None:
+                PUTBACK_R[name] = []
             sys.stdout.flush()
     finally:
         world.Draft.append = orig
@@ -437,8 +460,72 @@ def run_bigger():
                 print(f'{name} {b}: {r.states:,} states: {p} in {d} steps' + ('' if p == 'LIMIT' else ':'))
                 if p != 'LIMIT':
                     print(show(tr))
-                    print('    ' + repair(opt, drop, [b] + list(SWEEP)))
+                    txt, back = repair(opt, drop, [b] + list(SWEEP))
+                    print('    ' + txt)
+                    PUTBACK_B.setdefault(name, set()).update(back or ['?'])
             sys.stdout.flush()
+
+
+# ------------------------------------------------------------------ C: both at once
+CORE = ['fixN', 'slot', 'rekey', 'rekey-carry', 'pslot', 'split', 'lanes', 'lanes-carry', 'pslot-fused']
+
+
+def run_combined():
+    """Each core set with every rule R and B put back, checked with a step
+    taken twice on the sweep, twice1 and the bigger bounds at once; then
+    each rule put back is dropped again alone: it must break some bound
+    (so the count is 1-minimal among those put back)."""
+    print('## C: the bigger bounds and a step taken twice, together\n')
+    print('Each core set with every rule that R or B put back, run with a step taken twice on the six sweep '
+          'bounds, twice1 and the bigger bounds B uses. Then each rule put back is dropped again, alone: it '
+          'must break a bound. Runs stop at 300,000 states (LIMIT: undecided).\n')
+    orig = world.Draft.append
+    world.Draft.append = repeat_append
+    try:
+        for name in CORE:
+            if A.only and name not in A.only:
+                continue
+            drop = removed(name)
+            if drop is None or name not in PUTBACK_R:
+                print(f'{name}: no result yet (needs R first)')
+                continue
+            r, b = PUTBACK_R[name], sorted(PUTBACK_B.get(name, ()))
+            if r is None or '?' in b:
+                print(f'{name}: R or B found no repair; nothing to combine')
+                continue
+            opt = option_of(name)
+            if os.path.isdir(os.path.join(A.work, 'options', 'once')) and opt in ROPT:
+                base = {x.id for x in runner.rule_list(opt)}
+                opt = ROPT[opt]
+                drop = drop + [x.id for x in runner.rule_list(opt) if x.id not in base]
+            back = list(dict.fromkeys(r + b))
+            cur = [x for x in drop if x not in back]
+            bs = list(SWEEP) + list(VERIFY) + ['readback', 'readback1', 'bothread']
+            if opt.startswith('once-') or opt in THREE_OK:
+                bs += list(THREE)
+            if name == 'fixN':
+                bs = list(SWEEP) + list(VERIFY) + ['bothread']
+            t0 = time.time()
+            fb = first_bad(check(opt, cur, bs, limit=RLIMIT))
+            kept = len(runner.rule_list(opt)) - len(cur)
+            if fb is not None:
+                what = f'{fb[1]} on {fb[0]}' + ('' if fb[1] == 'LIMIT' else f' in {fb[2]} steps')
+                print(f'{name}: with {back} put back it still FAILS {what}')
+                if fb[1] != 'LIMIT':
+                    print(show(fb[3]))
+                continue
+            need = []
+            for x in back:
+                fx = first_bad(check(opt, cur + [x], bs, limit=RLIMIT))
+                need.append(f'{x}: ' + ('NOT needed' if fx is None else f'{fx[1]} on {fx[0]}' +
+                                        ('' if fx[1] == 'LIMIT' else f' in {fx[2]} steps')))
+            print(f'{name}: {kept} rules ({kept - len(back)} + {len(back)} put back: {", ".join(back) or "none"}) '
+                  f'hold every bound with a step taken twice ({time.time() - t0:.0f}s)')
+            for x in need:
+                print(f'    without {x}')
+            sys.stdout.flush()
+    finally:
+        world.Draft.append = orig
 
 
 # ------------------------------------------------------------------ S: the state an option adds
@@ -475,9 +562,16 @@ def run_stats():
 if __name__ == '__main__':
     what = set(A.what)
     if 'all' in what:
-        what = {'others', 'repeat', 'bigger', 'stats'}
+        what = {'others', 'repeat', 'bigger', 'combined', 'stats'}
+    if 'combined' in what:
+        what |= {'repeat', 'bigger'}
     print('# E-17 part 3: the hunt (hunt.py)\n')
-    for k, f in (('stats', run_stats), ('others', run_others), ('bigger', run_bigger), ('repeat', run_repeat)):
+    for k, f in (('stats', run_stats), ('others', run_others), ('bigger', run_bigger), ('repeat', run_repeat),
+                 ('combined', run_combined)):
         if k in what:
             f()
             print()
+    print('## Where each smallest set came from\n')
+    for n in SETS:
+        if n in SOURCE:
+            print(f'- {n}: {SOURCE[n]}')

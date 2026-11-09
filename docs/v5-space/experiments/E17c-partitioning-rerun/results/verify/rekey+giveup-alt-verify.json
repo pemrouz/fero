@@ -1,0 +1,847 @@
+{
+ "name": "rekey+giveup-alt",
+ "option": "rekey",
+ "kept": 41,
+ "pinned": [
+  "abandon.append"
+ ],
+ "minimal_holds": true,
+ "minimal_states": {
+  "grow": 46618,
+  "shrink": 597624,
+  "both": 67350,
+  "read": 134163,
+  "deep": 89539,
+  "twice": 930225,
+  "twice1": 1500001
+ },
+ "same_digests": true,
+ "same_verify": true,
+ "necessary_rerun": 39,
+ "undecided_rerun": 1,
+ "not_needed_rerun": [],
+ "agree_with_orig": 40,
+ "of": 40,
+ "rows": [
+  {
+   "id": "write.route",
+   "rerun": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.live",
+   "rerun": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.nofrz",
+   "rerun": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.dedup",
+   "rerun": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.fence",
+   "rerun": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.pos",
+   "rerun": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "write.append",
+   "rerun": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "refuse.dedup",
+   "rerun": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "refuse.stale",
+   "rerun": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "refuse.answer",
+   "rerun": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.committed",
+   "rerun": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.gen",
+   "rerun": [
+    "read",
+    "P4",
+    17,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    17,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.after",
+   "rerun": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.next",
+   "rerun": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.take",
+   "rerun": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "read.cursor",
+   "rerun": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "restart.route",
+   "rerun": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "restart.newer",
+   "rerun": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "restart.live",
+   "rerun": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "restart.take",
+   "rerun": [
+    "read",
+    "P4",
+    18,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    18,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "restart.cursor",
+   "rerun": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "orig": [
+    "read",
+    "P4",
+    16,
+    [
+     "P4"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "start.prev",
+   "rerun": [
+    "twice",
+    "P6",
+    22,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "twice",
+    "P6",
+    22,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "start.src",
+   "rerun": [
+    "twice",
+    "P6",
+    22,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "twice",
+    "P6",
+    22,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "start.append",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "cut.append",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "freeze.cutcom",
+   "rerun": [
+    "grow",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "freeze.append",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.frzcom",
+   "rerun": [
+    "grow",
+    "P6",
+    11,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P6",
+    11,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.once",
+   "rerun": [
+    "shrink",
+    "LIMIT",
+    1500002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "orig": [
+    "shrink",
+    "LIMIT",
+    1500002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.rows",
+   "rerun": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.outs",
+   "rerun": [
+    "grow",
+    "P3",
+    13,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    13,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.tok",
+   "rerun": [
+    "grow",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.fin",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "final.append",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "flip.fincom",
+   "rerun": [
+    "grow",
+    "P6",
+    4,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P6",
+    4,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "flip.noab",
+   "rerun": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "flip.append",
+   "rerun": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "abandon.noflip",
+   "rerun": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "thaw.abcom",
+   "rerun": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "P6",
+    16,
+    [
+     "P6"
+    ]
+   ],
+   "same": true
+  },
+  {
+   "id": "thaw.append",
+   "rerun": [
+    "grow",
+    "L5",
+    6,
+    [
+     "L5",
+     "L5g",
+     "L7"
+    ]
+   ],
+   "orig": [
+    "grow",
+    "L5",
+    6,
+    [
+     "L5",
+     "L5g",
+     "L7"
+    ]
+   ],
+   "same": true
+  }
+ ]
+}

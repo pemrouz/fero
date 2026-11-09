@@ -4,7 +4,7 @@
 # checkpoints; then the hunt for missed and extra rules. Nothing in
 # ../E17-partitioning is changed; it is only copied (and its results read).
 #
-#   ./run.sh              # the default: cheap cores variants warm orders verify extra table compare
+#   ./run.sh              # the default: cheap cores variants warm orders verify extra settle table compare
 #   ./run.sh cheap        # fixN, split (all variants), pslot-fused (all variants): full re-runs
 #   ./run.sh cores        # slot, rekey, rekey-carry, lanes, lanes-carry, pslot: full re-runs, with mutants
 #                         # (cores1 and cores2 are its two halves, run here as two chains side by side)
@@ -18,6 +18,7 @@
 #                         # first rekey+giveup (superseded by rekey+giveup-alt)
 #   ./run.sh giveups      # NOT in the default: the give-up prices re-derived in full
 #   ./run.sh extra        # the hunt (hunt.py) on this re-run's sets -> results/hunt.txt
+#   ./run.sh settle       # the hunt's undecided re-key checks, up to 1.5M states -> results/settle.txt
 #   ./run.sh table        # the table of options (table.py) -> results/table.md
 #   ./run.sh compare      # this re-run against the originals (compare.py) -> results/compare.md
 #
@@ -37,7 +38,7 @@ VAR=${VAR:-$SP/e17c/variants}
 HEAVY=${HEAVY:-$SP/bin/heavy}
 [ -x "$HEAVY" ] || HEAVY=
 JOBS=${JOBS:-2}
-PHASES=${*:-cheap cores variants warm orders verify extra table compare}
+PHASES=${*:-cheap cores variants warm orders verify extra settle table compare}
 
 [ -n "$FRESH" ] && rm -rf "$WORK" "$VAR"
 if [ ! -d "$WORK/harness" ]; then
@@ -130,7 +131,8 @@ for ph in $PHASES; do
     verify)
       for n in slot+abort pslot+abort lanes+abort rekey-carry+giveup rekey+giveup-alt; do
         check "$n"
-      done ;;
+      done
+      mkdir -p "$HERE/results/verify" && cp "$WORK"/results/*-verify.json "$HERE/results/verify/" ;;
     verify2)
       for n in slot+giveup rekey+giveup; do
         check "$n"
@@ -164,7 +166,19 @@ for ph in $PHASES; do
       run lanes+abort lanes --pin abort.append --pin import.append --tag lanes+abort --seed-from lanes \
           --no-mutants --warm-from lanes $GU --warm-keep fence.once ;;
     extra)
-      (cd "$HERE" && $HEAVY python3 hunt.py --work "$WORK" all > results/hunt.txt) ;;
+      # the hunt runs in the second harness root, which also holds the
+      # probe models (options/once: the "once" guards split and the fused
+      # probe never wrote), on this re-run's smallest sets
+      if [ ! -d "$VAR/harness" ]; then
+        mkdir -p "$VAR/results"
+        (cd "$WORK" && tar cf - harness options) | (cd "$VAR" && tar xf -)
+      fi
+      cp -r "$HERE/models/." "$VAR/options/"
+      (cd "$HERE" && $HEAVY python3 hunt.py --work "$VAR" --res "$WORK/results" all > results/hunt.txt) ;;
+    settle)
+      # two heavy holds (each about 15 to 25 minutes on this box)
+      (cd "$HERE" && $HEAVY python3 settle.py --work "$WORK" --head --name rekey-carry > results/settle.txt &&
+       $HEAVY python3 settle.py --work "$WORK" --name rekey >> results/settle.txt) ;;
     table)
       (cd "$HERE" && $HEAVY python3 table.py --work "$WORK" > results/table.md) ;;
     compare)
