@@ -507,7 +507,7 @@ func doGen() {
 	hotN := math.Max(1, math.Ceil(float64(n)*hot))
 	myRate := rate * float64(len(ledHot)) / hotN
 	el := float64(time.Since(genStart).Microseconds()) / 1000
-	due := math.Floor(el * myRate / 1000)
+	due := math.Floor(el*myRate/1000) + 1 // writes whose ideal arrival time is not later than now
 	for made < due {
 		rng ^= rng << 13
 		rng ^= rng >> 17
@@ -562,6 +562,15 @@ func flushPeer(p int, ping bool) {
 }
 
 func processReady() {
+	// frames queued outside the Ready loop (quiet notices from doTick, wake requests from
+	// handleItems) must go out even when no group is dirty
+	defer func() {
+		for p := 0; p < nPeers; p++ {
+			if outCount[p] > 0 {
+				flushPeer(p, false)
+			}
+		}
+	}()
 	for pass := 0; pass < 4 && len(dirtyList) > 0; pass++ {
 		list := dirtyList
 		dirtyList = nil
