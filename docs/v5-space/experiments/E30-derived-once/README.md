@@ -35,7 +35,11 @@ One exhaustive model in plain Python, [models/derived.py](models/derived.py), on
 | `keys` | an idempotency key per output, (source slot, sequence, group), kept for TTL = H |
 | `srcpos` | the id is the source position; kept for the source's retention (here the source keeps everything, so the key is never dropped) |
 | `srchi` | the id is the source position; the writer keeps one number per (consumer, source slot): the highest source sequence applied in this group, written in the output's own entry; an output at or below it is a duplicate |
+| `srchi-slot` | `srchi` kept per (consumer, source slot, B slot) instead, so a B slot move carries exactly that slot's numbers (added after `srchi` failed the move bounds) |
+| `srcpos-nok` | `srcpos` with the id (source slot, sequence) only, without the output's order k within the record's outputs (a check on why k is needed) |
 
-**Bounds**: `short` (one consumer restart, no time passes), `gcrash` (a restart and one leader crash in b0, b1 or gc), `drop` (a restart and one lost message), `long` (a restart while time passes beyond H), `deep` (x1 then x2 on one source slot, two restarts).
+**Bounds**: `short` (one consumer restart, no time passes), `gcrash` (a restart and one leader crash in b0, b1 or gc), `drop` (a restart and one lost message), `long` (a restart while time passes beyond H), `deep` (x1 then x2 on one source slot, two restarts), `bmove` and `bmove2` (a B slot move: x1's outputs sit in B slots P in b0 and R in b1, R moves from b1 to b0 by E-15's fence and open while the consumer may restart; `bmove2` adds x2 in P). In the move bounds, `win`, `sess`, `pid` and `keys` carry nothing with the moved slot: what each must carry is E-20's question, so only `srcpos` and `srchi` carry their state here.
+
+**Memory** ([mem.mjs](mem.mjs)): the same method as E-20's probe (build the map in Node 22, full GC, heap delta per entry) for the two options that hold: `srcpos`'s key per output and `srchi-slot`'s number per (consumer, source slot, B slot).
 
 __RESULTS_LONG__

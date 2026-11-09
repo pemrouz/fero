@@ -1,0 +1,3 @@
+# E-30 memory probe, 2026-11-09T18:52:52Z, 4 vCPU, load 1.37 2.35 3.02
+v22.22.0
+{"design":"srcpos","n":10000,"entries":10000,"bytes_per_entry":102,"total_mb":1}

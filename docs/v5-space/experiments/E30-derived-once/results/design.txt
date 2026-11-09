@@ -1,19 +1,465 @@
-# E-30 design runs, 2026-11-09T12:54:11Z, Python 3.13.17, 4 vCPU, load 3.68 5.37 4.83
-srchi-slot short: 64,897 states, 3.8s: all hold
+# E-30 design runs, 2026-11-09T18:25:41Z, Python 3.13.17, 4 vCPU, load 3.21 1.94 1.03
+srchi-slot short: 64,897 states, 5.1s: all hold
     DONE: 13,728 judged states, 0 cannot reach the goal
-srchi-slot gcrash: 337,773 states, 22.1s: all hold
+srchi-slot gcrash: 337,773 states, 32.7s: all hold
     DONE: 68,882 judged states, 0 cannot reach the goal
-srchi-slot drop: 136,078 states, 10.8s: all hold
+srchi-slot drop: 136,078 states, 11.2s: all hold
     DONE: 28,331 judged states, 0 cannot reach the goal
-srchi-slot long: 194,691 states, 14.6s: all hold
+srchi-slot long: 194,691 states, 15.6s: all hold
     DONE: 41,184 judged states, 0 cannot reach the goal
-srchi-slot deep: 12,019 states, 0.8s: all hold
+srchi-slot deep: 12,019 states, 0.6s: all hold
     DONE: 3,500 judged states, 0 cannot reach the goal
-srchi-slot bmove: 7,029 states, 0.2s: all hold
+srchi-slot bmove: 7,029 states, 0.5s: all hold
     DONE: 2,210 judged states, 0 cannot reach the goal
-srchi-slot bmove2: 42,877 states, 2.9s: all hold
+srchi-slot bmove2: 42,877 states, 2.8s: all hold
     DONE: 11,178 judged states, 0 cannot reach the goal
-srcpos short: 64,897 states, 4.4s: all hold
+srcpos short: 64,897 states, 4.8s: all hold
     DONE: 13,728 judged states, 0 cannot reach the goal
-srcpos gcrash: 337,773 states, 26.3s: all hold
+srcpos gcrash: 337,773 states, 27.9s: all hold
     DONE: 68,882 judged states, 0 cannot reach the goal
+srcpos drop: 136,078 states, 10.7s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srcpos long: 194,691 states, 16.2s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srcpos deep: 12,019 states, 0.8s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srcpos bmove: 7,029 states, 0.3s: all hold
+    DONE: 2,210 judged states, 0 cannot reach the goal
+srcpos bmove2: 42,877 states, 2.7s: all hold
+    DONE: 11,178 judged states, 0 cannot reach the goal
+srchi short: 64,897 states, 4.8s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srchi gcrash: 337,773 states, 28.5s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srchi drop: 136,078 states, 11.9s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srchi long: 194,691 states, 18.2s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srchi deep: 12,019 states, 0.7s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srchi bmove: 6,655 states, 0.4s: DONE (1 steps), LOST (12 steps)
+    DONE: 2,076 judged states, 1,042 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', ('d', 'a1', 0), ('a1', 0, 0), 0, 0, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+srchi bmove2: 44,523 states, 3.4s: DONE (1 steps), LOST (12 steps)
+    DONE: 11,468 judged states, 5,074 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', ('d', 'a1', 0), ('a1', 0, 0), 0, 0, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+srcpos-nok short: 64,897 states, 5.8s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srcpos-nok gcrash: 337,773 states, 36.4s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srcpos-nok drop: 136,078 states, 14.3s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srcpos-nok long: 194,691 states, 19.4s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srcpos-nok deep: 12,019 states, 0.6s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srcpos-nok bmove: 6,655 states, 0.3s: DONE (1 steps), LOST (12 steps)
+    DONE: 2,076 judged states, 1,042 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', ('d', 'a1', 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+srcpos-nok bmove2: 44,523 states, 2.8s: DONE (1 steps), LOST (12 steps)
+    DONE: 11,468 judged states, 5,074 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', ('d', 'a1', 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+win short: 322,785 states, 56.7s: all hold
+    DONE: 56,965 judged states, 0 cannot reach the goal
+win gcrash: 1,500,001 states, 200.5s: all hold (STOPPED AT THE STATE LIMIT)
+win drop: 681,779 states, 91.7s: all hold
+    DONE: 118,535 judged states, 0 cannot reach the goal
+win long: 1,500,004 states, 80.6s: ONCE (12 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 0), 0, 0)))
+     6. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 0, None, 'b0')
+     7. tick 1
+     8. emit (('o', 0),)
+     9. forget (('g', 0), ('k', ('d', 'a1')), ('t', 0))
+    10. commit b0 ('fg', ('d', 'a1'), 1)
+    11. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 1, ('a1', 0, 0), 0, 1)))
+    12. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 1, None, 'b0')
+win deep: 160,579 states, 19.3s: all hold
+    DONE: 33,037 judged states, 0 cannot reach the goal
+win bmove: 17,791 states, 1.3s: DONE (1 steps), LOST (12 steps), ONCE (11 steps)
+    DONE: 5,255 judged states, 2,198 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 11 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 1), 1, 0)))
+     4. commit b1 ('w', (('d', 'a1'), 0), ('a1', 0, 1), 0, None, 'R')
+     5. resend (('o', 1),)
+     6. fence ()
+     7. commit b1 ('fence', 'R', frozenset())
+     8. open (('f', ('fence', 'R', frozenset())),)
+     9. commit b0 ('open', 'R', frozenset(), 0)
+    10. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 1), 1, 0)))
+    11. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 1), 0, None, 'R')
+win bmove2: 183,923 states, 18.3s: DONE (1 steps), LOST (12 steps), ONCE (11 steps)
+    DONE: 35,503 judged states, 12,768 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 11 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 1), 1, 0)))
+     4. commit b1 ('w', (('d', 'a1'), 0), ('a1', 0, 1), 0, None, 'R')
+     5. resend (('o', 1),)
+     6. fence ()
+     7. commit b1 ('fence', 'R', frozenset())
+     8. open (('f', ('fence', 'R', frozenset())),)
+     9. commit b0 ('open', 'R', frozenset(), 0)
+    10. apply (('g', 0), ('m', ('c', (('d', 'a1'), 0), 0, ('a1', 0, 1), 1, 0)))
+    11. commit b0 ('w', (('d', 'a1'), 0), ('a1', 0, 1), 0, None, 'R')
+sess short: 322,791 states, 30.8s: all hold
+    DONE: 56,971 judged states, 0 cannot reach the goal
+sess gcrash: 1,500,001 states, 134.5s: all hold (STOPPED AT THE STATE LIMIT)
+sess drop: 681,785 states, 72.2s: all hold
+    DONE: 118,541 judged states, 0 cannot reach the goal
+sess long: 1,500,002 states, 77.3s: ONCE (13 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 13 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. tick 1
+     5. emit (('o', 0),)
+     6. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 0), 0, None, 'b0')
+     8. expire (('sid', ('s', 0)), ('t', 0))
+     9. commit gc ('exp', ('s', 0))
+    10. newsess ()
+    11. resend (('o', 0),)
+    12. apply (('g', 0), ('m', ('c', (('s', 1), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+    13. commit b0 ('w', (('s', 1), ('a1', 0)), ('a1', 0, 0), 0, None, 'b0')
+sess deep: 163,109 states, 15.1s: all hold
+    DONE: 35,607 judged states, 0 cannot reach the goal
+sess bmove: 17,821 states, 1.1s: DONE (1 steps), LOST (14 steps), ONCE (13 steps)
+    DONE: 5,285 judged states, 2,222 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 14 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. emit (('o', 0),)
+     5. emit (('o', 1),)
+     6. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 0), 0, None, 'P')
+     8. learn (('o', 0),)
+     9. fence ()
+    10. commit b1 ('fence', 'R', frozenset())
+    11. open (('f', ('fence', 'R', frozenset())),)
+    12. learn (('o', 1),)
+    13. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    14. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 13 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. emit (('o', 1),)
+     5. apply (('g', 1), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 1), 1, 0)))
+     6. commit b1 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 1), 0, None, 'R')
+     7. resend (('o', 1),)
+     8. fence ()
+     9. commit b1 ('fence', 'R', frozenset())
+    10. open (('f', ('fence', 'R', frozenset())),)
+    11. commit b0 ('open', 'R', frozenset(), 0)
+    12. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 1), 1, 0)))
+    13. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 1), 0, None, 'R')
+sess bmove2: 182,589 states, 14.3s: DONE (1 steps), LOST (14 steps), ONCE (13 steps)
+    DONE: 38,541 judged states, 14,104 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 14 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. emit (('o', 0),)
+     5. emit (('o', 1),)
+     6. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 0), 0, None, 'P')
+     8. learn (('o', 0),)
+     9. fence ()
+    10. commit b1 ('fence', 'R', frozenset())
+    11. open (('f', ('fence', 'R', frozenset())),)
+    12. learn (('o', 1),)
+    13. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    14. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 13 steps
+     1. start ()
+     2. register ()
+     3. commit gc ('ren', ('s', 0), 0)
+     4. emit (('o', 1),)
+     5. apply (('g', 1), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 1), 1, 0)))
+     6. commit b1 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 1), 0, None, 'R')
+     7. resend (('o', 1),)
+     8. fence ()
+     9. commit b1 ('fence', 'R', frozenset())
+    10. open (('f', ('fence', 'R', frozenset())),)
+    11. commit b0 ('open', 'R', frozenset(), 0)
+    12. apply (('g', 0), ('m', ('c', (('s', 0), ('a1', 0)), 0, ('a1', 0, 1), 1, 0)))
+    13. commit b0 ('w', (('s', 0), ('a1', 0)), ('a1', 0, 1), 0, None, 'R')
+pid short: 588,677 states, 91.3s: DONE (4 steps), ONCE (9 steps)
+    DONE: 36,886 judged states, 33,633 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+pid gcrash: 1,500,002 states, 162.2s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+pid drop: 1,370,797 states, 171.0s: DONE (4 steps), ONCE (9 steps)
+    DONE: 89,716 judged states, 81,632 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+pid long: 1,500,001 states, 120.6s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+pid deep: 1,500,002 states, 103.8s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'b0')
+pid bmove: 61,445 states, 3.2s: DONE (1 steps), LOST (12 steps), ONCE (9 steps)
+    DONE: 10,161 judged states, 6,853 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'P')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'P')
+pid bmove2: 589,904 states, 41.5s: DONE (1 steps), LOST (12 steps), ONCE (9 steps)
+    DONE: 55,896 judged states, 46,466 cannot reach the goal
+  DONE: shortest trace, 1 steps
+     1. fence ()
+  LOST: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     5. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'P')
+     6. learn (('o', 0),)
+     7. fence ()
+     8. commit b1 ('fence', 'R', frozenset())
+     9. open (('f', ('fence', 'R', frozenset())),)
+    10. learn (('o', 1),)
+    11. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+    12. commit gc ('cur', 'a1', 1)
+  ONCE: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. emit (('o', 0),)
+     6. apply_first (('g', 0), ('m', ('c', (('p', 0), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     7. commit b0 ('w', (('p', 0), 0, 0), ('a1', 0, 0), 0, None, 'P')
+     8. apply_first (('g', 0), ('m', ('c', (('p', 1), 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     9. commit b0 ('w', (('p', 1), 0, 0), ('a1', 0, 0), 0, None, 'P')
+keys short: 64,897 states, 4.5s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+keys gcrash: 337,773 states, 25.2s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+keys drop: 136,078 states, 10.2s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+keys long: 1,500,001 states, 65.8s: ONCE (12 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 12 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. crash ()
+     4. start ()
+     5. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 0), 0, ('a1', 0, 0), 0, 0)))
+     6. commit b0 ('w', ('k', 'a1', 0, 0), ('a1', 0, 0), 0, None, 'b0')
+     7. tick 1
+     8. emit (('o', 0),)
+     9. forget (('g', 0), ('k', ('k', 'a1', 0, 0)), ('t', 0))
+    10. commit b0 ('fg', ('k', 'a1', 0, 0), 1)
+    11. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 0), 0, ('a1', 0, 0), 0, 1)))
+    12. commit b0 ('w', ('k', 'a1', 0, 0), ('a1', 0, 0), 1, None, 'b0')
+keys deep: 12,019 states, 0.6s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+keys bmove: 9,121 states, 0.4s: DONE (4 steps), ONCE (11 steps)
+    DONE: 2,823 judged states, 855 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+     4. fence ()
+  ONCE: shortest trace, 11 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+     4. commit b1 ('w', ('k', 'a1', 0, 1), ('a1', 0, 1), 0, None, 'R')
+     5. resend (('o', 1),)
+     6. fence ()
+     7. commit b1 ('fence', 'R', frozenset())
+     8. open (('f', ('fence', 'R', frozenset())),)
+     9. commit b0 ('open', 'R', frozenset(), 0)
+    10. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+    11. commit b0 ('w', ('k', 'a1', 0, 1), ('a1', 0, 1), 0, None, 'R')
+keys bmove2: 65,097 states, 3.9s: DONE (4 steps), ONCE (11 steps)
+    DONE: 16,849 judged states, 7,260 cannot reach the goal
+  DONE: shortest trace, 4 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+     4. fence ()
+  ONCE: shortest trace, 11 steps
+     1. start ()
+     2. emit (('o', 1),)
+     3. apply (('g', 1), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+     4. commit b1 ('w', ('k', 'a1', 0, 1), ('a1', 0, 1), 0, None, 'R')
+     5. resend (('o', 1),)
+     6. fence ()
+     7. commit b1 ('fence', 'R', frozenset())
+     8. open (('f', ('fence', 'R', frozenset())),)
+     9. commit b0 ('open', 'R', frozenset(), 0)
+    10. apply (('g', 0), ('m', ('c', ('k', 'a1', 0, 1), 0, ('a1', 0, 1), 1, 0)))
+    11. commit b0 ('w', ('k', 'a1', 0, 1), ('a1', 0, 1), 0, None, 'R')
