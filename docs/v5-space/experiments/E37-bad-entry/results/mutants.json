@@ -115,6 +115,7 @@
   "verdict": "not caught"
  },
  "ZRepair:drop-guard:r07": {
+  "by": "ZLogInv on par2 (4 states in the trace)",
   "runs": {
    "par1": {
     "complete": true,
@@ -132,6 +133,14 @@
     "stuck_live": null,
     "violated": null
    },
+   "par2": {
+    "complete": false,
+    "distinct": 48,
+    "error": null,
+    "secs": 637,
+    "stuck_live": null,
+    "violated": "ZLogInv"
+   },
    "par2d": {
     "complete": true,
     "distinct": 570034,
@@ -141,7 +150,7 @@
     "violated": null
    }
   },
-  "verdict": "not caught"
+  "verdict": "caught"
  },
  "ZRepair:drop-guard:r08": {
   "runs": {

@@ -22,6 +22,8 @@ java -version 2>&1 | grep -v Picked >> results/versions.txt
 python3 --version >> results/versions.txt
 if [ "$1" = mutants ]; then
   for k in 1 2 3 4; do "$SP/bin/heavy" timeout 1560 python3 tools/mutrun37.py --runs par1,par1r2,par2d --inhold --budget 900; done
+  # the peer-slot guard needs the same offset on two replicas: par2 (17 min)
+  python3 tools/mutrun37.py --runs par2 --only ZRepair:drop-guard:r07 --force --timeout 1500
   exit 0
 fi
 if [ $# -gt 0 ]; then
@@ -35,6 +37,7 @@ python3 tools/run37.py cut1 cut1-obs silent1 ghost1 ghost1-obs --timeout 1500
 python3 tools/run37.py rejoin1 rejoin2 --timeout 1500
 # 3. Z par (the cheapest fix): one damage plus a crash; two damages at
 #    different offsets; repair only from the leader.
-python3 tools/run37.py par1 par1r2 par1c par2 par2d par2d-leader par2-leader --timeout 1500
+python3 tools/run37.py par1 par1r2 par2 par2d par2d-leader par2-leader --timeout 1500
 # 4. DEV-10's mutants of the par fix.
 for k in 1 2 3 4; do "$SP/bin/heavy" timeout 1560 python3 tools/mutrun37.py --runs par1,par1r2,par2d --inhold --budget 900; done
+python3 tools/mutrun37.py --runs par2 --only ZRepair:drop-guard:r07 --force --timeout 1500
