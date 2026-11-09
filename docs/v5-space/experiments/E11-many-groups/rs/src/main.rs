@@ -139,6 +139,8 @@ impl Host {
       for p in 0..self.np { if self.out_count[p] > 0 { self.flush(p, false); } }
       for g in lights { if self.groups[g].rn.has_ready() { self.mark(g); } }
     }
+    // frames queued outside the Ready loop (quiet notices from tick, wake requests from handle) go out even when no group was dirty
+    for p in 0..self.np { if self.out_count[p] > 0 { self.flush(p, false); } }
   }
 }
 
@@ -227,7 +229,7 @@ fn main() {
     if started && rate > 0.0 && now >= next_gen && now < we && !led_hot.is_empty() {
       next_gen = now + Duration::from_millis(1);
       let my_rate = rate * led_hot.len() as f64 / hot_n as f64;
-      let due = (now.duration_since(gen_start).as_secs_f64() * my_rate).floor();
+      let due = (now.duration_since(gen_start).as_secs_f64() * my_rate).floor() + 1.0; // writes whose ideal arrival is not later than now
       while made < due {
         rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
         let gi = led_hot[((rng as f64 / 4294967296.0) * led_hot.len() as f64) as usize];

@@ -32,6 +32,7 @@ function configs(block) {
   if (block === 'idle') for (const m of Object.keys(MODES)) for (const n of idleNs) c.push({ m, n, rate: 0, hot: 1 });
   if (block === 'idle-small') for (const m of Object.keys(MODES)) for (const n of [10, 100, 1000, 2000]) c.push({ m, n, rate: 0, hot: 1 });
   if (block === 'idle-10k') for (const m of Object.keys(MODES)) c.push({ m, n: 10000, rate: 0, hot: 1 });
+  if (block === 'idle-quiet') for (const n of idleNs) c.push({ m: 'quiet500', n, rate: 0, hot: 1 });
   if (block === 'busy') {
     for (const n of [1, 10, 16, 100, 1000, 2000, 10000]) c.push({ m: 'quiet500', n, rate: 10000, hot: 1 });
     for (const n of [100, 1000, 2000, 10000]) c.push({ m: 'quiet500', n, rate: 10000, hot: 0.01 });
@@ -58,7 +59,7 @@ async function runOne(impl, c) {
   for (let i = 1; i <= 3; i++) {
     const [cmd, ...pre] = BIN[impl];
     const argv = [...pre, `id=${i}`, `n=${c.n}`, `mode=${md.mode}`, `tick=${md.tick}`, `elect=${md.elect}`, 'ping=500', `rate=${c.rate}`, `hot=${c.hot}`,
-      'size=100', `warm=${warm}`, 'dur=10000', `dir=${dir}`, 'fsync=1', `ports=${ports}`];
+      'size=100', `warm=${warm}`, 'dur=6000', `dir=${dir}`, 'fsync=1', `ports=${ports}`];
     const p = spawn(cmd, argv, { stdio: ['pipe', 'pipe', 'pipe'] });
     let err = ''; p.stderr.on('data', (d) => { err += d; if (err.length > 20000) err = err.slice(-20000); });
     p.errText = () => err;

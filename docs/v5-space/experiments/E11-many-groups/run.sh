@@ -24,7 +24,7 @@ build() {
 case "${1:-all}" in
   build) build ;;
   smoke) for i in go rs ts; do node "$HERE/bench.mjs" block=smoke runs=1 impls=$i n=100 m=quiet500 rate=1000; done ;;
-  idle-small|idle-10k|busy|busy-tick) node "$HERE/bench.mjs" block="$1" runs="${RUNS:-3}" ;;
+  idle-small|idle-10k|idle-quiet|busy|busy-tick) node "$HERE/bench.mjs" block="$1" runs="${RUNS:-3}" ;;
   summary) python3 "$HERE/summarize.py" "$HERE/results/runs.jsonl" > "$HERE/results/tables.md"; cat "$HERE/results/tables.md" ;;
   all)
     "$SP/bin/heavy" sh "$HERE/run.sh" build

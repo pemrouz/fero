@@ -137,6 +137,8 @@ function processReady() {
     for (let p = 0; p < NP; p++) if (outCount[p] > 0) flush(p, false);
     for (const [g, rd] of rds) { apply(rd.CommittedEntries); groups[g].rn.Advance(rd); if (groups[g].rn.HasReady()) { const gr = groups[g]; if (!gr.dirty) { gr.dirty = true; dirty.push(g); } } }
   }
+  // frames queued outside the Ready loop (quiet notices from tick, wake requests from onFrame) go out even when no group was dirty
+  for (let p = 0; p < NP; p++) if (outCount[p] > 0) flush(p, false);
   if (dirty.length) schedule();
 }
 function tick() {
@@ -171,7 +173,7 @@ let rng = 0x9e3779b9 | 0;
 function gen() {
   if (!started || !ledHot.length) return;
   const now = performance.now(); if (now >= we) return;
-  const myRate = a.rate * ledHot.length / hotN; const due = Math.floor((now - genStart) * myRate / 1000);
+  const myRate = a.rate * ledHot.length / hotN; const due = Math.floor((now - genStart) * myRate / 1000) + 1; // writes whose ideal arrival is not later than now
   while (made < due) {
     rng ^= rng << 13; rng ^= rng >>> 17; rng ^= rng << 5;
     const g = ledHot[Math.floor(((rng >>> 0) / 4294967296) * ledHot.length)];
