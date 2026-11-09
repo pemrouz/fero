@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>E-40 cold client</title>
+<script type="module">
+// E-40 cold client in a browser page, or (mode=worker) in a dedicated Web Worker started by this page.
+// Times are milliseconds from navigation start (the page's performance.timeOrigin).
+const q = new URLSearchParams(location.search)
+const opts = { name: 'room', secret: 'e40-secret', firstWrite: [{ type: 0, key: ['k1', 'n'], value: 1 }] }
+const t0 = performance.now()
+try {
+  if (q.get('mode') === 'worker') {
+    const tw = performance.now()
+    const w = new Worker('./worker.mjs?' + q, { type: 'module' })
+    w.onmessage = (e) => { const off = e.data.timeOrigin - performance.timeOrigin; const m = {}; for (const [k, v] of Object.entries(e.data.marks)) m[k] = +(v + off).toFixed(2)
+      window.__r = { mode: 'worker', script_start: +t0.toFixed(2), worker_created: +tw.toFixed(2), worker_origin: +off.toFixed(2), import_ms: e.data.import_ms, marks: m, warm: e.data.warm, rows: e.data.rows } }
+    w.onerror = (e) => { window.__r = { error: String(e.message) } }
+  } else {
+    const a = performance.now(); const c = await import('./client.mjs'); const b = performance.now()
+    const cl = await c.connect(q.get('wss'), opts)
+    const m = {}; for (const [k, v] of Object.entries(cl.marks)) m[k] = +v.toFixed(2)
+    const cl2 = await c.connect(q.get('wss'), { ...opts, firstWrite: [{ type: 0, key: ['k2', 'n'], value: 2 }] }) // warm: a second client
+    const w = {}; for (const [k, v] of Object.entries(cl2.marks)) w[k] = +(v - cl2.marks.start).toFixed(2)
+    window.__r = { mode: 'page', script_start: +t0.toFixed(2), import_ms: +(b - a).toFixed(2), marks: m, warm: w, rows: Object.keys(cl.data[Symbol.for('data.v4.value')] ?? {}).length }
+  }
+} catch (e) { window.__r = { error: String(e) } }
+</script>
