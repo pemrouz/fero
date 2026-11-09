@@ -1,0 +1,2965 @@
+{
+ "bounds": [
+  "lost",
+  "move",
+  "restart",
+  "expire",
+  "exprst"
+ ],
+ "verify": [
+  "mvexp"
+ ],
+ "pinned": [
+  "send.status",
+  "send.emit",
+  "resend.k",
+  "resend.emit",
+  "recv.status",
+  "recv.eat",
+  "learn.status",
+  "giveup.status",
+  "forward.emit",
+  "restart.reset",
+  "register.append",
+  "renew.append",
+  "newsess.unknown",
+  "fence.append",
+  "open.append",
+  "dup.in",
+  "dup.eat",
+  "dup.known",
+  "dup.seen",
+  "ooo.known",
+  "ooo.gap",
+  "ooo.eat",
+  "unknownpid.unknown",
+  "unknownpid.nonzero",
+  "unknownpid.eat",
+  "unknownpid.emit",
+  "apply.eat",
+  "apply.append",
+  "refuse_r.eat",
+  "refuse_r.append",
+  "refuse_f.eat",
+  "refuse_f.emit",
+  "stale.eat",
+  "stale.emit",
+  "expired.eat",
+  "expired.emit",
+  "forget.append",
+  "expire.append",
+  "send.L",
+  "resend.L",
+  "apply_next.eat",
+  "apply_next.append",
+  "apply_first.eat",
+  "apply_first.append",
+  "refuse_next.eat",
+  "refuse_next.append",
+  "refuse_first.eat",
+  "refuse_first.append"
+ ],
+ "base": {
+  "lost": {
+   "states": 6316,
+   "secs": 0.47,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    6316,
+    24935,
+    13609629923325043256
+   ],
+   "judged": {
+    "L7": [
+     2628,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 6764,
+   "secs": 0.36,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    6764,
+    17046,
+    8091752830790676099
+   ],
+   "judged": {
+    "L7": [
+     2433,
+     0
+    ]
+   }
+  },
+  "restart": {
+   "states": 2259,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2259,
+    5989,
+    8537489546670107837
+   ],
+   "judged": {
+    "L7": [
+     747,
+     0
+    ]
+   }
+  },
+  "expire": {
+   "states": 19777,
+   "secs": 0.96,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    19777,
+    54509,
+    14677108632336201561
+   ],
+   "judged": {
+    "L7": [
+     10256,
+     0
+    ]
+   }
+  },
+  "exprst": {
+   "states": 643,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    643,
+    1535,
+    12234845639633904865
+   ],
+   "judged": {
+    "L7": [
+     463,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "giveup.late",
+   "dropped"
+  ],
+  [
+   "refuse_r.floor",
+   "dropped"
+  ],
+  [
+   "refuse_r.resend",
+   "dropped"
+  ],
+  [
+   "refuse_f.notin",
+   "dropped"
+  ],
+  [
+   "refuse_f.floor",
+   "dropped"
+  ],
+  [
+   "refuse_f.budget",
+   "dropped"
+  ],
+  [
+   "stale.notin",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "giveup.late",
+  "refuse_r.floor",
+  "refuse_r.resend",
+  "refuse_f.notin",
+  "refuse_f.floor",
+  "refuse_f.budget",
+  "stale.notin"
+ ],
+ "put_back": [],
+ "minimal": {
+  "lost": {
+   "states": 77253,
+   "secs": 6.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    77253,
+    451367,
+    12990286629668711091
+   ],
+   "judged": {
+    "L7": [
+     49275,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 64898,
+   "secs": 4.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    64898,
+    230396,
+    4022377268791172395
+   ],
+   "judged": {
+    "L7": [
+     40754,
+     0
+    ]
+   }
+  },
+  "restart": {
+   "states": 5192,
+   "secs": 0.25,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5192,
+    18694,
+    4940908612890220063
+   ],
+   "judged": {
+    "L7": [
+     3218,
+     0
+    ]
+   }
+  },
+  "expire": {
+   "states": 61225,
+   "secs": 3.23,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    61225,
+    219973,
+    16605555416435436292
+   ],
+   "judged": {
+    "L7": [
+     39603,
+     0
+    ]
+   }
+  },
+  "exprst": {
+   "states": 853,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    853,
+    2398,
+    9724031763446545233
+   ],
+   "judged": {
+    "L7": [
+     649,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "mvexp": {
+   "states": 36391,
+   "secs": 1.71,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    36391,
+    108318,
+    915318408303307053
+   ],
+   "judged": {
+    "L7": [
+     24141,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "send.window",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "issuer window: ids span less than W",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    8,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    8,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "id": "send.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "lost",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "send.emit",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "resend.horizon",
+   "kind": "guard",
+   "role": "time",
+   "note": "stop retrying R (half the horizon) after the first send",
+   "cmp": "<",
+   "alone": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "resend.k",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "id": "resend.emit",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "L7",
+    2,
+    [
+     "L7"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "giveup.late",
+   "kind": "guard",
+   "role": "time",
+   "note": "after R the attempt ends unknown",
+   "cmp": ">=",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "giveup.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "expire",
+    "L7",
+    2,
+    [
+     "L7"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "expire",
+    "L7",
+    3,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "drop",
+     "('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)"
+    ],
+    [
+     "tick",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "recv.latest",
+   "kind": "guard",
+   "role": "answer",
+   "note": "accept only the answer to the latest copy",
+   "cmp": ">=",
+   "alone": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "id": "recv.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "recv.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "learn.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "L7",
+    2,
+    [
+     "L7"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "restart.life",
+   "kind": "update",
+   "role": "dedup",
+   "note": "a restarted process takes a new issuer id (its life)",
+   "cmp": null,
+   "alone": [
+    "restart",
+    "TRUE",
+    6,
+    [
+     "TRUE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "restart",
+    "TRUE",
+    6,
+    [
+     "TRUE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ]
+   ]
+  },
+  {
+   "id": "restart.reset",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "restart",
+    "ONCE",
+    7,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "restart",
+    "ONCE",
+    7,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 1), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 1), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes (log end)",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "above the floor (highest - W)",
+   "cmp": ">",
+   "alone": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "the copy's budget is not spent",
+   "cmp": "<",
+   "alone": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "lost",
+    "REFUSED",
+    5,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "refuse_r.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes (log end)",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_r.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "above the floor (highest - W)",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refuse_r.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "the copy's budget is not spent",
+   "cmp": "<",
+   "alone": [
+    "expire",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "expire",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_r.resend",
+   "kind": "guard",
+   "role": "perf",
+   "note": "only a resend's refusal is appended",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refuse_r.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "refuse_r.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "refuse_f.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes (log end)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refuse_f.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "above the floor (highest - W)",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refuse_f.budget",
+   "kind": "guard",
+   "role": "hop",
+   "note": "the copy's budget is not spent",
+   "cmp": "<",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refuse_f.first",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "a refusal not appended only for a first send",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_f.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lost",
+    "REFUSED",
+    5,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "lost",
+    "REFUSED",
+    5,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 1)),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "refuse_f.emit",
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "stale.notin",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "not among the outcomes",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "stale.floor",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "at or below the floor",
+   "cmp": "<=",
+   "alone": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "id": "stale.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "stale.emit",
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "dup.in",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "dup.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "forget.silent",
+   "kind": "guard",
+   "role": "time",
+   "note": "forget an issuer silent for the horizon",
+   "cmp": ">=",
+   "alone": [
+    "lost",
+    "REFUSED",
+    9,
+    [
+     "REFUSED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lost",
+    "REFUSED",
+    9,
+    [
+     "REFUSED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 0)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "id": "forget.append",
+   "kind": "update",
+   "role": "mem",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "fence.outs",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries the slot's outcomes",
+   "cmp": null,
+   "alone": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "fence.hi",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries each issuer's highest id",
+   "cmp": null,
+   "alone": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset())"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset())),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "fence.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "open.outs",
+   "kind": "update",
+   "role": "carry",
+   "note": "open takes the carried outcomes",
+   "cmp": null,
+   "alone": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "open.hi",
+   "kind": "update",
+   "role": "carry",
+   "note": "open takes the carried highest ids (merged by max)",
+   "cmp": null,
+   "alone": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "id": "open.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "move",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "send.window",
+   "caught": [
+    "lost",
+    "REFUSED",
+    8,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resend.horizon",
+   "caught": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "recv.latest",
+   "caught": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 1)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "restart.life",
+   "caught": [
+    "restart",
+    "TRUE",
+    6,
+    [
+     "TRUE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "restart",
+     "()"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.notin",
+   "caught": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.floor",
+   "caught": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.budget",
+   "caught": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse_r.notin",
+   "caught": [
+    "lost",
+    "REFUSED",
+    7,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse_r.budget",
+   "caught": [
+    "expire",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse_f.first",
+   "caught": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "refuse_f",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 'r', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stale.floor",
+   "caught": [
+    "lost",
+    "REFUSED",
+    6,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "stale",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "recv",
+     "(('m', ('a', 's', (0, 0), 2)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "forget.silent",
+   "caught": [
+    "lost",
+    "REFUSED",
+    9,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 0)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "fence.outs",
+   "caught": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "fence.hi",
+   "caught": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset())"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset())),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "open.outs",
+   "caught": [
+    "move",
+    "ONCE",
+    10,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset({((('i', 0), 0), 'w')}), frozenset({(('i', 0), 0)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset({(('i', 0), 0)}), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "open.hi",
+   "caught": [
+    "move",
+    "ONCE",
+    14,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 's2', frozenset(), frozenset({(('i', 0), 1)}))),)"
+    ],
+    [
+     "commit",
+     "g1",
+     "('open', 's2', frozenset(), frozenset(), 0)"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g1",
+     "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "resend.horizon",
+   "caught": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 1, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "recv.latest",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "flip",
+   "rule": "apply.floor",
+   "caught": [
+    "lost",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 1), (0, 1), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 1), 's1', 0, (0, 1), None)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "apply.budget",
+   "caught": [
+    "expire",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "refuse_r.budget",
+   "caught": [
+    "expire",
+    "REFUSED",
+    10,
+    [
+     "REFUSED"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "resend",
+     "(('n', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
+    ],
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "forget",
+     "(('g', 0), ('iss', ('i', 0)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('fg', ('i', 0), 1)"
+    ],
+    [
+     "refuse_r",
+     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
+    ],
+    [
+     "commit",
+     "g0",
+     "('r', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'r'))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "stale.floor",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "flip",
+   "rule": "forget.silent",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "swap",
+   "rule": "fence: outs <-> hi",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "open: outs <-> hi",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "win-smart",
+ "secs": 748
+}
