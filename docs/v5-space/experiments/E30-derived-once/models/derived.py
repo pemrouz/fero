@@ -105,6 +105,8 @@ class Derived:
         self.ndrops = bound.get('drops', 1)
         self.restarts = bound.get('restarts', 1)
         self.slots = tuple(sorted(self.src))
+        self.bslots = bound.get('bslots')          # B slot per output (default: one slot per B group)
+        self.bmove = bound.get('bmove')            # (B slot, from group, to group): a B slot move
 
     # ------------------------------------------------------------ state
     def init(self):
@@ -206,17 +208,71 @@ class Derived:
             if self.ostat(st, o) == SENT and self.kk(st, o) < self.cap:
                 yield {'o': o}
 
+    def bslot(self, o):
+        return self.bslots[o] if self.bslots else GN[self.outs[o][2]]
+
+    def owner(self, st, bs):
+        """World: the B group that holds B slot bs open (by log end); None
+        while a move has fenced it and the target has not opened it."""
+        if self.bmove and self.bmove[0] == bs:
+            _, src, dst = self.bmove
+            if any(e[0] == 'open' and e[1] == bs for e in self.log(st, dst)):
+                return dst
+            if any(e[0] == 'fence' and e[1] == bs for e in self.log(st, src)):
+                return None
+            return src
+        return next(self.outs[o][2] for o in range(len(self.outs)) if self.bslot(o) == bs)
+
     def p_copies(self, md, st):
         for m in st[IX['net']]:
             if m[0] == 'c':
-                yield {'m': m, 'g': m[3][2]}
+                g = self.owner(st, self.bslot(m[4]))
+                if g is not None:
+                    yield {'m': m, 'g': g}
 
     def p_learn(self, md, st):
         if st[IX['down']]:
             return
-        for o, (s, q, g) in enumerate(self.outs):
-            if self.ostat(st, o) == SENT and self.outcome(st, g, self.wid(st, o), True) is not None:
+        for o in range(len(self.outs)):
+            if self.ostat(st, o) != SENT:
+                continue
+            g = self.owner(st, self.bslot(o))     # the writer that holds the output's slot now
+            if g is not None and self.outcome(st, g, self.wid(st, o), True) is not None:
                 yield {'o': o}
+
+    # ---- a B slot move (bound `bmove`): E-15's protocol, abstract; the
+    # option says what the fence carries
+    def carry_out(self, st, bs, src):
+        return E
+
+    def move_actions(self):
+        def p_fence(md, st):
+            if self.bmove and not any(e[0] == 'fence' for e in self.log(st, self.bmove[1])):
+                yield {}
+
+        def carry(md, st, b, d):
+            d.f['_e']['carry'] = self.carry_out(st, self.bmove[0], self.bmove[1])
+
+        def fence(md, st, b, d):
+            self.append(d, self.bmove[1], ('fence', self.bmove[0], d.f['_e'].get('carry', E)))
+
+        def p_open(md, st):
+            if not self.bmove or any(e[0] == 'open' for e in self.log(st, self.bmove[2])):
+                return
+            for e in self.com(st, self.bmove[1]):
+                if e[0] == 'fence':
+                    yield {'f': e}
+
+        def take(md, st, b, d):
+            d.f['_e']['carry'] = b['f'][2]
+
+        def opn(md, st, b, d):
+            self.append(d, self.bmove[2], ('open', self.bmove[0], d.f['_e'].get('carry', E), st[IX['now']]))
+        return [Action('fence', 'control', p_fence, [],
+                       [U('carry', carry, 'carry', 'the fence carries the option\'s dedup state for the slot'),
+                        U('append', fence, 'world')]),
+                Action('open', 'deliver', p_open, [],
+                       [U('carry', take, 'carry', 'open takes the carried state'), U('append', opn, 'world')])]
 
     def p_answers(self, md, st):
         for m in st[IX['net']]:
@@ -316,6 +372,7 @@ class Derived:
             d.f['faults'] = d.f['faults'] + 1
         A.append(Action('crash', 'control', p_crash, [], [U('crash', crash, 'world')]))
         A.extend(self.option_actions())
+        A.extend(self.move_actions())
         return A
 
     ANSWERS = False   # True: the writer answers outside the log (win's stale, sess's unknown)
@@ -427,7 +484,7 @@ class Derived:
             m = b['m']
             s, q, g = m[3]
             x = d.f['_e'].get('x', extra(st, b) if extra else None)
-            self.append(d, g, ('w', m[1], (s, q, g), st[IX['now']] if self.TIMED else 0, x))
+            self.append(d, b['g'], ('w', m[1], (s, q, g), st[IX['now']] if self.TIMED else 0, x, self.bslot(m[4])))
         return U('append', f, 'world')
 
     def answer(self, code):
@@ -681,16 +738,24 @@ class Keys(Derived):
 
 # ===================================================================== srcpos
 class SrcPos(Derived):
-    """The attempt id is the source position; kept for the source's
-    retention (the source keeps everything here, so it is never dropped)."""
+    """The attempt id is the source position and the output's order k within
+    the record's outputs (as a keyed call's (key, k), DESIGN-V5 4.5); kept for
+    the source's retention (the source keeps everything here, so it is never
+    dropped). ID_K = False is the id without k (bound bmove shows why k is
+    needed)."""
+    ID_K = True
 
     def wid(self, st, o):
         s, q, g = self.outs[o]
-        return ('d', s, q)
+        k = sum(1 for (s2, q2, g2) in self.outs[:o] if (s2, q2) == (s, q))
+        return ('d', s, q, k) if self.ID_K else ('d', s, q)
 
     def outcome(self, st, g, wid, committed):
         ents = self.com(st, g) if committed else self.log(st, g)
-        return 'w' if any(e[0] == 'w' and e[1] == wid for e in ents) else None
+        return 'w' if any((e[0] == 'w' and e[1] == wid) or (e[0] == 'open' and wid in e[2]) for e in ents) else None
+
+    def carry_out(self, st, bs, src):
+        return frozenset(e[1] for e in self.log(st, src) if e[0] == 'w' and e[5] == bs)
 
     def option_actions(self):
         notin = lambda w, st, b: self.outcome(st, b['g'], b['m'][1], False) is None
@@ -712,17 +777,33 @@ class SrcHi(Derived):
         s, q, g = self.outs[o]
         return ('d', s, q)
 
-    def hi(self, st, g, s, committed):
+    def hi(self, st, g, k, committed):
+        """The highest source sequence applied here for key k: (source slot)
+        here; (source slot, B slot) in srchi-slot."""
         ents = self.com(st, g) if committed else self.log(st, g)
-        qs = [e[4] for e in ents if e[0] == 'w' and e[4] is not None and e[1][1] == s]
+        qs = [e[4] for e in ents if e[0] == 'w' and e[4] is not None and self.ekey(e) == k]
+        for e in ents:
+            if e[0] == 'open':
+                qs += [h for kk, h in e[2] if kk == k]
         return max(qs) if qs else NEG
 
+    def ekey(self, e):
+        return e[1][1]
+
+    def wkey(self, wid):
+        return wid[1]
+
+    def carry_out(self, st, bs, src):
+        # the draft's "fence tables carried whole and merged by max"
+        ks = {self.ekey(e) for e in self.log(st, src) if e[0] == 'w' and e[4] is not None}
+        return frozenset((k, self.hi(st, src, k, False)) for k in ks)
+
     def outcome(self, st, g, wid, committed):
-        return 'w' if wid[2] <= self.hi(st, g, wid[1], committed) else None
+        return 'w' if wid[2] <= self.hi(st, g, self.wkey(wid), committed) else None
 
     def option_actions(self):
         q = lambda w, st, b: b['m'][1][2]
-        hi = lambda w, st, b: self.hi(st, b['g'], b['m'][1][1], False)
+        hi = lambda w, st, b: self.hi(st, b['g'], self.wkey(b['m'][1]), False)
 
         def mark(md, st, b, d):
             d.f['_e']['x'] = b['m'][1][2]
@@ -736,7 +817,31 @@ class SrcHi(Derived):
         ]
 
 
-OPTIONS = {'win': Win, 'sess': Sess, 'pid': Pid, 'keys': Keys, 'srcpos': SrcPos, 'srchi': SrcHi}
+class SrcPosNoK(SrcPos):
+    ID_K = False
+
+
+class SrcHiSlot(SrcHi):
+    """srchi kept per (consumer, source slot, B slot), so a B slot move
+    carries exactly that slot's numbers."""
+
+    def wid(self, st, o):
+        s, q, g = self.outs[o]
+        return ('d', s, q, self.bslot(o))
+
+    def ekey(self, e):
+        return (e[1][1], e[5])
+
+    def wkey(self, wid):
+        return (wid[1], wid[3])
+
+    def carry_out(self, st, bs, src):
+        ks = {self.ekey(e) for e in self.log(st, src) if e[0] == 'w' and e[4] is not None and e[5] == bs}
+        return frozenset((k, self.hi(st, src, k, False)) for k in ks)
+
+
+OPTIONS = {'win': Win, 'sess': Sess, 'pid': Pid, 'keys': Keys, 'srcpos': SrcPos, 'srchi': SrcHi,
+           'srchi-slot': SrcHiSlot, 'srcpos-nok': SrcPosNoK}
 
 _OUTS = (('a1', 0, B0), ('a1', 0, B1), ('a2', 0, B1))
 BOUNDS = {
@@ -756,9 +861,17 @@ BOUNDS = {
     'deep': {'src': {'a1': 2}, 'outs': (('a1', 0, B0), ('a1', 0, B1), ('a1', 1, B0)), 'cap': 2, 'crashes': 0,
              'faults': 2, 'drops': 0, 'tmax': 0, 'restarts': 2},
 }
-SWEEP = ('short', 'gcrash', 'drop', 'long', 'deep')
+# A B slot move: x1 has outputs in B slots P (in b0) and R (in b1); R moves
+# from b1 to b0 while the consumer may crash and restart: what must the move
+# carry for each option?
+BOUNDS['bmove'] = {'src': {'a1': 1}, 'outs': (('a1', 0, B0), ('a1', 0, B1)), 'bslots': ('P', 'R'),
+                   'bmove': ('R', B1, B0), 'cap': 2, 'crashes': 0, 'faults': 1, 'drops': 0, 'tmax': 0, 'restarts': 1}
+BOUNDS['bmove2'] = {'src': {'a1': 2}, 'outs': (('a1', 0, B0), ('a1', 0, B1), ('a1', 1, B0)),
+                    'bslots': ('P', 'R', 'P'), 'bmove': ('R', B1, B0), 'cap': 2, 'crashes': 0, 'faults': 1,
+                    'drops': 0, 'tmax': 0, 'restarts': 1}
+SWEEP = ('short', 'gcrash', 'drop', 'long', 'deep', 'bmove', 'bmove2')
 VERIFY = ()
-PIN = ('start.read', 'flush.append', 'emit.send', 'resend.send', 'learn.done', 'recv.take', 'commit.cursor', 'commit.advance',
+PIN = ('start.read', 'flush.append', 'fence.append', 'open.append', 'emit.send', 'resend.send', 'learn.done', 'recv.take', 'commit.cursor', 'commit.advance',
        'crash.crash', 'register.append', 'renew.append', 'newsess.sid', 'dup.in', 'dup.eat', 'dup.seen',
        'apply.eat', 'apply.append', 'apply_next.eat', 'apply_next.append', 'apply_first.eat', 'apply_first.append',
        'stale.eat', 'stale.answer', 'expired.eat', 'expired.answer', 'forget.append', 'expire.append')

@@ -113,7 +113,7 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--walks', type=int, default=200)
     ap.add_argument('--seed', type=int, default=1)
-    ap.add_argument('--options', default='win,sess,pid,keys,srcpos,srchi')
+    ap.add_argument('--options', default='win,sess,pid,keys,srcpos,srchi,srchi-slot')
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     idx = open(os.path.join(a.out, 'index.jsonl'), 'w')
