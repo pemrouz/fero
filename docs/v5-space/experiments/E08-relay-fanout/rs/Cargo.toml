@@ -1,0 +1,13 @@
+[package]
+name = "e08"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mio = { version = "=1.2.4", features = ["os-poll", "net"] }
+libc = "=0.2.191"
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 1
