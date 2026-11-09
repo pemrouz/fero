@@ -36,14 +36,24 @@ PINNED = ('stamp.read',)
 def _one(args):
     opt, seed, fam, mk = args
     m = ts.Mutation(drop=mk[0], flip=mk[1], swap=dict(mk[2]))
-    r = ts.run_one(opt, seed, fam, m)
-    return fam, seed, {k: r[k] for k in ts.CHECKS + ('overlap',)}, r['late_max'], r['early_max']
+    try:
+        r = ts.run_one(opt, seed, fam, m)
+    except (KeyError, TypeError, ValueError, IndexError, ZeroDivisionError):
+        # a mutant whose rules cannot run (for example an update moved before
+        # the clock reading it needs): reported as ERR, as E-16's engine and
+        # TLC report an evaluation error
+        out = {k: 0 for k in ts.CHECKS + ('overlap', 'leaderless')}
+        out['ERR'] = 1
+        return fam, seed, out, 0.0, 0.0
+    out = {k: r[k] for k in ts.CHECKS + ('overlap', 'leaderless')}
+    out['ERR'] = 0
+    return fam, seed, out, r['late_max'], r['early_max']
 
 
 def sweep(pool, opt, seeds, m, stop):
     mk = (tuple(sorted(m.drop)), tuple(sorted(m.flip)), tuple(sorted(m.swap.items())))
     jobs = [(opt, s, f, mk) for f in ts.FAMILIES for s in range(seeds)]
-    tot = {k: 0 for k in ts.CHECKS + ('overlap',)}
+    tot = {k: 0 for k in ts.CHECKS + ('overlap', 'leaderless', 'ERR')}
     tot['late_max'] = 0.0
     tot['early_max'] = 0.0
     first = None
@@ -56,7 +66,7 @@ def sweep(pool, opt, seeds, m, stop):
             tot['late_max'] = max(tot['late_max'], lm)
             tot['early_max'] = max(tot['early_max'], em)
             per[f'{fam}/{seed}'] = r
-            bad = [k for k in ts.CHECKS if r[k]]
+            bad = [k for k in ts.CHECKS + ('ERR',) if r[k]]
             if bad and first is None:
                 first = (fam, seed, bad)
         if first and stop:

@@ -4,7 +4,14 @@
 
 **Threshold.** The option that passes every check with the fewest rules wins. Reasoned expectation, to confirm or refute: fencing makes lock safety independent of clocks, and TTLs need a wall-time order (`clamp` or `hlc`).
 
-__RESULTS_SHORT__
+**In short** (simulated here, 30 seeds in each of seven families, 3 or 5 nodes; [results/design.jsonl](results/design.jsonl), [results/summary.md](results/summary.md)):
+- **Fencing makes lock safety independent of the clock rule.** With the fence, no protected write committed under a token below one the writer had seen, under every option, even `wall`, whose clock fails every TTL check; 28 to 127 writes per option were sent by clients that had lost the lock (pauses between check and send of up to 15 s, Kleppmann's case), and the fence refused them all. __FENCE__
+- **The draft's `clamp` misses P-02's bounds when the leader's own clock jumps.** Rows expired up to 600 ms early (a jump forward) and up to 600 ms late (a jump back), against `skew.max` (250 ms) and one tick + `skew.max` (350 ms): 314 early and 290 late rows in 210 runs. The window lets writer time sit `skew.max` off the median, which itself sits up to half of `skew.max` off real time.
+- **`clamp` with a window of 0 (`median`) passes every check** in every family where at most one clock is wrong: writer time = max(last t, the median of the members' clocks, own clock included, each reading carried forward by the receiver's monotonic clock). Worst early 100 ms, worst late 300 ms.
+- **`hlc` with CockroachDB's guards passes every check too**, and is the only option that stays safe when two of three clocks jump (it stops electing instead); it pays in leaderless time (221 s against 77 s over the 210 runs; 1,323 s in the two-bad-clocks family) __HLCRULES__.
+- **`mono` (etcd's lessor) fails P-02's late bound:** a new leader restarts every TTL, so rows lived up to 30 s too long after a failover (583 rows); with a checkpoint every second (`mono+ck`), up to 1.1 s (341 rows). etcd's default checkpoint is 5 minutes.
+- **`tt` passes every check, under its premise**: clock infrastructure that bounds the error (TrueTime, ClockBound). A laptop, a plain VM or `node app.ts` does not have it.
+- __RULES__
 
 ## Words used here
 

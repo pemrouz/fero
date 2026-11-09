@@ -1,0 +1,24 @@
+# E-21 ablation hlc, 30 seeds per family, 2026-11-09T12:43:34Z, Python 3.13.17, 4 vCPU, load 7.12 5.64 3.75
+hlc design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 27, "leaderless": 221400.0, "late_max": 300.0, "early_max": 200, "first": null}
+  drop stamp.hlc_max: None
+  drop stamp.never_back: None
+  drop stamp.set_l: None
+  drop send.send_max: ('jumpL+', 23, ['late'])
+  drop recv.near: ('jumpL+', 0, ['early'])
+  drop recv.adopt: None
+  drop apply.apply: None
+  drop selffence.far: ('crash', 18, ['avail'])
+  drop selffence.stepdown: ('jumpL+', 0, ['early', 'lease'])
+  drop stand.near: None
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 6, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop selffence.far: {'kind': 'drop', 'rule': 'selffence.far', 'caught': ('crash', 18, ['avail'])}
+  mutant drop selffence.stepdown: {'kind': 'drop', 'rule': 'selffence.stepdown', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 0, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}

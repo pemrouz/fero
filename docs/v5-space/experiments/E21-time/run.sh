@@ -23,7 +23,7 @@ head() { echo "# $1, $(date -u +%FT%TZ), $(python3 --version), $(nproc) vCPU, lo
 
 if [ "$STEP" = all ] || [ "$STEP" = design ]; then
   { head "E-21 design runs, $SEEDS seeds per family"
-    $HEAVY timeout 1500 sh -c "for o in $ALL; do python3 sim/timesim.py \$o --seeds $SEEDS; done"
+    $HEAVY timeout 1500 sh -c "for o in $ALL; do python3 sim/timesim.py \$o --seeds $SEEDS --extra; done"
   } > results/design.jsonl 2>&1
 fi
 if [ "$STEP" = all ] || [ "$STEP" = ablate ]; then

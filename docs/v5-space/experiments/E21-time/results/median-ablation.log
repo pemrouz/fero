@@ -1,0 +1,73 @@
+# E-21 ablation median, 30 seeds per family, 2026-11-09T11:28:06Z, Python 3.13.17, 4 vCPU, load 4.38 1.87 2.00
+median design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 33, "leaderless": 77400.0, "late_max": 300.0, "early_max": 100, "first": null}
+  drop stamp.peers: None
+  drop stamp.extrap: ('drift', 0, ['late'])
+  drop stamp.upper: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.lower: ('jumpL-', 0, ['late'])
+  drop stamp.never_back: None
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 2, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop stand.near: None
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop stamp.extrap: {'kind': 'drop', 'rule': 'stamp.extrap', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.upper: {'kind': 'drop', 'rule': 'stamp.upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.lower: {'kind': 'drop', 'rule': 'stamp.lower', 'caught': ('jumpL-', 0, ['late', 'back'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 2, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: extrap <-> upper: {'kind': 'swap', 'rule': 'stamp: extrap <-> upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: extrap <-> lower: {'kind': 'swap', 'rule': 'stamp: extrap <-> lower', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: upper <-> lower: {'kind': 'swap', 'rule': 'stamp: upper <-> lower', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> extrap: {'kind': 'swap', 'rule': 'stamp: read <-> extrap', 'caught': None, 'no_change': True}
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/ablate.py", line 39, in _one
+    r = ts.run_one(opt, seed, fam, m)
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/timesim.py", line 788, in run_one
+    return World(OPTIONS[opt_name], seed, family, mutation).run()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/timesim.py", line 530, in run
+    self.t_now = self.stamp(L)
+                 ~~~~~~~~~~^^^
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/timesim.py", line 499, in stamp
+    d = self.c.run('stamp', self, L, {}, {})
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/timesim.py", line 362, in run
+    u.fn(w, st, b, d)
+    ~~~~^^^^^^^^^^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/timesim.py", line 197, in <lambda>
+    U('upper', lambda w, st, b, d: d.__setitem__('t', min(d['t'], med(d, w, st) + WIN)), 'time',
+                                                          ~^^^^^
+KeyError: 't'
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/ablate.py", line 157, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/ablate.py", line 141, in main
+    r, p = run(m)
+           ~~~^^^
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/ablate.py", line 86, in run
+    return sweep(pool, a.option, a.seeds, m, stop)
+  File "/home/user/fero/docs/v5-space/experiments/E21-time/sim/ablate.py", line 53, in sweep
+    for fam, seed, r, lm, em in pool.map(_one, jobs[c:c + step]):
+                                ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 774, in get
+    raise self._value
+KeyError: 't'

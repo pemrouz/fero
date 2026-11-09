@@ -9,7 +9,7 @@ import sys
 from collections import Counter
 
 ORDER = ['wall', 'clamp', 'median', 'hlc', 'mono', 'mono+ck', 'tt']
-CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale')
+CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale', 'avail')
 
 
 def main():
