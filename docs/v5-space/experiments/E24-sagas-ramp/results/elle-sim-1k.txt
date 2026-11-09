@@ -1,0 +1,4 @@
+ramp-f00: 1000 histories, 18000 read transactions, 2098 needed a second round (11.7%), 0 a third or more; most rounds in one read: 2
+ramp-f15: 1000 histories, 18000 read transactions, 1459 needed a second round (8.1%), 0 a third or more; most rounds in one read: 2
+rampv-f00: 1000 histories, 18000 read transactions, 2100 needed a second round (11.7%), 0 a third or more; most rounds in one read: 2
+rampv-f15: 1000 histories, 18000 read transactions, 1458 needed a second round (8.1%), 0 a third or more; most rounds in one read: 2

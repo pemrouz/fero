@@ -52,7 +52,7 @@ if want elle; then
     -XX:ActiveProcessorCount=2 -cp "$HERE/elle:$JARS" clojure.main elle/check.clj "$W/elle.jsonl" "$W"/hist/*.edn
   python3 elle/summarize.py "$W/elle.jsonl" > $R/elle.md
   cp "$W/hist/plain-f00-000.edn" "$W/hist/ramp-f00-000.edn" "$W/hist/ramp-f00-069.edn" "$W/hist/rampv-f00-069.edn" $R/
-  for m in ramp rampv; do for f in 0 0.15; do python3 elle/sim.py "$W/hist1k" $m 1000 $f; done; done > /dev/null
+  for m in ramp rampv; do for f in 0 0.15; do python3 elle/sim.py "$W/hist1k" $m 1000 $f; done; done > $R/elle-sim-1k.txt
   python3 elle/fractured.py "$W/hist1k" > $R/fractured-1k.txt
 fi
 if want report; then
