@@ -8,6 +8,7 @@ Seeded runs: 30 seeds in each of 7 families (drift, jumpL+, jumpL-, jumpF, pause
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | wall | 0 | 616 | 2191 | 26 | 11 | 0 | 0 | 0 | 0 | 110 | 158000 | 29900 |
 | clamp | 0 | 314 | 290 | 0 | 0 | 0 | 0 | 0 | 0 | 33 | 600 | 600 |
+| median | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 33 | 300 | 100 |
 | hlc | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 27 | 300 | 200 |
 | mono | 0 | 0 | 583 | 0 | 3 | 0 | 0 | 0 | 0 | 33 | 30000 | 0 |
 | mono+ck | 0 | 0 | 341 | 0 | 0 | 0 | 0 | 0 | 0 | 33 | 1100 | 0 |
@@ -19,6 +20,7 @@ Seeded runs: 30 seeds in each of 7 families (drift, jumpL+, jumpL-, jumpF, pause
 |---|---|---|---|---|---|
 | wall | no: ['jumpL+', 0, ['early', 'lease']] | **5** | 5 | fence 1, log 1, time 3 | 0 / 0 |
 | clamp | no: ['jumpL+', 0, ['early']] | **10** | 10 | elect 1, fence 1, log 1, time 7 | 0 / 0 |
+| median | yes | **7** | 10 | fence 1, log 1, time 5 | 11 / 11 |
 | hlc | yes | **6** | 14 | elect 2, fence 1, log 1, time 2 | 6 / 6 |
 | mono | no: ['pause', 0, ['late']] | **6** | 6 | fence 1, log 1, time 4 | 0 / 0 |
 | mono+ck | no: ['pause', 0, ['late']] | **8** | 8 | fence 1, log 1, time 6 | 0 / 0 |
@@ -52,6 +54,42 @@ Fails as designed: first failure ['jumpL+', 0, ['early']] (family, seed, checks)
 | `grant.lapsed` | time | ['drift', 0, ['lease']] | - |
 | `stand.near` | elect | ['jumpL+', 0, ['early']] | - |
 | `pwrite.fence` | fence | ['drift', 17, ['stale']] | - |
+
+### median
+
+| rule | role | dropped alone breaks (family, seed, checks) | needed in the smallest set |
+|---|---|---|---|
+| `stamp.peers` | time | nothing | False |
+| `stamp.extrap` | time | ['drift', 0, ['late']] | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp.upper` | time | ['jumpL+', 0, ['early', 'lease']] | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp.lower` | time | ['jumpL-', 0, ['late']] | ['jumpL-', 0, ['late', 'back']] |
+| `stamp.never_back` | time | nothing | False |
+| `expire.due` | time | ['drift', 0, ['early_wt', 'early']] | ['drift', 0, ['early_wt', 'early']] |
+| `expire.log` | log | ['drift', 2, ['agree']] | ['drift', 2, ['agree']] |
+| `grant.lapsed` | time | ['drift', 0, ['lease']] | ['drift', 0, ['lease']] |
+| `stand.near` | elect | nothing | False |
+| `pwrite.fence` | fence | ['drift', 17, ['stale']] | ['drift', 17, ['stale']] |
+
+Dropped by the ablation: `stamp.peers`, `stamp.never_back`, `stand.near`.
+
+| mutant | kind | result |
+|---|---|---|
+| `stamp.extrap` | drop | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp.upper` | drop | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp.lower` | drop | ['jumpL-', 0, ['late', 'back']] |
+| `expire.due` | drop | ['drift', 0, ['early_wt', 'early']] |
+| `expire.log` | drop | ['drift', 2, ['agree']] |
+| `grant.lapsed` | drop | ['drift', 0, ['lease']] |
+| `pwrite.fence` | drop | ['drift', 17, ['stale']] |
+| `expire.due` | flip | no change |
+| `grant.lapsed` | flip | no change |
+| `pwrite.fence` | flip | no change |
+| `stamp: extrap <-> upper` | swap | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp: extrap <-> lower` | swap | ['jumpL+', 0, ['early', 'lease']] |
+| `stamp: upper <-> lower` | swap | no change |
+| `stamp: read <-> extrap` | swap | no change |
+| `stamp: read <-> upper` | swap | ['drift', 0, ['ERR']] |
+| `stamp: read <-> lower` | swap | ['drift', 0, ['ERR']] |
 
 ### hlc
 
