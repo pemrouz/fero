@@ -84,7 +84,7 @@ The bound with every feature and two faults (`all-state`, `all-log`) passed 3 mi
 | `fixed` | holds | holds | holds | holds | holds | holds | holds | holds | holds |
 | `off` | holds | holds | **P7**, 5 steps | **P2**, 5 steps | holds | holds | **P2** | **P7** | **P7** |
 | states (`fixed`) | 5,467 | 8,081 | 18,646 | 24,989 | 54,404 | 390,164 | 118,772 | 96,177 | 1,491,048 |
-| seconds (`fixed`) | 0.4 | 0.7 | 1.5 | 2.3 | 6.0 | 50.0 | 11.2 | 8.8 | 142.0 |
+| seconds (`fixed`) | 0.3 | 0.4 | 1.0 | 1.5 | 3.9 | 37.0 | 11.8 | 9.0 | 161.2 |
 
 Every `fixed` run finishes in under 3 minutes; all of them together take about 4 minutes on one core, inside Q-31's 1 h.
 

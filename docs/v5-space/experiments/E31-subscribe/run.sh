@@ -6,7 +6,8 @@
 #   ./run.sh ablate   DEV-10: ablation and mutants of the option whose design holds
 #   ./run.sh report   results/summary.md
 #   ./run.sh          all three
-# Every model step runs under $SP/bin/heavy, one hold per step, each under 25 minutes.
+# Every model step runs under $SP/bin/heavy, one hold per step, each under 25 minutes;
+# the ablation takes several holds.
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SP="${SP:-/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad}"
@@ -25,7 +26,12 @@ if want check; then
   $HEAVY timeout 1500 sh -c "for o in draft fixed off; do python3 $CLI models/subscribe.py \$o --limit 3000000; done" >> $R/design.txt 2>&1
 fi
 if want ablate; then
-  $HEAVY timeout 1500 python3 $CLI models/subscribe.py fixed --ablate $R/fixed-ablation.json --limit 3000000
+  # the ablation resumes from its .cache file: hold after hold (each <= 25 min) until it ends
+  n=0
+  until [ -f $R/fixed-ablation.json ]; do
+    n=$((n + 1)); [ $n -le 10 ] || { echo "ablation did not end in 10 holds" >&2; exit 1; }
+    $HEAVY timeout 1500 python3 $CLI models/subscribe.py fixed --ablate $R/fixed-ablation.json --limit 3000000 || true
+  done
 fi
 if want report; then
   python3 $REPORT $R/fixed-ablation.json > $R/summary.md
