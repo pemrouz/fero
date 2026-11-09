@@ -243,7 +243,8 @@ function tick() {
     for (let ci = 0; ci < classes.length; ci++) {
       const c = classes[ci];
       if (c.rate > 0) {
-        const due = Math.floor((t - t0) * c.rate / 1000);
+        // records whose ideal arrival time (t0 + k/rate) is not later than now: k = 0 .. floor((t - t0) * rate) inclusive
+        const due = Math.floor((t - t0) * c.rate / 1000) + 1;
         for (let k = made[ci]; k < due; k++) make(ci, t0 + (k * 1000) / c.rate);
         if (due > made[ci]) made[ci] = due;
       } else {
