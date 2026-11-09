@@ -622,7 +622,14 @@ class Off(Sub):
 
 
 OPTIONS = {'draft': Sub, 'fixed': Fixed, 'off': Off}
-PINNED = {k: ('bopen.phase',) for k in OPTIONS}
+# Pinned (never dropped or mutated): a world step written as a rule, and three
+# guards that are physics, not protocol: a server can send only records it holds
+# (rec.held), a diff from a cursor needs the records after it (diff.held), and a
+# log stream opens only at a record the server holds (open.held). The model takes
+# a sent record's value from the committed log, so without these pins the
+# ablation would let a server send records it has lost (E-33 pins its world
+# steps for the same reason).
+PINNED = {k: ('bopen.phase', 'rec.held', 'diff.held', 'open.held') for k in OPTIONS}
 
 
 def B(mode, **kw):
