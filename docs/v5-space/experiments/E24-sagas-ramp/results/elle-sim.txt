@@ -1,0 +1,4 @@
+plain-f00: 100 histories, 1800 read transactions, 0 needed a second round (0.0%)
+plain-f15: 100 histories, 1800 read transactions, 0 needed a second round (0.0%)
+ramp-f00: 100 histories, 1800 read transactions, 208 needed a second round (11.6%)
+ramp-f15: 100 histories, 1800 read transactions, 150 needed a second round (8.3%)
