@@ -1,0 +1,12 @@
+# E-20 memory probe, 2026-11-09T08:04:05Z, Python 3.13.17, 4 vCPU, load 11.02 9.92 6.70
+v22.22.0
+{"design":"win","n":10000,"entries":10000,"bytes_per_client":366,"total_mb":3}
+{"design":"win","n":1000000,"entries":1000000,"bytes_per_client":349,"total_mb":332}
+{"design":"sess","n":10000,"entries":10000,"bytes_per_client":327,"total_mb":3}
+{"design":"sess","n":1000000,"entries":1000000,"bytes_per_client":309,"total_mb":295}
+{"design":"sessslot","n":10000,"entries":40000,"bytes_per_client":1305,"total_mb":12}
+{"design":"sessslot","n":1000000,"entries":4000000,"bytes_per_client":1237,"total_mb":1180}
+{"design":"pid","n":10000,"entries":40000,"bytes_per_client":2201,"total_mb":21}
+{"design":"pid","n":1000000,"entries":4000000,"bytes_per_client":2133,"total_mb":2034}
+{"design":"keys","n":10000,"entries":10000,"bytes_per_client":240,"total_mb":2}
+{"design":"keys","n":1000000,"entries":1000000,"bytes_per_client":221,"total_mb":211}
