@@ -9,10 +9,10 @@ export SP
 # the dispatch is one brace group ending in exit, so editing this file during a run is safe
 {
 case "${1:-all}" in
-  probe|a|b|b40) node "$HERE/bench.mjs" block="$1" runs="${RUNS:-3}" ;;
+  probe|a|b|b40|bq) node "$HERE/bench.mjs" block="$1" runs="${RUNS:-3}" ;;
   summary) python3 "$HERE/summarize.py" > "$HERE/results/tables.md"; cat "$HERE/results/tables.md" ;;
   all)
-    for b in probe a b b40; do
+    for b in probe a b b40 bq; do
       echo "$(date +%T) block $b waiting"; "$SP/bin/timing" sh "$HERE/run.sh" "$b"; echo "$(date +%T) block $b done"
     done
     sh "$HERE/run.sh" summary ;;

@@ -47,6 +47,9 @@ function configs(block) {
       out.push({ id: `b${q}/${v}/A-1MiB`, spec: [A(q, MB), B, others], ...p, dur: 20000 });
       out.push({ id: `b${q}/${v}/A-64KiB`, spec: [A(q * 16, 65536), B, others], ...p, dur: 20000 });
     }
+  } else if (block === 'bq') {
+    // where does the neighbour clause hold? tenant A at lower quotas, in 1 MiB records, on the shared journal and on a journal per tenant
+    for (const q of [1, 2.5, 5]) for (const v of ['base', 'own']) out.push({ id: `bq${q}/${v}/A-1MiB`, spec: [A(q, MB), B, others], ...VARIANTS[v], dur: 20000 });
   }
   return out;
 }
