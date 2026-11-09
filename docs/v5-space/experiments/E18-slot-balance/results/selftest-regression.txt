@@ -1,0 +1,6 @@
+Regression for the float-tie ping-pong (found 2026-11-09 in part B, S = 16,384, G = 611:
+200,000 moves of equal app-split pieces with no end). selftest.py's 300 equal-piece cases,
+run against kern.c built without the margin (EPS = 0, the kernel before the fix) and with it:
+old kernel (no margin): cases that never end: 48 of 300
+fixed kernel (margin 1e-9 x floor): cases that never end: 0 of 300
+Every part was re-run from scratch with the fixed kernel; summary.md is from that run.

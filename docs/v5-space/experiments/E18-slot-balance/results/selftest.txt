@@ -1,0 +1,6 @@
+lpt vs twin: 400 cases equal; contiguous vs exact DP: 202 cases within 1e-9
+lpt vs brute-force optimum: 315 cases, worst ratio 1.1154 (bound 4/3)
+rebalance vs twin: 1200 cases equal (moves, rows, max, min, reached, pinned, assignment); 606 with a pinned group, 373 stuck
+equal pieces (the float-tie ping-pong regression): 300 cases end, in C and in the twin
+water level numpy vs twin: 200 cases equal; slot nesting and hot share: ok
+selftest ok

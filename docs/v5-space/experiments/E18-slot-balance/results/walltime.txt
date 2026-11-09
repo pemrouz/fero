@@ -1,0 +1,6 @@
+static start 04:44:16 load 1.71 1.95 1.86 2/122 15612
+static end   05:06:46
+eff start 05:06:46 load 2.06 2.19 1.87 2/124 17816
+eff end   05:11:44
+rest start 05:11:44 load 2.61 2.61 2.16 2/122 18457
+rest end   05:37:42
