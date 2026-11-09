@@ -1,2 +1,19 @@
-# E-30 design runs, 2026-11-09T10:25:52Z, Python 3.13.17, 4 vCPU, load 6.52 44.61 57.78
-Terminated
+# E-30 design runs, 2026-11-09T12:54:11Z, Python 3.13.17, 4 vCPU, load 3.68 5.37 4.83
+srchi-slot short: 64,897 states, 3.8s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srchi-slot gcrash: 337,773 states, 22.1s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srchi-slot drop: 136,078 states, 10.8s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srchi-slot long: 194,691 states, 14.6s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srchi-slot deep: 12,019 states, 0.8s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srchi-slot bmove: 7,029 states, 0.2s: all hold
+    DONE: 2,210 judged states, 0 cannot reach the goal
+srchi-slot bmove2: 42,877 states, 2.9s: all hold
+    DONE: 11,178 judged states, 0 cannot reach the goal
+srcpos short: 64,897 states, 4.4s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srcpos gcrash: 337,773 states, 26.3s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
