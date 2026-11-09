@@ -8,6 +8,7 @@ with a live majority where the design's same run has none. A TLC error (the
 mutant does not evaluate) is reported as such, not as caught.
 
   python3 tools/mutrun37.py [--runs par1,par2] [--only NAME ...] [--timeout S]
+  python3 tools/mutrun37.py --runs par2 --only NAME --force   (run a judged mutant on more runs)
 Writes results/mutants.json and results/mutants.md.
 """
 import json
@@ -43,7 +44,8 @@ def main():
         mut = open(os.path.join(WORK, name, 'MUTANT')).read().split('\n')[0]
         if only and mut not in only and name not in only:
             continue
-        if mut in res and res[mut].get('verdict') in ('caught', 'not caught', 'error', 'undecided'):
+        force = '--force' in args and (mut in only or name in only)
+        if mut in res and res[mut].get('verdict') in ('caught', 'not caught', 'error', 'undecided') and not force:
             continue
         if budget and time.time() - t0 > budget:
             print('budget used; run again to continue', flush=True)
@@ -71,6 +73,14 @@ def main():
                 verdict = 'undecided'
                 row['by'] = 'did not finish on %s within %d s' % (r, timeout)
                 break
+        if force and mut in res:
+            # --force: a mutant already judged, run again on more runs (the
+            # runs named here); its earlier runs are kept beside the new ones
+            old = res[mut]
+            row['runs'] = dict(old.get('runs', {}), **row['runs'])
+            if verdict == 'not caught' and old.get('verdict') == 'undecided':
+                verdict = 'undecided'
+                row['by'] = old.get('by', '')
         row['verdict'] = verdict
         res[mut] = row
         json.dump(res, open(resp, 'w'), indent=1, sort_keys=True)

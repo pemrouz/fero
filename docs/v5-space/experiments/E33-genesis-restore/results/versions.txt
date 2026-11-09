@@ -4,7 +4,7 @@ Linux 6.18.44-fc-v310 x86_64
 Mem:              15           0          14           0           0          14
 68908b496f9f61e57043c729cee469d80b2165bbb840159b6423e55f10c00c4c  E17-partitioning/harness/dsl.py
 f6695c75675611cc4d98be6c9bebd69a8a2c6216ebd23bcf2dd499a98e3c438f  E16-controller-loop/engine/engine.py (the engine the results and ablations were made with, 2026-11-07)
-686eea8393c3d218e9e7dcc2cc4f05e0ac6a4bf9307a246cbd630c1f56b4d0a6  E16-controller-loop/engine/engine.py (the current engine: adds error handling for mutants and a separate verify state limit; re-checked 2026-11-08: the design runs give the same states and verdicts)
+c6043076361bdcd6e6f893d80dd4ce6715116167fdd3d45f876964f61025c9d8  E16-controller-loop/engine/engine.py (the current engine, 2026-11-09: adds error handling for mutants, a separate verify state limit, and E-16's opt-in verify pass, which E-33 does not use; re-checked 2026-11-09: the design runs give the same states and verdicts)
 e832911e978d88adfa7646db688f701f6dc1f7ed3b873c2fe5b37b2de4455ed8  E33-genesis-restore/models/genesis.py
 6c1ca822bcd98b8cd02a8dcebf7d6b69b067cde76fe5a7de1c1902840816f0b2  E33-genesis-restore/models/onebox.py
 ad3ad9931621f43aa7c2e18e423b34e0ea1186be4fc264f2cf58218eb3d46e1f  E33-genesis-restore/models/restore.py
