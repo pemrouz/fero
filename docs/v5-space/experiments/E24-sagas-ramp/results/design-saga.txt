@@ -1,7 +1,18 @@
-# saga: every option on every bound, 2026-11-09T12:34:19Z, Python 3.13.17, 4 vCPU, load 0.66 1.78 2.13
-draft one: 80,588 states, 5.2s: all hold
-    L1: 80,588 judged states, 0 cannot reach the goal
-draft two: 10,551 states, 0.6s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
+# saga: every option on every bound, 2026-11-09T18:25:08Z, Python 3.13.17, 4 vCPU, load 2.84 1.73 0.93
+draft one: 9,777 states, 0.4s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. claim (('h', 1),)
+     6. begin (('h', 1),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 1),)
+     9. step (('h', 0),)
+    10. decide (('h', 1),)
+    11. close (('h', 1),)
+draft two: 10,551 states, 0.5s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
   A2: shortest trace, 17 steps
      1. claim (('h', 0),)
      2. claim (('h', 0),)
@@ -20,33 +31,165 @@ draft two: 10,551 states, 0.6s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
     15. adopt (('h', 2),)
     16. step (('h', 2),)
     17. step (('h', 2),)
-draft sub: 54,493 states, 3.5s: all hold
-    L1: 54,493 judged states, 0 cannot reach the goal
-draft three: 3,000,001 states, 226.9s: all hold (STOPPED AT THE STATE LIMIT)
-draft one2: 3,000,001 states, 222.5s: all hold (STOPPED AT THE STATE LIMIT)
-draft two-f: 1,199,605 states, 93.0s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
-  A2: shortest trace, 17 steps
+draft sub: 5,663 states, 0.2s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
      1. claim (('h', 0),)
      2. claim (('h', 0),)
      3. lapse a1
-     4. begin (('h', 0),)
+     4. claim (('h', 2),)
+     5. claim (('h', 2),)
+     6. begin (('h', 2),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 2),)
+     9. step (('h', 0),)
+    10. decide (('h', 2),)
+    11. close (('h', 2),)
+draft three: 118,984 states, 5.1s: A1 (13 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 13 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. claim (('h', 0),)
+     4. lapse a1
      5. claim (('h', 1),)
      6. claim (('h', 1),)
-     7. begin (('h', 1),)
-     8. step (('h', 0),)
-     9. step (('h', 1),)
-    10. step (('h', 1),)
-    11. crash a2
-    12. lapse a2
-    13. claim (('h', 2),)
-    14. claim (('h', 2),)
-    15. adopt (('h', 2),)
-    16. step (('h', 2),)
-    17. step (('h', 2),)
-draft sub-f: 3,000,001 states, 241.8s: all hold (STOPPED AT THE STATE LIMIT)
-owned one: 80,588 states, 5.4s: all hold
-    L1: 80,588 judged states, 0 cannot reach the goal
-owned two: 24,760 states, 1.7s: all hold
+     7. claim (('h', 1),)
+     8. begin (('h', 1),)
+     9. adopt (('h', 0),)
+    10. fail (('h', 1),)
+    11. step (('h', 0),)
+    12. decide (('h', 1),)
+    13. close (('h', 1),)
+draft one2: 33,738 states, 1.1s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. claim (('h', 1),)
+     6. begin (('h', 1),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 1),)
+     9. step (('h', 0),)
+    10. decide (('h', 1),)
+    11. close (('h', 1),)
+draft two-f: 77,824 states, 3.8s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 2),)
+     5. claim (('h', 2),)
+     6. begin (('h', 2),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 2),)
+     9. step (('h', 0),)
+    10. decide (('h', 2),)
+    11. close (('h', 2),)
+owned one: 9,777 states, 0.4s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. claim (('h', 1),)
+     6. begin (('h', 1),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 1),)
+     9. step (('h', 0),)
+    10. decide (('h', 1),)
+    11. close (('h', 1),)
+owned two: 24,760 states, 1.5s: all hold
     L1: 24,760 judged states, 0 cannot reach the goal
-owned sub: 66,975 states, 4.8s: all hold
-    L1: 66,975 judged states, 0 cannot reach the goal
+owned sub: 3,861 states, 0.2s: A1 (10 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 10 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. begin (('h', 1),)
+     6. other (('h', 0), ('v', 2))
+     7. fail (('h', 1),)
+     8. step (('h', 0),)
+     9. decide (('h', 1),)
+    10. close (('h', 1),)
+owned three: 118,984 states, 5.6s: A1 (13 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 13 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. claim (('h', 0),)
+     4. lapse a1
+     5. claim (('h', 1),)
+     6. claim (('h', 1),)
+     7. claim (('h', 1),)
+     8. begin (('h', 1),)
+     9. adopt (('h', 0),)
+    10. fail (('h', 1),)
+    11. step (('h', 0),)
+    12. decide (('h', 1),)
+    13. close (('h', 1),)
+owned one2: 33,738 states, 1.3s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. claim (('h', 1),)
+     6. begin (('h', 1),)
+     7. adopt (('h', 0),)
+     8. fail (('h', 1),)
+     9. step (('h', 0),)
+    10. decide (('h', 1),)
+    11. close (('h', 1),)
+owned two-f: 82,088 states, 4.2s: A1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  A1: shortest trace, 11 steps
+     1. claim (('h', 0),)
+     2. claim (('h', 0),)
+     3. lapse a1
+     4. claim (('h', 1),)
+     5. claim (('h', 1),)
+     6. begin (('h', 1),)
+     7. other (('h', 0), ('v', 2))
+     8. fail (('h', 1),)
+     9. step (('h', 0),)
+    10. decide (('h', 1),)
+    11. close (('h', 1),)
+bump one: 10,735 states, 0.4s: all hold
+    L1: 10,735 judged states, 0 cannot reach the goal
+bump two: 2,628 states, 0.1s: all hold
+    L1: 2,628 judged states, 0 cannot reach the goal
+bump sub: 7,699 states, 0.4s: all hold
+    L1: 7,699 judged states, 0 cannot reach the goal
+bump three: 285,392 states, 16.3s: all hold
+    L1: 285,392 judged states, 0 cannot reach the goal
+bump one2: 279,680 states, 19.9s: all hold
+    L1: 279,680 judged states, 0 cannot reach the goal
+bump two-f: 2,100,092 states, 170.1s: all hold
+    L1: 2,100,092 judged states, 0 cannot reach the goal
+fullundo one: 9,310 states, 0.5s: all hold
+    L1: 9,310 judged states, 0 cannot reach the goal
+fullundo two: 1,858 states, 0.1s: all hold
+    L1: 1,858 judged states, 0 cannot reach the goal
+fullundo sub: 6,831 states, 0.3s: all hold
+    L1: 6,831 judged states, 0 cannot reach the goal
+fullundo three: 283,698 states, 26.2s: all hold
+    L1: 283,698 judged states, 0 cannot reach the goal
+fullundo one2: 256,407 states, 20.4s: all hold
+    L1: 256,407 judged states, 0 cannot reach the goal
+fullundo two-f: 1,582,962 states, 155.3s: all hold
+    L1: 1,582,962 judged states, 0 cannot reach the goal
+raise one: 7,538 states, 0.4s: all hold
+    L1: 7,538 judged states, 0 cannot reach the goal
+raise two: 1,858 states, 0.1s: all hold
+    L1: 1,858 judged states, 0 cannot reach the goal
+raise sub: 5,935 states, 0.4s: all hold
+    L1: 5,935 judged states, 0 cannot reach the goal
+raise three: 216,043 states, 17.0s: all hold
+    L1: 216,043 judged states, 0 cannot reach the goal
+raise one2: 206,918 states, 15.0s: all hold
+    L1: 206,918 judged states, 0 cannot reach the goal
+raise two-f: 1,348,312 states, 121.6s: all hold
+    L1: 1,348,312 judged states, 0 cannot reach the goal
+# saga: sub-f, on fullundo first (it finishes on the corrected model, so it is a verify bound again), 2026-11-09T18:35:03Z, Python 3.13.17, 4 vCPU, load 6.13 5.67 3.46
+fullundo sub-f: 801,204 states, 94.3s: all hold
+    L1: 801,204 judged states, 0 cannot reach the goal
+# saga: sub-f on the other options, 2026-11-09T19:06:51Z, Python 3.13.17, 4 vCPU

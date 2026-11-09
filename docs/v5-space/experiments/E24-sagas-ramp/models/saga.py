@@ -38,9 +38,11 @@ PROPERTIES
   A2  no write cycle between units (Elle's G0): two units in the same two
       lists appear in the same order in both.
   L1  AG EF: every unit can end `done` or `undone` once faults stop
-      (holders act, dead holders' leases lapse, `b` restarts). A step whose
-      condition failed fails again for every later holder (it is the app's
-      answer, not a fault), so a unit with such a step can only end undone.
+      (holders act, dead holders' leases lapse, `b` restarts). A step's
+      condition is judged on the data when the write arrives, so a step
+      refused for one holder may pass for another later (a budget topped up
+      in between): a paused holder's late step is not stopped by an earlier
+      refusal.
 
 OPTIONS
   draft     5.3 as written: steps fenced by their partition's lock; each
@@ -245,26 +247,21 @@ class Saga:
                             yield {'h': h, 'v': v}
 
         def fails_left(w, st):
-            # world semantics, not rules: a step refused by its condition once
-            # is refused again (`bad`); a new refusal takes the budget; and a
-            # re-run of a step that is applied answers its first outcome
-            # (dedup by attempt id), so only a step not applied is refused
+            # world semantics, not rules: a step's condition is judged against
+            # the partition's data when the write arrives, and that data can
+            # change between attempts (a budget is topped up), so a step
+            # refused once may be refused again (free) or pass later (step's
+            # `ups`); a first refusal takes the budget; and a re-run of a step
+            # that is applied answers its first outcome, "applied" (dedup by
+            # attempt id, which is the saga id and the step), so only a step
+            # not applied is refused
             for b in ups(w, st):
                 pc_, _, tgt, _, _ = st[IX['procs']][b['h']]
                 if tgt not in O.units:
                     yield b                        # a mutant left no target: let the rules fail (ERR)
-                elif pc_[0] == 'step':
-                    if (tgt, pc_[1]) in st[IX['bad']]:
+                elif pc_[0] == 'step' and tgt not in st[IX['lists']][O.px[O.units[tgt][pc_[1]]]]:
+                    if (tgt, pc_[1]) in st[IX['bad']] or st[IX['fails']] < O.b['fails']:
                         yield b
-                    elif st[IX['fails']] < O.b['fails'] and \
-                            tgt not in st[IX['lists']][O.px[O.units[tgt][pc_[1]]]]:
-                        yield b
-
-        def can_step(w, st):
-            for b in ups(w, st):
-                pc_, _, tgt, _, _ = st[IX['procs']][b['h']]
-                if not (pc_[0] == 'step' and (tgt, pc_[1]) in st[IX['bad']]):
-                    yield b
 
         P_ = lambda st, b: st[IX['procs']][b['h']]
         pc = lambda st, b: P_(st, b)[0]
@@ -479,7 +476,7 @@ class Saga:
         g_step = [Guard('seq', is_('step'), role='seq'), pfence('fence')]
         if O.FOLLOW:
             g_step.append(pfollow('follow'))
-        acts.append(Action('step', 'deliver', can_step, g_step, [
+        acts.append(Action('step', 'deliver', ups, g_step, [
             Update('data', step_data, role='data', note='push the unit id if absent'),
             raise_('raise'),
             Update('pc', step_pc, role='seq'),
