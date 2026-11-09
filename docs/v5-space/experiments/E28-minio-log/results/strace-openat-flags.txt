@@ -1,0 +1,5 @@
+# MinIO server, strace -f -e openat during 0.2 s of 1 KB create PUTs (If-None-Match: *), 2026-11-09: open calls by path pattern and flags (UUIDs and object names replaced)
+     80 openat(AT_FDCWD, "$SP/e28/smoke-data/e28/st3/w0/N/xl.meta", O_RDONLY|O_NONBLOCK|O_NOATIME|O_CLOEXEC
+     40 openat(AT_FDCWD, "$SP/e28/smoke-data/e28/st3/w0/N/xl.meta", O_RDONLY|O_NOATIME|O_CLOEXEC
+     40 openat(AT_FDCWD, "$SP/e28/smoke-data/.minio.sys/tmp/UUID/xl.meta", O_WRONLY|O_CREAT|O_TRUNC|O_NONBLOCK|O_DSYNC|O_CLOEXEC, 0666
+      1 openat(AT_FDCWD, "$SP/e28/smoke-data/.minio.sys/buckets/.healing.bin", O_RDONLY|O_CLOEXEC
