@@ -399,4 +399,6 @@ BOUNDS = {
     'gc-fol': dict(units={1: ('p', 'q'), 2: ('p', 'q')}, crashes=1, reads=1, fol=('q',), gc=True),
 }
 SWEEP = ('two', 'fol', 'gc', 'move')
-VERIFY = ('fol-move', 'gc-move', 'gc-fol')
+# gc-fol passed 3,000,000 states (about 3 minutes) without an end: it cannot
+# decide a run, so it is not a verify bound; run.sh runs it once, partly
+VERIFY = ('fol-move', 'gc-move')

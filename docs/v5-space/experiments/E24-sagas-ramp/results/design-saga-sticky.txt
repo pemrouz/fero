@@ -1,0 +1,16 @@
+# An earlier version of models/saga.py (git dde8804..fc5165c) in which a step refused by its
+# condition was refused again for every later holder (a refusal was final). That run
+# (2026-11-09T12:34:19Z) stopped at the peak-hours pause after the lines below; they were
+# copied verbatim from results/design-saga.txt before the corrected model's run replaced it.
+# Kept only to show which designs hold if a refusal is final (see README, results 1).
+# saga: every option on every bound, 2026-11-09T12:34:19Z, Python 3.13.17, 4 vCPU, load 0.66 1.78 2.13
+draft one: 80,588 states, 5.2s: all hold
+draft two: 10,551 states, 0.6s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
+draft sub: 54,493 states, 3.5s: all hold
+draft three: 3,000,001 states, 226.9s: all hold (STOPPED AT THE STATE LIMIT)
+draft one2: 3,000,001 states, 222.5s: all hold (STOPPED AT THE STATE LIMIT)
+draft two-f: 1,199,605 states, 93.0s: A2 (17 steps) (STOPPED AT THE STATE LIMIT)
+draft sub-f: 3,000,001 states, 241.8s: all hold (STOPPED AT THE STATE LIMIT)
+owned one: 80,588 states, 5.4s: all hold
+owned two: 24,760 states, 1.7s: all hold
+owned sub: 66,975 states, 4.8s: all hold

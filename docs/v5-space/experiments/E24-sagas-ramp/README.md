@@ -30,7 +30,7 @@ Then a seeded simulation writes list-append histories with concurrent readers, a
 
 **The world (not counted).**
 - Data partitions p and q (and r in one bound), each in its own group, so a unit's steps land in up to three groups. `#locks` and `#sagas` share one more group, M. Every group is an abstract Raft group with one writer: a write is judged and applied at once, and the answer reaches the caller in the same step. E-14 and E-15 check Raft and moves; this model asks what the saga library needs on top.
-- A unit's step i appends the unit's id to the list at its partition (Elle's list-append, the form E-22's P-15 workload writes). An append is "push if absent", so it is idempotent, and its undo removes the id. A re-run of a step that is applied answers its first outcome (dedup by attempt id). A step's condition may fail (budget); a step that failed fails again for every later holder (it is the app's answer, not a fault), so such a unit can only end undone.
+- A unit's step i appends the unit's id to the list at its partition (Elle's list-append, the form E-22's P-15 workload writes). An append is "push if absent", so it is idempotent, and its undo removes the id. A re-run of a step that is applied answers its first outcome (dedup by attempt id). A step's condition may fail (budget). The writer judges it against the data when the write arrives, and the data can change between attempts (a budget is topped up), so a step refused for one holder may pass for another holder later, or be refused again.
 - Each unit has an original holder (`a`, which never restarts) and a later holder (`b`, the app calling `saga(steps, { id })` again; it restarts after a crash).
 - **Faults** (budgets): a crash at any point; a lease that lapses while its holder is alive (the paused holder, who acts later with its old tokens); a step whose condition fails. A crashed or finished holder's lease lapses with time. In the options that follow `#locks`, each writer's view of `#locks` lags by any amount (a calm step brings it up to date).
 
@@ -86,7 +86,7 @@ Then a seeded simulation writes list-append histories with concurrent readers, a
 | W | AG EF: every unit whose client is alive is written (so a model that never writes fails). |
 | L | AG EF: every read finishes. |
 
-**Bounds.** `two` (units 1 and 2 on p, q; one client crash; two reads), `fol` (unit 2 on q only; q has a follower), `gc` (garbage collection), `move` (q moves); verify: `fol-move` (three units), `gc-move`, `gc-fol`.
+**Bounds.** `two` (units 1 and 2 on p, q; one client crash; two reads), `fol` (unit 2 on q only; q has a follower), `gc` (garbage collection), `move` (q moves); verify: `fol-move` (three units), `gc-move`. `gc-fol` passed 3 million states without an end, so it cannot decide a run: it is run once, as a partial check, on `ramp`.
 
 ### 3. Elle ([elle/sim.py](elle/sim.py), [elle/check.clj](elle/check.clj))
 
@@ -98,13 +98,17 @@ A seeded random simulation, built from the rules the models check: units over 2 
 
 | Option | one | two | sub | three | one2 | two-f | sub-f |
 |---|---|---|---|---|---|---|---|
-| `draft` | A1, 11 steps | A2, 17 steps | A1 | A1 | A1 | A1 | A1 |
-| `owned` | A1, 11 steps | holds | A1 | A1 | A1 | A1 | A1 |
-| `bump` | holds | holds | holds | holds | holds | holds | holds |
+| `draft` | A1, 11 steps | A2, 17 steps | A1, 11 steps | A1, 13 steps | A1, 11 steps | A1, 11 steps | not run |
+| `owned` | A1, 11 steps | holds | A1, 10 steps | A1, 13 steps | A1, 11 steps | A1, 11 steps | not run |
+| `bump` | holds | holds | holds | holds | holds | holds | not run |
 | `fullundo` | holds | holds | holds | holds | holds | holds | holds |
-| `raise` | holds | holds | holds | holds | holds | holds | holds |
+| `raise` | holds | holds | holds | holds | holds | holds | not run |
+| states (`fullundo`) | 9,310 | 1,858 | 6,831 | 283,698 | 256,407 | 1,582,962 | 801,204 |
+| seconds (`fullundo`) | 0.5 | 0.1 | 0.3 | 26.2 | 20.4 | 155.3 | 94.3 |
 
-@@STATES@@
+`bump` explores 10,735 / 2,628 / 7,699 / 285,392 / 279,680 / 2,100,092 states on the same bounds, `raise` 7,538 / 1,858 / 5,935 / 216,043 / 206,918 / 1,348,312. Every run that holds is complete (every reachable state explored); a run that breaks stops at its first, shortest counterexample.
+
+**A note on the model, and when `owned` would be enough.** A step's condition is judged by the partition's writer against the data when the write arrives. That data can change between two attempts at the same step (a budget is topped up), so the model lets a step refused for one holder pass for another later. An earlier version of the model made a refusal final (refused again for every later holder). That rule forbids exactly the paused holder's late step, so it hid the A1 trace below: in that version `draft` broke only A2 and `owned` held on `one`, `two` and `sub` ([results/design-saga-sticky.txt](results/design-saga-sticky.txt), a partial run). So `owned` is enough only for apps whose step conditions never change their answer, which `saga` cannot know. The model also says that a re-run of a step that is applied answers "applied" (dedup by attempt id, the saga id and the step), never a refusal.
 
 **The draft's write cycle (A2, G0), 17 steps: E-22's finding, now exhaustive.** Holder a1 claims p and q and begins unit 1, then pauses (its lease lapses). Holder a2 claims both locks (tokens 2) and begins unit 2; the draft does not look at unit 1. a1, still paused in its own mind, appends 1 at p with token 1: p's writer has not yet followed `#locks` to version 2 and has seen no token for p, so it accepts. a2 appends 2 at p and at q and ends. Later holder b1 (tokens 3) finds unit 1 unfinished and finishes it: 1 goes to q. Now p is [1, 2] and q is [2, 1]: unit 1 is before unit 2 on p and after it on q.
 
