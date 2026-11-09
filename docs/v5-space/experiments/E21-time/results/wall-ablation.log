@@ -1,0 +1,8 @@
+# E-21 ablation wall, 30 seeds per family, 2026-11-09T12:53:46Z, Python 3.13.17, 4 vCPU, load 4.10 5.58 4.88
+wall design: {"early_wt": 0, "early": 616, "late": 2191, "lease": 26, "stuck": 11, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 110, "leaderless": 77400.0, "ERR": 0, "late_max": 158000, "early_max": 29900, "first": ["jumpL+", 0, ["early", "lease"]]}
+  drop stamp.never_back: ('jumpL+', 0, ['early', 'lease'])
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 0, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+wall: kept 5 of 5; 9 s

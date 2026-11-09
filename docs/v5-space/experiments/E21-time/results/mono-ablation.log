@@ -1,0 +1,9 @@
+# E-21 ablation mono, 30 seeds per family, 2026-11-09T12:53:32Z, Python 3.13.17, 4 vCPU, load 4.12 5.64 4.89
+mono design: {"early_wt": 0, "early": 0, "late": 583, "lease": 0, "stuck": 3, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 33, "leaderless": 77400.0, "ERR": 0, "late_max": 30000, "early_max": 0.0, "first": ["pause", 0, ["late"]]}
+  drop stamp.never_back: ('jumpL-', 0, ['back'])
+  drop expire.due: ('drift', 0, ['early'])
+  drop expire.log: ('drift', 0, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop promote.extend: ('pause', 0, ['late'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+mono: kept 6 of 6; 14 s

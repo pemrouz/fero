@@ -1,0 +1,265 @@
+{
+ "option": "clamp",
+ "seeds_per_family": 30,
+ "families": [
+  "drift",
+  "jumpL+",
+  "jumpL-",
+  "jumpF",
+  "pause",
+  "crash",
+  "mix"
+ ],
+ "rules": [
+  {
+   "id": "stamp.peers",
+   "kind": "update",
+   "role": "time",
+   "note": "peers' clocks ride the pings",
+   "cmp": null
+  },
+  {
+   "id": "stamp.extrap",
+   "kind": "update",
+   "role": "time",
+   "note": "a reading is carried forward by the receiver's monotonic time",
+   "cmp": null
+  },
+  {
+   "id": "stamp.upper",
+   "kind": "update",
+   "role": "time",
+   "note": "clamp to median + skew.max",
+   "cmp": null
+  },
+  {
+   "id": "stamp.lower",
+   "kind": "update",
+   "role": "time",
+   "note": "clamp to median - skew.max",
+   "cmp": null
+  },
+  {
+   "id": "stamp.never_back",
+   "kind": "update",
+   "role": "time",
+   "note": "writer time never goes back (max with the last t in the log)",
+   "cmp": null
+  },
+  {
+   "id": "expire.due",
+   "kind": "guard",
+   "role": "time",
+   "note": "a row ends when writer time passes its ttl",
+   "cmp": ">="
+  },
+  {
+   "id": "expire.log",
+   "kind": "update",
+   "role": "log",
+   "note": "expiry is a record in the log, so every replica removes the row at one position",
+   "cmp": null
+  },
+  {
+   "id": "grant.lapsed",
+   "kind": "guard",
+   "role": "time",
+   "note": "a lease lapses when writer time passes its end",
+   "cmp": ">="
+  },
+  {
+   "id": "stand.near",
+   "kind": "guard",
+   "role": "elect",
+   "note": "a member off by more than skew.max waits longer to stand",
+   "cmp": "<="
+  },
+  {
+   "id": "pwrite.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "refuse a token below the highest the writer has seen",
+   "cmp": ">="
+  }
+ ],
+ "base": {
+  "early_wt": 0,
+  "early": 314,
+  "late": 290,
+  "lease": 0,
+  "stuck": 0,
+  "back": 0,
+  "agree": 0,
+  "stale": 0,
+  "avail": 0,
+  "overlap": 33,
+  "leaderless": 77400.0,
+  "ERR": 0,
+  "late_max": 600.0,
+  "early_max": 600,
+  "first": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ]
+ },
+ "fails_as_designed": [
+  "jumpL+",
+  0,
+  [
+   "early"
+  ]
+ ],
+ "pass1": {
+  "stamp.peers": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "stamp.extrap": [
+   "jumpL+",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "stamp.upper": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stamp.lower": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "stamp.never_back": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   0,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "stand.near": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "removed": [],
+ "kept": {
+  "stamp.peers": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "stamp.extrap": [
+   "jumpL+",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "stamp.upper": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stamp.lower": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "stamp.never_back": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   0,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "stand.near": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "secs": 16
+}
