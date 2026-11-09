@@ -1,0 +1,739 @@
+{
+ "bounds": [
+  "r1",
+  "r2"
+ ],
+ "verify": [],
+ "pinned": [
+  "write.bound",
+  "write.count",
+  "handover.bound"
+ ],
+ "base": {
+  "r1": {
+   "states": 48,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    48,
+    84,
+    13907626707579803914
+   ],
+   "judged": {
+    "RL3": [
+     27,
+     0
+    ]
+   }
+  },
+  "r2": {
+   "states": 288,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    288,
+    729,
+    3299558058671248476
+   ],
+   "judged": {
+    "RL3": [
+     107,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "handover.other",
+   "dropped"
+  ],
+  [
+   "write.holder",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "handover.other",
+  "write.holder"
+ ],
+ "put_back": [],
+ "minimal": {
+  "r1": {
+   "states": 48,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    48,
+    84,
+    13907626707579803914
+   ],
+   "judged": {
+    "RL3": [
+     27,
+     0
+    ]
+   }
+  },
+  "r2": {
+   "states": 288,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    288,
+    729,
+    3299558058671248476
+   ],
+   "judged": {
+    "RL3": [
+     107,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "handover.bound",
+   "kind": "guard",
+   "role": "bound",
+   "note": "at most a few writer epochs (a bound, pinned)",
+   "cmp": "<",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "handover.gone",
+   "kind": "guard",
+   "role": "decide",
+   "note": "the current writer is gone to the controller",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL3",
+    5,
+    [
+     "RL3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL3",
+    5,
+    [
+     "RL3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "handover.alive",
+   "kind": "guard",
+   "role": "decide",
+   "note": "the new writer is up and linked",
+   "cmp": null,
+   "alone": [
+    "r2",
+    "RL3",
+    7,
+    [
+     "RL3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL3",
+    5,
+    [
+     "RL3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "handover.other",
+   "kind": "guard",
+   "role": "decide",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handover.append",
+   "kind": "update",
+   "role": "epoch",
+   "note": "commit a writer entry with the next epoch",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "takeover.named",
+   "kind": "guard",
+   "role": "epoch",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL1",
+    2,
+    [
+     "RL1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL1",
+    2,
+    [
+     "RL1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "takeover",
+     "(('s', 1),)"
+    ],
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "takeover.wep",
+   "kind": "update",
+   "role": "epoch",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "takeover.fold",
+   "kind": "update",
+   "role": "fold",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL2",
+    4,
+    [
+     "RL2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL2",
+    4,
+    [
+     "RL2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "handover",
+     "(('s', 1),)"
+    ],
+    [
+     "takeover",
+     "(('s', 1),)"
+    ],
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "write.bound",
+   "kind": "guard",
+   "role": "bound",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "r1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "r1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "write.holder",
+   "kind": "guard",
+   "role": "epoch",
+   "note": "it believes it holds a writer epoch",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "write.epoch",
+   "kind": "guard",
+   "role": "epoch",
+   "note": "the log's leader takes the append only with the latest committed writer epoch",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL1",
+    3,
+    [
+     "RL1",
+     "RL2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL1",
+    1,
+    [
+     "RL1",
+     "RL2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "write.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL3",
+    0,
+    [
+     "RL3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL3",
+    0,
+    [
+     "RL3"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "write.fold",
+   "kind": "update",
+   "role": "fold",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "RL2",
+    2,
+    [
+     "RL2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "RL2",
+    2,
+    [
+     "RL2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "(('s', 0),)"
+    ],
+    [
+     "write",
+     "(('s', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "write.count",
+   "kind": "update",
+   "role": "bound",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "r1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "handover.gone",
+   "caught": [
+    "r1",
+    "RL3",
+    5,
+    [
+     "RL3"
+    ]
+   ],
+   "trace": [
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.alive",
+   "caught": [
+    "r1",
+    "RL3",
+    5,
+    [
+     "RL3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ],
+    [
+     "handover",
+     "(('s', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.append",
+   "caught": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "takeover.named",
+   "caught": [
+    "r1",
+    "RL1",
+    2,
+    [
+     "RL1"
+    ]
+   ],
+   "trace": [
+    [
+     "takeover",
+     "(('s', 1),)"
+    ],
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "takeover.wep",
+   "caught": [
+    "r1",
+    "RL3",
+    1,
+    [
+     "RL3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "takeover.fold",
+   "caught": [
+    "r1",
+    "RL2",
+    4,
+    [
+     "RL2"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "handover",
+     "(('s', 1),)"
+    ],
+    [
+     "takeover",
+     "(('s', 1),)"
+    ],
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.epoch",
+   "caught": [
+    "r1",
+    "RL1",
+    1,
+    [
+     "RL1",
+     "RL2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "(('s', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "write.append",
+   "caught": [
+    "r1",
+    "RL3",
+    0,
+    [
+     "RL3"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "write.fold",
+   "caught": [
+    "r1",
+    "RL2",
+    2,
+    [
+     "RL2"
+    ]
+   ],
+   "trace": [
+    [
+     "write",
+     "(('s', 0),)"
+    ],
+    [
+     "write",
+     "(('s', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "takeover: wep <-> fold",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "write: append <-> fold",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "rlog",
+ "secs": 379
+}

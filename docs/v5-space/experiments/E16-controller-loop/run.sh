@@ -17,33 +17,35 @@ cd "$HERE"
 mkdir -p results
 
 # 1. The designs on the one-fault bounds and two-a, with traces and the
-#    WAIT and SWAP counts; then the other two-fault bounds (cent-co stops at
-#    900,000 states on them: safety only).
+#    WAIT and SWAP counts; then the other two-fault bounds (limit 2,000,000).
 for o in self cent-co; do
   "$HEAVY" timeout 1500 python3 engine/cli.py models/heal.py "$o" --bound three1 --bound four1 --bound meta1 \
     --bound two-a --limit 900000 > "results/design-$o.txt" 2>&1 || true
 done
 "$HEAVY" timeout 600 python3 engine/cli.py models/rlog.py rlog > results/design-rlog.txt 2>&1 || true
 "$HEAVY" timeout 1500 sh -c 'for o in self cent-co; do for b in two-b two-c three2; do
-  python3 engine/cli.py models/heal.py $o --bound $b --limit 900000; done; done' > results/design-extra.txt 2>&1 || true
+  python3 engine/cli.py models/heal.py $o --bound $b --limit 2000000; done; done' > results/design-extra.txt 2>&1 || true
 
-# 2. The verify probes: cent-co does not finish two-a in 4,000,000 states;
-#    a breadth-first run of three2 capped at 2,000,000 states covers every
-#    trace up to 18 steps; the two-fault traces the verify bound must find
-#    are found within it (12 and 14 steps).
+# 2. Probes (engine/depth.py, breadth first, safety only): the two-fault
+#    traces that rules needed only with two faults leave, and how deep a run
+#    gets.
 "$HEAVY" timeout 1500 sh -c '
-  echo "# Verify-bound probes. cli.py with --limit 4000000, and engine/depth.py."
-  python3 engine/cli.py models/heal.py cent-co --bound two-a --limit 4000000
+  echo "# Probes: engine/depth.py (breadth first, safety only)."
   python3 engine/depth.py models/heal.py cent-co two-b 3000000 exec.gone
   python3 engine/depth.py models/heal.py cent-co two-a 3000000 exec.allheld
-  python3 engine/depth.py models/heal.py self two-a 3000000 surplus.allheld
-  python3 engine/depth.py models/heal.py cent-co three2 2000000' > results/verify-probes.txt 2>&1 || true
+  python3 engine/depth.py models/heal.py self two-a 3000000 surplus.allheld' > results/verify-probes.txt 2>&1 || true
+# 3. cent-co without exec.live (the model before the promotion re-check was
+#    added): P8 breaks on two-a, 92 stuck states, 8 steps.
+"$HEAVY" timeout 600 python3 engine/cli.py models/heal.py cent-co --bound two-a --drop exec.live \
+  > results/cent-co-without-live.txt 2>&1 || true
 [ "$1" = check ] && exit 0
 
-# 3. The ablation and the mutants (DEV-10), resumable: each piece runs at
+# 4. The ablation and the mutants (DEV-10), resumable: each piece runs at
 #    most 25 minutes under the heavy lock; the cache keeps finished runs.
-#    The sweep runs stop at 900,000 states; cent-co's verify runs on three2
-#    stop at 2,000,000 (safety to 18 steps; self finishes three2).
+#    The sweep runs stop at 900,000 states; the verify runs on three2 stop
+#    at 2,000,000 (cent-co: safety to 18 steps; self finishes three2). Before
+#    E-17's put-back, each rule the sweep dropped is checked alone on three2
+#    (VERIFY_PASS1 in models/heal.py).
 ablate() {  # model option out [extra args]
   m=$1; o=$2; out=$3; shift 3
   n=0
@@ -52,7 +54,7 @@ ablate() {  # model option out [extra args]
     n=$((n + 1))
   done
 }
-ablate models/heal.py self results/self-ablation.json
+ablate models/heal.py self results/self-ablation.json --vlimit 2000000
 ablate models/rlog.py rlog results/rlog-ablation.json
 ablate models/heal.py cent-co results/cent-co-ablation.json --vlimit 2000000
 python3 engine/report.py results/self-ablation.json results/cent-co-ablation.json results/rlog-ablation.json > results/summary.md

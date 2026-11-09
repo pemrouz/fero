@@ -1,0 +1,2028 @@
+{
+ "bounds": [
+  "three1",
+  "four1",
+  "meta1"
+ ],
+ "verify": [
+  "three2"
+ ],
+ "pinned": [],
+ "base": {
+  "three1": {
+   "states": 4315,
+   "secs": 0.51,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4315,
+    10942,
+    14143887525622450915
+   ],
+   "judged": {
+    "P5": [
+     2547,
+     0
+    ],
+    "P8": [
+     2530,
+     0
+    ],
+    "SWAP": [
+     1768,
+     0
+    ],
+    "WAIT": [
+     17,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 3193,
+   "secs": 0.48,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3193,
+    8134,
+    18387511269131270249
+   ],
+   "judged": {
+    "P5": [
+     2249,
+     0
+    ],
+    "P8": [
+     2210,
+     0
+    ],
+    "SWAP": [
+     944,
+     0
+    ],
+    "WAIT": [
+     39,
+     0
+    ]
+   }
+  },
+  "meta1": {
+   "states": 4712,
+   "secs": 0.78,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4712,
+    12299,
+    14685539512380445524
+   ],
+   "judged": {
+    "P5": [
+     2944,
+     0
+    ],
+    "P8": [
+     2529,
+     0
+    ],
+    "SWAP": [
+     1768,
+     0
+    ],
+    "WAIT": [
+     415,
+     210
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [
+  [
+   "c_dropl.learner",
+   [
+    "three2",
+    "LIMIT",
+    2000002,
+    [
+     "LIMIT"
+    ]
+   ]
+  ]
+ ],
+ "verify_undecided": [
+  "three2",
+  "LIMIT",
+  2000001,
+  [
+   "LIMIT"
+  ]
+ ],
+ "greedy": [
+  [
+   "c_add.one",
+   "dropped"
+  ],
+  [
+   "c_add.need",
+   "dropped"
+  ],
+  [
+   "c_promote.one",
+   "dropped"
+  ],
+  [
+   "c_promote.live",
+   "dropped"
+  ],
+  [
+   "c_promote.need",
+   "kept: with the others dropped it breaks P9 on three1 in 28 steps"
+  ],
+  [
+   "c_remove.one",
+   "dropped"
+  ],
+  [
+   "c_remove.gone",
+   "dropped"
+  ],
+  [
+   "c_surplus.one",
+   "dropped"
+  ],
+  [
+   "c_surplus.voter",
+   "dropped"
+  ],
+  [
+   "c_surplus.nogone",
+   "dropped"
+  ],
+  [
+   "c_surplus.last",
+   "dropped"
+  ],
+  [
+   "c_dropl.one",
+   "dropped"
+  ],
+  [
+   "c_dropl.gone",
+   "dropped"
+  ],
+  [
+   "c_dropl.issue",
+   "dropped"
+  ],
+  [
+   "c_expire.stuck",
+   "dropped"
+  ],
+  [
+   "exec.leader",
+   "dropped"
+  ],
+  [
+   "exec.idle",
+   "dropped"
+  ],
+  [
+   "exec.caught",
+   "dropped"
+  ],
+  [
+   "exec.newok",
+   "dropped"
+  ],
+  [
+   "exec.gone",
+   "kept: with the others dropped it breaks P2 on three1 in 10 steps"
+  ],
+  [
+   "exec.live",
+   "dropped"
+  ],
+  [
+   "exec.done",
+   "dropped"
+  ],
+  [
+   "c_remove.issue",
+   "dropped in the final pass"
+  ],
+  [
+   "c_dropl.learner",
+   "dropped in the final pass"
+  ],
+  [
+   "c_expire.drop",
+   "dropped in the final pass"
+  ],
+  [
+   "c_add.cand",
+   "dropped in the final pass"
+  ],
+  [
+   "c_remove.voter",
+   "dropped in the final pass"
+  ],
+  [
+   "c_remove.four",
+   "dropped in the final pass"
+  ],
+  [
+   "exec.gone",
+   "dropped in the final pass"
+  ],
+  [
+   "exec.live",
+   "put back: alone on three2 it breaks P8 in 8 steps"
+  ],
+  [
+   "c_remove.issue",
+   "put back: alone on three2 it breaks P8 in 1 steps"
+  ],
+  [
+   "c_expire.drop",
+   "put back: alone on three2 it breaks P8 in 7 steps"
+  ],
+  [
+   "c_add.cand",
+   "put back: alone on three2 it breaks P9 in 29 steps"
+  ],
+  [
+   "c_remove.voter",
+   "put back: alone on three2 it breaks P9 in 30 steps"
+  ],
+  [
+   "c_remove.four",
+   "put back: alone on three2 it breaks P3 in 5 steps"
+  ],
+  [
+   "exec.gone",
+   "put back: alone on three2 it breaks P2 in 14 steps"
+  ]
+ ],
+ "removed": [
+  "c_add.one",
+  "c_add.need",
+  "c_promote.one",
+  "c_promote.live",
+  "c_remove.one",
+  "c_remove.gone",
+  "c_surplus.one",
+  "c_surplus.voter",
+  "c_surplus.nogone",
+  "c_surplus.last",
+  "c_dropl.one",
+  "c_dropl.gone",
+  "c_dropl.issue",
+  "c_expire.stuck",
+  "exec.leader",
+  "exec.idle",
+  "exec.caught",
+  "exec.newok",
+  "exec.done",
+  "c_dropl.learner"
+ ],
+ "put_back": [
+  [
+   "exec.live",
+   "put back: alone on three2 it breaks P8 in 8 steps"
+  ],
+  [
+   "c_remove.issue",
+   "put back: alone on three2 it breaks P8 in 1 steps"
+  ],
+  [
+   "c_expire.drop",
+   "put back: alone on three2 it breaks P8 in 7 steps"
+  ],
+  [
+   "c_add.cand",
+   "put back: alone on three2 it breaks P9 in 29 steps"
+  ],
+  [
+   "c_remove.voter",
+   "put back: alone on three2 it breaks P9 in 30 steps"
+  ],
+  [
+   "c_remove.four",
+   "put back: alone on three2 it breaks P3 in 5 steps"
+  ],
+  [
+   "exec.gone",
+   "put back: alone on three2 it breaks P2 in 14 steps"
+  ]
+ ],
+ "minimal": {
+  "three1": {
+   "states": 563598,
+   "secs": 88.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    563598,
+    6064359,
+    12307136417584706558
+   ],
+   "judged": {
+    "P5": [
+     213886,
+     0
+    ],
+    "P8": [
+     213728,
+     0
+    ],
+    "SWAP": [
+     349712,
+     0
+    ],
+    "WAIT": [
+     158,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 326404,
+   "secs": 49.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    326404,
+    3418013,
+    10930144339649434757
+   ],
+   "judged": {
+    "P5": [
+     127132,
+     0
+    ],
+    "P8": [
+     127101,
+     0
+    ],
+    "SWAP": [
+     199272,
+     0
+    ],
+    "WAIT": [
+     31,
+     0
+    ]
+   }
+  },
+  "meta1": {
+   "states": 559945,
+   "secs": 88.93,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    559945,
+    6027546,
+    17873081268719785210
+   ],
+   "judged": {
+    "P5": [
+     212961,
+     0
+    ],
+    "P8": [
+     212546,
+     0
+    ],
+    "SWAP": [
+     346984,
+     0
+    ],
+    "WAIT": [
+     415,
+     210
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "three2": {
+   "states": 2000001,
+   "secs": 129.67,
+   "complete": false,
+   "fail": {},
+   "digest": [
+    2000001,
+    9872700,
+    11798561713872765693
+   ],
+   "judged": {}
+  }
+ },
+ "rules": [
+  {
+   "id": "c_add.one",
+   "kind": "guard",
+   "role": "idem",
+   "note": "one command per reported epoch (PD: one operator per region at a time)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_add.cand",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    29,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three2",
+    "LIMIT",
+    2000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_add.new",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_add.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_add.issue",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "c_promote.one",
+   "kind": "guard",
+   "role": "idem",
+   "note": "one command per reported epoch (PD: one operator per region at a time)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_promote.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    29,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_promote.live",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_promote.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_promote.odd",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "three1",
+    "P3",
+    16,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "c_add",
+     "(('ep', 1), ('lrn', frozenset({(1, 1)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 2), ('lrn', frozenset({(1, 1), (3, 0)})), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'promote'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 3), ('lrn', frozenset({(3, 0)})), ('newv', (1, 1)), ('r', (3, 0)), ('vot', frozenset({(1, 0), (1, 1), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 3), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "c_promote.issue",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "c_remove.one",
+   "kind": "guard",
+   "role": "idem",
+   "note": "one command per reported epoch (PD: one operator per region at a time)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_remove.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    30,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_remove.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_remove.four",
+   "kind": "guard",
+   "role": "swap",
+   "note": "",
+   "cmp": ">=",
+   "alone": [
+    "three1",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_remove",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'remove'), ('r', (1, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "c_remove.issue",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three2",
+    "LIMIT",
+    2000003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "c_surplus.one",
+   "kind": "guard",
+   "role": "idem",
+   "note": "one command per reported epoch (PD: one operator per region at a time)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_surplus.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_surplus.four",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": ">=",
+   "alone": [
+    "three1",
+    "P2",
+    2,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    2,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "c_surplus",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "id": "c_surplus.nogone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_surplus.last",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_surplus.issue",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    10,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    9,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "c_dropl.one",
+   "kind": "guard",
+   "role": "idem",
+   "note": "one command per reported epoch (PD: one operator per region at a time)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_dropl.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P9",
+    29,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_dropl.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_dropl.issue",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_expire.stuck",
+   "kind": "guard",
+   "role": "idem",
+   "note": "only a command the group would not run now times out",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "c_expire.drop",
+   "kind": "update",
+   "role": "idem",
+   "note": "the command times out",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    11,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three2",
+    "LIMIT",
+    2000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "exec.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "exec.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "exec.epoch",
+   "kind": "guard",
+   "role": "epoch",
+   "note": "the command names the group's current config epoch",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P2",
+    15,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_remove",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (1, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "c_surplus",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'remove'), ('r', (1, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "id": "exec.caught",
+   "kind": "guard",
+   "role": "swap",
+   "note": "a promotion waits until the learner holds the commit offset (only the leader knows)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "exec.newok",
+   "kind": "guard",
+   "role": "swap",
+   "note": "a swap removal waits until the new voter holds the offset again",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "exec.allheld",
+   "kind": "guard",
+   "role": "swap",
+   "note": "a surplus removal waits until the voters left answer and hold the offset",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P2",
+    12,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    10,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_surplus",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "id": "exec.gone",
+   "kind": "guard",
+   "role": "view",
+   "note": "a removal of a gone replica runs only if the leader's own links agree (DESIGN-V5's planner rule: a leader whose link to that life is up ignores it)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P2",
+    10,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_remove",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'remove'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "id": "exec.live",
+   "kind": "guard",
+   "role": "view",
+   "note": "a promotion runs only if the learner is not gone to the leader's own links (found by P8 on two-a: a promotion decided before the learner died stays runnable, so it never times out, and it blocks every other decision)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three2",
+    "LIMIT",
+    2000005,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "exec.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "exec.done",
+   "kind": "update",
+   "role": "idem",
+   "note": "the command leaves #meta's list of live commands",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "c_add.cand",
+   "caught": null,
+   "undecided": [
+    "three2",
+    "LIMIT",
+    2000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_add.new",
+   "caught": null,
+   "undecided": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_add.issue",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_promote.learner",
+   "caught": null,
+   "undecided": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_promote.need",
+   "caught": null,
+   "undecided": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_promote.odd",
+   "caught": [
+    "three1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "c_add",
+     "(('ep', 1), ('lrn', frozenset({(1, 1)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 2), ('lrn', frozenset({(1, 1), (3, 0)})), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'promote'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 3), ('lrn', frozenset({(3, 0)})), ('newv', (1, 1)), ('r', (3, 0)), ('vot', frozenset({(1, 0), (1, 1), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 3), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_promote.issue",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_remove.voter",
+   "caught": null,
+   "undecided": [
+    "three1",
+    "LIMIT",
+    900001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_remove.four",
+   "caught": [
+    "three1",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_remove",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'remove'), ('r', (1, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_remove.issue",
+   "caught": null,
+   "undecided": [
+    "three2",
+    "LIMIT",
+    2000003,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_surplus.four",
+   "caught": [
+    "three1",
+    "P2",
+    2,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "c_surplus",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_surplus.issue",
+   "caught": [
+    "three1",
+    "P8",
+    9,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "c_expire.drop",
+   "caught": null,
+   "undecided": [
+    "three2",
+    "LIMIT",
+    2000002,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "exec.epoch",
+   "caught": [
+    "three1",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_remove",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (1, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "c_surplus",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'remove'), ('r', (1, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "exec.allheld",
+   "caught": [
+    "three1",
+    "P2",
+    10,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_surplus",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'surplus'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "exec.gone",
+   "caught": [
+    "three1",
+    "P2",
+    10,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_remove",
+     "(('ep', 2), ('lrn', frozenset()), ('newv', (3, 0)), ('r', (0, 0)), ('vot', frozenset({(1, 0), (2, 0), (3, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'remove'), ('r', (0, 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "exec.live",
+   "caught": null,
+   "undecided": [
+    "three2",
+    "LIMIT",
+    2000005,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "exec.append",
+   "caught": [
+    "three1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "c_promote.odd",
+   "caught": [
+    "three1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "c_add",
+     "(('ep', 1), ('lrn', frozenset({(1, 1)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 2), ('lrn', frozenset({(1, 1), (3, 0)})), ('newv', None), ('r', (1, 1)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 2), ('op', 'promote'), ('r', (1, 1)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 3), ('lrn', frozenset({(3, 0)})), ('newv', (1, 1)), ('r', (3, 0)), ('vot', frozenset({(1, 0), (1, 1), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 3), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "c_remove.four",
+   "caught": null,
+   "undecided": [
+    "three2",
+    "LIMIT",
+    2000003,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "c_surplus.four",
+   "caught": [
+    "three1",
+    "P8",
+    9,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "c_add",
+     "(('ep', 0), ('lrn', frozenset()), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "exec",
+     "(('ep', 0), ('op', 'add'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "c_promote",
+     "(('ep', 1), ('lrn', frozenset({(3, 0)})), ('newv', None), ('r', (3, 0)), ('vot', frozenset({(1, 0), (2, 0), (0, 0)})))"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "exec",
+     "(('ep', 1), ('op', 'promote'), ('r', (3, 0)))"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  }
+ ],
+ "option": "cent-co",
+ "secs": 1357
+}
