@@ -1,1 +1,2 @@
-the model as designed fails or does not finish: {'lost': ([], True), 'move': ([], True), 'restart': ([], True), 'expire': (['L7'], True), 'exprst': ([], True)}
+  pass 1: 17 of 26 rules necessary alone
+pid-smart: 16 rules needed of 26; mutants 23, caught 22, equivalent 0; put back []; 792 s

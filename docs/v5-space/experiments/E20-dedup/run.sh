@@ -6,9 +6,11 @@
 #
 #   ./run.sh            everything: design runs, ablations + mutants, summary, memory
 #   ./run.sh check      only the design runs (every option on every bound)
-#   ./run.sh ablate     DEV-10 (ablate20.py): the four smart options in full; each fwd option
-#                       from its smart option's smallest model (what the relay adds)
-#   ./run.sh variants   the two append-every-refusal variants (sess-fwd-all, win-fwd-all)
+#   ./run.sh ablate     DEV-10 (ablate20.py): the four smart options in full (sess-smart at a
+#                       2.5 million state limit, then resolve20.py); win, pid and keys under fwd
+#                       from their smart option's smallest model (what the relay adds); sess
+#                       under fwd by dropping its one relay rule on the full designs
+#   ./run.sh variants   the append-every-refusal variant win-fwd-all (sess-fwd-all is in ablate)
 #   ./run.sh rev [OPTION ...]       the same, greedy drops in reverse model-text order
 #   ./run.sh report     results/summary.md from the ablation files
 #   ./run.sh mem        Node memory per dedup entry at 1e4 and 1e6 clients
@@ -44,14 +46,23 @@ ablate() {   # $1 option, then ablate20.py's flags (pieces of 25 minutes, resume
 }
 
 if [ "$STEP" = all ] || [ "$STEP" = ablate ]; then
-  # the four smart options in full (DEV-10); each fwd option from its smart
-  # option's smallest model (what the relay adds)
-  for o in win-smart sess-smart pid-smart keys-smart; do ablate "$o"; done
-  for d in win sess pid keys; do ablate "$d-fwd" --from "results/$d-smart-ablation.json"; done
+  # the four smart options in full (DEV-10). sess-smart's smallest model needs
+  # 2,298,773 states on bound `lost`, so it runs with a 2.5 million limit;
+  # resolve20.py then settles any mutant that still stopped at a limit by
+  # trying the small bounds first (a no-op when none did)
+  ablate win-smart; ablate sess-smart --limit 2500000; ablate pid-smart; ablate keys-smart
+  "$HEAVY" timeout 1500 python3 resolve20.py results/sess-smart-ablation.json >> results/sess-smart-ablation.log 2>&1
+  # win, pid and keys under fwd: from the smart option's smallest model (what the relay adds)
+  for d in win pid keys; do ablate "$d-fwd" --from "results/$d-smart-ablation.json"; done
+  # sess under fwd: from sess-smart's smallest model, `lost` would need well
+  # over 2.5 million states; the relay's one rule (forward.once; sess has no
+  # budgets) is dropped alone on the full sess-fwd and sess-fwd-all designs
+  { echo "# E-20 relay rule under sess: forward.once dropped alone on the full designs, $(date -u +%FT%TZ), load $(cut -d' ' -f1-3 /proc/loadavg)"
+    "$HEAVY" timeout 1500 sh -c "for o in sess-fwd sess-fwd-all; do python3 '$CLI' models/dedup.py \$o --drop forward.once; done"
+  } > results/sess-fwd-relay.txt 2>&1
 fi
 if [ "$STEP" = all ] || [ "$STEP" = variants ]; then
-  # every refusal appended: is a fwd hop rule still needed?
-  ablate sess-fwd-all --from results/sess-smart-ablation.json
+  # every refusal appended: is a fwd hop rule still needed? (sess: see sess-fwd-relay.txt)
   ablate win-fwd-all --from results/win-smart-ablation.json
 fi
 if [ "$STEP" = rev ]; then

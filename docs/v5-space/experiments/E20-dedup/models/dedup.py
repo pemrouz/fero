@@ -932,12 +932,37 @@ class Pid(Dedup):
         p, slot, sq = self.wid(st, n)
         return any(e[0] == 'pfg' and e[1] == p and e[2] == slot for g in DATA for e in self.com(st, g))
 
-    def seq(self, n):
+    SLOTI = {'s1': 0, 's2': 1}
+
+    def epoch(self, st, slot):
+        """(epoch, first attempt under it) for this life and partition.
+        cl[4] holds (life, per slot (epoch, first)); another life's value
+        counts as (0, 0): a new life is a new producer id."""
+        x = st[IX['cl']][4]
+        if not isinstance(x, tuple) or x[0] != self.life(st):
+            return (0, 0)
+        return x[1][self.SLOTI[slot]]
+
+    def bump(self, st, d, n):
+        """KIP-360: after an attempt ends `unknown`, the producer bumps its
+        epoch on that partition and its sequence there restarts at 0."""
         slot = self.plan[n]
-        return sum(1 for j in range(n) if self.plan[j] == slot)
+        cl = d.f['cl']
+        x = cl[4] if isinstance(cl[4], tuple) and cl[4][0] == self.life(st) else (self.life(st), ((0, 0), (0, 0)))
+        eps = list(x[1])
+        eps[self.SLOTI[slot]] = (eps[self.SLOTI[slot]][0] + 1, n + 1)
+        d.f['cl'] = cl[:4] + ((x[0], tuple(eps)),)
+
+    def seq(self, st, n):
+        slot = self.plan[n]
+        first = self.epoch(st, slot)[1]
+        return sum(1 for j in range(first, n) if self.plan[j] == slot)
 
     def wid(self, st, n):
-        return (self.pid(st), self.plan[n], self.seq(n))
+        # one attempt in flight per partition, so the epoch never changes
+        # under an attempt that is still pending: every copy keeps its id
+        slot = self.plan[n]
+        return (self.pid(st) + (self.epoch(st, slot)[0],), slot, self.seq(st, n))
 
     def fold(self, st, g, committed):
         """(pid, slot) -> (last seq, its kind, last_t)."""
@@ -991,8 +1016,18 @@ class Pid(Dedup):
         A.append(Action('giveup', 'tick', self.p_pending,
                         [Cmp('late', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '>=', lambda w, st, b: R,
                              role='time', note='after R the attempt ends unknown')],
-                        [self.giveup_update()]))
-        A.append(self.a_recv())
+                        [self.giveup_update(),
+                         U('bump', lambda md, st, b, d: self.bump(st, d, b['n']), 'dedup',
+                           'a give-up bumps the epoch: the partition\'s sequence restarts at 0 (KIP-360)')]))
+        rv = self.a_recv()
+
+        def rbump(md, st, b, d):
+            if b['m'][1] == 'x':
+                self.bump(st, d, b['m'][2][1])
+        bu = U('bump', rbump, 'dedup', 'an unknown-producer answer bumps the epoch too (KIP-360)')
+        bu.action = rv.name
+        rv.updates.append(bu)
+        A.append(rv)
         A.append(self.a_learn())
 
         def p_reg(md, st):
@@ -1038,7 +1073,10 @@ class Pid(Dedup):
                         [eat()]))
         A.append(Action('unknownpid', 'deliver', self.p_copies,
                         [T('unknown', lambda w, st, b: self.state(st, b['g'], b['m']) is None, 'world'),
-                         T('nonzero', lambda w, st, b: b['m'][1][2] > 0, 'world')],
+                         T('nonzero', lambda w, st, b: b['m'][1][2] > 0, 'world'),
+                         T('forgotten', lambda w, st, b: any(e[0] == 'pfg' and (e[1], e[2]) == (b['m'][1][0], b['m'][1][1])
+                                                             for e in self.com(st, b['g'])), 'dedup',
+                           'answer unknown only once the forget has committed')],
                         [eat(), U('emit', lambda md, st, b, d: self.send_msg(d, ('a', 'x', b['m'][2], b['m'][4])), 'perf')]))
 
         def p_forget(md, st):

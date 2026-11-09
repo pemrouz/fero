@@ -1,0 +1,97 @@
+# E-20 design runs, 2026-11-09T18:39:16Z, Python 3.13.17, 4 vCPU, load 4.79 5.28 3.85
+win-smart lost: 6,316 states, 0.9s: all hold
+    L7: 2,628 judged states, 0 cannot reach the goal
+win-smart move: 6,764 states, 0.9s: all hold
+    L7: 2,433 judged states, 0 cannot reach the goal
+win-smart restart: 2,259 states, 0.2s: all hold
+    L7: 747 judged states, 0 cannot reach the goal
+win-smart expire: 19,777 states, 1.9s: all hold
+    L7: 10,256 judged states, 0 cannot reach the goal
+win-smart exprst: 643 states, 0.0s: all hold
+    L7: 463 judged states, 0 cannot reach the goal
+win-smart mvexp: 27,412 states, 2.2s: all hold
+    L7: 16,579 judged states, 0 cannot reach the goal
+win-fwd lost: 24,390 states, 3.9s: all hold
+    L7: 8,644 judged states, 0 cannot reach the goal
+win-fwd move: 13,420 states, 1.3s: all hold
+    L7: 4,451 judged states, 0 cannot reach the goal
+win-fwd restart: 4,713 states, 0.5s: all hold
+    L7: 1,417 judged states, 0 cannot reach the goal
+win-fwd expire: 42,431 states, 3.6s: all hold
+    L7: 20,899 judged states, 0 cannot reach the goal
+win-fwd exprst: 1,000 states, 0.1s: all hold
+    L7: 724 judged states, 0 cannot reach the goal
+win-fwd mvexp: 39,448 states, 2.9s: all hold
+    L7: 23,789 judged states, 0 cannot reach the goal
+sess-smart lost: 116,570 states, 19.4s: all hold
+    L7: 24,046 judged states, 0 cannot reach the goal
+sess-smart move: 50,810 states, 6.1s: all hold
+    L7: 9,478 judged states, 0 cannot reach the goal
+sess-smart restart: 3,243 states, 0.3s: all hold
+    L7: 1,255 judged states, 0 cannot reach the goal
+sess-smart expire: 98,538 states, 10.8s: all hold
+    L7: 53,265 judged states, 0 cannot reach the goal
+sess-smart exprst: 14,152 states, 0.8s: all hold
+    L7: 12,960 judged states, 0 cannot reach the goal
+sess-smart mvexp: 209,213 states, 18.6s: all hold
+    L7: 134,353 judged states, 0 cannot reach the goal
+sess-fwd lost: 462,506 states, 65.1s: all hold
+    L7: 80,982 judged states, 0 cannot reach the goal
+sess-fwd move: 107,948 states, 11.2s: all hold
+    L7: 18,532 judged states, 0 cannot reach the goal
+sess-fwd restart: 6,849 states, 0.5s: all hold
+    L7: 2,383 judged states, 0 cannot reach the goal
+sess-fwd expire: 332,167 states, 38.8s: all hold
+    L7: 169,355 judged states, 0 cannot reach the goal
+sess-fwd exprst: 39,807 states, 3.2s: all hold
+    L7: 37,343 judged states, 0 cannot reach the goal
+sess-fwd mvexp: 417,805 states, 33.8s: all hold
+    L7: 267,724 judged states, 0 cannot reach the goal
+pid-smart lost: 10,540 states, 1.1s: all hold
+    L7: 5,206 judged states, 0 cannot reach the goal
+pid-smart move: 41,517 states, 3.9s: all hold
+    L7: 9,835 judged states, 0 cannot reach the goal
+pid-smart restart: 3,531 states, 0.2s: all hold
+    L7: 1,628 judged states, 0 cannot reach the goal
+pid-smart expire: 27,026 states, 2.1s: all hold
+    L7: 16,298 judged states, 0 cannot reach the goal
+pid-smart exprst: 1,561 states, 0.0s: all hold
+    L7: 1,411 judged states, 0 cannot reach the goal
+pid-smart mvexp: 36,998 states, 2.1s: all hold
+    L7: 26,107 judged states, 0 cannot reach the goal
+pid-fwd lost: 46,352 states, 5.3s: all hold
+    L7: 19,004 judged states, 0 cannot reach the goal
+pid-fwd move: 95,659 states, 10.1s: all hold
+    L7: 17,894 judged states, 0 cannot reach the goal
+pid-fwd restart: 8,051 states, 0.6s: all hold
+    L7: 3,203 judged states, 0 cannot reach the goal
+pid-fwd expire: 60,488 states, 3.9s: all hold
+    L7: 33,734 judged states, 0 cannot reach the goal
+pid-fwd exprst: 2,601 states, 0.2s: all hold
+    L7: 2,337 judged states, 0 cannot reach the goal
+pid-fwd mvexp: 55,382 states, 3.3s: all hold
+    L7: 37,286 judged states, 0 cannot reach the goal
+keys-smart lost: 53,195 states, 4.7s: all hold
+    L7: 8,553 judged states, 0 cannot reach the goal
+keys-smart move: 33,803 states, 2.3s: all hold
+    L7: 4,810 judged states, 0 cannot reach the goal
+keys-smart restart: 2,259 states, 0.2s: all hold
+    L7: 747 judged states, 0 cannot reach the goal
+keys-smart expire: 37,141 states, 1.8s: all hold
+    L7: 20,478 judged states, 0 cannot reach the goal
+keys-smart exprst: 643 states, 0.0s: all hold
+    L7: 463 judged states, 0 cannot reach the goal
+keys-smart mvexp: 27,412 states, 1.2s: all hold
+    L7: 16,579 judged states, 0 cannot reach the goal
+keys-fwd lost: 195,150 states, 17.3s: all hold
+    L7: 24,272 judged states, 0 cannot reach the goal
+keys-fwd move: 69,165 states, 4.9s: all hold
+    L7: 8,610 judged states, 0 cannot reach the goal
+keys-fwd restart: 4,713 states, 0.2s: all hold
+    L7: 1,417 judged states, 0 cannot reach the goal
+keys-fwd expire: 76,258 states, 4.3s: all hold
+    L7: 40,920 judged states, 0 cannot reach the goal
+keys-fwd exprst: 1,000 states, 0.0s: all hold
+    L7: 724 judged states, 0 cannot reach the goal
+keys-fwd mvexp: 39,448 states, 1.7s: all hold
+    L7: 23,789 judged states, 0 cannot reach the goal
