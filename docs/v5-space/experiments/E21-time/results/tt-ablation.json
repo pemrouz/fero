@@ -1,0 +1,199 @@
+{
+ "option": "tt",
+ "seeds_per_family": 30,
+ "families": [
+  "drift",
+  "jumpL+",
+  "jumpL-",
+  "jumpF",
+  "pause",
+  "crash",
+  "mix"
+ ],
+ "rules": [
+  {
+   "id": "stamp.never_back",
+   "kind": "update",
+   "role": "time",
+   "note": "never below the last t in the log",
+   "cmp": null
+  },
+  {
+   "id": "expire.due",
+   "kind": "guard",
+   "role": "time",
+   "note": "a row ends when `earliest` passes its ttl",
+   "cmp": ">="
+  },
+  {
+   "id": "expire.log",
+   "kind": "update",
+   "role": "log",
+   "note": "expiry is a record in the log, so every replica removes the row at one position",
+   "cmp": null
+  },
+  {
+   "id": "grant.lapsed",
+   "kind": "guard",
+   "role": "time",
+   "note": "a lease lapses when `earliest` passes its end",
+   "cmp": ">="
+  },
+  {
+   "id": "pwrite.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "refuse a token below the highest the writer has seen",
+   "cmp": ">="
+  }
+ ],
+ "base": {
+  "early_wt": 0,
+  "early": 0,
+  "late": 0,
+  "lease": 0,
+  "stuck": 0,
+  "back": 0,
+  "agree": 0,
+  "stale": 0,
+  "avail": 0,
+  "overlap": 30,
+  "leaderless": 77400.0,
+  "ERR": 0,
+  "late_max": 300.0,
+  "early_max": 0.0,
+  "first": null
+ },
+ "pass1": {
+  "stamp.never_back": null,
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "jumpF",
+   3,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "removed": [
+  "stamp.never_back"
+ ],
+ "kept": {
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "jumpF",
+   3,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "expire.due",
+   "caught": [
+    "drift",
+    0,
+    [
+     "early_wt",
+     "early"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.log",
+   "caught": [
+    "jumpF",
+    3,
+    [
+     "agree"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "grant.lapsed",
+   "caught": [
+    "drift",
+    0,
+    [
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pwrite.fence",
+   "caught": [
+    "drift",
+    17,
+    [
+     "stale"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "expire.due",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "grant.lapsed",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "pwrite.fence",
+   "caught": null,
+   "no_change": true
+  }
+ ],
+ "secs": 86
+}

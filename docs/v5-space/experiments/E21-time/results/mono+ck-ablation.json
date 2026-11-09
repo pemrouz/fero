@@ -1,0 +1,219 @@
+{
+ "option": "mono+ck",
+ "seeds_per_family": 30,
+ "families": [
+  "drift",
+  "jumpL+",
+  "jumpL-",
+  "jumpF",
+  "pause",
+  "crash",
+  "mix"
+ ],
+ "rules": [
+  {
+   "id": "stamp.never_back",
+   "kind": "update",
+   "role": "time",
+   "note": "writer time (ctx.now) never goes back",
+   "cmp": null
+  },
+  {
+   "id": "expire.due",
+   "kind": "guard",
+   "role": "time",
+   "note": "a row ends when the leader's monotonic clock passes its deadline",
+   "cmp": ">="
+  },
+  {
+   "id": "expire.log",
+   "kind": "update",
+   "role": "log",
+   "note": "expiry is a record in the log, so every replica removes the row at one position",
+   "cmp": null
+  },
+  {
+   "id": "grant.lapsed",
+   "kind": "guard",
+   "role": "time",
+   "note": "a lease lapses on the leader's monotonic clock",
+   "cmp": ">="
+  },
+  {
+   "id": "promote.extend",
+   "kind": "update",
+   "role": "time",
+   "note": "a new leader restarts every deadline at its full length (etcd Promote)",
+   "cmp": null
+  },
+  {
+   "id": "pwrite.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "refuse a token below the highest the writer has seen",
+   "cmp": ">="
+  },
+  {
+   "id": "ckpt.ckpt",
+   "kind": "update",
+   "role": "time",
+   "note": "the leader logs each remaining duration (etcd 3.4 checkpoint)",
+   "cmp": null
+  },
+  {
+   "id": "resume.resume",
+   "kind": "update",
+   "role": "time",
+   "note": "a new leader resumes from the last checkpoint",
+   "cmp": null
+  }
+ ],
+ "base": {
+  "early_wt": 0,
+  "early": 0,
+  "late": 341,
+  "lease": 0,
+  "stuck": 0,
+  "back": 0,
+  "agree": 0,
+  "stale": 0,
+  "avail": 0,
+  "overlap": 33,
+  "leaderless": 77400.0,
+  "ERR": 0,
+  "late_max": 1100.0,
+  "early_max": 0.0,
+  "first": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ]
+ },
+ "fails_as_designed": [
+  "pause",
+  0,
+  [
+   "late"
+  ]
+ ],
+ "pass1": {
+  "stamp.never_back": [
+   "jumpL-",
+   0,
+   [
+    "back"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   0,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "promote.extend": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ],
+  "ckpt.ckpt": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "resume.resume": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ]
+ },
+ "removed": [],
+ "kept": {
+  "stamp.never_back": [
+   "jumpL-",
+   0,
+   [
+    "back"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   0,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "promote.extend": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ],
+  "ckpt.ckpt": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "resume.resume": [
+   "pause",
+   0,
+   [
+    "late"
+   ]
+  ]
+ },
+ "secs": 22
+}

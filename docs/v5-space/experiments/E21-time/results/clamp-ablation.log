@@ -1,0 +1,13 @@
+# E-21 ablation clamp, 30 seeds per family, 2026-11-09T12:52:54Z, Python 3.13.17, 4 vCPU, load 4.46 5.91 4.94
+clamp design: {"early_wt": 0, "early": 314, "late": 290, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 33, "leaderless": 77400.0, "ERR": 0, "late_max": 600.0, "early_max": 600, "first": ["jumpL+", 0, ["early"]]}
+  drop stamp.peers: ('jumpL+', 0, ['early'])
+  drop stamp.extrap: ('jumpL+', 0, ['late'])
+  drop stamp.upper: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.lower: ('jumpL+', 0, ['early'])
+  drop stamp.never_back: ('jumpL+', 0, ['early'])
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 0, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop stand.near: ('jumpL+', 0, ['early'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+clamp: kept 10 of 10; 16 s

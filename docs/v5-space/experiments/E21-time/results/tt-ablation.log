@@ -1,0 +1,15 @@
+# E-21 ablation tt, 30 seeds per family, 2026-11-09T12:51:28Z, Python 3.13.17, 4 vCPU, load 5.91 6.54 5.03
+tt design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 30, "leaderless": 77400.0, "ERR": 0, "late_max": 300.0, "early_max": 0.0, "first": null}
+  drop stamp.never_back: None
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('jumpF', 3, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('jumpF', 3, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+tt: kept 4 of 5; 86 s

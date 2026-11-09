@@ -22,3 +22,5 @@ hlc design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back
   mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
   mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
   mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+hlc: kept 6 of 14; 473 s
