@@ -1,4 +1,4 @@
-# E-21 ablation median, 30 seeds per family, 2026-11-09T12:54:11Z, Python 3.13.17, 4 vCPU, load 3.68 5.37 4.83
+# E-21 ablation median, 30 seeds per family, 2026-11-09T18:16:04Z, Python 3.13.17, 4 vCPU, load 0.64 0.31 0.13
 median design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 33, "leaderless": 77400.0, "ERR": 0, "late_max": 300.0, "early_max": 100, "first": null}
   drop stamp.peers: None
   drop stamp.extrap: ('drift', 0, ['late'])
@@ -10,3 +10,20 @@ median design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "b
   drop grant.lapsed: ('drift', 0, ['lease'])
   drop stand.near: None
   drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop stamp.extrap: {'kind': 'drop', 'rule': 'stamp.extrap', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.upper: {'kind': 'drop', 'rule': 'stamp.upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.lower: {'kind': 'drop', 'rule': 'stamp.lower', 'caught': ('jumpL-', 0, ['late', 'back'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 2, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: extrap <-> upper: {'kind': 'swap', 'rule': 'stamp: extrap <-> upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: extrap <-> lower: {'kind': 'swap', 'rule': 'stamp: extrap <-> lower', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: upper <-> lower: {'kind': 'swap', 'rule': 'stamp: upper <-> lower', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> extrap: {'kind': 'swap', 'rule': 'stamp: read <-> extrap', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> upper: {'kind': 'swap', 'rule': 'stamp: read <-> upper', 'caught': ('drift', 0, ['ERR'])}
+  mutant swap stamp: read <-> lower: {'kind': 'swap', 'rule': 'stamp: read <-> lower', 'caught': ('drift', 0, ['ERR'])}
+median: kept 7 of 10; 167 s
