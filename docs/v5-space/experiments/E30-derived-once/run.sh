@@ -7,7 +7,7 @@
 #
 #   ./run.sh            everything
 #   ./run.sh check      the design runs (every option on every bound, every property broken listed)
-#   ./run.sh ablate     DEV-10 ablation + mutants of the options that hold (srchi, srcpos)
+#   ./run.sh ablate     DEV-10 ablation + mutants of the options that hold (srchi-slot, srcpos)
 #   ./run.sh elle       random walks of the model as list-append histories, checked by real Elle
 #   ./run.sh report     results/summary.md
 # Every model and JVM run is under $SP/bin/heavy, each hold under 25 minutes.
@@ -25,13 +25,18 @@ head() { echo "# $1, $(date -u +%FT%TZ), $(python3 --version), $(nproc) vCPU, lo
 
 if [ "$STEP" = all ] || [ "$STEP" = check ]; then
   { head "E-30 design runs"
-    $HEAVY timeout 1500 sh -c "for o in srchi srcpos win sess pid keys; do python3 '$CLI' models/derived.py \$o --all-fails --limit 1500000; done"
+    $HEAVY timeout 1500 sh -c "for o in srchi-slot srcpos srchi srcpos-nok; do python3 '$CLI' models/derived.py \$o --all-fails --limit 1500000; done"
+    # the options that fail: every property they break, each run to the state limit
+    $HEAVY timeout 1500 sh -c "for o in win sess; do python3 '$CLI' models/derived.py \$o --all-fails --limit 1500000; done"
+    $HEAVY timeout 1500 sh -c "for o in pid keys; do python3 '$CLI' models/derived.py \$o --all-fails --limit 1500000; done"
   } > results/design.txt 2>&1 || true
 fi
 if [ "$STEP" = all ] || [ "$STEP" = ablate ]; then
-  for o in srchi srcpos; do
+  # E-20's ablate20.py: E-17's procedure on the rules that are not pinned
+  for o in srchi-slot srcpos; do
     for piece in 1 2 3 4; do
-      $HEAVY timeout 1500 python3 "$CLI" models/derived.py "$o" --ablate "results/$o-ablation.json" \
+      [ -f "results/$o-ablation.json" ] && break
+      $HEAVY timeout 1500 python3 ../E20-dedup/ablate20.py "$o" "results/$o-ablation.json" --model models/derived.py \
         >> "results/$o-ablation.log" 2>&1 && break
       echo "piece $piece stopped at 25 minutes; carrying on from the cache" >> "results/$o-ablation.log"
     done
@@ -48,5 +53,5 @@ if [ "$STEP" = all ] || [ "$STEP" = elle ]; then
   cp "$H/elle.jsonl" results/elle-verdicts.jsonl
 fi
 if [ "$STEP" = all ] || [ "$STEP" = report ]; then
-  python3 ../E20-dedup/report.py results/srchi-ablation.json results/srcpos-ablation.json > results/summary.md
+  python3 ../E20-dedup/report.py results/srchi-slot-ablation.json results/srcpos-ablation.json > results/summary.md
 fi
