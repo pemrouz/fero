@@ -355,6 +355,8 @@ class Dedup:
                 self.tell(d, m[2], 'R')
             else:
                 self.set_cl(d, 1, n, UNKNOWN)
+                if not self.unknown_ok(st, n):
+                    self.tell(d, m[2], 'U!')      # ghost: `unknown` before the design allows it
 
         def upd_eat(md, st, b, d):
             self.eat(d, b['m'])
@@ -469,7 +471,25 @@ class Dedup:
         return []
 
     def goals(self, st):
-        return {'L7': all(x not in (IDLE, PEND) for x in st[IX['cl']][1])}
+        # every attempt of the current life ends, and none ended `unknown`
+        # before the design allows (API.md: fero keeps retrying until a
+        # definite answer or half the horizon; an expired session or a
+        # forgotten producer is the other way to `unknown`)
+        return {'L7': all(x not in (IDLE, PEND) for x in st[IX['cl']][1]) and
+                not any(w == 'U!' for _, w in st[IX['told']])}
+
+    def unknown_ok(self, st, n):
+        """May attempt n end `unknown` by an answer now? (sess: its session
+        expired; pid: its producer state was forgotten.)"""
+        return False
+
+    def giveup_update(self):
+        def giveup(md, st, b, d):
+            n = b['n']
+            self.set_cl(d, 1, n, UNKNOWN)
+            if st[IX['now']] - self.t0(st, n) < self.R:
+                self.tell(d, self.gid(st, n), 'U!')     # ghost: gave up before the horizon
+        return U('status', giveup, 'world')
 
     def judged(self, st):
         # Judged where the client's resends cannot have run out: every
@@ -553,12 +573,10 @@ class Win(Dedup):
         def giveup_p(md, st):
             yield from self.p_pending(md, st)
 
-        def giveup(md, st, b, d):
-            self.set_cl(d, 1, b['n'], UNKNOWN)
         A.append(Action('giveup', 'tick', giveup_p,
                         [Cmp('late', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '>=', lambda w, st, b: R,
                              role='time', note='after R the attempt ends unknown')],
-                        [U('status', giveup, 'world')]))
+                        [self.giveup_update()]))
         A.append(self.a_recv())
         A.append(self.a_learn())
         if self.fwd:
@@ -679,6 +697,9 @@ class Sess(Dedup):
 
     def expired(self, st, sid):
         return any(e[0] == 'exp' and e[1] == sid for e in self.com(st, GS))
+
+    def unknown_ok(self, st, n):
+        return self.expired(st, self.sid(st))
 
     def registered(self, st, sid, committed=True):
         ents = self.com(st, GS) if committed else self.log(st, GS)
@@ -907,6 +928,10 @@ class Pid(Dedup):
     def pid(self, st):
         return ('p', self.life(st))
 
+    def unknown_ok(self, st, n):
+        p, slot, sq = self.wid(st, n)
+        return any(e[0] == 'pfg' and e[1] == p and e[2] == slot for g in DATA for e in self.com(st, g))
+
     def seq(self, n):
         slot = self.plan[n]
         return sum(1 for j in range(n) if self.plan[j] == slot)
@@ -963,12 +988,10 @@ class Pid(Dedup):
         A.append(self.a_resend([Cmp('horizon', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '<',
                                     lambda w, st, b: R, role='time', note='stop retrying after R (delivery.timeout.ms)')]))
 
-        def giveup(md, st, b, d):
-            self.set_cl(d, 1, b['n'], UNKNOWN)
         A.append(Action('giveup', 'tick', self.p_pending,
                         [Cmp('late', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '>=', lambda w, st, b: R,
                              role='time', note='after R the attempt ends unknown')],
-                        [U('status', giveup, 'world')]))
+                        [self.giveup_update()]))
         A.append(self.a_recv())
         A.append(self.a_learn())
 
@@ -1103,12 +1126,10 @@ class Keys(Dedup):
         A.append(self.a_resend([Cmp('horizon', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '<',
                                     lambda w, st, b: R, role='time', note='stop retrying after R')]))
 
-        def giveup(md, st, b, d):
-            self.set_cl(d, 1, b['n'], UNKNOWN)
         A.append(Action('giveup', 'tick', self.p_pending,
                         [Cmp('late', lambda w, st, b: st[IX['now']] - self.t0(st, b['n']), '>=', lambda w, st, b: R,
                              role='time', note='after R the attempt ends unknown')],
-                        [U('status', giveup, 'world')]))
+                        [self.giveup_update()]))
         A.append(self.a_recv())
         A.append(self.a_learn())
         if self.fwd:

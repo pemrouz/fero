@@ -1,3 +1,2 @@
-  pass 1: 24 of 45 rules necessary alone
-  mutants: 25; caught 20; equivalent 2; undecided 0; survived 3
-win-smart: 38 rules kept of 45; error: None
+  pass 1: 17 of 23 rules necessary alone
+win-smart: 17 rules needed of 23; mutants 27, caught 22, equivalent 2; put back []; 159 s

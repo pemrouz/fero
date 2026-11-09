@@ -1,4 +1,5 @@
 {
+ "option": "win-smart",
  "bounds": [
   "lost",
   "move",
@@ -10,59 +11,33 @@
   "mvexp"
  ],
  "pinned": [
-  "send.status",
-  "send.emit",
-  "resend.k",
-  "resend.emit",
-  "recv.status",
-  "recv.eat",
-  "learn.status",
-  "giveup.status",
-  "forward.emit",
-  "restart.reset",
-  "register.append",
-  "renew.append",
-  "newsess.unknown",
-  "fence.append",
-  "open.append",
-  "dup.in",
-  "dup.eat",
-  "dup.known",
-  "dup.seen",
-  "ooo.known",
-  "ooo.gap",
-  "ooo.eat",
-  "unknownpid.unknown",
-  "unknownpid.nonzero",
-  "unknownpid.eat",
-  "unknownpid.emit",
-  "apply.eat",
   "apply.append",
-  "refuse_r.eat",
-  "refuse_r.append",
+  "apply.eat",
+  "dup.eat",
+  "dup.in",
+  "fence.append",
+  "forget.append",
+  "giveup.status",
+  "learn.status",
+  "open.append",
+  "recv.eat",
+  "recv.status",
   "refuse_f.eat",
   "refuse_f.emit",
+  "refuse_r.append",
+  "refuse_r.eat",
+  "resend.emit",
+  "resend.k",
+  "restart.reset",
+  "send.emit",
+  "send.status",
   "stale.eat",
-  "stale.emit",
-  "expired.eat",
-  "expired.emit",
-  "forget.append",
-  "expire.append",
-  "send.L",
-  "resend.L",
-  "apply_next.eat",
-  "apply_next.append",
-  "apply_first.eat",
-  "apply_first.append",
-  "refuse_next.eat",
-  "refuse_next.append",
-  "refuse_first.eat",
-  "refuse_first.append"
+  "stale.emit"
  ],
  "base": {
   "lost": {
    "states": 6316,
-   "secs": 0.47,
+   "secs": 0.68,
    "complete": true,
    "fail": {},
    "digest": [
@@ -79,7 +54,7 @@
   },
   "move": {
    "states": 6764,
-   "secs": 0.36,
+   "secs": 0.58,
    "complete": true,
    "fail": {},
    "digest": [
@@ -96,7 +71,7 @@
   },
   "restart": {
    "states": 2259,
-   "secs": 0.11,
+   "secs": 0.09,
    "complete": true,
    "fail": {},
    "digest": [
@@ -113,7 +88,7 @@
   },
   "expire": {
    "states": 19777,
-   "secs": 0.96,
+   "secs": 2.01,
    "complete": true,
    "fail": {},
    "digest": [
@@ -130,7 +105,7 @@
   },
   "exprst": {
    "states": 643,
-   "secs": 0.02,
+   "secs": 0.1,
    "complete": true,
    "fail": {},
    "digest": [
@@ -147,10 +122,6 @@
   }
  },
  "greedy": [
-  [
-   "giveup.late",
-   "dropped"
-  ],
   [
    "refuse_r.floor",
    "dropped"
@@ -177,7 +148,6 @@
   ]
  ],
  "removed": [
-  "giveup.late",
   "refuse_r.floor",
   "refuse_r.resend",
   "refuse_f.notin",
@@ -188,86 +158,86 @@
  "put_back": [],
  "minimal": {
   "lost": {
-   "states": 77253,
-   "secs": 6.26,
+   "states": 10225,
+   "secs": 0.7,
    "complete": true,
    "fail": {},
    "digest": [
-    77253,
-    451367,
-    12990286629668711091
+    10225,
+    51654,
+    16863273198411531374
    ],
    "judged": {
     "L7": [
-     49275,
+     4537,
      0
     ]
    }
   },
   "move": {
-   "states": 64898,
-   "secs": 4.0,
+   "states": 11522,
+   "secs": 0.5,
    "complete": true,
    "fail": {},
    "digest": [
-    64898,
-    230396,
-    4022377268791172395
+    11522,
+    33869,
+    17804295269949320952
    ],
    "judged": {
     "L7": [
-     40754,
+     4762,
      0
     ]
    }
   },
   "restart": {
-   "states": 5192,
-   "secs": 0.25,
+   "states": 3122,
+   "secs": 0.12,
    "complete": true,
    "fail": {},
    "digest": [
-    5192,
-    18694,
-    4940908612890220063
+    3122,
+    9992,
+    69413491386307146
    ],
    "judged": {
     "L7": [
-     3218,
+     1148,
      0
     ]
    }
   },
   "expire": {
-   "states": 61225,
-   "secs": 3.23,
+   "states": 29671,
+   "secs": 1.38,
    "complete": true,
    "fail": {},
    "digest": [
-    61225,
-    219973,
-    16605555416435436292
+    29671,
+    96560,
+    8446056643020624895
    ],
    "judged": {
     "L7": [
-     39603,
+     16421,
      0
     ]
    }
   },
   "exprst": {
-   "states": 853,
+   "states": 793,
    "secs": 0.03,
    "complete": true,
    "fail": {},
    "digest": [
-    853,
-    2398,
-    9724031763446545233
+    793,
+    2136,
+    15897984497953250310
    ],
    "judged": {
     "L7": [
-     649,
+     589,
      0
     ]
    }
@@ -275,18 +245,18 @@
  },
  "verify_result": {
   "mvexp": {
-   "states": 36391,
-   "secs": 1.71,
+   "states": 34615,
+   "secs": 1.34,
    "complete": true,
    "fail": {},
    "digest": [
-    36391,
-    108318,
-    915318408303307053
+    34615,
+    101824,
+    1266274004984544851
    ],
    "judged": {
     "L7": [
-     24141,
+     22365,
      0
     ]
    }
@@ -299,6 +269,8 @@
    "role": "dedup",
    "note": "issuer window: ids span less than W",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -307,8 +279,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -359,25 +329,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "lost",
-    "L7",
-    0,
-    [
-     "L7"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": [
-    "lost",
-    "L7",
-    0,
-    [
-     "L7"
-    ]
-   ],
-   "final_trace": []
+   "kept": true,
+   "alone": null
   },
   {
    "id": "send.emit",
@@ -385,11 +339,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "resend.horizon",
@@ -397,6 +349,8 @@
    "role": "time",
    "note": "stop retrying R (half the horizon) after the first send",
    "cmp": "<",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "expire",
     "ONCE",
@@ -405,8 +359,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "expire",
     "ONCE",
@@ -463,51 +415,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "lost",
-    "REFUSED",
-    6,
-    [
-     "REFUSED"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": [
-    "lost",
-    "REFUSED",
-    6,
-    [
-     "REFUSED"
-    ]
-   ],
-   "final_trace": [
-    [
-     "send",
-     "(('n', 0),)"
-    ],
-    [
-     "resend",
-     "(('n', 0),)"
-    ],
-    [
-     "apply",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 2, 1, 0, None)))"
-    ],
-    [
-     "commit",
-     "g0",
-     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
-    ],
-    [
-     "refuse_f",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "recv",
-     "(('m', ('a', 'r', (0, 0), 1)),)"
-    ]
-   ]
+   "kept": true,
+   "alone": null
   },
   {
    "id": "resend.emit",
@@ -515,6 +425,18 @@
    "role": "world",
    "note": "",
    "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "giveup.late",
+   "kind": "guard",
+   "role": "time",
+   "note": "after R the attempt ends unknown",
+   "cmp": ">=",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "L7",
@@ -523,41 +445,10 @@
      "L7"
     ]
    ],
-   "kept": true,
-   "pinned": true,
-   "final": null,
-   "final_trace": null
-  },
-  {
-   "id": "giveup.late",
-   "kind": "guard",
-   "role": "time",
-   "note": "after R the attempt ends unknown",
-   "cmp": ">=",
-   "alone": null,
-   "kept": false,
-   "pinned": false
-  },
-  {
-   "id": "giveup.status",
-   "kind": "update",
-   "role": "world",
-   "note": "",
-   "cmp": null,
-   "alone": [
-    "expire",
+   "final": [
+    "lost",
     "L7",
     2,
-    [
-     "L7"
-    ]
-   ],
-   "kept": true,
-   "pinned": true,
-   "final": [
-    "expire",
-    "L7",
-    3,
     [
      "L7"
     ]
@@ -568,14 +459,20 @@
      "(('n', 0),)"
     ],
     [
-     "drop",
-     "('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)"
-    ],
-    [
-     "tick",
-     "1"
+     "giveup",
+     "(('n', 0),)"
     ]
    ]
+  },
+  {
+   "id": "giveup.status",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
   },
   {
    "id": "recv.latest",
@@ -583,6 +480,8 @@
    "role": "answer",
    "note": "accept only the answer to the latest copy",
    "cmp": ">=",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -591,8 +490,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -635,11 +532,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "recv.eat",
@@ -647,11 +542,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "learn.status",
@@ -659,18 +552,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "lost",
-    "L7",
-    2,
-    [
-     "L7"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "restart.life",
@@ -678,6 +562,8 @@
    "role": "dedup",
    "note": "a restarted process takes a new issuer id (its life)",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "restart",
     "TRUE",
@@ -686,8 +572,6 @@
      "TRUE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "restart",
     "TRUE",
@@ -730,56 +614,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "restart",
-    "ONCE",
-    7,
-    [
-     "ONCE"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": [
-    "restart",
-    "ONCE",
-    7,
-    [
-     "ONCE"
-    ]
-   ],
-   "final_trace": [
-    [
-     "send",
-     "(('n', 0),)"
-    ],
-    [
-     "restart",
-     "()"
-    ],
-    [
-     "resend",
-     "(('n', 0),)"
-    ],
-    [
-     "apply",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "commit",
-     "g0",
-     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
-    ],
-    [
-     "apply",
-     "(('g', 0), ('m', ('c', (('i', 1), 0), (0, 0), 's1', 2, 1, 0, None)))"
-    ],
-    [
-     "commit",
-     "g0",
-     "('w', (('i', 1), 0), 's1', 0, (0, 0), None)"
-    ]
-   ]
+   "kept": true,
+   "alone": null
   },
   {
    "id": "apply.notin",
@@ -787,6 +624,8 @@
    "role": "dedup",
    "note": "not among the outcomes (log end)",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -795,8 +634,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -844,6 +681,8 @@
    "role": "dedup",
    "note": "above the floor (highest - W)",
    "cmp": ">",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -852,8 +691,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -914,6 +751,8 @@
    "role": "hop",
    "note": "the copy's budget is not spent",
    "cmp": "<",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "expire",
     "ONCE",
@@ -922,8 +761,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "expire",
     "ONCE",
@@ -980,40 +817,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": [
-    "lost",
-    "REFUSED",
-    5,
-    [
-     "REFUSED"
-    ]
-   ],
-   "final_trace": [
-    [
-     "send",
-     "(('n', 0),)"
-    ],
-    [
-     "apply",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "commit",
-     "g0",
-     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
-    ],
-    [
-     "refuse_f",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "recv",
-     "(('m', ('a', 'r', (0, 0), 1)),)"
-    ]
-   ]
+   "kept": true,
+   "alone": null
   },
   {
    "id": "apply.append",
@@ -1021,11 +827,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "refuse_r.notin",
@@ -1033,6 +837,8 @@
    "role": "dedup",
    "note": "not among the outcomes (log end)",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -1041,8 +847,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -1090,9 +894,9 @@
    "role": "dedup",
    "note": "above the floor (highest - W)",
    "cmp": ">",
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "refuse_r.budget",
@@ -1100,6 +904,8 @@
    "role": "hop",
    "note": "the copy's budget is not spent",
    "cmp": "<",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "expire",
     "REFUSED",
@@ -1108,8 +914,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "expire",
     "REFUSED",
@@ -1170,9 +974,9 @@
    "role": "perf",
    "note": "only a resend's refusal is appended",
    "cmp": null,
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "refuse_r.eat",
@@ -1180,11 +984,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "refuse_r.append",
@@ -1192,11 +994,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "refuse_f.notin",
@@ -1204,9 +1004,9 @@
    "role": "dedup",
    "note": "not among the outcomes (log end)",
    "cmp": null,
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "refuse_f.floor",
@@ -1214,9 +1014,9 @@
    "role": "dedup",
    "note": "above the floor (highest - W)",
    "cmp": ">",
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "refuse_f.budget",
@@ -1224,9 +1024,9 @@
    "role": "hop",
    "note": "the copy's budget is not spent",
    "cmp": "<",
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "refuse_f.first",
@@ -1234,6 +1034,8 @@
    "role": "dedup",
    "note": "a refusal not appended only for a first send",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -1242,8 +1044,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -1286,47 +1086,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "lost",
-    "REFUSED",
-    5,
-    [
-     "REFUSED"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": [
-    "lost",
-    "REFUSED",
-    5,
-    [
-     "REFUSED"
-    ]
-   ],
-   "final_trace": [
-    [
-     "send",
-     "(('n', 0),)"
-    ],
-    [
-     "refuse_f",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "recv",
-     "(('m', ('a', 'r', (0, 0), 1)),)"
-    ],
-    [
-     "apply",
-     "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 0, None)))"
-    ],
-    [
-     "commit",
-     "g0",
-     "('w', (('i', 0), 0), 's1', 0, (0, 0), None)"
-    ]
-   ]
+   "kept": true,
+   "alone": null
   },
   {
    "id": "refuse_f.emit",
@@ -1334,11 +1096,9 @@
    "role": "perf",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "stale.notin",
@@ -1346,9 +1106,9 @@
    "role": "dedup",
    "note": "not among the outcomes",
    "cmp": null,
-   "alone": null,
+   "pinned": false,
    "kept": false,
-   "pinned": false
+   "alone": null
   },
   {
    "id": "stale.floor",
@@ -1356,6 +1116,8 @@
    "role": "dedup",
    "note": "at or below the floor",
    "cmp": "<=",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -1364,8 +1126,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -1408,11 +1168,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "stale.emit",
@@ -1420,11 +1178,9 @@
    "role": "perf",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "dup.in",
@@ -1432,11 +1188,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "dup.eat",
@@ -1444,11 +1198,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "forget.silent",
@@ -1456,6 +1208,8 @@
    "role": "time",
    "note": "forget an issuer silent for the horizon",
    "cmp": ">=",
+   "pinned": false,
+   "kept": true,
    "alone": [
     "lost",
     "REFUSED",
@@ -1464,8 +1218,6 @@
      "REFUSED"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "lost",
     "REFUSED",
@@ -1522,11 +1274,9 @@
    "role": "mem",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "fence.outs",
@@ -1534,6 +1284,8 @@
    "role": "carry",
    "note": "the fence carries the slot's outcomes",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "move",
     "ONCE",
@@ -1542,8 +1294,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "move",
     "ONCE",
@@ -1605,6 +1355,8 @@
    "role": "carry",
    "note": "the fence carries each issuer's highest id",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "move",
     "ONCE",
@@ -1613,8 +1365,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "move",
     "ONCE",
@@ -1633,14 +1383,6 @@
      "(('n', 0),)"
     ],
     [
-     "giveup",
-     "(('n', 0),)"
-    ],
-    [
-     "send",
-     "(('n', 1),)"
-    ],
-    [
      "apply",
      "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
     ],
@@ -1648,6 +1390,14 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
     ],
     [
      "apply",
@@ -1693,11 +1443,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": null,
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   },
   {
    "id": "open.outs",
@@ -1705,6 +1453,8 @@
    "role": "carry",
    "note": "open takes the carried outcomes",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "move",
     "ONCE",
@@ -1713,8 +1463,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "move",
     "ONCE",
@@ -1776,6 +1524,8 @@
    "role": "carry",
    "note": "open takes the carried highest ids (merged by max)",
    "cmp": null,
+   "pinned": false,
+   "kept": true,
    "alone": [
     "move",
     "ONCE",
@@ -1784,8 +1534,6 @@
      "ONCE"
     ]
    ],
-   "kept": true,
-   "pinned": false,
    "final": [
     "move",
     "ONCE",
@@ -1804,14 +1552,6 @@
      "(('n', 0),)"
     ],
     [
-     "giveup",
-     "(('n', 0),)"
-    ],
-    [
-     "send",
-     "(('n', 1),)"
-    ],
-    [
      "apply",
      "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
     ],
@@ -1819,6 +1559,14 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
     ],
     [
      "apply",
@@ -1864,18 +1612,9 @@
    "role": "world",
    "note": "",
    "cmp": null,
-   "alone": [
-    "move",
-    "L7",
-    1,
-    [
-     "L7"
-    ]
-   ],
-   "kept": true,
    "pinned": true,
-   "final": null,
-   "final_trace": null
+   "kept": true,
+   "alone": null
   }
  ],
  "mutants": [
@@ -1976,6 +1715,28 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "giveup.late",
+   "caught": [
+    "lost",
+    "L7",
+    2,
+    [
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "giveup",
+     "(('n', 0),)"
     ]
    ]
   },
@@ -2522,14 +2283,6 @@
      "(('n', 0),)"
     ],
     [
-     "giveup",
-     "(('n', 0),)"
-    ],
-    [
-     "send",
-     "(('n', 1),)"
-    ],
-    [
      "apply",
      "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
     ],
@@ -2537,6 +2290,14 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
     ],
     [
      "apply",
@@ -2655,14 +2416,6 @@
      "(('n', 0),)"
     ],
     [
-     "giveup",
-     "(('n', 0),)"
-    ],
-    [
-     "send",
-     "(('n', 1),)"
-    ],
-    [
      "apply",
      "(('g', 0), ('m', ('c', (('i', 0), 0), (0, 0), 's2', 1, 0, 0, None)))"
     ],
@@ -2670,6 +2423,14 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's2', 0, (0, 0), None)"
+    ],
+    [
+     "learn",
+     "(('g', 0), ('n', 0), ('o', 'w'))"
+    ],
+    [
+     "send",
+     "(('n', 1),)"
     ],
     [
      "apply",
@@ -2759,6 +2520,36 @@
      "commit",
      "g0",
      "('w', (('i', 0), 0), 's1', 1, (0, 0), None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "giveup.late",
+   "caught": [
+    "expire",
+    "L7",
+    4,
+    [
+     "L7"
+    ]
+   ],
+   "trace": [
+    [
+     "tick",
+     "1"
+    ],
+    [
+     "send",
+     "(('n', 0),)"
+    ],
+    [
+     "drop",
+     "('c', (('i', 0), 0), (0, 0), 's1', 1, 0, 1, None)"
+    ],
+    [
+     "tick",
+     "2"
     ]
    ]
   },
@@ -2960,6 +2751,5 @@
    "equivalent": true
   }
  ],
- "option": "win-smart",
- "secs": 748
+ "secs": 159
 }
