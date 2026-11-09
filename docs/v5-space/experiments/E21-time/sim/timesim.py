@@ -27,8 +27,8 @@ THE WORLD (shared, not counted).
   holder renews every lease/3 and believes it holds until its monotonic
   clock reaches (last ack + lease - margin), margin = a round trip plus
   skew.max (DESIGN-V5 5.3); it sends a protected write every 500 ms while
-  it believes it holds, sometimes pausing between the check and the send
-  (Kleppmann 2016).
+  it believes it holds, sometimes (5%) pausing 1 to 15 s between the check
+  and the send (Kleppmann 2016).
 
 OPTIONS (SPACE.md axis T)
   wall     the baseline: writer time = the leader's wall clock, never back.
@@ -74,6 +74,9 @@ CHECKS (per seed)
   agree      replicas removed a row at different log positions.
   stale      a protected write committed with a token below one the
              writer had already seen (TEST-13's fencing checker).
+  avail      the group stayed without a leader for election.ms + 2 s
+             while a majority was up and every live clock was sound (the
+             rule itself kept it from electing).
   overlap    (reported, not a check) protected writes sent by a client that
              was not the holder of the latest token at that moment: what
              fencing has to stop.
@@ -107,7 +110,8 @@ EPS = 125        # tt's error bound (the premise)
 CKPT = 1000      # mono+ck: checkpoint every second (etcd's default: 5 minutes)
 DRIFT = 200e-6
 FAMILIES = ('drift', 'jumpL+', 'jumpL-', 'jumpF', 'pause', 'crash', 'mix')
-CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale')
+EXTRA = ('jump2',)   # beyond the premise (a majority of clocks wrong): reported, not checked
+CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale', 'avail')
 
 
 def G(name, fn, role='', note=''):
@@ -234,12 +238,12 @@ class Hlc(Opt):
                    [U('apply', lambda w, st, b, d: setattr(st, 'l', max(st.l, b['t'])), 'time',
                       'l = max(l, an applied entry\'s t)')]),
             Action('selffence', 'deliver', None,
-                   [Cmp('far', lambda w, st, b: abs(w.wall(st) - w.peer_median(st)), '>', lambda w, st, b: MAXOFF,
-                        role='elect', note='a leader whose clock is off by more than max-offset')],
+                   [G('far', lambda w, st, b: w.off_majority(st, MAXOFF), 'elect',
+                      'a leader off by more than max-offset from most of its peers')],
                    [U('stepdown', lambda w, st, b, d: d.__setitem__('down', True), 'elect', 'steps down')]),
             Action('stand', 'deliver', None,
-                   [Cmp('near', lambda w, st, b: abs(w.wall(st) - w.peer_median(st)), '<=', lambda w, st, b: MAXOFF,
-                        role='elect', note='a node off by more than max-offset does not stand')], []),
+                   [G('near', lambda w, st, b: not w.off_majority(st, MAXOFF), 'elect',
+                      'a node off by more than max-offset from most of its peers does not stand')], []),
             Action('expire', 'deliver', None,
                    [Cmp('due', lambda w, st, b: w.t_now - b['t_w'], '>=', lambda w, st, b: b['d'], role='time',
                         note='a row ends when the HLC passes its ttl')],
@@ -379,7 +383,7 @@ class World:
     def __init__(self, opt_cls, seed, family, mutation=None):
         self.opt = opt_cls()
         self.c = Compiled(self.opt, mutation)
-        self.rng = random.Random(seed * 7919 + FAMILIES.index(family))
+        self.rng = random.Random(seed * 7919 + (FAMILIES + EXTRA).index(family))
         r = self.rng
         self.family = family
         self.N = 3 if seed % 2 == 0 else 5
@@ -402,6 +406,7 @@ class World:
         self.res['late_max'] = 0.0
         self.res['early_max'] = 0.0
         self.pending = []
+        self.avail_flag = False
         self.leader_down = None
         self.stepped = False
         self._plan()
@@ -430,13 +435,20 @@ class World:
             for _ in range(r.randint(1, 2)):
                 a = r.uniform(15_000, 140_000)
                 self.nodes[r.randrange(self.N)].down.append((a, a + 30_000))
+        if fam == 'jump2':
+            # beyond the premise: two nodes' clocks jump the same way (a
+            # majority of a 3-node group); reported, not a check
+            sign = r.choice((-1, 1))
+            for n in r.sample(range(self.N), 2):
+                self.nodes[n].jumps.append((r.uniform(20_000, 120_000), sign * math.exp(r.uniform(math.log(1000), math.log(3_600_000)))))
         if fam == 'mix':
+            bad = r.randrange(self.N)        # at most one node's clock jumps (a minority)
             for _ in range(r.randint(1, 4)):
                 n = r.randrange(self.N)
                 a = r.uniform(15_000, 150_000)
                 k = r.choice(('jump', 'pause', 'crash'))
                 if k == 'jump':
-                    self.nodes[n].jumps.append((a, r.choice((-1, 1)) * math.exp(r.uniform(math.log(1000), math.log(3_600_000)))))
+                    self.nodes[bad].jumps.append((a, r.choice((-1, 1)) * math.exp(r.uniform(math.log(1000), math.log(3_600_000)))))
                 elif k == 'pause':
                     self.nodes[n].pauses.append((a, a + r.uniform(1000, 5000)))
                 else:
@@ -461,6 +473,16 @@ class World:
 
     def readings(self, st):
         return [v for p, v in st.reads.items() if p != st.i]
+
+    def off_majority(self, st, limit):
+        """CockroachDB's rule (RemoteClockMonitor): a node is off when its
+        clock differs by more than `limit` from more than half of its peers'
+        readings (each carried forward by the receiver's monotonic time)."""
+        rs = [v[0] + (self.mono(st) - v[1]) for v in self.readings(st)]
+        if not rs:
+            return False
+        w = self.wall(st)
+        return 2 * sum(1 for x in rs if abs(x - w) > limit) > len(rs)
 
     def peer_median(self, st):
         rs = [v[0] + (self.mono(st) - v[1]) for v in self.readings(st)]
@@ -531,6 +553,7 @@ class World:
             self.clients_step(working)
             self.tau += TICK
         self.finish()
+        self.res['leaderless'] = self.unavail_total()
         return self.res
 
     def unavail_total(self, upto=None):
@@ -562,6 +585,13 @@ class World:
             return
         if self.tau - self.lost_at < ELECT:
             return
+        alive = [n for n in self.nodes if self.alive(n)]
+        if self.tau - self.lost_at > ELECT + 2000 and 2 * len(alive) > self.N and not self.avail_flag and \
+                not any(at <= self.tau for n in alive for at, dl in n.jumps):
+            # a majority is up with sound clocks, yet no leader: the rule
+            # itself keeps the group from electing (a liveness check)
+            self.res['avail'] += 1
+            self.avail_flag = True
         cands = [n for n in self.nodes if self.alive(n) and n.i != self.leader_down]
         good = [n for n in cands if self.c.ok('stand', self, n, {})]
         # clamp: a skewed member only waits longer, so it can still lead when
@@ -572,6 +602,7 @@ class World:
         new = self.rng.choice(pool)
         self.unavail.append((self.lost_at, self.tau))
         self.lost_at = None
+        self.avail_flag = False
         self.leader = new.i
         self.leader_down = None
         self.stepped = False
@@ -661,7 +692,9 @@ class World:
                 self.renew(c, L, mono_c)
             if c['hold'] is not None and self.tau >= c['next_write']:
                 c['next_write'] = self.tau + PING
-                delay = r.uniform(1000, 5000) if r.random() < 0.05 else 0     # a pause between check and send
+                # a pause between the check and the send (Kleppmann 2016): 1 to
+                # 15 s, so it can outlive the lease (10 s)
+                delay = r.uniform(1000, 15000) if r.random() < 0.05 else 0
                 self.pending.append((self.tau + delay, c['k'], c['hold']))
         self.deliver_writes(working)
 
@@ -761,10 +794,22 @@ def sweep(opt_name, seeds, mutation=None, families=FAMILIES, stop=False):
     tot['overlap'] = 0
     tot['late_max'] = 0.0
     tot['early_max'] = 0.0
+    tot['leaderless_s'] = 0.0
+    tot['by_family'] = {}
     first = None
     for fam in families:
+        bf = tot['by_family'].setdefault(fam, {k: 0 for k in CHECKS})
+        bf['leaderless_s'] = 0.0
+        bf['late_max'] = 0.0
+        bf['early_max'] = 0.0
         for s in range(seeds):
             r = run_one(opt_name, s, fam, mutation)
+            for k in CHECKS:
+                bf[k] += r[k]
+            bf['leaderless_s'] = round(bf['leaderless_s'] + r['leaderless'] / 1000, 1)
+            bf['late_max'] = max(bf['late_max'], r['late_max'])
+            bf['early_max'] = max(bf['early_max'], r['early_max'])
+            tot['leaderless_s'] = round(tot['leaderless_s'] + r['leaderless'] / 1000, 1)
             for k in CHECKS + ('overlap',):
                 tot[k] += r[k]
             tot['late_max'] = max(tot['late_max'], r['late_max'])
@@ -787,7 +832,9 @@ if __name__ == '__main__':
     ap.add_argument('--drop', action='append', default=[])
     ap.add_argument('--flip', action='append', default=[])
     ap.add_argument('--family', action='append', default=[])
+    ap.add_argument('--extra', action='store_true', help='also run the families beyond the premise (jump2)')
     a = ap.parse_args()
     m = Mutation(drop=a.drop, flip=a.flip)
-    r = sweep(a.option, a.seeds, m, tuple(a.family) or FAMILIES)
+    fams = tuple(a.family) or (FAMILIES + EXTRA if a.extra else FAMILIES)
+    r = sweep(a.option, a.seeds, m, fams)
     print(json.dumps({'option': a.option, 'seeds': a.seeds, 'mutation': repr(m), **r}, default=str))
