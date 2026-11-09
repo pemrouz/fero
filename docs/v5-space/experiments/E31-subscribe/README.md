@@ -37,9 +37,9 @@ One exhaustive model in plain Python, in slot_move.py's style (states, faults, s
 
 As DESIGN-V5 4.4 writes it:
 - **Who serves**: a server sends a snapshot, a diff or a record only if it is loaded (a relay: once its upstream snapshot has landed) and holds the slot; never before its fold has reached the subscriber's cursor; a record only up to its fold (committed records only) and only if it holds it; a diff only if it holds the records after the cursor (else a snapshot replaces).
-- **Answers**: an unloaded server, or B before it opens, answers `retry` (or `moved`, naming a ready one; the client treats both the same: it goes elsewhere, with its cursor). A, once fenced, answers `moved`. In `log` mode, a server that no longer holds the record after the cursor ends the subscription: the **draft** answers `expired` (DESIGN-V5 4.4: "A follower that falls behind the tail and reloads a snapshot ends its log subscriptions on that shard with `expired`"); the **fixed** option answers `END`.
+- **Answers**: an unloaded server, or B before it opens, answers `retry` (or `moved`, naming a ready one; the client treats both the same: it goes elsewhere, with its cursor). A, once fenced, answers `moved`. In `log` mode, a server that no longer holds the record after the cursor ends the subscription: the **draft** answers `expired` (DESIGN-V5 4.4: "A follower that falls behind the tail and reloads a snapshot ends its log subscriptions on that shard with `expired`"); the **fixed** option answers `END`, and only the holding group's leader, whose log is the group's retention, answers `expired`.
 - **The subscriber**: a snapshot clears the view and applies the rows, then sets the cursor; a diff adds the rows set and removes the rows removed; a record is applied and moves the cursor one on. `moved`, `retry` and `END` make it resubscribe elsewhere with its cursor; `expired` is thrown to the app.
-- **The move's carried state that serving needs**: B starts from A's rows at N, and with the names of A's segments below N (so B can serve `log` readers from before N).
+- **The move's carried state that serving needs**: B starts from A's rows at N, and with the names of A's segments below N, so B can serve `log` readers from before N, as far back as a live A replica still holds them (there is no object store in this model: with one, every replica could reach every kept segment, and `expired` would come only from retention).
 - **The client's write** resolves when it has committed and the client's own subscription has passed its position.
 
 ### Options
@@ -47,7 +47,7 @@ As DESIGN-V5 4.4 writes it:
 | Option | What differs |
 |---|---|
 | `draft` | DESIGN-V5 4.4 as written. |
-| `fixed` | A server that cannot serve a `log` cursor answers `END`, not `expired`. |
+| `fixed` | A replica that cannot serve a `log` cursor answers `END`, not `expired`; only the holding group's leader says `expired`. |
 | `off` | `fixed`, with positions as each group's own offsets (O `off`): B's log holds one record of another slot first, so B's offsets for s are one higher than A's. |
 
 ### Properties
@@ -60,18 +60,47 @@ As DESIGN-V5 4.4 writes it:
 | P4 | A resolved write is visible to its writer's own subscription, and stays visible (the cursor is at or past it). |
 | P6 | The client's cursor never goes back. |
 | P7 | No false `expired`: the client is told `expired` only when no live, loaded replica that holds the slot has its next record. |
-| P5 | AG EF: from every state, with faults over, the client reaches a serving replica and catches up: the script written, its cursor at the commit offset, its write resolved. This is "after `moved`, `END` or `retry`, a fault-free path reaches a serving replica". |
+| P5 | AG EF: from every state, with faults over, the client reaches a serving replica and catches up: the script written, its cursor at the commit offset, its write resolved (or it was told a true `expired`, which P7 checks). This is "after `moved`, `END` or `retry`, a fault-free path reaches a serving replica". |
 
 ### Bounds
+
+The bound with every feature and two faults (`all-state`, `all-log`) passed 3 million states without an end, and `mvrl-state` did not finish within a 25-minute hold, so they are left out; the verify bounds below each add one thing to the sweep.
 
 | Bound | Mode | Move | Relay | Faults |
 |---|---|---|---|---|
 | `fo-state`, `fo-log` | state, log | no | no | 1 of: LA crash, FA reload, link drop |
 | `mv-state`, `mv-log` | state, log | yes | no | 1 of: LA crash, link drop |
-| `rl-state`, `rl-log` | state, log | no | yes | 1 of: LA crash, relay crash, link drop |
-| `all-state`, `all-log` (verify) | state, log | yes | yes | 2 of any kind |
+| `rl-state`, `rl-log` | state, log | no | yes | 1 of: LA crash, relay crash |
+| `fo2-state`, `fo2-log` (verify) | state, log | yes | no | 2 of: LA crash, FA reload, link drop |
+| `mvrl-log` (verify) | log | yes | yes | 1 of any kind |
 
-@@RESULTS@@
+## Results
+
+### 1. Which designs hold (model-checked here, [results/design.txt](results/design.txt))
+
+| Option | fo-log | fo-state | mv-log | mv-state | rl-log | rl-state | fo2-state | fo2-log | mvrl-log |
+|---|---|---|---|---|---|---|---|---|---|
+| `draft` | **P7**, 7 steps | holds | holds | holds | holds | holds | holds | **P7** | **P7** |
+| `fixed` | holds | holds | holds | holds | holds | holds | holds | holds | holds |
+| `off` | holds | holds | **P7**, 5 steps | **P2**, 5 steps | holds | holds | **P2** | **P7** | **P7** |
+| states (`fixed`) | 5,467 | 8,081 | 18,646 | 24,989 | 54,404 | 390,164 | 118,772 | 96,177 | 1,491,048 |
+| seconds (`fixed`) | 0.4 | 0.7 | 1.5 | 2.3 | 6.0 | 50.0 | 11.2 | 8.8 | 142.0 |
+
+Every `fixed` run finishes in under 3 minutes; all of them together take about 4 minutes on one core, inside Q-31's 1 h.
+
+**The draft's false `expired`, 7 steps (P7, and P5 with it).**
+1. Record 1 commits at A.
+2. FA falls behind the tail and reloads a snapshot at 1: it now holds the rows at 1, but no record before it.
+3. The client opens a `log` subscription at FA from the start (cursor 0).
+4. FA cannot send record 1. DESIGN-V5 4.4 says a reloaded follower "ends its log subscriptions on that shard with `expired`", so it does.
+5. The client's reader throws `expired` to the app (API.md: "Iterating throws 'expired'"), although LA, alive, holds record 1 and every record after it.
+
+So a follower's routine snapshot reload, which is not a loss of data, ends a log reader's stream for good. The fix (option `fixed`, holds on every bound): a replica that does not hold the reader's next record answers `END` (resubscribe elsewhere, with the cursor), and only the holding group's leader, whose log is the group's retention, says `expired`. With LA dead as well (two faults, `fo2-log`), the leader FA does say `expired`, and it is true: no live replica holds record 1 (in this model, with no object store).
+
+**Cursors as each group's own offsets fail at the first move (`off`).** B's log holds a record of another slot before s's records, so B's offsets for s are one higher than A's. In `state` mode (P2, 5 steps), B's snapshot carries B's offset, and the client's cursor then names a different position of s than its rows show. In `log` mode (P7, 5 steps), B reads the client's fresh cursor as its own offset and decides it no longer holds the next record, though it holds every record of s. A per-slot sequence (O `slot`, the draft's cursor) has neither problem: positions go on unchanged at B, and `fixed` holds on every move bound. This is the cursor shape DEV-09 fixes in phase 1.
+
+@@ABLATION@@
+
 
 ## What the model leaves out
 

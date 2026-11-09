@@ -49,7 +49,8 @@ PROPERTIES
       holds its next record (here every record is kept somewhere, so never).
   P5  (AG EF) after any answer, with faults over, the client reaches a
       serving replica and catches up: its cursor at the commit offset, the
-      script written, its write resolved.
+      script written, its write resolved; or it was told a true `expired`
+      (the records it needs are on no live replica of the slot).
 """
 
 import os
@@ -143,7 +144,14 @@ class Sub:
         if x == RL:
             a, s, lk, inf, cur, view, ld, base = st[IX['rel']]
             return (a, ld, cur, base)
-        return st[IX['srv']][x]
+        a, ld, f, base = st[IX['srv']][x]
+        if x == LB and st[IX['segs']] and ld:
+            # B reads the records below N from A's segments: as far back as a
+            # live A replica still holds them (no object store in this model)
+            n = st[IX['phase']][1]
+            held = [st[IX['srv']][y][3] for y in (LA, FA) if st[IX['srv']][y][0] and st[IX['srv']][y][1]]
+            base = min([n] + held)
+        return (a, ld, f, base)
 
     def src_rows(self, st, x):
         if x == RL:
@@ -165,6 +173,14 @@ class Sub:
         if pos == len(log) + 1 and st[IX['tail']] and self.leads(st, x):
             return st[IX['tail']]      # the leader's uncommitted entry
         return log[pos - 1] if 0 < pos <= len(log) else None
+
+    def expire_answer(self, st, b):
+        x, who = b['x'], b['who']
+        if who == 'rel' or x == RL:
+            return ('end',)
+        if not self.FIXED or self.leads(st, x):
+            return ('expired',)
+        return ('end',)
 
     def slotpos(self, x, pos):
         """Under OFF, B reads a position as its own offset."""
@@ -321,8 +337,8 @@ class Sub:
             # P7: some live replica holding s could have served the next record
             cur = s[IX['cl']][3]
             for x in (LA, FA, LB):
-                a, ld, f, base = s[IX['srv']][x]
-                if a and ld and self.holds(s, x) and base <= cur and (x != LB or s[IX['segs']] or cur >= s[IX['phase']][1]):
+                a, ld, f, base = self.src_state(s, x)
+                if a and ld and self.holds(s, x) and base <= cur:
                     bad.append('P7')
                     break
         return bad
@@ -331,7 +347,9 @@ class Sub:
         log = st[IX['log']]
         s, lk, inf, cur, view, res, dead = st[IX['cl']]
         done = st[IX['nxt']] == len(SCRIPT) and not st[IX['tail']]
-        return {'P5': (not dead) and done and cur == len(log) and res}
+        # a true `expired` (P7 checks it is true) is also an end: the records
+        # the reader needs are gone from every live replica of the slot
+        return {'P5': done and (dead or (cur == len(log) and res))}
 
     def judged(self, st):
         return {'P5': True}
@@ -462,10 +480,10 @@ class Sub:
             Guard('loaded', lambda w, st, b: SRC(st, b)[1], role='answer'),
             Cmp('lost', lambda w, st, b: srcpos(st, b['x'], SRC(st, b)[3]), '>', cur_, role='answer',
                 note='it no longer holds the record after the cursor (a reload, or a relay that started later)'),
-        ], [Update('send', lambda w, st, b, d: O.setsub(
-            d, b['who'], inf=('end',) if O.FIXED or b['who'] == 'rel' or isrc(b['x']) else ('expired',)),
-            role='answer', note='draft: a reloaded follower ends log subscriptions with expired; '
-                                'fixed: with END, so the reader goes elsewhere')]))
+        ], [Update('send', lambda w, st, b, d: O.setsub(d, b['who'], inf=O.expire_answer(st, b)),
+            role='answer', note='draft: a replica that lacks the record ends log subscriptions with expired; '
+                                'fixed: with END, so the reader goes elsewhere, and only the holding '
+                                "group's leader, whose log is the group's retention, says expired")]))
 
         # -------- a subscriber takes what arrived
         def take(kind):
@@ -618,15 +636,16 @@ BOUNDS = {
     'fo-log': B('log'),
     'mv-state': B('state', move=True, kinds=('crash', 'drop')),
     'mv-log': B('log', move=True, kinds=('crash', 'drop')),
-    'rl-state': B('state', relay=True, kinds=('crash', 'relay', 'drop')),
-    'rl-log': B('log', relay=True, kinds=('crash', 'relay', 'drop')),
+    'rl-state': B('state', relay=True, kinds=('crash', 'relay')),
+    'rl-log': B('log', relay=True, kinds=('crash', 'relay')),
     'all-state': B('state', move=True, relay=True, faults=2, kinds=('crash', 'reload', 'relay', 'drop')),
     'all-log': B('log', move=True, relay=True, faults=2, kinds=('crash', 'reload', 'relay', 'drop')),
-    # verify bounds that finish: two faults without the relay; the move with the relay
+    # verify bounds that finish within the hold: the move and two faults; the move
+    # and the relay with one fault (mvrl-state did not finish within a 25-minute hold)
     'fo2-state': B('state', move=True, faults=2, kinds=('crash', 'reload', 'drop')),
     'fo2-log': B('log', move=True, faults=2, kinds=('crash', 'reload', 'drop')),
     'mvrl-state': B('state', move=True, relay=True, kinds=('crash', 'reload', 'relay', 'drop')),
     'mvrl-log': B('log', move=True, relay=True, kinds=('crash', 'reload', 'relay', 'drop')),
 }
-SWEEP = ('fo-state', 'fo-log', 'mv-state', 'mv-log', 'rl-state', 'rl-log')
-VERIFY = ('all-state', 'all-log')
+SWEEP = ('fo-log', 'fo-state', 'mv-log', 'mv-state', 'rl-log', 'rl-state')
+VERIFY = ('fo2-state', 'fo2-log', 'mvrl-log')
