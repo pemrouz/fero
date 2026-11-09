@@ -61,6 +61,17 @@ for q in (10, 40):
     for v in V:
         P(f"| {v} | {ratio(f'b{q}/{v}/A-1MiB', f'b/{v}/alone', 'others')} | {ratio(f'b{q}/{v}/A-64KiB', f'b/{v}/alone', 'others')} |")
 
+if any(t.startswith("bq") for t in by):
+    P("\n## (b) Quota sweep: tenant A in 1 MiB records at lower quotas (shared journal and journal per tenant)\n")
+    P("| quota MiB/s | variant | B p99 (alone → beside) | ratio | all light tenants: ratio | A p99 |")
+    P("|---|---|---|---|---|---|")
+    for q in ("1", "2.5", "5", "10", "40"):
+        for v in ("base", "own"):
+            t = f"bq{q}/{v}/A-1MiB" if q in ("1", "2.5", "5") else f"b{q}/{v}/A-1MiB"
+            if t not in by: continue
+            t0 = f"b/{v}/alone"
+            P(f"| {q} | {v} | {cell(t0,'B','p99')} → {cell(t,'B','p99')} | {ratio(t,t0,'B')} | {ratio(t,t0,'others')} | {cell(t,'A','p99')} |")
+
 pp = os.path.join(HERE, "results", "probe.jsonl")
 if os.path.exists(pp):
     pr = [json.loads(l) for l in open(pp) if l.strip()]
