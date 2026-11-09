@@ -37,27 +37,34 @@ from dsl import Mutation                           # noqa: E402
 from world import World                            # noqa: E402
 
 RES = os.path.join(A.work, 'results')
-ROWS = [  # name, label, other order, give-up result
-    ('fixN', 'fixN', None, None),
-    ('slot', 'slot moves', 'slot-rev', 'slot+abort'),
-    ('rekey', 'fixN + re-key (CELL as written)', 'rekey-alt', 'rekey+giveup-alt'),
-    ('rekey-carry', 'fixN + re-key, positions carried', 'rekey-carry-alt', 'rekey-carry+giveup'),
-    ('pslot', 'pslot (MIN-P)', 'pslot-rev', 'pslot+abort'),
-    ('split', 'split + merge (SPLIT)', 'split-rev', 'split+giveup'),
-    ('lanes', 'lanes + range moves (LANE)', 'lanes-rev', 'lanes+abort'),
-    ('lanes-carry', 'lanes, records carried', None, None),
-    ('pslot-fused', 'probe: pslot-fused', 'pslot-fused-rev', 'pslot-fused+abort'),
+ROWS = [  # name, label, other orders, give-up result
+    ('fixN', 'fixN', (), None),
+    ('slot', 'slot moves', ('slot-rev',), 'slot+abort'),
+    ('rekey', 'fixN + re-key (CELL as written)', ('rekey-rev', 'rekey-alt'), 'rekey+giveup-alt'),
+    ('rekey-carry', 'fixN + re-key, positions carried', ('rekey-carry-rev', 'rekey-carry-alt'), 'rekey-carry+giveup'),
+    ('pslot', 'pslot (MIN-P)', ('pslot-rev',), 'pslot+abort'),
+    ('split', 'split + merge (SPLIT)', ('split-rev',), 'split+giveup'),
+    ('lanes', 'lanes + range moves (LANE)', ('lanes-rev',), 'lanes+abort'),
+    ('lanes-carry', 'lanes, records carried', (), None),
+    ('pslot-fused', 'probe: pslot-fused', ('pslot-fused-rev',), 'pslot-fused+abort'),
 ]
+ORIG = os.path.join(os.path.dirname(HERE), 'E17-partitioning', 'results')
 FILES = {'fixN': 'fixN/model.py', 'slot': 'slot/model.py', 'rekey': 'rekey/model.py',
          'rekey-carry': 'rekey/model.py', 'pslot': 'pslot/model.py', 'split': 'split/model.py',
          'lanes': 'lanes/model.py', 'lanes-carry': 'lanes/model.py', 'pslot-fused': 'pslot/fused.py'}
 
 
-def load(name):
+def load(name, orig=False):
+    """This re-run's result; with orig, the original's if this re-run only
+    checked it (verify.py), marked by a dagger."""
     for d in (RES, os.path.join(HERE, 'results')):
         p = os.path.join(d, f'{name}-ablation.json')
         if os.path.exists(p):
             return json.load(open(p))
+    if orig and os.path.exists(os.path.join(RES, f'{name}-verify.json')):
+        d = json.load(open(os.path.join(ORIG, f'{name}-ablation.json')))
+        d['_checked'] = True
+        return d
     return None
 
 
@@ -67,6 +74,13 @@ def kept(d):
 
 def undecided(d):
     return sum(1 for r in d['rules'] if r['kept'] and r.get('final') and r['final'][1] == 'LIMIT')
+
+
+def gtxt(g):
+    if not g:
+        return '-'
+    k, u = kept(g), undecided(g)
+    return (f'{k - u} to {k}' if u else f'{k}') + (' †' if g.get('_checked') else '')
 
 
 def option_of(name):
@@ -104,6 +118,8 @@ def main():
            'States as written, 6 sweep bounds | States smallest, 6 bounds; twice1 | Seconds, one sweep: as written; '
            'smallest | Mutants caught of made (equivalent; survived) |',
            '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
+    notes = ['', '† the original set (parts 1 and 2), checked fresh by verify.py, not re-derived. A range counts '
+             'the rules still undecided at the state limit (kept).']
     base = None
     for name, label, other, gu in ROWS:
         d = load(name)
@@ -113,8 +129,8 @@ def main():
         n = kept(d)
         if base is None:
             base = n
-        o = load(other) if other else None
-        g = load(gu) if gu else None
+        os_ = [load(x) for x in other]
+        g = load(gu, orig=True) if gu else None
         k, cp = kinds(name, d['removed'])
         sw = sum(d['base'][b]['states'] for b in SWEEP)
         sm = sum(d['minimal'][b]['states'] for b in SWEEP)
@@ -127,12 +143,13 @@ def main():
         u = sum(1 for r in mu if r.get('undecided'))
         lines = code_lines(os.path.join(A.work, 'options', FILES[name]))
         out.append(
-            f'| {label} | {len(d["rules"])} | **{n}** | {n - base} | {kept(o) if o else "-"} | '
-            f'{f"{kept(g)} ({undecided(g)})" if g else "-"} | {lines} | '
+            f'| {label} | {len(d["rules"])} | **{n}** | {n - base} | '
+            f'{"; ".join(f"{kept(o)} (`{x}`)" for x, o in zip(other, os_) if o) or "-"} | '
+            f'{gtxt(g)} | {lines} | '
             f'{len(k)}: ' + ', '.join(f'`{x}` ({f})' for x, f in sorted(k.items())) + f' | {cp} | '
             f'{sw:,} | {sm:,}; {tv:,} | {ts:.0f}; {tm:.1f} | '
             f'{c} of {len(mu)} ({e}; {len(mu) - c - e - u}) |')
-    print('\n'.join(out))
+    print('\n'.join(out + notes))
 
 
 if __name__ == '__main__':

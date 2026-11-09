@@ -1,0 +1,1110 @@
+# E-17 part 3: the hunt (hunt.py)
+
+## S: the state each smallest model adds
+
+fixN: entry kinds 0: ; cursor (0, -1) (2 parts)
+slot: entry kinds 4: cp (8 fields), exp (2 fields), fen (3 fields), open (3 fields); cursor ('s', 0) (2 parts)
+rekey: entry kinds 5: cp (7 fields), cut (1 fields), flip (1 fields), frz (1 fields), rk (2 fields); cursor (1, 0, -1) (3 parts)
+rekey-carry: entry kinds 5: cp (7 fields), cut (1 fields), flip (1 fields), frz (1 fields), rk (2 fields); cursor (1, 0, -1) (3 parts)
+pslot: entry kinds 4: cp (8 fields), exp (2 fields), fen (3 fields), open (3 fields); cursor ('P', 0, 0) (3 parts)
+split: entry kinds 5: init (7 fields), mgd (7 fields), mrg (2 fields), spl (3 fields), sub (2 fields); cursor (-1, -1, -1) (3 parts)
+lanes: entry kinds 4: cp (8 fields), exp (2 fields), fen (3 fields), open (2 fields); cursor (-1, -1, -1) (3 parts)
+lanes-carry: entry kinds 4: cp (8 fields), exp (2 fields), fen (3 fields), open (2 fields); cursor (-1, -1, -1) (3 parts)
+pslot-fused: entry kinds 2: cp (6 fields), fen (3 fields); cursor ('P', 0, 0) (3 parts)
+
+## L8 (others go on) and F8 (copy only what moves)
+
+fixN both [as written]: 41 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+fixN bothshrink [as written]: 36 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+fixN bothtwice [as written]: 11 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+fixN both [smallest set]: 41 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+fixN bothshrink [smallest set]: 36 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+fixN bothtwice [smallest set]: 11 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot both [as written]: 39,409 states, 1.4s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot bothshrink [as written]: 34,986 states, 1.4s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot bothtwice [as written]: 6,601 states, 0.3s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot bothtwice [smallest set]: 626 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot-rev both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot-rev bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot-rev bothtwice [smallest set]: 848 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot+abort both [smallest set]: 201,410 states, 8.8s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot+abort bothshrink [smallest set]: 203,920 states, 9.6s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+slot+abort bothtwice [smallest set]: 32,809 states, 1.7s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+rekey both [as written]: 94,799 states, 6.2s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c1', 'from', 'g1c0')
+           6. commit g2c1 ('cp', 2, 'g1c0', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey bothshrink [as written]: 313,995 states, 22.8s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c1')
+           6. commit g2c0 ('cp', 2, 'g1c1', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey bothtwice [as written]: 1,019,161 states, 103.6s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c1', 'from', 'g1c0')
+           6. commit g2c1 ('cp', 2, 'g1c0', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey both [smallest set]: 1,764 states, 0.1s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey bothshrink [smallest set]: 3,994 states, 0.2s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey bothtwice [smallest set]: 622 states, 0.0s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-alt both [smallest set]: 1,313 states, 0.1s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-alt bothshrink [smallest set]: 3,670 states, 0.2s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-alt bothtwice [smallest set]: 538 states, 0.0s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry both [as written]: 94,799 states, 6.8s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c1', 'from', 'g1c0')
+           6. commit g2c1 ('cp', 2, 'g1c0', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey-carry bothshrink [as written]: 313,995 states, 26.5s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c1')
+           6. commit g2c0 ('cp', 2, 'g1c1', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey-carry bothtwice [as written]: 1,019,161 states, 99.5s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           4. commit g2c0 ('cp', 2, 'g1c0', 'upto=0', {'q': []}, {}, {}, '')
+           5. copy ('gen', 2, 'g2c1', 'from', 'g1c0')
+           6. commit g2c1 ('cp', 2, 'g1c0', 'upto=0', {'p': []}, {}, {}, '')
+           7. cut ('gen', 2)
+           8. commit C ('cut', 2)
+           9. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. copy ('gen', 2, 'g2c0', 'from', 'g1c0')
+           6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': ['w3']}, {}, {}, '')
+rekey-carry both [smallest set]: 1,764 states, 0.1s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry bothshrink [smallest set]: 3,994 states, 0.2s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry bothtwice [smallest set]: 622 states, 0.1s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. cut ('gen', 2)
+           4. commit C ('cut', 2)
+           5. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. cut ('gen', 2)
+           6. commit C ('cut', 2)
+           7. freeze ('gen', 2, 'g1c0')
+           8. commit g1c0 ('frz', 2)
+           9. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+          10. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry-alt both [smallest set]: 1,313 states, 0.1s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry-alt bothshrink [smallest set]: 3,670 states, 0.2s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+rekey-carry-alt bothtwice [smallest set]: 538 states, 0.0s
+    L8 FAILS for w3 (q, never moved by the layouts): from this state no client step or commit can answer it; it waits for the change:
+           1. start ('gen', 2)
+           2. commit C ('rk', 2, 1)
+           3. freeze ('gen', 2, 'g1c0')
+    F8 FAILS: rows of q (never moved by the layouts) are copied to g2c0:
+           1. write ('w3', 'g1c0')
+           2. commit g1c0 ('w', 'w3', 'q', (1, 0, 0), 1)
+           3. start ('gen', 2)
+           4. commit C ('rk', 2, 1)
+           5. freeze ('gen', 2, 'g1c0')
+           6. commit g1c0 ('frz', 2)
+           7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+           8. commit g2c0 ('cp', 2, 'g1c0', 'upto=2', {'q': ['w3']}, {'q': frozenset({'w3'})}, {'q': 1}, 'fin')
+pslot both [as written]: 39,409 states, 2.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot bothshrink [as written]: 34,986 states, 1.8s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot bothtwice [as written]: 6,601 states, 0.5s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot bothtwice [smallest set]: 626 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-rev both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-rev bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-rev bothtwice [smallest set]: 848 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot+abort both [smallest set]: 201,410 states, 12.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot+abort bothshrink [smallest set]: 203,920 states, 12.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot+abort bothtwice [smallest set]: 32,809 states, 2.3s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused both [as written]: 3,541 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused bothshrink [as written]: 2,677 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused bothtwice [as written]: 330 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused both [smallest set]: 398 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused bothshrink [smallest set]: 384 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused bothtwice [smallest set]: 134 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused+abort both [smallest set]: 3,541 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused+abort bothshrink [smallest set]: 2,677 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+pslot-fused+abort bothtwice [smallest set]: 330 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split both [as written]: 398 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split bothshrink [as written]: 2,806 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split bothtwice [as written]: 588 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split both [smallest set]: 398 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split bothshrink [smallest set]: 722 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split bothtwice [smallest set]: 252 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split+giveup both [smallest set]: 398 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split+giveup bothshrink [smallest set]: 2,854 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+split+giveup bothtwice [smallest set]: 588 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave G0
+lanes both [as written]: 39,409 states, 1.4s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes bothshrink [as written]: 34,986 states, 1.5s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes bothtwice [as written]: 6,601 states, 0.3s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes bothtwice [smallest set]: 848 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-rev both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-rev bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-rev bothtwice [smallest set]: 848 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes+abort both [smallest set]: 201,410 states, 9.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes+abort bothshrink [smallest set]: 203,920 states, 8.4s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes+abort bothtwice [smallest set]: 32,809 states, 1.6s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry both [as written]: 39,409 states, 1.7s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry bothshrink [as written]: 34,986 states, 1.4s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry bothtwice [as written]: 6,601 states, 0.3s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry both [smallest set]: 2,262 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry bothshrink [smallest set]: 1,630 states, 0.1s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+lanes-carry bothtwice [smallest set]: 626 states, 0.0s
+    L8 holds for w3
+    F8 holds: rows of q never leave L0
+
+## B: bigger bounds
+
+fixN bothread: 51 states, 0s: all hold
+slot readback: 1,235 states, 0s: all hold
+slot readback1: 7,510 states, 0s: all hold
+slot bothread: 3,056 states, 0s: all hold
+slot chain3: 1,235 states, 0s: all hold
+slot chain3c: 504 states, 0s: all hold
+slot fork3: 98,207 states, 6s: all hold
+slot-rev readback: 1,929 states: L7 in 17 steps:
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('s', 1), 1)
+      11. export ('s', 'G1', '->', 'G0')
+      12. commit G1 ('exp', 's', 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), 's', 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+    repair: put back any one of ['fence.once']
+slot-rev readback1: 12,212 states: L7 in 17 steps:
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('s', 1), 1)
+      11. export ('s', 'G1', '->', 'G0')
+      12. commit G1 ('exp', 's', 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), 's', 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+    repair: put back any one of ['fence.once']
+slot-rev bothread: 3,056 states, 0s: all hold
+slot-rev chain3: 1,235 states, 0s: all hold
+slot-rev chain3c: 504 states, 0s: all hold
+slot-rev fork3: 98,207 states, 7s: all hold
+slot+abort readback: 65,368 states, 6s: all hold
+slot+abort bothread: 287,648 states, 19s: all hold
+rekey readback: 2,348 states, 0s: all hold
+rekey readback1: 18,006 states, 2s: all hold
+rekey bothread: 2,702 states, 0s: all hold
+rekey-alt readback: 2,117 states, 0s: all hold
+rekey-alt readback1: 16,261 states, 2s: all hold
+rekey-alt bothread: 2,141 states, 0s: all hold
+rekey-carry readback: 1,471 states, 0s: all hold
+rekey-carry readback1: 10,967 states, 1s: all hold
+rekey-carry bothread: 2,447 states, 0s: all hold
+rekey-carry-alt readback: 1,297 states, 0s: all hold
+rekey-carry-alt readback1: 9,705 states, 1s: all hold
+rekey-carry-alt bothread: 1,886 states, 0s: all hold
+pslot readback: 1,235 states, 0s: all hold
+pslot readback1: 7,510 states, 1s: all hold
+pslot bothread: 3,056 states, 0s: all hold
+pslot chain3: 1,235 states, 0s: all hold
+pslot chain3c: 504 states, 0s: all hold
+pslot fork3: 98,207 states, 7s: all hold
+pslot-rev readback: 1,929 states: L7 in 17 steps:
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+      11. export (('P', 0), 'G1', '->', 'G0')
+      12. commit G1 ('exp', ('P', 0), 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), ('P', 0), 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+    repair: put back any one of ['fence.once']
+pslot-rev readback1: 12,212 states: L7 in 17 steps:
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. write ('w1', 'G1')
+      10. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+      11. export (('P', 0), 'G1', '->', 'G0')
+      12. commit G1 ('exp', ('P', 0), 0)
+      13. fence ((1, 3, 0), 'to', 'G0')
+      14. commit G1 ('fen', (1, 3, 0), ('P', 0), 1)
+      15. final ((1, 3, 0), 'END', 1)
+      16. open ((1, 3, 0), 'at', 1)
+      17. fence ((0, 0, 1), 'to', 'G1')
+    repair: put back any one of ['fence.once']
+pslot-rev bothread: 3,056 states, 0s: all hold
+pslot-rev chain3: 1,235 states, 0s: all hold
+pslot-rev chain3c: 504 states, 0s: all hold
+pslot-rev fork3: 98,207 states, 7s: all hold
+pslot+abort readback: 65,368 states, 6s: all hold
+pslot+abort bothread: 287,648 states, 23s: all hold
+pslot-fused readback: 257 states, 0s: all hold
+pslot-fused readback1: 1,193 states, 0s: all hold
+pslot-fused bothread: 532 states, 0s: all hold
+pslot-fused chain3: 257 states, 0s: all hold
+pslot-fused chain3c: 120 states, 0s: all hold
+pslot-fused fork3: 1,285 states, 0s: all hold
+pslot-fused+abort readback: 591 states, 0s: all hold
+pslot-fused+abort bothread: 4,817 states, 0s: all hold
+split readback: 400 states: P4 in 15 steps:
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+    repair: put back any one of ['merged.base']
+split readback1: 2,008 states: P4 in 15 steps:
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+    repair: put back any one of ['merged.base']
+split bothread: 532 states, 0s: all hold
+split chain3: 4,285 states: P6 in 5 steps:
+       1. split ('p', 'G0', '->', 'G1')
+       2. split ('p', 'G1', '->', 'G2')
+       3. commit G1 ('spl', 'p', 2, 0)
+       4. init ((1, 0, 2), 'p')
+       5. commit G2 ('init', (1, 0, 2), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+    repair: put back any one of ['split.open']
+split chain3c: 542 states: P6 in 5 steps:
+       1. split ('p', 'G0', '->', 'G1')
+       2. split ('p', 'G1', '->', 'G2')
+       3. commit G1 ('spl', 'p', 2, 0)
+       4. init ((1, 0, 2), 'p')
+       5. commit G2 ('init', (1, 0, 2), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+    repair: put back any one of ['split.open']
+split fork3: 1,285 states, 0s: all hold
+split+giveup readback: 865 states: P4 in 15 steps:
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. merge ('p', 'G1', 'into', 'G0')
+       8. commit G0 ('mrg', 'p', 1)
+       9. subsume ((0, 1, 1), 'p')
+      10. commit G1 ('sub', (0, 1, 1), 'p')
+      11. merged ((0, 1, 1), 'p')
+      12. commit G0 ('mgd', (0, 1, 1), 'p', ['w1'], ['w1'], 'tok=1', 'base=(-1, -1, -1)', 'gen=1')
+      13. write ('w2', 'G0')
+      14. commit G0 ('w', 'w2', 'p', (1, 0, 3), 1)
+      15. read ('G0', 'w2', (1, 0, 3))
+    repair: put back any one of ['merged.base']
+split+giveup bothread: 532 states, 0s: all hold
+lanes readback: 1,929 states: L7 in 17 steps:
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+    repair: put back any one of ['fence.once']
+lanes readback1: 12,212 states: L7 in 17 steps:
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+    repair: put back any one of ['fence.once']
+lanes bothread: 3,056 states, 0s: all hold
+lanes chain3: 1,235 states, 0s: all hold
+lanes chain3c: 504 states, 0s: all hold
+lanes fork3: 98,207 states, 6s: all hold
+lanes-rev readback: 1,929 states: L7 in 17 steps:
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+    repair: put back any one of ['fence.once']
+lanes-rev readback1: 12,212 states: L7 in 17 steps:
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. write ('w1', 'L1')
+      10. commit L1 ('w', 'w1', 'p', (1, 1, 2), 1)
+      11. export ('r', 'L1', '->', 'L0')
+      12. commit L1 ('exp', 'r', 0)
+      13. fence ((1, 3, 0), 'to', 'L0')
+      14. commit L1 ('fen', (1, 3, 0), 'r', (1, 1, 2))
+      15. final ((1, 3, 0), 'END', (1, 1, 2))
+      16. open ((1, 3, 0),)
+      17. fence ((0, 0, 1), 'to', 'L1')
+    repair: put back any one of ['fence.once']
+lanes-rev bothread: 3,056 states, 0s: all hold
+lanes-rev chain3: 1,235 states, 0s: all hold
+lanes-rev chain3c: 504 states, 0s: all hold
+lanes-rev fork3: 98,207 states, 6s: all hold
+lanes+abort readback: 65,368 states, 5s: all hold
+lanes+abort bothread: 287,648 states, 19s: all hold
+lanes-carry readback: 1,235 states, 0s: all hold
+lanes-carry readback1: 7,510 states, 0s: all hold
+lanes-carry bothread: 3,056 states, 0s: all hold
+lanes-carry chain3: 1,235 states, 0s: all hold
+lanes-carry chain3c: 504 states, 0s: all hold
+lanes-carry fork3: 98,207 states, 6s: all hold
+
+## R: a log that may append an exact repeat once
+
+Each smallest set on the shared sweep and twice1 (twice1 left out for the give-up sets), with world.Draft.append changed so an entry already in the log may be appended once more (a step taken twice: at most two copies of an entry, within the same 10-entry cap). A cap hit still counts as able to reach a liveness goal, as in the harness. Runs stop at 300,000 states (LIMIT: undecided).
+
+fixN (fixN): holds every bound with a step taken twice (grow 28, shrink 28, both 41, read 61, deep 58, twice 4, twice1 6; 0s)
+slot (slot): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,843):
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. export ('s', 'G1', '->', 'G0')
+      10. commit G1 ('exp', 's', 0)
+      11. fence ((1, 2, 0), 'to', 'G0')
+      12. commit G1 ('fen', (1, 2, 0), 's', 0)
+      13. final ((1, 2, 0), 'END', 0)
+      14. commit G0 ('cp', (1, 2, 0), 's', 'upto=4', [], [], 'tok=0', 'seq=0', 'end=0')
+      15. open ((1, 2, 0), 'at', 0)
+      16. commit G0 ('open', (1, 2, 0), 's', 0)
+      17. open ((0, 0, 1), 'at', 0)
+      18. commit G1 ('open', (0, 0, 1), 's', 0)
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+slot-rev (slot): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,880):
+       1. export ('s', 'G0', '->', 'G1')
+       2. commit G0 ('exp', 's', 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), 's', 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), 's', 0)
+       9. export ('s', 'G1', '->', 'G0')
+      10. commit G1 ('exp', 's', 0)
+      11. fence ((1, 2, 0), 'to', 'G0')
+      12. commit G1 ('fen', (1, 2, 0), 's', 0)
+      13. final ((1, 2, 0), 'END', 0)
+      14. commit G0 ('cp', (1, 2, 0), 's', 'upto=4', [], [], 'tok=0', 'seq=0', 'end=0')
+      15. open ((1, 2, 0), 'at', 0)
+      16. commit G0 ('open', (1, 2, 0), 's', 0)
+      17. open ((0, 0, 1), 'at', 0)
+      18. commit G1 ('open', (0, 0, 1), 's', 0)
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+slot+abort (slot): undecided: grow passed 300,000 states with no counterexample (grow 300,002)
+    repair: not repaired even with every dropped guard put back (L5b on grow)
+rekey (rekey): FAILS P1 on grow in 16 steps with a step taken twice (grow 41,222):
+       1. start ('gen', 2)
+       2. commit C ('rk', 2, 1)
+       3. cut ('gen', 2)
+       4. commit C ('cut', 2)
+       5. freeze ('gen', 2, 'g1c0')
+       6. commit g1c0 ('frz', 2)
+       7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+       8. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')
+       9. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      10. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+      11. flip ('gen', 2)
+      12. commit C ('flip', 2)
+      13. write ('w1', 'g2c1')
+      14. commit g2c1 ('w', 'w1', 'p', (2, 1, 1), 1)
+      15. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      16. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+    repair: put back ['freeze.once', 'final.once', 'flip.once'] (3 rules)
+rekey-alt (rekey): FAILS P1 on grow in 14 steps with a step taken twice (grow 18,577):
+       1. start ('gen', 2)
+       2. commit C ('rk', 2, 1)
+       3. freeze ('gen', 2, 'g1c0')
+       4. commit g1c0 ('frz', 2)
+       5. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+       6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')
+       7. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+       8. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+       9. flip ('gen', 2)
+      10. commit C ('flip', 2)
+      11. write ('w1', 'g2c1')
+      12. commit g2c1 ('w', 'w1', 'p', (2, 1, 1), 1)
+      13. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      14. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+    repair: put back ['final.once', 'flip.once'] (2 rules)
+rekey-carry (rekey-carry): FAILS P1 on grow in 16 steps with a step taken twice (grow 41,222):
+       1. start ('gen', 2)
+       2. commit C ('rk', 2, 1)
+       3. cut ('gen', 2)
+       4. commit C ('cut', 2)
+       5. freeze ('gen', 2, 'g1c0')
+       6. commit g1c0 ('frz', 2)
+       7. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+       8. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')
+       9. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      10. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+      11. flip ('gen', 2)
+      12. commit C ('flip', 2)
+      13. write ('w1', 'g2c1')
+      14. commit g2c1 ('w', 'w1', 'p', (2, 1, 1), 1)
+      15. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      16. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+    repair: put back ['freeze.once', 'final.once', 'flip.once'] (3 rules)
+rekey-carry-alt (rekey-carry): FAILS P1 on grow in 14 steps with a step taken twice (grow 18,577):
+       1. start ('gen', 2)
+       2. commit C ('rk', 2, 1)
+       3. freeze ('gen', 2, 'g1c0')
+       4. commit g1c0 ('frz', 2)
+       5. final ('gen', 2, 'g2c0', 'from', 'g1c0')
+       6. commit g2c0 ('cp', 2, 'g1c0', 'upto=1', {'q': []}, {'q': frozenset()}, {'q': 0}, 'fin')
+       7. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+       8. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+       9. flip ('gen', 2)
+      10. commit C ('flip', 2)
+      11. write ('w1', 'g2c1')
+      12. commit g2c1 ('w', 'w1', 'p', (2, 1, 1), 1)
+      13. final ('gen', 2, 'g2c1', 'from', 'g1c0')
+      14. commit g2c1 ('cp', 2, 'g1c0', 'upto=1', {'p': []}, {'p': frozenset()}, {'p': 0}, 'fin')
+    repair: put back ['final.once', 'flip.once'] (2 rules)
+pslot (pslot): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,843):
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. export (('P', 0), 'G1', '->', 'G0')
+      10. commit G1 ('exp', ('P', 0), 0)
+      11. fence ((1, 2, 0), 'to', 'G0')
+      12. commit G1 ('fen', (1, 2, 0), ('P', 0), 0)
+      13. final ((1, 2, 0), 'END', 0)
+      14. commit G0 ('cp', (1, 2, 0), ('P', 0), 'upto=4', [], [], 'tok=0', 'seq=0', 'end=0')
+      15. open ((1, 2, 0), 'at', 0)
+      16. commit G0 ('open', (1, 2, 0), ('P', 0), 0)
+      17. open ((0, 0, 1), 'at', 0)
+      18. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+pslot-rev (pslot): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,880):
+       1. export (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('exp', ('P', 0), 1)
+       3. fence ((0, 0, 1), 'to', 'G1')
+       4. commit G0 ('fen', (0, 0, 1), ('P', 0), 0)
+       5. final ((0, 0, 1), 'END', 0)
+       6. commit G1 ('cp', (0, 0, 1), ('P', 0), 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+       7. open ((0, 0, 1), 'at', 0)
+       8. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+       9. export (('P', 0), 'G1', '->', 'G0')
+      10. commit G1 ('exp', ('P', 0), 0)
+      11. fence ((1, 2, 0), 'to', 'G0')
+      12. commit G1 ('fen', (1, 2, 0), ('P', 0), 0)
+      13. final ((1, 2, 0), 'END', 0)
+      14. commit G0 ('cp', (1, 2, 0), ('P', 0), 'upto=4', [], [], 'tok=0', 'seq=0', 'end=0')
+      15. open ((1, 2, 0), 'at', 0)
+      16. commit G0 ('open', (1, 2, 0), ('P', 0), 0)
+      17. open ((0, 0, 1), 'at', 0)
+      18. commit G1 ('open', (0, 0, 1), ('P', 0), 0)
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+pslot+abort (pslot): undecided: grow passed 300,000 states with no counterexample (grow 300,002)
+    repair: not repaired even with every dropped guard put back (L5b on grow)
+pslot-fused (once-pslot-fused): FAILS P1 on grow in 8 steps with a step taken twice (grow 249):
+       1. fence (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('fen', ('P', 0), 1, 0)
+       3. final ((0, 0, 1),)
+       4. commit G1 ('cp', (0, 0, 1), ('P', 0), [], [], 'tok=0', 'seq=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+       7. final ((0, 0, 1),)
+       8. commit G1 ('cp', (0, 0, 1), ('P', 0), [], [], 'tok=0', 'seq=0')
+    repair: put back ['final.once'] (1 rule)
+pslot-fused+abort (once-pslot-fused): FAILS P1 on grow in 8 steps with a step taken twice (grow 1,452):
+       1. fence (('P', 0), 'G0', '->', 'G1')
+       2. commit G0 ('fen', ('P', 0), 1, 0)
+       3. final ((0, 0, 1),)
+       4. commit G1 ('cp', (0, 0, 1), ('P', 0), [], [], 'tok=0', 'seq=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', ('P', 0, 1), 1)
+       7. final ((0, 0, 1),)
+       8. commit G1 ('cp', (0, 0, 1), ('P', 0), [], [], 'tok=0', 'seq=0')
+    repair: put back ['final.once'] (1 rule)
+split (once-split): FAILS P1 on grow in 8 steps with a step taken twice (grow 249):
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. init ((0, 0, 1), 'p')
+       8. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+    repair: put back ['init.once', 'merged.once'] (2 rules)
+split+giveup (once-split): FAILS P1 on grow in 8 steps with a step taken twice (grow 249):
+       1. split ('p', 'G0', '->', 'G1')
+       2. commit G0 ('spl', 'p', 1, 0)
+       3. init ((0, 0, 1), 'p')
+       4. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+       5. write ('w1', 'G1')
+       6. commit G1 ('w', 'w1', 'p', (0, 1, 1), 1)
+       7. init ((0, 0, 1), 'p')
+       8. commit G1 ('init', (0, 0, 1), 'p', [], [], 'tok=0', 'base=(-1, -1, -1)', 'gen=0')
+    repair: put back ['init.once', 'subsume.once', 'merged.once'] (3 rules)
+lanes (lanes): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,880):
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. export ('r', 'L1', '->', 'L0')
+      10. commit L1 ('exp', 'r', 0)
+      11. fence ((1, 2, 0), 'to', 'L0')
+      12. commit L1 ('fen', (1, 2, 0), 'r', (-1, -1, -1))
+      13. final ((1, 2, 0), 'END', (-1, -1, -1))
+      14. commit L0 ('cp', (1, 2, 0), 'r', 'upto=4', [], [], 'tok=0', 'ep=2', 'end=(-1, -1, -1)')
+      15. open ((1, 2, 0),)
+      16. commit L0 ('open', (1, 2, 0), 'r')
+      17. open ((0, 0, 1),)
+      18. commit L1 ('open', (0, 0, 1), 'r')
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+lanes-rev (lanes): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,880):
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. export ('r', 'L1', '->', 'L0')
+      10. commit L1 ('exp', 'r', 0)
+      11. fence ((1, 2, 0), 'to', 'L0')
+      12. commit L1 ('fen', (1, 2, 0), 'r', (-1, -1, -1))
+      13. final ((1, 2, 0), 'END', (-1, -1, -1))
+      14. commit L0 ('cp', (1, 2, 0), 'r', 'upto=4', [], [], 'tok=0', 'ep=2', 'end=(-1, -1, -1)')
+      15. open ((1, 2, 0),)
+      16. commit L0 ('open', (1, 2, 0), 'r')
+      17. open ((0, 0, 1),)
+      18. commit L1 ('open', (0, 0, 1), 'r')
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+lanes+abort (lanes): undecided: grow passed 300,000 states with no counterexample (grow 300,001)
+    repair: not repaired even with every dropped guard put back (L5b on grow)
+lanes-carry (lanes-carry): FAILS P6 on twice in 18 steps with a step taken twice (grow 8,240, shrink 8,240, both 17,381, read 21,816, deep 24,893, twice 2,843):
+       1. export ('r', 'L0', '->', 'L1')
+       2. commit L0 ('exp', 'r', 1)
+       3. fence ((0, 0, 1), 'to', 'L1')
+       4. commit L0 ('fen', (0, 0, 1), 'r', (-1, -1, -1))
+       5. final ((0, 0, 1), 'END', (-1, -1, -1))
+       6. commit L1 ('cp', (0, 0, 1), 'r', 'upto=2', [], [], 'tok=0', 'ep=1', 'end=(-1, -1, -1)')
+       7. open ((0, 0, 1),)
+       8. commit L1 ('open', (0, 0, 1), 'r')
+       9. export ('r', 'L1', '->', 'L0')
+      10. commit L1 ('exp', 'r', 0)
+      11. fence ((1, 2, 0), 'to', 'L0')
+      12. commit L1 ('fen', (1, 2, 0), 'r', (-1, -1, -1))
+      13. final ((1, 2, 0), 'END', (-1, -1, -1))
+      14. commit L0 ('cp', (1, 2, 0), 'r', 'upto=4', [], [], 'tok=0', 'ep=2', 'end=(-1, -1, -1)')
+      15. open ((1, 2, 0),)
+      16. commit L0 ('open', (1, 2, 0), 'r')
+      17. open ((0, 0, 1),)
+      18. commit L1 ('open', (0, 0, 1), 'r')
+    repair: put back ['fence.once', 'open.once'] (2 rules)
+
+## C: the bigger bounds and a step taken twice, together
+
+Each core set with every rule that R or B put back, run with a step taken twice on the six sweep bounds, twice1 and the bigger bounds B uses. Then each rule put back is dropped again, alone: it must break a bound. Runs stop at 300,000 states (LIMIT: undecided).
+
+fixN: 13 rules (13 + 0 put back: none) hold every bound with a step taken twice (0s)
+slot: 28 rules (26 + 2 put back: fence.once, open.once) hold every bound with a step taken twice (10s)
+    without fence.once: L7 on twice in 15 steps
+    without open.once: P6 on twice in 18 steps
+rekey: with ['freeze.once', 'final.once', 'flip.once'] put back it still FAILS LIMIT on readback1
+rekey-carry: 32 rules (29 + 3 put back: freeze.once, final.once, flip.once) hold every bound with a step taken twice (146s)
+    without freeze.once: LIMIT on twice1
+    without final.once: P1 on grow in 16 steps
+    without flip.once: LIMIT on twice1
+pslot: 32 rules (30 + 2 put back: fence.once, open.once) hold every bound with a step taken twice (12s)
+    without fence.once: L7 on twice in 15 steps
+    without open.once: P6 on twice in 18 steps
+split: 37 rules (33 + 4 put back: init.once, merged.once, merged.base, split.open) hold every bound with a step taken twice (1s)
+    without init.once: P1 on grow in 8 steps
+    without merged.once: P1 on shrink in 10 steps
+    without merged.base: P4 on readback in 15 steps
+    without split.open: P6 on chain3 in 5 steps
+lanes: 30 rules (28 + 2 put back: fence.once, open.once) hold every bound with a step taken twice (11s)
+    without fence.once: L7 on twice in 15 steps
+    without open.once: P6 on twice in 18 steps
+lanes-carry: 28 rules (26 + 2 put back: fence.once, open.once) hold every bound with a step taken twice (10s)
+    without fence.once: L7 on twice in 15 steps
+    without open.once: P6 on twice in 18 steps
+pslot-fused: 25 rules (24 + 1 put back: final.once) hold every bound with a step taken twice (0s)
+    without final.once: P1 on grow in 8 steps
+
+## Where each smallest set came from
+
+- fixN: re-run
+- slot: re-run
+- slot-rev: re-run
+- slot+abort: the original set (parts 1 and 2), which this re-run checks fresh with verify.py (compare.md)
+- rekey: re-run
+- rekey-alt: re-run
+- rekey-carry: re-run
+- rekey-carry-alt: re-run
+- pslot: re-run
+- pslot-rev: re-run
+- pslot+abort: the original set (parts 1 and 2), which this re-run checks fresh with verify.py (compare.md)
+- pslot-fused: re-run
+- pslot-fused+abort: re-run
+- split: re-run
+- split+giveup: re-run
+- lanes: re-run
+- lanes-rev: re-run
+- lanes+abort: the original set (parts 1 and 2), which this re-run checks fresh with verify.py (compare.md)
+- lanes-carry: re-run

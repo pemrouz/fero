@@ -12,3 +12,18 @@ lanes-carry 1997 s wall
 rekey-carry 3069 s wall
 rekey-alt 1930 s wall
 rekey-carry-alt 2092 s wall
+slot-rev 826 s wall
+rekey-rev 761 s wall
+rekey-carry-rev 1160 s wall
+pslot 3275 s wall
+slotkey 324 s wall
+lanes-rev 1155 s wall
+pslot-rev 2337 s wall
+hunt 3223 s wall
+slot+abort-verify 1590 s wall
+rekey+giveup-alt-verify 1463 s wall
+pslot+abort-verify 1467 s wall
+settle-rekey-carry 771 s (the sum of its runs; it ran in one hold with the first part of the re-key check, which was stopped at 01:37 to free the box for a timing run)
+lanes+abort-verify 2592 s wall
+settle-rekey 2137 s wall
+rekey-carry+giveup-verify 4105 s wall

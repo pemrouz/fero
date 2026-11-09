@@ -1,0 +1,2874 @@
+{
+ "option": "slotprobe-trig",
+ "bounds": [
+  "grow",
+  "shrink",
+  "both",
+  "read",
+  "deep",
+  "twice"
+ ],
+ "pinned": [],
+ "base": {
+  "grow": {
+   "states": 22797,
+   "edges": 65563,
+   "secs": 1.45,
+   "fail": {},
+   "digest": [
+    22797,
+    65563,
+    5489392203732156271
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 22797,
+   "edges": 65563,
+   "secs": 1.32,
+   "fail": {},
+   "digest": [
+    22797,
+    65563,
+    1757110895258182960
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 39409,
+   "edges": 113242,
+   "secs": 2.41,
+   "fail": {},
+   "digest": [
+    39409,
+    113242,
+    10733321065662182499
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 62653,
+   "edges": 207054,
+   "secs": 4.3,
+   "fail": {},
+   "digest": [
+    62653,
+    207054,
+    12249620993103202761
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 53644,
+   "edges": 160442,
+   "secs": 2.89,
+   "fail": {},
+   "digest": [
+    53644,
+    160442,
+    2601080371416890379
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 1318,
+   "edges": 3434,
+   "secs": 0.09,
+   "fail": {},
+   "digest": [
+    1318,
+    3434,
+    9822796148079088515
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "warm": [
+  "refuse.open",
+  "export.nofence",
+  "export.one",
+  "import.new",
+  "copy.impcom",
+  "copy.noabort",
+  "copy.recs",
+  "fence.ready",
+  "fence.expcom",
+  "fence.open",
+  "fence.nofence",
+  "fence.N",
+  "final.imp",
+  "final.noabort",
+  "open.cpcom",
+  "open.once",
+  "open.N",
+  "cancel.once",
+  "cancel.append",
+  "drop.cancom",
+  "drop.once",
+  "abort.once",
+  "abort.append",
+  "unfence.once",
+  "unfence.N",
+  "cancel_on_abort.abcom",
+  "cancel_on_abort.nofen",
+  "cancel_on_abort.once",
+  "import.append",
+  "copy.append",
+  "fence.nocancel",
+  "fence.once",
+  "open.noabort",
+  "cancel.nofence",
+  "drop.append",
+  "abort.imp",
+  "abort.noopen",
+  "unfence.abcom",
+  "unfence.fen",
+  "unfence.append",
+  "cancel_on_abort.append",
+  "import.expcom",
+  "copy.once"
+ ],
+ "order": "text",
+ "greedy": [
+  [
+   "refuse.open",
+   "dropped by the warm start"
+  ],
+  [
+   "export.nofence",
+   "dropped by the warm start"
+  ],
+  [
+   "export.one",
+   "dropped by the warm start"
+  ],
+  [
+   "import.new",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.impcom",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.noabort",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.recs",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.ready",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.expcom",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.open",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.nofence",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.N",
+   "dropped by the warm start"
+  ],
+  [
+   "final.imp",
+   "dropped by the warm start"
+  ],
+  [
+   "final.noabort",
+   "dropped by the warm start"
+  ],
+  [
+   "open.cpcom",
+   "dropped by the warm start"
+  ],
+  [
+   "open.once",
+   "dropped by the warm start"
+  ],
+  [
+   "open.N",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel.once",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel.append",
+   "dropped by the warm start"
+  ],
+  [
+   "drop.cancom",
+   "dropped by the warm start"
+  ],
+  [
+   "drop.once",
+   "dropped by the warm start"
+  ],
+  [
+   "abort.once",
+   "dropped by the warm start"
+  ],
+  [
+   "abort.append",
+   "dropped by the warm start"
+  ],
+  [
+   "unfence.once",
+   "dropped by the warm start"
+  ],
+  [
+   "unfence.N",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel_on_abort.abcom",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel_on_abort.nofen",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel_on_abort.once",
+   "dropped by the warm start"
+  ],
+  [
+   "import.append",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.append",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.nocancel",
+   "dropped by the warm start"
+  ],
+  [
+   "fence.once",
+   "dropped by the warm start"
+  ],
+  [
+   "open.noabort",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel.nofence",
+   "dropped by the warm start"
+  ],
+  [
+   "drop.append",
+   "dropped by the warm start"
+  ],
+  [
+   "abort.imp",
+   "dropped by the warm start"
+  ],
+  [
+   "abort.noopen",
+   "dropped by the warm start"
+  ],
+  [
+   "unfence.abcom",
+   "dropped by the warm start"
+  ],
+  [
+   "unfence.fen",
+   "dropped by the warm start"
+  ],
+  [
+   "unfence.append",
+   "dropped by the warm start"
+  ],
+  [
+   "cancel_on_abort.append",
+   "dropped by the warm start"
+  ],
+  [
+   "import.expcom",
+   "dropped by the warm start"
+  ],
+  [
+   "copy.once",
+   "dropped by the warm start"
+  ],
+  [
+   "open.final",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "refuse.open",
+  "export.nofence",
+  "export.one",
+  "import.new",
+  "copy.impcom",
+  "copy.noabort",
+  "copy.recs",
+  "fence.ready",
+  "fence.expcom",
+  "fence.open",
+  "fence.nofence",
+  "fence.N",
+  "final.imp",
+  "final.noabort",
+  "open.cpcom",
+  "open.once",
+  "open.N",
+  "cancel.once",
+  "cancel.append",
+  "drop.cancom",
+  "drop.once",
+  "abort.once",
+  "abort.append",
+  "unfence.once",
+  "unfence.N",
+  "cancel_on_abort.abcom",
+  "cancel_on_abort.nofen",
+  "cancel_on_abort.once",
+  "import.append",
+  "copy.append",
+  "fence.nocancel",
+  "fence.once",
+  "open.noabort",
+  "cancel.nofence",
+  "drop.append",
+  "abort.imp",
+  "abort.noopen",
+  "unfence.abcom",
+  "unfence.fen",
+  "unfence.append",
+  "cancel_on_abort.append",
+  "import.expcom",
+  "copy.once",
+  "open.final"
+ ],
+ "verify": {
+  "twice1": {
+   "states": 487,
+   "edges": 745,
+   "secs": 0.02,
+   "fail": {},
+   "digest": [
+    487,
+    745,
+    18229699064638015267
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "put_back": [],
+ "minimal": {
+  "grow": {
+   "states": 1086,
+   "edges": 1938,
+   "secs": 0.06,
+   "fail": {},
+   "digest": [
+    1086,
+    1938,
+    693959061146720503
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "shrink": {
+   "states": 1086,
+   "edges": 1938,
+   "secs": 0.06,
+   "fail": {},
+   "digest": [
+    1086,
+    1938,
+    4458783471038721274
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "both": {
+   "states": 2262,
+   "edges": 4242,
+   "secs": 0.08,
+   "fail": {},
+   "digest": [
+    2262,
+    4242,
+    8616533460985711813
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "read": {
+   "states": 2625,
+   "edges": 5522,
+   "secs": 0.13,
+   "fail": {},
+   "digest": [
+    2625,
+    5522,
+    13678326770882771191
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "deep": {
+   "states": 5036,
+   "edges": 11509,
+   "secs": 0.22,
+   "fail": {},
+   "digest": [
+    5036,
+    11509,
+    15019171143511606991
+   ],
+   "capped": 0,
+   "complete": true
+  },
+  "twice": {
+   "states": 154,
+   "edges": 279,
+   "secs": 0.01,
+   "fail": {},
+   "digest": [
+    154,
+    279,
+    8269066799576670219
+   ],
+   "capped": 0,
+   "complete": true
+  }
+ },
+ "rules": [
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "the group holds the slot open by its committed log",
+   "cmp": null,
+   "id": "write.open",
+   "alone": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    2,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "no write once fenced is in the log, committed or not",
+   "cmp": null,
+   "id": "write.nofence",
+   "alone": [
+    "grow",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "",
+   "cmp": null,
+   "id": "write.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "",
+   "cmp": ">=",
+   "id": "write.fence",
+   "alone": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ],
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "stamp the slot's next sequence, from the log end",
+   "cmp": null,
+   "id": "write.pos",
+   "alone": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('-', 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('-', 0), 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P2",
+    4,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('-', 0), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('-', 0), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "write.append",
+   "alone": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    0,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "route",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.open",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "dedup",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.dedup",
+   "alone": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    5,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 2)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "fence",
+   "note": "",
+   "cmp": "<",
+   "id": "refuse.stale",
+   "alone": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G1')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "refuse",
+     "('w1', 'G1')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "id": "refuse.answer",
+   "alone": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L7",
+    1,
+    [
+     "L7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.committed",
+   "alone": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    2,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": ">",
+   "id": "read.after",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.next",
+   "alone": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w2', ('s', 2))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w2', ('s', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.take",
+   "alone": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "L4",
+    2,
+    [
+     "L4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "id": "read.cursor",
+   "alone": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "read",
+    "P4",
+    4,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ],
+    [
+     "read",
+     "('G0', 'w1', ('s', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "A exports only a slot its committed log holds open",
+   "cmp": null,
+   "id": "export.open",
+   "alone": [
+    "twice",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "export",
+     "('s', 'G1', '->', 'G0')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('exp', 's', 0)"
+    ],
+    [
+     "fence",
+     "((1, 0, 0), 'to', 'G0')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('fen', (1, 0, 0), 's', 0)"
+    ],
+    [
+     "final",
+     "((1, 0, 0), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('cp', (1, 0, 0), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "twice",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "export",
+     "('s', 'G1', '->', 'G0')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('exp', 's', 0)"
+    ],
+    [
+     "fence",
+     "((1, 0, 0), 'to', 'G0')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('fen', (1, 0, 0), 's', 0)"
+    ],
+    [
+     "final",
+     "((1, 0, 0), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('cp', (1, 0, 0), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "export.nofence",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "one move of a slot at a time",
+   "cmp": null,
+   "id": "export.one",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "export.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5b"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B acts on a committed exporting",
+   "cmp": null,
+   "id": "import.expcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B refuses a name it has imported or aborted",
+   "cmp": null,
+   "id": "import.new",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "import.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "B commits importing, then copies",
+   "cmp": null,
+   "id": "copy.impcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "id": "copy.noabort",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "one bulk copy; the rest comes after the fence",
+   "cmp": null,
+   "id": "copy.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "id": "copy.recs",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "perf",
+   "note": "",
+   "cmp": null,
+   "id": "copy.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "perf",
+   "note": "A fences on B's report of a committed copy",
+   "cmp": null,
+   "id": "fence.ready",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "A owns the move once exporting commits; the name is the position of that exporting in A's committed log, so a stale name is ignored",
+   "cmp": null,
+   "id": "fence.expcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "A never fences once cancel is in its log",
+   "cmp": null,
+   "id": "fence.nocancel",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "fence.open",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "fence.nofence",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "fence.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "N is the slot's last sequence in A's log (its end, not its commit)",
+   "cmp": null,
+   "id": "fence.N",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "fence.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "only once fenced commits does A send the delta and END(N)",
+   "cmp": null,
+   "id": "final.fencom",
+   "alone": [
+    "grow",
+    "P6",
+    6,
+    [
+     "P6"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=0', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P6",
+    6,
+    [
+     "P6"
+    ]
+   ],
+   "final_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=0', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B has committed importing",
+   "cmp": null,
+   "id": "final.imp",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "final.noabort",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "final.once",
+   "alone": [
+    "both",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w3', 'G0')"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w3', 'q', ('t', 1), 1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=3', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "both",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w3', 'G0')"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w3', 'q', ('t', 1), 1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=3', [], [], 'tok=0', 'seq=0', 'end=0')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "the rows and records of the slot",
+   "cmp": null,
+   "id": "final.recs",
+   "alone": [
+    "grow",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', [], ['w1'], 'tok=1', 'seq=1', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P1",
+    10,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', [], ['w1'], 'tok=1', 'seq=1', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "the dedup outcomes tagged with the slot",
+   "cmp": null,
+   "id": "final.outs",
+   "alone": [
+    "grow",
+    "P3",
+    11,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 2)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 2, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 2, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 2, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 2, 1), 's', 'upto=4', ['w1', 'w2'], [], 'tok=2', 'seq=2', 'end=0')"
+    ],
+    [
+     "refuse",
+     "('w1', 'G1')"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    11,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 2), 2)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 2, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 2, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 2, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 2, 1), 's', 'upto=4', ['w1', 'w2'], [], 'tok=2', 'seq=2', 'end=0')"
+    ],
+    [
+     "refuse",
+     "('w1', 'G1')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "the highest lock token",
+   "cmp": null,
+   "id": "final.tok",
+   "alone": [
+    "grow",
+    "P3",
+    12,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', ['w2'], ['w2'], 'tok=0', 'seq=1', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P3",
+    12,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w2', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', ['w2'], ['w2'], 'tok=0', 'seq=1', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 2), 1)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "carry",
+   "note": "the slot's sequence",
+   "cmp": null,
+   "id": "final.seq",
+   "alone": [
+    "grow",
+    "P2",
+    12,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', ['w1'], ['w1'], 'tok=1', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w2', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "P2",
+    12,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "write",
+     "('w1', 'G0')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 1, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "final",
+     "((0, 1, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 1, 1), 's', 'upto=3', ['w1'], ['w1'], 'tok=1', 'seq=0', 'end=0')"
+    ],
+    [
+     "open",
+     "((0, 1, 1), 'at', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 1, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w2', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w2', 'p', ('s', 1), 2)"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "END(N)",
+   "cmp": null,
+   "id": "final.end",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "both",
+    "P1",
+    14,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "export",
+     "('s', 'G0', '->', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('exp', 's', 1)"
+    ],
+    [
+     "fence",
+     "((0, 0, 1), 'to', 'G1')"
+    ],
+    [
+     "commit",
+     "G0",
+     "('fen', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w3', 'G0')"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G0",
+     "('w', 'w3', 'q', ('t', 1), 1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=-1')"
+    ],
+    [
+     "open",
+     "((0, 0, 1), 'at', -1)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('open', (0, 0, 1), 's', 0)"
+    ],
+    [
+     "write",
+     "('w1', 'G1')"
+    ],
+    [
+     "commit",
+     "G1",
+     "('w', 'w1', 'p', ('s', 1), 1)"
+    ],
+    [
+     "final",
+     "((0, 0, 1), 'END', 0)"
+    ],
+    [
+     "commit",
+     "G1",
+     "('cp', (0, 0, 1), 's', 'upto=3', [], [], 'tok=0', 'seq=0', 'end=-1')"
+    ]
+   ]
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "final.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B opens on the final copy (END(N) set), not on the bulk copy",
+   "cmp": null,
+   "id": "open.final",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B opens once the delta, END(N) and the carried state commit",
+   "cmp": null,
+   "id": "open.cpcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B never opens once abort is in its log",
+   "cmp": null,
+   "id": "open.noabort",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "open.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "",
+   "cmp": null,
+   "id": "open.N",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "open.append",
+   "alone": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "alone_trace": [],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "grow",
+    "L5b",
+    0,
+    [
+     "L5",
+     "L5b",
+     "L7"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "before its fence, A may cancel on its own",
+   "cmp": null,
+   "id": "cancel.nofence",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "cancel.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cancel.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "drop.cancom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "drop.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "drop.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B gives up only a move it is importing",
+   "cmp": null,
+   "id": "abort.imp",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "B aborts only while its log has no open",
+   "cmp": null,
+   "id": "abort.noopen",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "abort.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "abort.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "A reopens only on B's committed abort",
+   "cmp": null,
+   "id": "unfence.abcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "unfence.fen",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "unfence.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "stamp",
+   "note": "reopen at N",
+   "cmp": null,
+   "id": "unfence.N",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "unfence.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cancel_on_abort.abcom",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cancel_on_abort.nofen",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "guard",
+   "role": "idem",
+   "note": "",
+   "cmp": null,
+   "id": "cancel_on_abort.once",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "id": "cancel_on_abort.append",
+   "alone": null,
+   "alone_trace": null,
+   "kept": false,
+   "pinned": false
+  }
+ ]
+}
