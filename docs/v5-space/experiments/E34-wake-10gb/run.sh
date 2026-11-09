@@ -64,7 +64,16 @@ setup() {
   "$HERE/tree.sh" "$TREE"
   { cat "$TREE/VERSIONS"; node --version; uname -r; nproc; free -m | head -2; } > "$R/versions.txt"
 }
-limits() { for w in map object source; do "$SP/bin/heavy" node --max-old-space-size=8192 --experimental-strip-types --no-warnings "$B/limits.mjs" $w >> "$R/limits.jsonl"; done; }
+limits() {
+  # each case is cut off at 300 s: the object case never reaches its own 150 s check (a block of 1,024 inserts stalls)
+  for w in map object source; do
+    "$SP/bin/heavy" timeout 300 node --max-old-space-size=8192 --experimental-strip-types --no-warnings "$B/limits.mjs" $w >> "$R/limits.jsonl" ||
+      printf '{"exp":"E-34","part":"limits","what":"%s","held":null,"error":"killed by timeout at 300 s"}\n' $w >> "$R/limits.jsonl"
+  done
+  # the object case never reaches its own cap check, so this probe prints its progress and is stopped at 200 s
+  printf '{"exp":"E-34","part":"limits-object-progress","loadavg":"%s","cap_s":200}\n' "$(cat /proc/loadavg)" > "$R/limits-object-progress.jsonl"
+  "$SP/bin/heavy" timeout 200 node --max-old-space-size=8192 "$B/limits-object-progress.mjs" >> "$R/limits-object-progress.jsonl" || true
+}
 timing() {
   for run in ${RUNS:-1 2 3}; do
     "$SP/bin/timing" "$HERE/run.sh" _small $run
