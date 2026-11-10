@@ -1,0 +1,113 @@
+# E-21 verify family handover, 30 seeds, 2026-11-10T01:22:45Z, Python 3.13.17, 4 vCPU, load 3.85 3.27 2.84
+wall design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 200, "first": null}
+clamp design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 200, "first": null}
+median design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 100.0, "early_max": 0.0, "first": null}
+median smallest model (7 rules) on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 48, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 100.0, "early_max": 0.0, "first": ["handover", 0, ["back"]]}
+  put back stand.near: ('handover', 0, ['back'])
+  put back stamp.never_back: holds
+  put back stamp.peers: ('handover', 0, ['back'])
+  median new smallest (8 rules) on eight families: first None
+  drop stamp.extrap: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.upper: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.lower: ('jumpL-', 0, ['late'])
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 2, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  drop stamp.never_back: ('handover', 0, ['back'])
+  mutant drop stamp.extrap: {'kind': 'drop', 'rule': 'stamp.extrap', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.upper: {'kind': 'drop', 'rule': 'stamp.upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.lower: {'kind': 'drop', 'rule': 'stamp.lower', 'caught': ('jumpL-', 0, ['late'])}
+  mutant drop stamp.never_back: {'kind': 'drop', 'rule': 'stamp.never_back', 'caught': ('handover', 0, ['back'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 2, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: extrap <-> upper: {'kind': 'swap', 'rule': 'stamp: extrap <-> upper', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: extrap <-> lower: {'kind': 'swap', 'rule': 'stamp: extrap <-> lower', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: extrap <-> never_back: {'kind': 'swap', 'rule': 'stamp: extrap <-> never_back', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: upper <-> lower: {'kind': 'swap', 'rule': 'stamp: upper <-> lower', 'caught': None, 'no_change': True}
+  mutant swap stamp: upper <-> never_back: {'kind': 'swap', 'rule': 'stamp: upper <-> never_back', 'caught': ('handover', 0, ['back'])}
+  mutant swap stamp: lower <-> never_back: {'kind': 'swap', 'rule': 'stamp: lower <-> never_back', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> extrap: {'kind': 'swap', 'rule': 'stamp: read <-> extrap', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> upper: {'kind': 'swap', 'rule': 'stamp: read <-> upper', 'caught': ('drift', 0, ['ERR'])}
+  mutant swap stamp: read <-> lower: {'kind': 'swap', 'rule': 'stamp: read <-> lower', 'caught': ('drift', 0, ['ERR'])}
+  mutant swap stamp: read <-> never_back: {'kind': 'swap', 'rule': 'stamp: read <-> never_back', 'caught': ('drift', 0, ['ERR'])}
+median1 design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 100.0, "early_max": 0.0, "first": null}
+median1 smallest model (6 rules) on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 48, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 100.0, "early_max": 0.0, "first": ["handover", 0, ["back"]]}
+  put back stand.near: ('handover', 0, ['back'])
+  put back stamp.never_back: holds
+  put back stamp.peers: ('handover', 0, ['back'])
+  median1 new smallest (7 rules) on eight families: first None
+  drop stamp.extrap: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.median: ('jumpL+', 0, ['early', 'lease'])
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 2, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  drop stamp.never_back: ('handover', 0, ['back'])
+  mutant drop stamp.extrap: {'kind': 'drop', 'rule': 'stamp.extrap', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.median: {'kind': 'drop', 'rule': 'stamp.median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.never_back: {'kind': 'drop', 'rule': 'stamp.never_back', 'caught': ('handover', 0, ['back'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 2, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: extrap <-> median: {'kind': 'swap', 'rule': 'stamp: extrap <-> median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: extrap <-> never_back: {'kind': 'swap', 'rule': 'stamp: extrap <-> never_back', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: median <-> never_back: {'kind': 'swap', 'rule': 'stamp: median <-> never_back', 'caught': ('handover', 0, ['back'])}
+  mutant swap stamp: read <-> extrap: {'kind': 'swap', 'rule': 'stamp: read <-> extrap', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> median: {'kind': 'swap', 'rule': 'stamp: read <-> median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: read <-> never_back: {'kind': 'swap', 'rule': 'stamp: read <-> never_back', 'caught': ('drift', 0, ['ERR'])}
+hlc design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 0.0, "first": null}
+hlc smallest model (6 rules) on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 66, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 200, "first": ["handover", 0, ["back"]]}
+  put back recv.near: ('handover', 0, ['back'])
+  put back send.send_max: ('handover', 0, ['back'])
+  put back stand.near: ('handover', 0, ['back'])
+  put back apply.apply: ('handover', 0, ['back'])
+  put back recv.adopt: ('handover', 0, ['back'])
+  put back stamp.set_l: ('handover', 0, ['back'])
+  put back stamp.never_back: holds
+  put back stamp.hlc_max: ('handover', 0, ['back'])
+  hlc new smallest (7 rules) on eight families: first None
+  drop selffence.far: ('crash', 18, ['avail'])
+  drop selffence.stepdown: ('jumpL+', 0, ['early', 'lease'])
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 0, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  drop stamp.never_back: ('handover', 0, ['back'])
+  mutant drop stamp.never_back: {'kind': 'drop', 'rule': 'stamp.never_back', 'caught': ('handover', 0, ['back'])}
+  mutant drop selffence.far: {'kind': 'drop', 'rule': 'selffence.far', 'caught': ('crash', 18, ['avail'])}
+  mutant drop selffence.stepdown: {'kind': 'drop', 'rule': 'selffence.stepdown', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 0, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> never_back: {'kind': 'swap', 'rule': 'stamp: read <-> never_back', 'caught': ('drift', 0, ['ERR'])}
+mono design on handover: {"early_wt": 0, "early": 0, "late": 1468, "lease": 0, "stuck": 3, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 93400.0, "early_max": 0.0, "first": ["handover", 0, ["late", "stuck"]]}
+mono+ck design on handover: {"early_wt": 0, "early": 0, "late": 1324, "lease": 2, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 5, "ERR": 0, "late_max": 2900.0, "early_max": 0.0, "first": ["handover", 0, ["late"]]}
+tt design on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 0.0, "first": null}
+tt smallest model (4 rules) on handover: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 1, "ERR": 0, "late_max": 300.0, "early_max": 0.0, "first": null}
+  tt new smallest (4 rules) on eight families: first None
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('jumpF', 3, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('jumpF', 3, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+done in 443 s

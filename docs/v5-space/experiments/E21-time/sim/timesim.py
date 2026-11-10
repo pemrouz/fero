@@ -37,6 +37,12 @@ OPTIONS (SPACE.md axis T)
            clocks from pings (own included), each reading carried forward by
            the receiver's monotonic time since it arrived; a member whose
            clock is off by more than skew.max waits longer to stand.
+  median   clamp with a window of 0 (added after clamp failed): writer time
+           is the median of the members' clocks, own included, never back.
+  median1  the same rule written as one assignment instead of two clamps.
+  median+g median1 plus an agreement guard: step down (and do not stand)
+           when fewer than a majority of the known clocks lie within
+           max-offset of their median. Design runs only.
   hlc      hybrid logical clocks (Kulkarni et al. 2014) with CockroachDB's
            guards: l = max(l, clock) when stamping, max(l, received l) on a
            ping, max(l, t) on applying an entry; a reading more than
@@ -111,6 +117,13 @@ CKPT = 1000      # mono+ck: checkpoint every second (etcd's default: 5 minutes)
 DRIFT = 200e-6
 FAMILIES = ('drift', 'jumpL+', 'jumpL-', 'jumpF', 'pause', 'crash', 'mix')
 EXTRA = ('jump2',)   # beyond the premise (a majority of clocks wrong): reported, not checked
+# The verify family (E-17's verify bound): `drift` plus 2 to 6 planned
+# handovers (Raft's leader transfer; a roll uses it). The leader stamps its
+# last entry, another member takes over in the same tick and stamps its
+# first, so two leaders' clocks meet with no 2 s election between them.
+# sim/verify.py runs each option's smallest model on it. Not in FAMILIES,
+# so the design runs and the ablations of the seven families are unchanged.
+VERIFY = ('handover',)
 CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale', 'avail')
 
 
@@ -140,6 +153,7 @@ def median(xs):
 class Opt:
     name = 'opt'
     TIMER = 'wall'        # which clock a row's deadline uses: 'wall' (writer time) or 'mono'
+    STAND_ALONE = False   # may a member that fails `stand` lead when no other can? (clamp: yes)
 
     def common_expire_updates(self):
         return [U('log', lambda w, st, b, d: d.__setitem__('log', True), 'log',
@@ -178,6 +192,7 @@ class Wall(Opt):
 class Clamp(Opt):
     name = 'clamp'
     WIN = S          # the clamp's half-width around the median
+    STAND_ALONE = True   # a skewed member only waits longer: it still leads when it alone can win
 
     def actions(self):
         WIN = self.WIN
@@ -322,7 +337,51 @@ class Median(Clamp):
     WIN = 0
 
 
-OPTIONS = {o.name: o for o in (Wall, Clamp, Median, Hlc, Mono, MonoCk, TT)}
+class Median1(Clamp):
+    """`median` written as one assignment instead of two clamps: writer time
+    is the median of the members' clocks (own clock included), never back.
+    At a window of 0 the upper and the lower clamp give one value, so this
+    is the same rule; it is here so that the count (DEV-10: one update, one
+    rule) does not hang on how the clamp happens to be written."""
+    name = 'median1'
+    WIN = 0
+
+    def actions(self):
+        acts = Clamp.actions(self)
+
+        def setmed(w, st, b, d):
+            d['t'] = median(d.get('est', []) + [w.wall(st)])
+        ups = [u for u in acts[0].updates if u.name not in ('upper', 'lower')]
+        ups.insert([u.name for u in ups].index('never_back'),
+                   U('median', setmed, 'time', 'writer time = the median of the members\' clocks, own clock included'))
+        acts[0] = Action('stamp', 'deliver', None, [], ups)
+        return acts
+
+
+class MedianGuard(Median1):
+    """median1 plus an agreement guard (added on resume, design runs only):
+    a leader steps down, and a member does not stand, when fewer than a
+    majority of the clocks it knows (its own and each peer reading carried
+    forward) lie within max-offset of their median. One wrong clock never
+    trips it: the median absorbs it, so a leader's clock jump costs no
+    failover (F-06). Most clocks wrong does: the group stops instead of
+    expiring rows by a wrong time (what CockroachDB's guard buys in jump2)."""
+    name = 'median+g'
+    STAND_ALONE = False
+
+    def actions(self):
+        acts = [a for a in Median1.actions(self) if a.name != 'stand']
+        acts.append(Action('selffence', 'deliver', None,
+                           [G('scattered', lambda w, st, b: w.scattered(st, MAXOFF), 'elect',
+                              'fewer than a majority of the known clocks lie within max-offset of their median')],
+                           [U('stepdown', lambda w, st, b, d: d.__setitem__('down', True), 'elect', 'steps down')]))
+        acts.append(Action('stand', 'deliver', None,
+                           [G('agree', lambda w, st, b: not w.scattered(st, MAXOFF), 'elect',
+                              'a member that sees the clocks scattered does not stand')], []))
+        return acts
+
+
+OPTIONS = {o.name: o for o in (Wall, Clamp, Median, Median1, MedianGuard, Hlc, Mono, MonoCk, TT)}
 
 
 class Compiled:
@@ -383,7 +442,7 @@ class World:
     def __init__(self, opt_cls, seed, family, mutation=None):
         self.opt = opt_cls()
         self.c = Compiled(self.opt, mutation)
-        self.rng = random.Random(seed * 7919 + (FAMILIES + EXTRA).index(family))
+        self.rng = random.Random(seed * 7919 + (FAMILIES + EXTRA + VERIFY).index(family))
         r = self.rng
         self.family = family
         self.N = 3 if seed % 2 == 0 else 5
@@ -409,6 +468,7 @@ class World:
         self.avail_flag = False
         self.leader_down = None
         self.stepped = False
+        self.handovers = []      # the verify family: real times of planned handovers
         self._plan()
 
     def _client(self, k):
@@ -435,6 +495,8 @@ class World:
             for _ in range(r.randint(1, 2)):
                 a = r.uniform(15_000, 140_000)
                 self.nodes[r.randrange(self.N)].down.append((a, a + 30_000))
+        if fam == 'handover':
+            self.handovers = sorted(r.uniform(15_000, 165_000) for _ in range(r.randint(2, 6)))
         if fam == 'jump2':
             # beyond the premise: two nodes' clocks jump the same way (a
             # majority of a 3-node group); reported, not a check
@@ -484,6 +546,14 @@ class World:
         w = self.wall(st)
         return 2 * sum(1 for x in rs if abs(x - w) > limit) > len(rs)
 
+    def scattered(self, st, limit):
+        """median+g's guard: fewer than a majority of the clocks this node
+        knows (own included, readings carried forward) within `limit` of
+        their median."""
+        xs = [v[0] + (self.mono(st) - v[1]) for v in self.readings(st)] + [self.wall(st)]
+        m = median(xs)
+        return 2 * sum(1 for x in xs if abs(x - m) <= limit) <= len(xs)
+
     def peer_median(self, st):
         rs = [v[0] + (self.mono(st) - v[1]) for v in self.readings(st)]
         return median(rs) if rs else self.wall(st)
@@ -505,6 +575,7 @@ class World:
         t = self.stamp(L)
         if t < self.last_t:
             self.res['back'] += 1
+            self.res['back_max'] = max(self.res.get('back_max', 0.0), self.last_t - t)   # read by verify.py only
         self.last_t = t
         self.t_now = t
         e = dict(kind=kind, t=t, tau=self.tau, idx=len(self.log), **kw)
@@ -533,6 +604,9 @@ class World:
                         self.lose_leader()
                         self.stepped = True
                         working = False
+            if working and self.handovers and self.tau >= self.handovers[0]:
+                self.handovers.pop(0)
+                L = self.handover(L)
             if working:
                 if self.tau >= next_row:
                     d = TTLS[rid % 2]
@@ -596,7 +670,7 @@ class World:
         good = [n for n in cands if self.c.ok('stand', self, n, {})]
         # clamp: a skewed member only waits longer, so it can still lead when
         # it alone can win; hlc: a node off by more than max-offset never stands
-        pool = good or (cands if isinstance(self.opt, Clamp) else [])
+        pool = good or (cands if self.opt.STAND_ALONE else [])
         if not pool:
             return
         new = self.rng.choice(pool)
@@ -606,6 +680,24 @@ class World:
         self.leader = new.i
         self.leader_down = None
         self.stepped = False
+        self._installed(new)
+
+    def handover(self, L):
+        """A planned handover (the verify family): the leader stamps its last
+        entry, gives leadership to another member that may stand, and the new
+        leader stamps its first entry in the same tick (E-13 measured about
+        10 ms for etcd's move-leader, far below one tick)."""
+        cands = [n for n in self.nodes if n is not L and self.alive(n) and self.c.ok('stand', self, n, {})]
+        if not cands:
+            return L
+        self.append('handover')
+        new = self.rng.choice(cands)
+        self.leader = new.i
+        self._installed(new)
+        self.append('lead')
+        return new
+
+    def _installed(self, new):
         # the new leader holds every committed entry (leader completeness)
         for e in self.log:
             self.c.run('apply', self, new, {'t': e['t']}, {})
@@ -835,6 +927,6 @@ if __name__ == '__main__':
     ap.add_argument('--extra', action='store_true', help='also run the families beyond the premise (jump2)')
     a = ap.parse_args()
     m = Mutation(drop=a.drop, flip=a.flip)
-    fams = tuple(a.family) or (FAMILIES + EXTRA if a.extra else FAMILIES)
+    fams = tuple(a.family) or (FAMILIES + EXTRA if a.extra else FAMILIES)   # the verify family: --family handover
     r = sweep(a.option, a.seeds, m, fams)
     print(json.dumps({'option': a.option, 'seeds': a.seeds, 'mutation': repr(m), **r}, default=str))

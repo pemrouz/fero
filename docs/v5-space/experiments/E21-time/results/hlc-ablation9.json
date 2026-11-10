@@ -1,0 +1,371 @@
+{
+ "option": "hlc",
+ "seeds_per_family": 30,
+ "families": [
+  "drift",
+  "jumpL+",
+  "jumpL-",
+  "jumpF",
+  "pause",
+  "crash",
+  "mix",
+  "jump2",
+  "handover"
+ ],
+ "rules": [
+  {
+   "id": "stamp.hlc_max",
+   "kind": "update",
+   "role": "time",
+   "note": "l = max(l, clock)",
+   "cmp": null
+  },
+  {
+   "id": "stamp.never_back",
+   "kind": "update",
+   "role": "time",
+   "note": "never below the last t in the log",
+   "cmp": null
+  },
+  {
+   "id": "stamp.set_l",
+   "kind": "update",
+   "role": "time",
+   "note": "the stamp is the new l",
+   "cmp": null
+  },
+  {
+   "id": "send.send_max",
+   "kind": "update",
+   "role": "time",
+   "note": "on a send, l = max(l, clock)",
+   "cmp": null
+  },
+  {
+   "id": "recv.near",
+   "kind": "guard",
+   "role": "time",
+   "note": "refuse a reading more than max-offset ahead (CockroachDB)",
+   "cmp": "<="
+  },
+  {
+   "id": "recv.adopt",
+   "kind": "update",
+   "role": "time",
+   "note": "l = max(l, received l)",
+   "cmp": null
+  },
+  {
+   "id": "apply.apply",
+   "kind": "update",
+   "role": "time",
+   "note": "l = max(l, an applied entry's t)",
+   "cmp": null
+  },
+  {
+   "id": "selffence.far",
+   "kind": "guard",
+   "role": "elect",
+   "note": "a leader off by more than max-offset from most of its peers",
+   "cmp": null
+  },
+  {
+   "id": "selffence.stepdown",
+   "kind": "update",
+   "role": "elect",
+   "note": "steps down",
+   "cmp": null
+  },
+  {
+   "id": "stand.near",
+   "kind": "guard",
+   "role": "elect",
+   "note": "a node off by more than max-offset from most of its peers does not stand",
+   "cmp": null
+  },
+  {
+   "id": "expire.due",
+   "kind": "guard",
+   "role": "time",
+   "note": "a row ends when the HLC passes its ttl",
+   "cmp": ">="
+  },
+  {
+   "id": "expire.log",
+   "kind": "update",
+   "role": "log",
+   "note": "expiry is a record in the log, so every replica removes the row at one position",
+   "cmp": null
+  },
+  {
+   "id": "grant.lapsed",
+   "kind": "guard",
+   "role": "time",
+   "note": "a lease lapses when the HLC passes its end",
+   "cmp": ">="
+  },
+  {
+   "id": "pwrite.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "refuse a token below the highest the writer has seen",
+   "cmp": ">="
+  }
+ ],
+ "base": {
+  "early_wt": 0,
+  "early": 0,
+  "late": 0,
+  "lease": 0,
+  "stuck": 0,
+  "back": 0,
+  "agree": 0,
+  "stale": 0,
+  "avail": 0,
+  "overlap": 29,
+  "leaderless": 1544400.0,
+  "ERR": 0,
+  "late_max": 300.0,
+  "early_max": 200,
+  "first": null
+ },
+ "pass1": {
+  "stamp.hlc_max": null,
+  "stamp.never_back": null,
+  "stamp.set_l": null,
+  "send.send_max": [
+   "jumpL+",
+   23,
+   [
+    "late"
+   ]
+  ],
+  "recv.near": [
+   "jumpL+",
+   0,
+   [
+    "early"
+   ]
+  ],
+  "recv.adopt": null,
+  "apply.apply": null,
+  "selffence.far": [
+   "crash",
+   18,
+   [
+    "avail"
+   ]
+  ],
+  "selffence.stepdown": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stand.near": null,
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   6,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "removed": [
+  "stamp.hlc_max",
+  "stamp.set_l",
+  "recv.adopt",
+  "apply.apply",
+  "stand.near",
+  "send.send_max",
+  "recv.near"
+ ],
+ "kept": {
+  "stamp.never_back": [
+   "handover",
+   0,
+   [
+    "back"
+   ]
+  ],
+  "selffence.far": [
+   "crash",
+   18,
+   [
+    "avail"
+   ]
+  ],
+  "selffence.stepdown": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   0,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ]
+ },
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "stamp.never_back",
+   "caught": [
+    "handover",
+    0,
+    [
+     "back"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "selffence.far",
+   "caught": [
+    "crash",
+    18,
+    [
+     "avail"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "selffence.stepdown",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.due",
+   "caught": [
+    "drift",
+    0,
+    [
+     "early_wt",
+     "early"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.log",
+   "caught": [
+    "drift",
+    0,
+    [
+     "agree"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "grant.lapsed",
+   "caught": [
+    "drift",
+    0,
+    [
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pwrite.fence",
+   "caught": [
+    "drift",
+    17,
+    [
+     "stale"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "expire.due",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "grant.lapsed",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "pwrite.fence",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: read <-> never_back",
+   "caught": [
+    "drift",
+    0,
+    [
+     "ERR"
+    ]
+   ]
+  }
+ ],
+ "secs": 309
+}

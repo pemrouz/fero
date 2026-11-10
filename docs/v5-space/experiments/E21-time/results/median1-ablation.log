@@ -1,0 +1,24 @@
+# E-21 ablation median1, 30 seeds per family, 2026-11-10T01:20:26Z, Python 3.13.17, 4 vCPU, load 2.31 2.83 2.64
+median1 design: {"early_wt": 0, "early": 0, "late": 0, "lease": 0, "stuck": 0, "back": 0, "agree": 0, "stale": 0, "avail": 0, "overlap": 33, "leaderless": 77400.0, "ERR": 0, "late_max": 300.0, "early_max": 100, "first": null}
+  drop stamp.peers: None
+  drop stamp.extrap: ('drift', 0, ['late'])
+  drop stamp.median: ('jumpL+', 0, ['early', 'lease'])
+  drop stamp.never_back: None
+  drop expire.due: ('drift', 0, ['early_wt', 'early'])
+  drop expire.log: ('drift', 2, ['agree'])
+  drop grant.lapsed: ('drift', 0, ['lease'])
+  drop stand.near: None
+  drop pwrite.fence: ('drift', 17, ['stale'])
+  mutant drop stamp.extrap: {'kind': 'drop', 'rule': 'stamp.extrap', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop stamp.median: {'kind': 'drop', 'rule': 'stamp.median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant drop expire.due: {'kind': 'drop', 'rule': 'expire.due', 'caught': ('drift', 0, ['early_wt', 'early'])}
+  mutant drop expire.log: {'kind': 'drop', 'rule': 'expire.log', 'caught': ('drift', 2, ['agree'])}
+  mutant drop grant.lapsed: {'kind': 'drop', 'rule': 'grant.lapsed', 'caught': ('drift', 0, ['lease'])}
+  mutant drop pwrite.fence: {'kind': 'drop', 'rule': 'pwrite.fence', 'caught': ('drift', 17, ['stale'])}
+  mutant flip expire.due: {'kind': 'flip', 'rule': 'expire.due', 'caught': None, 'no_change': True}
+  mutant flip grant.lapsed: {'kind': 'flip', 'rule': 'grant.lapsed', 'caught': None, 'no_change': True}
+  mutant flip pwrite.fence: {'kind': 'flip', 'rule': 'pwrite.fence', 'caught': None, 'no_change': True}
+  mutant swap stamp: extrap <-> median: {'kind': 'swap', 'rule': 'stamp: extrap <-> median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+  mutant swap stamp: read <-> extrap: {'kind': 'swap', 'rule': 'stamp: read <-> extrap', 'caught': None, 'no_change': True}
+  mutant swap stamp: read <-> median: {'kind': 'swap', 'rule': 'stamp: read <-> median', 'caught': ('jumpL+', 0, ['early', 'lease'])}
+median1: kept 6 of 9; 139 s
