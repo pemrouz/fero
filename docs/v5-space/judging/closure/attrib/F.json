@@ -212,8 +212,20 @@
        "rlog"
       ],
       "D": [
+       "win"
+      ]
+     },
+     "v": "open",
+     "basis": "Re-ruled (RR-05): these rows carry both the dedup window and fence tokens. E-32 found a 6-step write that was both applied and told refused where the two meet; the fix was checked only with sessions, and E-32 says win rows owe the same rule by reasoning."
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "D": [
        "sess",
-       "win",
        "pid"
       ]
      },
@@ -477,11 +489,8 @@
        "rlog"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 1.44,
-     "basis": "AMENDMENTS 1.3, F-05's handover clause: etcd's own leader transfer pauses its group 9.7 to 9.8 ms at the median and 24 to 31 ms at worst on this disk, against 10 ms (TS) and 2 ms (native); a port of the same Raft can only approach that (E-13; gap from 24.4 ms against 10 ms). Restated as 'C plus the longest normal gap between commits plus 5 ms' it is open: the port's handover was not timed, and failover at E = 2 s with 0.25 E jitter sums to 2.5 s with no margin (reasoned, not run; at E = 1 s one native failover took 1.42 s against 1.25 s)"
+     "v": "open",
+     "basis": "Re-ruled (RR-01): E-13 is not a ceiling. The handover meets 10 ms at the median (9.7 and 9.8 ms); the 24 to 31 ms worst cases sit inside this disk's own stalls (22.9 ms in a quiet window with no handover), measured on etcd's Go server, not a port's floor. Earlier reason: AMENDMENTS 1.3, F-05's handover clause: etcd's own leader transfer pauses its group 9.7 to 9.8 ms at the median and 24 to 31 ms at worst on this disk, against 10 ms (TS) and 2 ms (native); a port of the same Raft can only approach that (E-13; gap from 24.4 ms against 10 ms). Restated as 'C plus the longest normal gap between commits plus 5 ms' it is open: the port's handover was not timed, and failover at E = 2 s with 0.25 E jitter sums to 2.5 s with no margin (reasoned, not run; at E = 1 s one native failover took 1.42 s against 1.25 s)"
     },
     {
      "when": {

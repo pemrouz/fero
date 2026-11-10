@@ -384,9 +384,18 @@
       "self+p",
       "self+mv"
      ]
+    },
+    {
+     "C": [
+      "self"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ]
     }
    ],
-   "basis": "C self+p (DRAFT, LANE, SPLIT), and COMP's self+mv, which owes the same hint path for DEP-17 (AMENDMENTS 4, footnote 15). CELL's plain self has no planner."
+   "basis": "C self+p (DRAFT, LANE, SPLIT), and COMP's self+mv, which owes the same hint path for DEP-17 (AMENDMENTS 4, footnote 15). CELL's plain self has no planner. Re-ruled (RM-05): CELL carries it too (V5-PRIMITIVE keeps planner hints as admin requests to the leader)."
   },
   {
    "key": "log-replicas",
@@ -485,11 +494,12 @@
    "when": [
     {
      "P": [
+      "split",
       "split+merge"
      ]
     }
    ],
-   "basis": "P split + merge only, as settled (PD). VERDICT section 10 asks to re-rule it onto SPLIT too; that would need a re-ruling file, not a change here."
+   "basis": "P split + merge only, as settled (PD). VERDICT section 10 asks to re-rule it onto SPLIT too; that would need a re-ruling file, not a change here. Re-ruled (rerulings.mech.json RM-01): SPLIT carries the merge too (SPACE 2 says split later merges; E-17b and AMENDMENTS 3 charge SPLIT for it)."
   },
   {
    "key": "range-table",
@@ -787,7 +797,8 @@
    "when": [
     {
      "S": [
-      "lsm"
+      "lsm",
+      "lsm +tier"
      ]
     }
    ],
@@ -801,7 +812,8 @@
       "jrnl +tier",
       "jrnl +tier(store)",
       "walg +tier",
-      "tier + obj"
+      "tier + obj",
+      "lsm +tier"
      ]
     }
    ],
@@ -1039,7 +1051,8 @@
       "jrnl +tier",
       "walg +tier",
       "walg",
-      "lsm"
+      "lsm",
+      "lsm +tier"
      ],
      "R": [
       "raft",

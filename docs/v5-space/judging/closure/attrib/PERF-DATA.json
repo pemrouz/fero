@@ -120,8 +120,8 @@
      "v": "fails",
      "depends_on": "PERF-01 losses",
      "alt": "open",
-     "gap": 0.33,
-     "basis": "the row's only durable rung is `persisted`, whose floor on this box is C = 0.73 ms (E-01). JetStream's default acks one publisher at p99 0.55 ms, below that floor (E-09b), so the default single-publisher row cannot be won, and PERF-01 allows no loss while the user's list of accepted losses is empty. The matched rows stay open (JetStream 1,228 acks a second, p99 1.31 ms)."
+     "gap": 0.39,
+     "basis": "Re-ruled (RR-04): still fails, on PERF-01's spread rule. A win needs a p99 below about 0.303 ms; the best case for a persisted 2-of-3 commit plus one hop is about 0.422 ms, sampled from E-01's fsync table (a ceiling, reasoned from measured parts). Gap 0.39. Earlier reason: the row's only durable rung is `persisted`, whose floor on this box is C = 0.73 ms (E-01). JetStream's default acks one publisher at p99 0.55 ms, below that floor (E-09b), so the default single-publisher row cannot be won, and PERF-01 allows no loss while the user's list of accepted losses is empty. The matched rows stay open (JetStream 1,228 acks a second, p99 1.31 ms)."
     }
    ],
    "else": {

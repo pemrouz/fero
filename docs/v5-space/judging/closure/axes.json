@@ -599,6 +599,7 @@
    "jrnl +tier",
    "jrnl +tier(store)",
    "lsm",
+   "lsm +tier",
    "obj",
    "theirs",
    "tier + obj",
@@ -690,7 +691,8 @@
   "F all(isolates)": "EMB-V8 footnote 10: data folds inside V8 isolates in the server.",
   "F ldr(app folds)": "SIDE footnote 11: the app's Node process folds for the groups its host leads; every app folds what it follows.",
   "Y fwd(local daemon)": "SIDE: writes go to the local daemon, which forwards.",
-  "Z par": "No judged row holds it. E-37 modelled it; AMENDMENTS 4 proposes COMP+par."
+  "Z par": "No judged row holds it. E-37 modelled it; AMENDMENTS 4 proposes COMP+par.",
+  "S lsm +tier": "No judged row holds it. An LSM store (PD's) with old data and snapshots also sent to an object store, as the review's PD+fix (TiKV's shape with fixes) needs. SPACE 2 S lists +tier as a modifier of a log store."
  },
- "search_options": "The closure search uses, on each axis, the tags some judged row holds, minus BUY's outside/theirs tags, plus Z par."
+ "search_options": "The closure search uses, on each axis, the tags some judged row holds, minus BUY's outside/theirs tags, plus two tags no judged row holds but the review priced: Z par (E-37) and S lsm +tier (PD+fix)."
 }
