@@ -1,0 +1,13 @@
+# saga fullundo: safety with tokens capped at 4 and one lock guard dropped (steal_check.py), 2026-11-10T02:05:45Z, Python 3.13.17, 4 vCPU, load 5.69 3.16 2.75
+fullundo, tokens capped at 4, the design, one: 13,373 states, 0.6s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, the design, two: 1,858 states, 0.1s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, the design, sub: 9,804 states, 0.5s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without claim.free, one: 338,998 states, 18.7s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without claim.free, two: 583,641 states, 41.1s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without claim.free, sub: 1,929,568 states, 143.5s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without giveup.lost, one: 274,728 states, 14.3s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without giveup.lost, two: 69,243 states, 4.4s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without giveup.lost, sub: 888,981 states, 60.6s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without backoff.blocked, one: 70,112 states, 3.4s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without backoff.blocked, two: 16,119 states, 0.9s: A1 and A2 hold in every reachable state (complete, hashed states)
+fullundo, tokens capped at 4, without backoff.blocked, sub: 116,153 states, 6.7s: A1 and A2 hold in every reachable state (complete, hashed states)

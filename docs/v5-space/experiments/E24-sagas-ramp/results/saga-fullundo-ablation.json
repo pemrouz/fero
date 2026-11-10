@@ -1,0 +1,4483 @@
+{
+ "bounds": [
+  "one",
+  "two",
+  "sub",
+  "three"
+ ],
+ "verify": [
+  "one2",
+  "two-f",
+  "sub-f"
+ ],
+ "pinned": [
+  "fail.count"
+ ],
+ "base": {
+  "one": {
+   "states": 13373,
+   "secs": 0.67,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    13373,
+    30319,
+    16752660660228932821
+   ],
+   "judged": {
+    "L1": [
+     13373,
+     0
+    ]
+   }
+  },
+  "two": {
+   "states": 1858,
+   "secs": 0.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1858,
+    2924,
+    16610041728439405759
+   ],
+   "judged": {
+    "L1": [
+     1858,
+     0
+    ]
+   }
+  },
+  "sub": {
+   "states": 9916,
+   "secs": 0.54,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    9916,
+    21142,
+    9420819810947607029
+   ],
+   "judged": {
+    "L1": [
+     9916,
+     0
+    ]
+   }
+  },
+  "three": {
+   "states": 391613,
+   "secs": 25.42,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    391613,
+    1035454,
+    6069146875685051968
+   ],
+   "judged": {
+    "L1": [
+     391613,
+     0
+    ]
+   }
+  }
+ },
+ "verify_undecided": [
+  "sub-f",
+  "LIMIT",
+  3000001,
+  [
+   "LIMIT"
+  ]
+ ],
+ "greedy": [
+  [
+   "begin.holds0",
+   "dropped"
+  ],
+  [
+   "begin.holdsN",
+   "dropped"
+  ],
+  [
+   "begin.pc",
+   "dropped"
+  ],
+  [
+   "adopt.noother",
+   "dropped"
+  ],
+  [
+   "backoff.seq",
+   "dropped"
+  ],
+  [
+   "backoff.holds0",
+   "dropped"
+  ],
+  [
+   "backoff.holdsN",
+   "dropped"
+  ],
+  [
+   "backoff.pc",
+   "dropped"
+  ],
+  [
+   "skip.seq",
+   "dropped"
+  ],
+  [
+   "step.raise",
+   "dropped"
+  ],
+  [
+   "fail.fence",
+   "dropped"
+  ],
+  [
+   "decide.holds0",
+   "kept: with the others dropped it breaks A1 on sub in 13 steps"
+  ],
+  [
+   "decide.intent",
+   "kept: with the others dropped it breaks A1 on one in 15 steps"
+  ],
+  [
+   "undo.fence",
+   "dropped"
+  ],
+  [
+   "begin.tgt",
+   "dropped in the final pass"
+  ],
+  [
+   "retry.noother",
+   "dropped in the final pass"
+  ],
+  [
+   "retry.pc",
+   "dropped in the final pass"
+  ],
+  [
+   "begin.seq",
+   "dropped in the final pass"
+  ],
+  [
+   "retry.seq",
+   "dropped in the final pass"
+  ],
+  [
+   "skip.pc",
+   "dropped in the final pass"
+  ],
+  [
+   "skip.ended",
+   "dropped in the final pass"
+  ]
+ ],
+ "removed": [
+  "begin.holds0",
+  "begin.holdsN",
+  "begin.pc",
+  "adopt.noother",
+  "backoff.seq",
+  "backoff.holds0",
+  "backoff.holdsN",
+  "backoff.pc",
+  "skip.seq",
+  "step.raise",
+  "fail.fence",
+  "undo.fence",
+  "begin.tgt",
+  "retry.noother",
+  "retry.pc",
+  "begin.seq",
+  "retry.seq",
+  "skip.pc",
+  "skip.ended"
+ ],
+ "put_back": [],
+ "minimal": {
+  "one": {
+   "states": 12419,
+   "secs": 0.69,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    12419,
+    29506,
+    16888103326883526399
+   ],
+   "judged": {
+    "L1": [
+     12419,
+     0
+    ]
+   }
+  },
+  "two": {
+   "states": 3192,
+   "secs": 0.21,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3192,
+    6733,
+    6601466554026589864
+   ],
+   "judged": {
+    "L1": [
+     3192,
+     0
+    ]
+   }
+  },
+  "sub": {
+   "states": 27054,
+   "secs": 2.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    27054,
+    72594,
+    9652756369722866232
+   ],
+   "judged": {
+    "L1": [
+     27054,
+     0
+    ]
+   }
+  },
+  "three": {
+   "states": 342808,
+   "secs": 23.16,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    342808,
+    958572,
+    9372605008427001020
+   ],
+   "judged": {
+    "L1": [
+     342808,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "one2": {
+   "states": 293460,
+   "secs": 18.25,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    293460,
+    824286,
+    17605090204038653442
+   ],
+   "judged": {
+    "L1": [
+     293460,
+     0
+    ]
+   }
+  },
+  "two-f": {
+   "states": 2432844,
+   "secs": 228.56,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2432844,
+    7299730,
+    10434500637902049557
+   ],
+   "judged": {
+    "L1": [
+     2432844,
+     0
+    ]
+   }
+  },
+  "sub-f": {
+   "states": 3000001,
+   "secs": 262.31,
+   "complete": false,
+   "fail": {},
+   "digest": [
+    3000001,
+    9694905,
+    7830560454144225024
+   ],
+   "judged": {}
+  }
+ },
+ "rules": [
+  {
+   "id": "claim.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "claim the locks in key order, one at a time",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "claim.free",
+   "kind": "guard",
+   "role": "lock",
+   "note": "a claim succeeds only if the lock is absent or its lease lapsed",
+   "cmp": null,
+   "alone": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "claim.lock",
+   "kind": "update",
+   "role": "lock",
+   "note": "the lock row: a new version (the token), this holder",
+   "cmp": null,
+   "alone": [
+    "one",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "claim.tok",
+   "kind": "update",
+   "role": "lock",
+   "note": "the holder keeps the token",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "claim.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "begin.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    3,
+    [
+     "L1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "begin.absent",
+   "kind": "guard",
+   "role": "intent",
+   "note": "write the intent only if none exists (if: absent)",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    11,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    16,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "1",
+     "0"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "begin.noother",
+   "kind": "guard",
+   "role": "own",
+   "note": "F3: no other unit is unfinished on my partitions",
+   "cmp": null,
+   "alone": [
+    "two",
+    "A2",
+    17,
+    [
+     "A2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "A2",
+    13,
+    [
+     "A2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "begin.holds0",
+   "kind": "guard",
+   "role": "fence",
+   "note": "an intent write carries the first lock's token; M refuses one below the lock's version",
+   "cmp": ">=",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "begin.holdsN",
+   "kind": "guard",
+   "role": "fence",
+   "note": "... and the other locks' tokens",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "begin.intent",
+   "kind": "update",
+   "role": "intent",
+   "note": "the intent row: run",
+   "cmp": null,
+   "alone": [
+    "two",
+    "A2",
+    17,
+    [
+     "A2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "begin.tgt",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    4,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "begin.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "adopt.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    10,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.unfin",
+   "kind": "guard",
+   "role": "intent",
+   "note": "a later holder that finds the intent continues it",
+   "cmp": null,
+   "alone": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.noother",
+   "kind": "guard",
+   "role": "own",
+   "note": "F3: no other unit is unfinished on my partitions",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "adopt.tgt",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    8,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    5,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.pc",
+   "kind": "update",
+   "role": "recover",
+   "note": "continue in the recorded direction",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "other.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "other",
+     "(('h', 2), ('v', 2))"
+    ]
+   ]
+  },
+  {
+   "id": "other.unfin",
+   "kind": "guard",
+   "role": "own",
+   "note": "F3: another unit's unfinished intent on my partitions",
+   "cmp": null,
+   "alone": [
+    "two",
+    "A2",
+    14,
+    [
+     "A2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "A2",
+    11,
+    [
+     "A2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "other",
+     "(('h', 1), ('v', 1))"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "other.tgt",
+   "kind": "update",
+   "role": "own",
+   "note": "F3: resolve it first, with my tokens",
+   "cmp": null,
+   "alone": [
+    "two",
+    "ERR",
+    8,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "ERR",
+    5,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "other.pc",
+   "kind": "update",
+   "role": "recover",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L1",
+    2,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "backoff.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "backoff.blocked",
+   "kind": "guard",
+   "role": "own",
+   "note": "F3: an unfinished unit on my partitions that needs locks I do not hold",
+   "cmp": null,
+   "alone": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "LIMIT",
+    3000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "backoff.holds0",
+   "kind": "guard",
+   "role": "fence",
+   "note": "an intent write carries the first lock's token; M refuses one below the lock's version",
+   "cmp": ">=",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "backoff.holdsN",
+   "kind": "guard",
+   "role": "fence",
+   "note": "... and the other locks' tokens",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "backoff.release",
+   "kind": "update",
+   "role": "own",
+   "note": "release my locks (only rows I still hold) so its holder can finish it",
+   "cmp": null,
+   "alone": [
+    "sub",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "sub",
+    "L1",
+    2,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "backoff.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "retry.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    2,
+    [
+     "L1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "retry.noother",
+   "kind": "guard",
+   "role": "own",
+   "note": "F3: no other unit is unfinished on my partitions",
+   "cmp": null,
+   "alone": [
+    "sub",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "retry.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "sub",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "skip.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "skip.ended",
+   "kind": "guard",
+   "role": "intent",
+   "note": "a unit already ended runs once only",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "skip.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L1",
+    8,
+    [
+     "L1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "step.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "step",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "step.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "the writer refuses a token below the highest it has seen for the partition's lock",
+   "cmp": ">=",
+   "alone": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "step.data",
+   "kind": "update",
+   "role": "data",
+   "note": "push the unit id if absent",
+   "cmp": null,
+   "alone": [
+    "one",
+    "A1",
+    6,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    7,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "step.raise",
+   "kind": "update",
+   "role": "fence",
+   "note": "the write raises the partition's fence to its token",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "step.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "fail.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "fail.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "the writer refuses a token below the highest it has seen for the partition's lock",
+   "cmp": ">=",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "fail.count",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "fail.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "decide.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "decide",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "decide.holds0",
+   "kind": "guard",
+   "role": "fence",
+   "note": "an intent write carries the first lock's token; M refuses one below the lock's version",
+   "cmp": ">=",
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "a2"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "decide.holdsN",
+   "kind": "guard",
+   "role": "fence",
+   "note": "... and the other locks' tokens",
+   "cmp": null,
+   "alone": [
+    "sub",
+    "L1",
+    23,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "decide.intent",
+   "kind": "update",
+   "role": "intent",
+   "note": "record undo before compensating",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "1",
+     "0"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "decide.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "undo.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "undo",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "undo.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "the writer refuses a token below the highest it has seen for the partition's lock",
+   "cmp": ">=",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "undo.data",
+   "kind": "update",
+   "role": "data",
+   "note": "remove the unit id",
+   "cmp": null,
+   "alone": [
+    "one",
+    "A1",
+    9,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    10,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "undo.raise",
+   "kind": "update",
+   "role": "fence",
+   "note": "the write raises the partition's fence to its token",
+   "cmp": null,
+   "alone": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "undo.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "giveup.lost",
+   "kind": "guard",
+   "role": "lock",
+   "note": "a holder whose lock has a newer version (it was refused fenced) stops",
+   "cmp": null,
+   "alone": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "giveup.release",
+   "kind": "update",
+   "role": "lock",
+   "note": "and releases the rows it still holds",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "giveup.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "the app calls saga(steps, { id }) again until it gets an answer",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "b1"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "crash",
+     "a1"
+    ]
+   ]
+  },
+  {
+   "id": "close.seq",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "close.holds0",
+   "kind": "guard",
+   "role": "fence",
+   "note": "an intent write carries the first lock's token; M refuses one below the lock's version",
+   "cmp": ">=",
+   "alone": [
+    "sub",
+    "A1",
+    12,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "a2"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "close.holdsN",
+   "kind": "guard",
+   "role": "fence",
+   "note": "... and the other locks' tokens",
+   "cmp": null,
+   "alone": [
+    "sub",
+    "A1",
+    12,
+    [
+     "A1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "close.intent",
+   "kind": "update",
+   "role": "intent",
+   "note": "record done or undone (kept, so a retry runs once)",
+   "cmp": null,
+   "alone": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "close.pc",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "final_trace": []
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "claim.seq",
+   "caught": [
+    "one",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "claim.free",
+   "caught": null,
+   "undecided": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "claim.lock",
+   "caught": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "claim.tok",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "claim.pc",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "begin.absent",
+   "caught": [
+    "one",
+    "A1",
+    16,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "1",
+     "0"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "begin.noother",
+   "caught": [
+    "two",
+    "A2",
+    13,
+    [
+     "A2"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "begin.intent",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.seq",
+   "caught": [
+    "one",
+    "A1",
+    10,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.unfin",
+   "caught": [
+    "one",
+    "A1",
+    14,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.tgt",
+   "caught": [
+    "one",
+    "ERR",
+    5,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.pc",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "other.seq",
+   "caught": [
+    "two",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "other",
+     "(('h', 2), ('v', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "other.unfin",
+   "caught": [
+    "two",
+    "A2",
+    11,
+    [
+     "A2"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "other",
+     "(('h', 1), ('v', 1))"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "other.tgt",
+   "caught": [
+    "two",
+    "ERR",
+    5,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "other.pc",
+   "caught": [
+    "two",
+    "L1",
+    2,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "backoff.blocked",
+   "caught": null,
+   "undecided": [
+    "one",
+    "LIMIT",
+    3000002,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "backoff.release",
+   "caught": [
+    "sub",
+    "L1",
+    2,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "step.seq",
+   "caught": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "step",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "step.fence",
+   "caught": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "step.data",
+   "caught": [
+    "one",
+    "A1",
+    7,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "step.pc",
+   "caught": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "fail.seq",
+   "caught": [
+    "one",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "fail.pc",
+   "caught": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "decide.seq",
+   "caught": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "decide",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "decide.holds0",
+   "caught": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "a2"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "decide.holdsN",
+   "caught": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "decide.intent",
+   "caught": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "1",
+     "0"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "decide.pc",
+   "caught": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "undo.seq",
+   "caught": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "undo",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "undo.data",
+   "caught": [
+    "one",
+    "A1",
+    10,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "undo.raise",
+   "caught": [
+    "one",
+    "A1",
+    15,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "undo.pc",
+   "caught": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "giveup.lost",
+   "caught": null,
+   "undecided": [
+    "one",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "giveup.release",
+   "caught": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "giveup.pc",
+   "caught": [
+    "one",
+    "L1",
+    4,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "b1"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "crash",
+     "a1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "close.seq",
+   "caught": [
+    "one",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "close.holds0",
+   "caught": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "lapse",
+     "a2"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 1),)"
+    ],
+    [
+     "decide",
+     "(('h', 0),)"
+    ],
+    [
+     "undo",
+     "(('h', 0),)"
+    ],
+    [
+     "close",
+     "(('h', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "close.holdsN",
+   "caught": [
+    "sub",
+    "A1",
+    13,
+    [
+     "A1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "lapse",
+     "a1"
+    ],
+    [
+     "claim",
+     "(('h', 1),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "adopt",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 1),)"
+    ],
+    [
+     "topup",
+     "2",
+     "0"
+    ],
+    [
+     "step",
+     "(('h', 0),)"
+    ],
+    [
+     "decide",
+     "(('h', 1),)"
+    ],
+    [
+     "undo",
+     "(('h', 1),)"
+    ],
+    [
+     "close",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "close.intent",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "close.pc",
+   "caught": [
+    "two",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "step.fence",
+   "caught": [
+    "sub",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 1),)"
+    ],
+    [
+     "other",
+     "(('h', 0), ('v', 2))"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "decide.holds0",
+   "caught": [
+    "one",
+    "L1",
+    5,
+    [
+     "L1"
+    ]
+   ],
+   "trace": [
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "claim",
+     "(('h', 0),)"
+    ],
+    [
+     "begin",
+     "(('h', 0),)"
+    ],
+    [
+     "adopt",
+     "(('h', 0),)"
+    ],
+    [
+     "fail",
+     "(('h', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "close.holds0",
+   "caught": [
+    "one",
+    "L1",
+    0,
+    [
+     "L1"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "claim: lock <-> tok",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "claim: lock <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "claim: tok <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "adopt: tgt <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "other: tgt <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "step: data <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "decide: intent <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "undo: data <-> raise",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "undo: data <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "undo: raise <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "giveup: release <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  },
+  {
+   "kind": "swap",
+   "rule": "close: intent <-> pc",
+   "caught": null,
+   "was_undecided": [
+    "sub-f",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "equivalent": true,
+   "resolved_by": "resolve24.py: the same state digest as the smallest model on every bound; on sub-f both runs stop at the state limit with the same first 3,000,001 states"
+  }
+ ],
+ "option": "fullundo",
+ "secs": 1018,
+ "resolved": 12
+}
