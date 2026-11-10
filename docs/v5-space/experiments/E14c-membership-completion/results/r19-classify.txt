@@ -1,0 +1,11 @@
+# tools/classify.py on design-m3-t5 (judged at term 3)
+stuck with a live majority, judged at term <= 3: 812
+  candidate  812
+  nonvoter   0
+  other      0
+
+# tools/classify.py on r19-m3-t5 (judged at term 3)
+stuck with a live majority, judged at term <= 3: 6340
+  candidate  1990
+  nonvoter   4350
+  other      0

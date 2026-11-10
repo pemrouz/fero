@@ -1,0 +1,37 @@
+Error: Invariant MoreThanOneLeaderInv is violated.
+(v<t> = an empty entry of term t; x<t> = a client entry; C<t>:{...} = a configuration entry of term t with those voters)
+1 <Initial predicate>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 2, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2 >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2 >> )
+    applied config ( s1 [V{s1, s2, s3} L{}], s2 [V{s1, s2, s3} L{}], s3 [V{s1, s2, s3} L{}] )
+2 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 2, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2 >> )
+6 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 2, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s2 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s3 :> << C1:{s1, s2, s3}, v2 >> )
+14 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+16 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 0 | voted (s1 s1, s2 s1, s3 s1)
+    applied config ( s1 [V{s1, s3} L{}], s2 [V{s1, s2, s3} L{}], s3 [V{s1, s2, s3} L{}] )
+18 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Follower, s2 Follower, s3 Follower) | term (s1 2, s2 2, s3 2) | commit (s1 3, s2 2, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s1, s3 s1)
+19 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 2) | commit (s1 3, s2 2, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s1)
+24 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 Nil)
+26 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+29 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Follower, s2 Candidate, s3 Follower) | term (s1 2, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+30 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Candidate, s2 Candidate, s3 Follower) | term (s1 3, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s2)
+35 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Candidate, s2 Candidate, s3 Follower) | term (s1 3, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s1)
+38 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Candidate, s3 Follower) | term (s1 3, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, v3 >> | s2 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s3 :> << C1:{s1, s2, s3}, v2 >> )
+40 <CNext line 85, col 10 to line 85, col 28 of module MCferoc>
+    role (s1 Leader, s2 Leader, s3 Follower) | term (s1 3, s2 3, s3 3) | commit (s1 3, s2 2, s3 2) | up {s1, s2, s3} | faults 1 | voted (s1 s1, s2 s2, s3 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, v3 >> | s2 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, v3 >> | s3 :> << C1:{s1, s2, s3}, v2 >> )
