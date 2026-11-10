@@ -63,7 +63,27 @@ def settled(group):
                     if f in x['to'] and x['to'][f] is None:
                         c.pop(f, None)
                 cells[k] = c
+    for nm, h in hybrid_cards().items():
+        for c in h['cells']:
+            if c['group'] == group:
+                cells[(c['req'], c['part'], nm)] = c
     return cells
+
+
+def hybrid_cards():
+    """Rows the closure pass judged (judging/closure/hybrids/cards.json): each with its options, its full card
+    (every cell: predicted from the judged rows, or settled by the closure judges) and its mechanisms."""
+    p = os.path.join(CL, 'hybrids', 'cards.json')
+    return load(p)['rows'] if os.path.exists(p) else {}
+
+
+def all_rows(ax=None):
+    """The judged rows' options: the 20 of the study, then the closure pass's judged rows."""
+    ax = ax or axes()
+    rows = dict(ax['rows'])
+    for nm, h in hybrid_cards().items():
+        rows[nm] = h['vec']
+    return rows
 
 
 def matches(vec, when):
@@ -119,7 +139,7 @@ def check(group, quiet=False):
                 bad = [t for t in tags if t not in ax['options'].get(a, [])]
                 if bad:
                     errs.append('%s %s: tags %s are not options of %s (axes.json)' % (k[0], k[1], bad, a))
-        for row, vec in ax['rows'].items():
+        for row, vec in all_rows(ax).items():
             want = norm(cells[(k[0], k[1], row)])
             pr = predict_part(p, vec, row)
             if pr is None:
@@ -130,7 +150,7 @@ def check(group, quiet=False):
                 errs.append('%s %s %s: rule %s gives %s, settled is %s' % (k[0], k[1], row, pr['_rule'], have, want))
     nover = sum(len(p.get('overrides') or {}) for p in got.values())
     if not quiet or errs:
-        print('%s: %d parts, %d cells, %d overrides, %d mismatches' % (group, len(parts), len(parts) * len(ax['rows']), nover, len(errs)))
+        print('%s: %d parts, %d cells, %d overrides, %d mismatches' % (group, len(parts), len(parts) * len(all_rows(ax)), nover, len(errs)))
         for e in errs[:80]:
             print('  -', e)
     return len(errs)
@@ -161,8 +181,18 @@ def mech_rows():
                 if row not in m['rows']:
                     m['rows'] = m['rows'] + [row]
             m['rows'] = [r for r in m['rows'] if r not in x.get('drop_rows', [])]
-            if 'novel' in x:
+            if 'novel' in x and x['novel'] is not None:
                 m['novel'] = x['novel']
+        for x in load(rr).get('new', []) or []:
+            ms[x['key']] = dict(x)
+    for nm, h in hybrid_cards().items():
+        for k in h['mechs']:
+            if k in ms and nm not in ms[k]['rows']:
+                ms[k]['rows'] = ms[k]['rows'] + [nm]
+        for x in h.get('new_mechs', []):
+            if x['key'] not in ms:
+                ms[x['key']] = dict(x, rows=[])
+            ms[x['key']]['rows'] = ms[x['key']]['rows'] + [nm]
     return ms
 
 
@@ -182,7 +212,7 @@ def check_mech(quiet=False):
         if k not in ms:
             errs.append('%s: not in judging/mechanisms.json' % k)
             continue
-        for row, vec in ax['rows'].items():
+        for row, vec in all_rows(ax).items():
             want = row in ms[k]['rows']
             have = carries(e, vec)
             if want != have:
@@ -251,7 +281,7 @@ class Model:
         ms = mech_rows()
         self.mech = [(e, ms[e['key']]) for e in mech()['mechanisms']]
         self.cons = cons()
-        self.judged = self.ax['rows']
+        self.judged = all_rows(self.ax)
         self._pairs = {}
 
     def cell(self, p, vec):
@@ -371,7 +401,7 @@ class Search:
         self.scenario, self.choice, self.only_req = scenario, choice, only_req
         self.res = {}       # key -> result
         self.broken = 0
-        self.judged_keys = {self.key(v): r for r, v in ax['rows'].items()}
+        self.judged_keys = {self.key(v): r for r, v in all_rows(ax).items()}
 
     def key(self, vec):
         return tuple(vec[a] for a in self.axes)
