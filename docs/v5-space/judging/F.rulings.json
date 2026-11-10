@@ -1,0 +1,349 @@
+[
+ {
+  "req": "F-01",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I confirmed it in v4's own sim (sim/scale-probes.test.ts, 'short lane (durable)', pinned red today; STATUS.md). Step 1: n02 writes row x and leaves; n01 removes x and then writes 100 rows of its own. Step 2: tombstone GC and compaction drop the remove from n01's lane, but n02's old write stays the last entry of its lane on every disk. Step 3: n01 restarts from its own disk and shows x again. So an acknowledged remove does not survive a restart, and v4 takes no fix (AMENDMENTS 3). Judge 1 looked only at the stranded commit.",
+  "proof": "structural"
+ },
+ {
+  "req": "F-03",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1's verdict stands, but on steps I confirmed in v4's code, not on its steps 2 and 3 (STATUS.md says a minority is read-only, and the stranded commit is one writer after another). Step 1: v4's own monitor asks for one writer per partition per epoch only, and exempts epoch 0 by design: 'open genesis is multi-writer LWW' (sim/monitors.ts). Step 2: an owner commits alone, before any other member holds the write, whenever its own link table shows a majority (kernel/membership.ts `gate`; STATUS.md: 'no other node ever held the first commit'). Step 3: so no lease and no majority round orders an old owner's last commit before the new owner's first one once the others vote it out. So more than one writer can commit to a partition at a time; judge 2's 'one owner per view' is true per view only.",
+  "proof": "structural"
+ },
+ {
+  "req": "F-04",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I confirmed it in sim/scale-probes.test.ts ('zombie lane', pinned red today; STATUS.md). Step 1: n04 commits x = v2 as its links sever, and is voted out. Step 2: n01 removes x at epoch 2; readers on n01, n02 and n03 see it gone, and the three collect the tombstone. Step 3: the link heals, the three take n04's older write and show v2 again, while n04, which showed v2, shows nothing. So readers saw a write that later disappeared, on both sides. Judge 1 held it open because no run in this study judged it; v4's own pinned test does.",
+  "proof": "structural"
+ },
+ {
+  "req": "F-09",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I checked the code. Step 1: v4 prints a stderr line only for a door or contract refusal, a cut write loop and a fault in user code (api/index.ts); a name refusal prints nothing since V4-3. Step 2: a member that turns read-only as `minority` or `held` only flips the `writable` row of `cluster`, and a first view that waits on a dead static host says nothing at all (STATUS.md: 'silently'; kernel/node.ts: a target that never answers is not counted out and not said). Step 3: so a loss of writability can last for good with no stderr line naming the cause and the fix, which fails F-09's test for that kind and its silent-wait monitor. Judge 1 said this was not checked; it is now.",
+  "proof": "structural"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "V4",
+  "v": "open",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 is right: judge 2's two steps do not show a failed rejoin of a member that was only cut off. The 10 schedules that stay wedged are clean-stop schedules with a cut or a restart in them (sim/leave-sweep.test.ts, family 2: pairs cut apart inside the leave window, a leaver whose vote is needed, a leaver restarted from its dir), which is F-07's ground. In the pinned zombie case the cut-off member comes back by itself; what goes wrong is the data, which F-01, F-04 and F-08 already count. No v4 run judges plain partitions from 10 s to 1 h.",
+  "closes": "v4's own sweeps with partitions from 10 s to 1 h and no clean stop in them; not planned (a reference row)"
+ },
+ {
+  "req": "F-19",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "basis": "measured",
+  "ev": [
+   "E-44"
+  ],
+  "why": "Judge 1 is right. F-19 says a kill that fails over 1,000 groups at once must meet F-05, and both judges already fail BUY on F-05: one JetStream stream took 5.2, 5.4 and 7.2 s to take writes again, against 2.5 s (E-44, measured), on an election timer that is JetStream's own. A thousand streams at once run on the same timer, so they cannot be faster than one (reasoned). Judge 2 judged the overload clause only.",
+  "proof": "ceiling",
+  "gap": 1.08
+ },
+ {
+  "req": "F-21",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I checked the code. Step 1: v4's members compare lane digests only; its rolling state hash is read by the simulator and the debugger, never compared between members (kernel/node.ts `stateHash`, kernel/diag.ts). Step 2: copies whose lanes pass the digests can still show different rows: after a fresh member's seed, three members show a deleted row and the fourth does not, at one writable view, in 2 runs of 2 (STATUS.md). Step 3: no health row and no stderr line follows. So a divergence of the fold is not caught, and the check as worded needs a leader and a committed offset, which R `lww` and O `lamp` do not have. Judge 1 named the same facts and stopped at open.",
+  "proof": "structural"
+ },
+ {
+  "req": "F-01",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-29",
+   "E-14c",
+   "E-37"
+  ],
+  "why": "Judge 1's verdict stands, for its second reason only. Judge 2 is right that one bad entry is F-22's fault, not F-01's (F-10 says so), and that Raft's commit rule keeps a synced entry (E-14c, by reasoning for raft-rs). But F-01 also needs the store to give back after a power cut what it synced: E-29's journal lost an acknowledged batch in 2 of 1,200 rounds through a recovery bug, though it synced before it answered. PD's store is an LSM and no experiment ran it (AMENDMENTS 2, S: '`lsm`: no experiment'); both judges hold F-20 open for PD on the same ground.",
+  "closes": "a LazyFS power-loss run on an LSM store with PD's sync settings; none is planned"
+ },
+ {
+  "req": "F-02",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-20"
+  ],
+  "why": "Judge 1 is right. E-20's world is three abstract Raft groups: a crash deposes a leader and the new one keeps the committed log. `pid` holds there with A-22's two fixes (16 rules). ISR's own leader change (the in-sync set, leader epochs, a controller) was never modelled, and both judges hold F-01 and F-03 open for ISR for that reason. An attempt cannot be shown to land once across a failover that is itself not shown; judge 2 left the default.",
+  "closes": "a model of the in-sync-set leader change under E-20's scenarios; none is planned"
+ },
+ {
+  "req": "F-02",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-20",
+   "E-28"
+  ],
+  "why": "Judge 1 is right. `sess` holds in E-20's model, whose groups are Raft. OBJ changes writers by a lease and a compare-and-swap on the manifest, which no experiment modelled (E-28 timed the PUT only), and both judges hold F-03 open for OBJ. E-20's own line moves OBJ up on F-02; it does not show it. Judge 2 left the default.",
+  "closes": "a model of the lease and manifest compare-and-swap under E-20's scenarios, with a paused old writer; none is planned"
+ },
+ {
+  "req": "F-02",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-20"
+  ],
+  "why": "Judge 1 is right. `win` holds in E-20's model (17 rules, 19 under `fwd`), whose groups are Raft. SLOG changes writers by a seal and a metadata compare-and-swap, never modelled; a late append by the old writer is the case that matters. Both judges hold F-01 and F-03 open for SLOG on this; judge 2 left the default.",
+  "closes": "a model of the seal and writer change under E-20's scenarios; none is planned"
+ },
+ {
+  "req": "F-02",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-20",
+   "E-22"
+  ],
+  "why": "Judge 1 is right. E-20's rules hold for SIDE's writes (`sess`, 14 rules under `fwd`). But SIDE runs each call at its partition's leader (U `ldr`), and SPACE counts one novel rule there: calls in flight across a handover. No experiment modelled it: E-20 reasons about a re-run as a late resend, and E-22 ran calls at the writer across a failover only to judge check-then-set. F-02 names method re-runs, so this row's own rule must be shown before it is met.",
+  "closes": "an E-20-style model of a call in flight across a handover under U `ldr`; none is planned"
+ },
+ {
+  "req": "F-04",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-31"
+  ],
+  "why": "Judge 1 is right. E-31's model takes the committed log as given: a group with a leader and a follower, where a crash loses only the uncommitted tail. SLOG's own log, a write quorum of log nodes changed by a seal and a metadata compare-and-swap, was never modelled, and both judges hold F-01 open for SLOG. A reader's view cannot be shown to be a prefix of a committed log that is itself not shown; judge 2 held ISR and OBJ open on this ground and left SLOG at the default.",
+  "closes": "a model of the seal and compare-and-swap that says which entries a reader may be served, then E-31's bounds on it; none is planned"
+ },
+ {
+  "req": "F-11",
+  "part": "M",
+  "row": "BUY",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-44"
+  ],
+  "why": "Judge 1 is right. Three nats-server processes with three file replicas and an fsync before each ack lost none of 900 acknowledged writes through a kill of the stream's leader (E-44, measured on the real system). Judge 2 held it open because the two-machine health line is not built; but no row has built or tested that line, and both judges met the other rows without it, so like is treated alike."
+ },
+ {
+  "req": "F-12",
+  "part": "M",
+  "row": "OBJ",
+  "v": "met",
+  "basis": "construction",
+  "ev": [],
+  "why": "Judge 2 is right. OBJ has no voters at all: a commit is an object in the store, the writer is whoever holds the lease, and the controller is a compare-and-swap on the manifest (SPACE 4.1: R `obj`, V `tier`, no Raft core). So no majority can be lost and the command has nothing to do: it holds by construction, as F-15 does for PD and F-14 for SRV, which both judges met the same way. Judge 1's default speaks of dropped voters and unclean recovery, which do not arise here; a store that loses objects is F-15's and the restore's ground."
+ },
+ {
+  "req": "F-14",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-03",
+   "E-07"
+  ],
+  "why": "Judge 2 is right. E-07's stall test ran a Node kernel on a worker, and its closing line names the M `kw` rows, not EMB-V8. EMB-V8 runs `data`, methods and rules in V8 isolates inside a Rust server, and E-03 only timed calls into an isolate (2.6 ns an op): no stall and no throw was injected, and where a writer rule or a condition waits on an isolate is not written. Separate threads alone are a promise: E-34 found 0.25 to 0.49 s pauses on a kernel worker that looked separate too.",
+  "closes": "a 5 s isolate stall, a slow writer rule and a throw on E-03's deno_core prototype, with a kernel thread beside it"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-16",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-16",
+   "E-14c",
+   "E-13"
+  ],
+  "why": "Judge 1 is right. The rejoin is shown only in part: E-16's model cuts members off and heals them with no operator step (4 members, up to two faults, both healing options live), but its Raft is abstract and catch-up is one step; E-14c runs etcd's own spec, leaves out 'partitions as such', and its full runs did not finish (G-10). The second half is not shown: after a long cut the leader's log is gone and the draft sends a snapshot 'as any new replica does' (DESIGN-V5 4.2), a whole copy (5.2 to 6.9 s per GB on etcd, E-13), not only what the member lacks. Judge 2 called that fallback met by construction.",
+  "closes": "the phase-2 sim's partitions from 10 s to 1 h on the real kernel, with retention and snapshot catch-up, and a pin on the bytes a member copies when it is back after the log was cut"
+ },
+ {
+  "req": "F-20",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-29",
+   "E-12"
+  ],
+  "why": "Judge 1 is right. E-29 ran F-20's test on one journal per process: the reserve is one marked segment of that journal, sized for groups that share it (1 MiB holds nine rounds of elections for 2,000 groups). ISR keeps a log file per group (S `walg`) and commits by the in-sync set, so where the reserve lives and what a full follower does to the set were not run. Both judges hold PD and OBJ open because their store is not E-29's journal; the same holds here.",
+  "closes": "E-29(b)'s steps on a log file per group with an in-sync set: a full follower, a full leader, and a leader change from the reserve; none is planned"
+ },
+ {
+  "req": "F-20",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-29"
+  ],
+  "why": "Judge 1 is right. E-29's pipeline is a leader and two followers, each on one shared journal. SLOG's storage is log nodes plus the object store (S `tier + obj`, not `jrnl`; it does not take A-25), and a full log node meets a write quorum, a seal and a metadata compare-and-swap, none of which was run or modelled. Like PD and OBJ, which both judges hold open, its store is not the journal E-29 filled.",
+  "closes": "E-29(b)'s steps on a log-tier prototype: a full log node under a write quorum, a seal from the reserve, and writes resuming with no node lost; none is planned"
+ }
+]
