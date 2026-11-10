@@ -1,7 +1,11 @@
 """
 ablate.py: DEV-10 for E-21's options, on seeded runs instead of a full search.
 
-    python3 sim/ablate.py OPTION [--seeds N] [--jobs 2] [--out results/OPTION.json]
+    python3 sim/ablate.py OPTION [--seeds N] [--jobs 2] [--out results/OPTION.json] [--nine]
+
+--nine (added on resume) runs the same procedure on nine families: the
+seven, `jump2` (a majority of clocks wrong) and `handover`. It answers
+"which rules are needed if a majority of wrong clocks must be survived too".
 
 1. The design runs on every family x seed. Its failures are reported (an
    option that fails as designed is not ablated further).
@@ -31,6 +35,7 @@ sys.path.insert(0, HERE)
 import timesim as ts   # noqa: E402
 
 PINNED = ('stamp.read',)
+FAMS = ts.FAMILIES   # --nine: also jump2 (a majority of clocks wrong) and handover, as check families
 
 
 def _one(args):
@@ -52,7 +57,7 @@ def _one(args):
 
 def sweep(pool, opt, seeds, m, stop):
     mk = (tuple(sorted(m.drop)), tuple(sorted(m.flip)), tuple(sorted(m.swap.items())))
-    jobs = [(opt, s, f, mk) for f in ts.FAMILIES for s in range(seeds)]
+    jobs = [(opt, s, f, mk) for f in FAMS for s in range(seeds)]
     tot = {k: 0 for k in ts.CHECKS + ('overlap', 'leaderless', 'ERR')}
     tot['late_max'] = 0.0
     tot['early_max'] = 0.0
@@ -82,12 +87,16 @@ def main():
     ap.add_argument('--jobs', type=int, default=2)
     ap.add_argument('--out')
     ap.add_argument('--no-mutants', action='store_true')
+    ap.add_argument('--nine', action='store_true', help='nine families: the seven, jump2 and handover')
     a = ap.parse_args()
+    if a.nine:
+        global FAMS
+        FAMS = ts.FAMILIES + ts.EXTRA + ts.VERIFY
     opt = ts.OPTIONS[a.option]()
     acts = opt.actions()
     rl = [r for r in ts.rules(acts) if r.id not in PINNED]
     ids = [r.id for r in rl]
-    out = {'option': a.option, 'seeds_per_family': a.seeds, 'families': ts.FAMILIES,
+    out = {'option': a.option, 'seeds_per_family': a.seeds, 'families': FAMS,
            'rules': [{'id': r.id, 'kind': 'guard' if isinstance(r, ts.Guard) else 'update', 'role': r.role,
                       'note': r.note, 'cmp': getattr(r, 'op', None)} for r in rl]}
     t0 = time.time()

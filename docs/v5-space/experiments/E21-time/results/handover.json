@@ -1,0 +1,1186 @@
+{
+ "family": "handover",
+ "seeds": 30,
+ "options": {
+  "wall": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 200,
+    "first": null
+   }
+  },
+  "clamp": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 200,
+    "first": null
+   }
+  },
+  "median": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 100.0,
+    "early_max": 0.0,
+    "first": null
+   },
+   "smallest": {
+    "removed": [
+     "stamp.peers",
+     "stamp.never_back",
+     "stand.near"
+    ],
+    "result": {
+     "early_wt": 0,
+     "early": 0,
+     "late": 0,
+     "lease": 0,
+     "stuck": 0,
+     "back": 48,
+     "agree": 0,
+     "stale": 0,
+     "avail": 0,
+     "overlap": 1,
+     "ERR": 0,
+     "late_max": 100.0,
+     "early_max": 0.0,
+     "first": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    "back_max_ms": 0.101
+   },
+   "put_back_tries": {
+    "stand.near": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "stamp.never_back": null,
+    "stamp.peers": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "put_back": "stamp.never_back",
+   "rules_needed": 8,
+   "new_smallest_on_eight": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 34,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 100,
+    "first": null
+   },
+   "kept": {
+    "stamp.extrap": [
+     "jumpL+",
+     0,
+     [
+      "early",
+      "lease"
+     ]
+    ],
+    "stamp.upper": [
+     "jumpL+",
+     0,
+     [
+      "early",
+      "lease"
+     ]
+    ],
+    "stamp.lower": [
+     "jumpL-",
+     0,
+     [
+      "late"
+     ]
+    ],
+    "expire.due": [
+     "drift",
+     0,
+     [
+      "early_wt",
+      "early"
+     ]
+    ],
+    "expire.log": [
+     "drift",
+     2,
+     [
+      "agree"
+     ]
+    ],
+    "grant.lapsed": [
+     "drift",
+     0,
+     [
+      "lease"
+     ]
+    ],
+    "pwrite.fence": [
+     "drift",
+     17,
+     [
+      "stale"
+     ]
+    ],
+    "stamp.never_back": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "mutants": [
+    {
+     "kind": "drop",
+     "rule": "stamp.extrap",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "stamp.upper",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "stamp.lower",
+     "caught": [
+      "jumpL-",
+      0,
+      [
+       "late"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "stamp.never_back",
+     "caught": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.due",
+     "caught": [
+      "drift",
+      0,
+      [
+       "early_wt",
+       "early"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.log",
+     "caught": [
+      "drift",
+      2,
+      [
+       "agree"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "grant.lapsed",
+     "caught": [
+      "drift",
+      0,
+      [
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "pwrite.fence",
+     "caught": [
+      "drift",
+      17,
+      [
+       "stale"
+      ]
+     ]
+    },
+    {
+     "kind": "flip",
+     "rule": "expire.due",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "grant.lapsed",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "pwrite.fence",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: extrap <-> upper",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: extrap <-> lower",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: extrap <-> never_back",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: upper <-> lower",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: upper <-> never_back",
+     "caught": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: lower <-> never_back",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> extrap",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> upper",
+     "caught": [
+      "drift",
+      0,
+      [
+       "ERR"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> lower",
+     "caught": [
+      "drift",
+      0,
+      [
+       "ERR"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> never_back",
+     "caught": [
+      "drift",
+      0,
+      [
+       "ERR"
+      ]
+     ]
+    }
+   ]
+  },
+  "median1": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 100.0,
+    "early_max": 0.0,
+    "first": null
+   },
+   "smallest": {
+    "removed": [
+     "stamp.peers",
+     "stamp.never_back",
+     "stand.near"
+    ],
+    "result": {
+     "early_wt": 0,
+     "early": 0,
+     "late": 0,
+     "lease": 0,
+     "stuck": 0,
+     "back": 48,
+     "agree": 0,
+     "stale": 0,
+     "avail": 0,
+     "overlap": 1,
+     "ERR": 0,
+     "late_max": 100.0,
+     "early_max": 0.0,
+     "first": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    "back_max_ms": 0.101
+   },
+   "put_back_tries": {
+    "stand.near": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "stamp.never_back": null,
+    "stamp.peers": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "put_back": "stamp.never_back",
+   "rules_needed": 7,
+   "new_smallest_on_eight": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 34,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 100,
+    "first": null
+   },
+   "kept": {
+    "stamp.extrap": [
+     "jumpL+",
+     0,
+     [
+      "early",
+      "lease"
+     ]
+    ],
+    "stamp.median": [
+     "jumpL+",
+     0,
+     [
+      "early",
+      "lease"
+     ]
+    ],
+    "expire.due": [
+     "drift",
+     0,
+     [
+      "early_wt",
+      "early"
+     ]
+    ],
+    "expire.log": [
+     "drift",
+     2,
+     [
+      "agree"
+     ]
+    ],
+    "grant.lapsed": [
+     "drift",
+     0,
+     [
+      "lease"
+     ]
+    ],
+    "pwrite.fence": [
+     "drift",
+     17,
+     [
+      "stale"
+     ]
+    ],
+    "stamp.never_back": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "mutants": [
+    {
+     "kind": "drop",
+     "rule": "stamp.extrap",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "stamp.median",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "stamp.never_back",
+     "caught": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.due",
+     "caught": [
+      "drift",
+      0,
+      [
+       "early_wt",
+       "early"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.log",
+     "caught": [
+      "drift",
+      2,
+      [
+       "agree"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "grant.lapsed",
+     "caught": [
+      "drift",
+      0,
+      [
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "pwrite.fence",
+     "caught": [
+      "drift",
+      17,
+      [
+       "stale"
+      ]
+     ]
+    },
+    {
+     "kind": "flip",
+     "rule": "expire.due",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "grant.lapsed",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "pwrite.fence",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: extrap <-> median",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: extrap <-> never_back",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: median <-> never_back",
+     "caught": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> extrap",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> median",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> never_back",
+     "caught": [
+      "drift",
+      0,
+      [
+       "ERR"
+      ]
+     ]
+    }
+   ]
+  },
+  "hlc": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 0.0,
+    "first": null
+   },
+   "smallest": {
+    "removed": [
+     "stamp.hlc_max",
+     "stamp.never_back",
+     "stamp.set_l",
+     "recv.adopt",
+     "apply.apply",
+     "stand.near",
+     "send.send_max",
+     "recv.near"
+    ],
+    "result": {
+     "early_wt": 0,
+     "early": 0,
+     "late": 0,
+     "lease": 0,
+     "stuck": 0,
+     "back": 66,
+     "agree": 0,
+     "stale": 0,
+     "avail": 0,
+     "overlap": 1,
+     "ERR": 0,
+     "late_max": 300.0,
+     "early_max": 200,
+     "first": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    "back_max_ms": 248.64
+   },
+   "put_back_tries": {
+    "recv.near": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "send.send_max": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "stand.near": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "apply.apply": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "recv.adopt": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "stamp.set_l": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ],
+    "stamp.never_back": null,
+    "stamp.hlc_max": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "put_back": "stamp.never_back",
+   "rules_needed": 7,
+   "new_smallest_on_eight": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 28,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 200,
+    "first": null
+   },
+   "kept": {
+    "selffence.far": [
+     "crash",
+     18,
+     [
+      "avail"
+     ]
+    ],
+    "selffence.stepdown": [
+     "jumpL+",
+     0,
+     [
+      "early",
+      "lease"
+     ]
+    ],
+    "expire.due": [
+     "drift",
+     0,
+     [
+      "early_wt",
+      "early"
+     ]
+    ],
+    "expire.log": [
+     "drift",
+     0,
+     [
+      "agree"
+     ]
+    ],
+    "grant.lapsed": [
+     "drift",
+     0,
+     [
+      "lease"
+     ]
+    ],
+    "pwrite.fence": [
+     "drift",
+     17,
+     [
+      "stale"
+     ]
+    ],
+    "stamp.never_back": [
+     "handover",
+     0,
+     [
+      "back"
+     ]
+    ]
+   },
+   "mutants": [
+    {
+     "kind": "drop",
+     "rule": "stamp.never_back",
+     "caught": [
+      "handover",
+      0,
+      [
+       "back"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "selffence.far",
+     "caught": [
+      "crash",
+      18,
+      [
+       "avail"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "selffence.stepdown",
+     "caught": [
+      "jumpL+",
+      0,
+      [
+       "early",
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.due",
+     "caught": [
+      "drift",
+      0,
+      [
+       "early_wt",
+       "early"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.log",
+     "caught": [
+      "drift",
+      0,
+      [
+       "agree"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "grant.lapsed",
+     "caught": [
+      "drift",
+      0,
+      [
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "pwrite.fence",
+     "caught": [
+      "drift",
+      17,
+      [
+       "stale"
+      ]
+     ]
+    },
+    {
+     "kind": "flip",
+     "rule": "expire.due",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "grant.lapsed",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "pwrite.fence",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "swap",
+     "rule": "stamp: read <-> never_back",
+     "caught": [
+      "drift",
+      0,
+      [
+       "ERR"
+      ]
+     ]
+    }
+   ]
+  },
+  "mono": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 1468,
+    "lease": 0,
+    "stuck": 3,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 93400.0,
+    "early_max": 0.0,
+    "first": [
+     "handover",
+     0,
+     [
+      "late",
+      "stuck"
+     ]
+    ]
+   }
+  },
+  "mono+ck": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 1324,
+    "lease": 2,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 5,
+    "ERR": 0,
+    "late_max": 2900.0,
+    "early_max": 0.0,
+    "first": [
+     "handover",
+     0,
+     [
+      "late"
+     ]
+    ]
+   }
+  },
+  "tt": {
+   "design": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 1,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 0.0,
+    "first": null
+   },
+   "smallest": {
+    "removed": [
+     "stamp.never_back"
+    ],
+    "result": {
+     "early_wt": 0,
+     "early": 0,
+     "late": 0,
+     "lease": 0,
+     "stuck": 0,
+     "back": 0,
+     "agree": 0,
+     "stale": 0,
+     "avail": 0,
+     "overlap": 1,
+     "ERR": 0,
+     "late_max": 300.0,
+     "early_max": 0.0,
+     "first": null
+    },
+    "back_max_ms": 0.0
+   },
+   "put_back": null,
+   "rules_needed": 4,
+   "new_smallest_on_eight": {
+    "early_wt": 0,
+    "early": 0,
+    "late": 0,
+    "lease": 0,
+    "stuck": 0,
+    "back": 0,
+    "agree": 0,
+    "stale": 0,
+    "avail": 0,
+    "overlap": 31,
+    "ERR": 0,
+    "late_max": 300.0,
+    "early_max": 0.0,
+    "first": null
+   },
+   "kept": {
+    "expire.due": [
+     "drift",
+     0,
+     [
+      "early_wt",
+      "early"
+     ]
+    ],
+    "expire.log": [
+     "jumpF",
+     3,
+     [
+      "agree"
+     ]
+    ],
+    "grant.lapsed": [
+     "drift",
+     0,
+     [
+      "lease"
+     ]
+    ],
+    "pwrite.fence": [
+     "drift",
+     17,
+     [
+      "stale"
+     ]
+    ]
+   },
+   "mutants": [
+    {
+     "kind": "drop",
+     "rule": "expire.due",
+     "caught": [
+      "drift",
+      0,
+      [
+       "early_wt",
+       "early"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "expire.log",
+     "caught": [
+      "jumpF",
+      3,
+      [
+       "agree"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "grant.lapsed",
+     "caught": [
+      "drift",
+      0,
+      [
+       "lease"
+      ]
+     ]
+    },
+    {
+     "kind": "drop",
+     "rule": "pwrite.fence",
+     "caught": [
+      "drift",
+      17,
+      [
+       "stale"
+      ]
+     ]
+    },
+    {
+     "kind": "flip",
+     "rule": "expire.due",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "grant.lapsed",
+     "caught": null,
+     "no_change": true
+    },
+    {
+     "kind": "flip",
+     "rule": "pwrite.fence",
+     "caught": null,
+     "no_change": true
+    }
+   ]
+  }
+ },
+ "secs": 443
+}

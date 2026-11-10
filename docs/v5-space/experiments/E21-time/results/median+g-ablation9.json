@@ -1,0 +1,439 @@
+{
+ "option": "median+g",
+ "seeds_per_family": 30,
+ "families": [
+  "drift",
+  "jumpL+",
+  "jumpL-",
+  "jumpF",
+  "pause",
+  "crash",
+  "mix",
+  "jump2",
+  "handover"
+ ],
+ "rules": [
+  {
+   "id": "stamp.peers",
+   "kind": "update",
+   "role": "time",
+   "note": "peers' clocks ride the pings",
+   "cmp": null
+  },
+  {
+   "id": "stamp.extrap",
+   "kind": "update",
+   "role": "time",
+   "note": "a reading is carried forward by the receiver's monotonic time",
+   "cmp": null
+  },
+  {
+   "id": "stamp.median",
+   "kind": "update",
+   "role": "time",
+   "note": "writer time = the median of the members' clocks, own clock included",
+   "cmp": null
+  },
+  {
+   "id": "stamp.never_back",
+   "kind": "update",
+   "role": "time",
+   "note": "writer time never goes back (max with the last t in the log)",
+   "cmp": null
+  },
+  {
+   "id": "expire.due",
+   "kind": "guard",
+   "role": "time",
+   "note": "a row ends when writer time passes its ttl",
+   "cmp": ">="
+  },
+  {
+   "id": "expire.log",
+   "kind": "update",
+   "role": "log",
+   "note": "expiry is a record in the log, so every replica removes the row at one position",
+   "cmp": null
+  },
+  {
+   "id": "grant.lapsed",
+   "kind": "guard",
+   "role": "time",
+   "note": "a lease lapses when writer time passes its end",
+   "cmp": ">="
+  },
+  {
+   "id": "pwrite.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "refuse a token below the highest the writer has seen",
+   "cmp": ">="
+  },
+  {
+   "id": "selffence.scattered",
+   "kind": "guard",
+   "role": "elect",
+   "note": "fewer than a majority of the known clocks lie within max-offset of their median",
+   "cmp": null
+  },
+  {
+   "id": "selffence.stepdown",
+   "kind": "update",
+   "role": "elect",
+   "note": "steps down",
+   "cmp": null
+  },
+  {
+   "id": "stand.agree",
+   "kind": "guard",
+   "role": "elect",
+   "note": "a member that sees the clocks scattered does not stand",
+   "cmp": null
+  }
+ ],
+ "base": {
+  "early_wt": 0,
+  "early": 0,
+  "late": 0,
+  "lease": 0,
+  "stuck": 0,
+  "back": 0,
+  "agree": 0,
+  "stale": 0,
+  "avail": 0,
+  "overlap": 35,
+  "leaderless": 1376000.0,
+  "ERR": 0,
+  "late_max": 300.0,
+  "early_max": 100,
+  "first": null
+ },
+ "pass1": {
+  "stamp.peers": null,
+  "stamp.extrap": [
+   "drift",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "stamp.median": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stamp.never_back": [
+   "handover",
+   0,
+   [
+    "back"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   2,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ],
+  "selffence.scattered": [
+   "crash",
+   18,
+   [
+    "avail"
+   ]
+  ],
+  "selffence.stepdown": [
+   "jump2",
+   0,
+   [
+    "late"
+   ]
+  ],
+  "stand.agree": null
+ },
+ "removed": [
+  "stamp.peers",
+  "stand.agree"
+ ],
+ "kept": {
+  "stamp.extrap": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stamp.median": [
+   "jumpL+",
+   0,
+   [
+    "early",
+    "lease"
+   ]
+  ],
+  "stamp.never_back": [
+   "handover",
+   0,
+   [
+    "back"
+   ]
+  ],
+  "expire.due": [
+   "drift",
+   0,
+   [
+    "early_wt",
+    "early"
+   ]
+  ],
+  "expire.log": [
+   "drift",
+   2,
+   [
+    "agree"
+   ]
+  ],
+  "grant.lapsed": [
+   "drift",
+   0,
+   [
+    "lease"
+   ]
+  ],
+  "pwrite.fence": [
+   "drift",
+   17,
+   [
+    "stale"
+   ]
+  ],
+  "selffence.scattered": [
+   "crash",
+   18,
+   [
+    "avail"
+   ]
+  ],
+  "selffence.stepdown": [
+   "jump2",
+   0,
+   [
+    "late"
+   ]
+  ]
+ },
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "stamp.extrap",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stamp.median",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "stamp.never_back",
+   "caught": [
+    "handover",
+    0,
+    [
+     "back"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.due",
+   "caught": [
+    "drift",
+    0,
+    [
+     "early_wt",
+     "early"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.log",
+   "caught": [
+    "drift",
+    2,
+    [
+     "agree"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "grant.lapsed",
+   "caught": [
+    "drift",
+    0,
+    [
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pwrite.fence",
+   "caught": [
+    "drift",
+    17,
+    [
+     "stale"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "selffence.scattered",
+   "caught": [
+    "crash",
+    18,
+    [
+     "avail"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "selffence.stepdown",
+   "caught": [
+    "jump2",
+    0,
+    [
+     "late"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "expire.due",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "grant.lapsed",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "flip",
+   "rule": "pwrite.fence",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: extrap <-> median",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: extrap <-> never_back",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: median <-> never_back",
+   "caught": [
+    "handover",
+    0,
+    [
+     "back"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: read <-> extrap",
+   "caught": null,
+   "no_change": true
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: read <-> median",
+   "caught": [
+    "jumpL+",
+    0,
+    [
+     "early",
+     "lease"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "stamp: read <-> never_back",
+   "caught": [
+    "drift",
+    0,
+    [
+     "ERR"
+    ]
+   ]
+  }
+ ],
+ "secs": 251
+}

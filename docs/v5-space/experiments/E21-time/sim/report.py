@@ -8,7 +8,7 @@ import os
 import sys
 from collections import Counter
 
-ORDER = ['wall', 'clamp', 'median', 'hlc', 'mono', 'mono+ck', 'tt']
+ORDER = ['wall', 'clamp', 'median', 'median1', 'median+g', 'hlc', 'mono', 'mono+ck', 'tt']
 CHECKS = ('early_wt', 'early', 'late', 'lease', 'stuck', 'back', 'agree', 'stale', 'avail')
 
 
