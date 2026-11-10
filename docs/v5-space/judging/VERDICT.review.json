@@ -1,0 +1,408 @@
+{
+ "about": "The findings of the VERDICT.md review of 2026-11-10: three skeptics, the E-41 price re-check, and the fresh reader who rechecked the revised page. VERDICT.md section 10 answers the skeptics; the recheck findings (V-01 to V-18) are for the next revision. Scratch scripts the agents name were not kept.",
+ "skeptics": [
+  {
+   "label": "skeptic: arithmetic",
+   "lens": "The arithmetic and the cells: OUTCOME rebuilt in a scratch copy, the mechanism and pair counts re-derived, every number in VERDICT checked against the files, and every cell where COMP differs from SPLIT, DRAFT, SLOG, ISR, MIN-P and the other nine PERF-04 rows read with its reason and evidence.",
+   "findings": [
+    {
+     "id": "S1",
+     "severity": "changes the winner",
+     "claim": "Section 0 and section 5 name COMP with Z `rejoin` as the answer, and section 8 item 3 justifies `rejoin` with \"COMP follows rule 4\". Section 4 itself says \"Rule 3 as written would rank it [COMP+par] above COMP\", but the headline never says so.",
+     "evidence": "judging/mechanisms.json `par-repair`: novel false, \"So COMP+par has COMP's count of novel mechanisms\" (also MECHANISMS 4.2). COMP's F-22 (S) cell is `not` only because \"Only Z `par` keeps the group writable (0 of 276 two-damage states stuck), and no row holds it\" (E-37, model-checked; par's DEV-03 mutants 8 of 9). AMENDMENTS line 571's \"COMP follows rule 4\" was written when `par` counted as +1 mechanism with novelty open (AMENDMENTS line 269); MECHANISMS has since settled it as not novel. Computed (scratchpad comppar.py): COMP+par has 3 novel mechanisms and 293 pairs (disk-incarnation kept). Rule 3 gives 3 against 3, then SHOULDs 6 against 5, so COMP+par wins. It wins with SHOULDs first too, and it beats SPLIT 3 against 5. REQUIREMENTS rule 4 ranks G4 (few NOVEL mechanisms) first, so it cannot separate them either. Only a count of all mechanisms or of rules keeps `rejoin`, and no judging rule uses those. No judging file scores COMP+par, though AMENDMENTS section 4 asks for it. One side effect (par_perf.py): with `par` on COMP alone, the PERF-01-accepted flip goes to COMP+par instead of MIN-P. With `par` open to every Raft row, MIN-P+par wins again on pairs.",
+     "fix": "Have the judges score COMP+par as AMENDMENTS section 4 asks. Then either name COMP with Z `par` as the rule's winner (open: par with a membership change, K-24), or name the rule that keeps `rejoin` (total mechanisms or rules) and list it in section 8 as a user choice that changes the winner. Replace \"COMP follows rule 4\" in section 8 item 3 and say it in section 0."
+    },
+    {
+     "id": "S2",
+     "severity": "changes a reported number or claim",
+     "claim": "\"The margin is thin: ... one more for COMP alone, or one fewer for SPLIT, hands the win to SPLIT\" (section 0). The same claim appears in section 3 (\"if the counts were less than 2 apart, the pairs would pick SPLIT\"), in section 4's first scratch row and the B sweep lines \"SPLIT with 2 fewer\" / \"COMP with 2 more\" -> SPLIT, in \"A precedent for any one of SPLIT's three makes SPLIT the winner\", and in section 9's first overturn row. All of them use SPLIT's 278 pairs, a count made without a merge, while SPLIT's SC-04 is open only because it has one.",
+     "evidence": "SC-04 SPLIT ruling (SC.settled.json): \"the row shrinks through the merge, at that price ... if SPLIT keeps the merge, DEV-01 counts it for SPLIT, and if it does not, SC-04 fails for SPLIT\". mechanisms.json gives `merge-record` to PD only, yet SPLIT's `range-table` reads `merge.record`, which nothing in SPLIT writes. Recount with the tool's own pair rule (merge_test.py): SPLIT plus `merge-record` has 295 pairs, 17 more, above COMP's 283. Then COMP +1 or SPLIT -1 gives COMP; COMP +2 or SPLIT -2 gives COMP (flips.py). Without the merge, SPLIT fails SC-04 and is out, and COMP +1 and +2 still win against DRAFT. So under either reading that agrees with itself, COMP keeps the lead with 1 or 2 more novel mechanisms. VERDICT section 6 notes the merge question, but the margin claims do not follow it through.",
+     "fix": "Settle the merge for SPLIT. Either add `merge-record` to SPLIT's rows and rerun `pairs` and `verdict`, or fail SC-04 for SPLIT. Then restate the margin: COMP's lead over SPLIT survives one or two more novel mechanisms. Correct section 0, section 3, section 4 (both tables and the precedent sentence), section 9's overturn row, and OUTCOME B.3's two \"no\" lines."
+    },
+    {
+     "id": "S3",
+     "severity": "changes a reported number or claim",
+     "claim": "\"Forbid a slot move to wait while the object store is down and SPLIT wins\" (section 0). The same claim appears in section 4 (\"F-15 kept as worded ... SPLIT\") and section 8 item 11 (\"No: COMP is out and SPLIT wins\").",
+     "evidence": "COMP, SPLIT and DRAFT all carry the same `restore-mark` mechanism, whose rule is \"Every new epoch is recorded in the mark before it is used\". For a row with no slots, the epoch is \"its unit's generation\", and SPLIT's `range-table` raises a generation on every split or merge. SPLIT and DRAFT also carry `tier`. Their F-15 cells are open only because \"the home of the restore mark is open\" (their OPS-07 cells say the same, G-21). COMP fails only because its home is decided. Computed (flips.py): if SPLIT and DRAFT also fail F-15 as worded, then \"F-15 as worded, rest restated\" gives level DRAFT, SPLIT, COMP, not SPLIT. If SPLIT lacks the merge (S2), it gives DRAFT. The restated \"or the mark gets another home\" is open to COMP as much as to them (reasoned).",
+     "fix": "Say that SPLIT (or DRAFT) wins under item 11 only while their restore mark has no home. If its home is the store, their splits and moves wait too and the three are level. The \"no\" answer can also be met by moving COMP's mark. Add this to section 0, section 4 and section 8 item 11."
+    },
+    {
+     "id": "S4",
+     "severity": "changes a reported number or claim",
+     "claim": "F-02 (Exactly once per attempt) is `met` for DRAFT and SPLIT (and LANE), so the A table's \"MUSTs met\" reads DRAFT 34 and SPLIT 32.",
+     "evidence": "F-02 cells for DRAFT and SPLIT cite E-20 only. The composed model (E32-composition/crossing/README.md) found a 6-step counterexample, a write both applied and told \"refused\", at E-20's dedup floor against E-17's lock-token refusal. It says \"DRAFT, LANE, SPLIT, SLOG (`win`) not checked here, and owed the same floor rule by reasoning\". SPLIT and DRAFT carry `fence-tokens` and `dedup-window`. COMP's fix is model-checked; theirs is reasoned only.",
+     "fix": "Make F-02 open for the `win` rows until the floor rule is checked for them. DRAFT's and SPLIT's met counts each drop by 1 in A and B. Rules 2 and 3 do not count met MUSTs, so no ranking changes."
+    },
+    {
+     "id": "S5",
+     "severity": "wording or clarity",
+     "claim": "\"A failure proven by a structural argument or a counterexample carries no gap number, so it adds 0 to the gap sum\" (section 2).",
+     "evidence": "10 structural failures carry a gap: V4's PERF-02, PERF-03, PERF-04, PERF-05, PERF-06, PERF-07, PERF-11 and DEP-12 (0.91 to 0.999), and BUY's SC-03 and SC-10 (0.98 each). They are in V4's 10.04 and BUY's 9.24. No place changes, because rule 2 orders those rows by count first.",
+     "fix": "Say \"carries no gap number, except 10 cells of V4 and BUY\", or remove those gaps and rerun."
+    },
+    {
+     "id": "S6",
+     "severity": "wording or clarity",
+     "claim": "\"every row that runs its own kernel carries 144 or more\" (section 7, from pairs.md).",
+     "evidence": "pairs.json: V4 runs its own kernel and carries 52 pairs. OBJ carries 144.",
+     "fix": "Say \"every v5 row that runs its own kernel\"."
+    },
+    {
+     "id": "S7",
+     "severity": "wording or clarity",
+     "claim": "Section 0: \"The two choices that can change it\" (PERF-01 losses and F-15). Section 2: ISR's \"own is SC-04\".",
+     "evidence": "OUTCOME B.3: each of the F-07, P-02 and P-13 readings (section 8 items 15 to 17) puts every row out and leaves DRAFT, SPLIT and COMP level. F-05 kept as worded gives SLOG by rule 2 (VERDICT's own section 4). LANE also fails SC-04 in both outcomes.",
+     "fix": "In section 0, name the three readings and the SLOG case beside the two choices. In section 2, say SC-04 is failed by ISR and LANE only."
+    },
+    {
+     "id": "S8",
+     "severity": "wording or clarity",
+     "claim": "\"failover at E = 2 s with 0.25 E jitter sums to 2.5 s with no margin\" (COMP's F-05 cell; section 9, step 5).",
+     "evidence": "E-13: a failover takes \"the election timer plus about 5 ms\" (2.03 to 3.36 s at E = 2 s with etcd's jitter). The worst draw is therefore about 2.505 s, just over the 2.5 s bar, not on it.",
+     "fix": "Say \"up to about 5 ms over the bar at the worst draw\", or name the E or the jitter that keeps p99 under 2.5 s."
+    },
+    {
+     "id": "S9",
+     "severity": "wording or clarity",
+     "claim": "VERDICT's pair counts (ISR 214 and others) are taken from pairs.json, but readers are sent to MECHANISMS.md for the counts.",
+     "evidence": "MECHANISMS.md section 2 prints PD 210, ISR 215 and OBJ 147. pairs.json (rebuilt byte-identical here) gives 209, 214 and 144. VERDICT and OUTCOME use pairs.json, which is correct, but the cited file disagrees.",
+     "fix": "Regenerate MECHANISMS.md section 2's pair column, or say in VERDICT that pairs.json is the source."
+    }
+   ],
+   "verdict_survives": false,
+   "summary": "The arithmetic itself is sound. I rebuilt the outcome in a scratch copy and outcome.json came out identical byte for byte. The mechanism counts and the 773 pairs also re-derive exactly. Every number I checked in VERDICT sections 1 to 7 matches OUTCOME and the cells: the agreement table, the A and B tallies, the gaps (P-05 0.45, SC-03/SC-10 0.66, F-05 1.44, PERF-04 0.33), the rows that B.4 lets back in, the proof counts for BUY and V4, the SHOULD lists, and all 97 open MUSTs of COMP, with no item missing and none extra.\n\nThe cells barely tell the leading rows apart. COMP differs from SPLIT on 4 cells, from DRAFT on 2, and from MIN-P, MIN and LEAN on 1 each (PERF-04). The PERF-04 difference is real: COMP, DRAFT, SPLIT and CELL carry the `memory` rung, and C = 0.73 ms sits above JetStream's 0.55 ms (E-01, E-09b). No judged row overturns the COMP composite in outcome B.\n\nThree findings still undo the verdict as written:\n\n1. **The rule picks COMP with Z `par`, not COMP.** `par-repair` is settled as not novel. So COMP+par has the same 3 novel mechanisms and meets one more SHOULD, F-22 (S), by E-37's model. Rule 3, in either order, ranks it above COMP. VERDICT's \\\"COMP follows rule 4\\\" is left over from before that ruling, and AMENDMENTS asked for COMP+par to be judged, which never happened.\n\n2. **The \\\"thin margin\\\" mixes two readings of SPLIT.** SPLIT's 278 pairs leave out the merge, while its SC-04 is open only because it has the merge. With the merge, SPLIT has 295 pairs. Without it, SC-04 fails and SPLIT is out. Under either reading, COMP's lead survives one or two more novel mechanisms. So the stated certainty is understated, not overstated.\n\n3. **The F-15 flip to SPLIT is overstated.** SPLIT and DRAFT keep F-15 open only because their restore mark has no home yet. If that home is the store, they are level with COMP.\n\nSmaller points: F-02 should be open for the `win` rows; some structural failures do carry gaps; and there are four wording slips.\n\nScripts are in /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/skeptic-arith/ (load.py, flips.py, merge_test.py, comppar.py, par_perf.py). The rebuilt copy is in its v5/ folder. No repo file was changed."
+  },
+  {
+   "label": "skeptic: evidence",
+   "lens": "The evidence under the deciding cells. I checked the cells that put rows out that would otherwise be in: PERF-04 for the 10 persisted-only rows plus LANE and PD; LANE's SC-03, SC-04 and SC-10; PD's F-22 and SC-05; ISR's SC-03, SC-04 and SC-10; SPLIT's SC-04, which the referee kept open. I also checked the AMENDMENTS 1.3 restatements that let DRAFT, SPLIT and COMP in: F-05, F-15, F-17, P-05, SC-03 and SC-10. For each one I opened the experiment README (and for E-01 and E-38 the raw results) and re-ran the arithmetic with tools/judging.py's own tally and rank functions from scratch scripts. Nothing in the repo was changed.",
+   "findings": [
+    {
+     "id": "S1",
+     "severity": "changes a reported number or claim",
+     "claim": "PERF-04 cells of MIN, RUST, SRV, LEAN, LANE, PD, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, and VERDICT section 3: \"JetStream at its default acks one publisher at p99 0.55 ms, below C = 0.73 ms, the floor of any persisted commit here ([E-01], [E-09b], measured)\". The gap is 0.33.",
+     "evidence": "C is built by adding two separately measured p99s: the fio fdatasync p99 with three writers (676 µs) and the RTT p99 (58 µs). That sum is a convention. It is not a floor on a 2-of-3 commit's p99, because the commit needs only the second-fastest of three fsyncs. Two numbers from E-01 itself show the gap. First, the one-writer fsync p99 is 481 µs, and 481 + 58 = 0.54 ms, which is below 0.55. Second, I sampled E-01's own one-writer CDF (experiments/E01-floors/results/fdatasync-1w-cdf.txt): leader and followers in parallel, commit at the 2nd of 3, independent disks as in E-02's emu variant. The commit p99 comes out at about 0.34 to 0.36 ms, also below 0.55. So 'C > 0.55' does not prove the fail. The fail does survive on a ground the cell never states, PERF-01's win rule. JetStream's default single-publisher p99 runs were 0.536 to 0.783 ms (E-09b table, a spread of 0.247 ms). A win must beat the median by more than the larger spread, so it needs a p99 below about 0.30 ms. A persisted 2-of-3 commit plus the client hop is about 0.40 ms even in the best case (reasoned from measured parts). So the fail is right, but the stated reason and the gap are not.",
+     "fix": "Restate the reason in these 12 cells and in VERDICT sections 3 and 8 (item 2): 'PERF-01's win needs p99 below about 0.30 ms (JetStream's 0.55 ms minus its 0.25 ms run spread). A persisted 2-of-3 commit plus a client hop cannot get there: about 0.40 ms in the best, independent-disk case, reasoned from E-01's measured CDF.' Mark the basis as reasoned from measured parts. Recompute the gap against 0.30 ms (about 1.4). I re-ran outcome A with gap 1.41 and the order does not change: SLOG is still 2nd at 3.18 against DRAFT's 3.21."
+    },
+    {
+     "id": "S2",
+     "severity": "changes a reported number or claim",
+     "claim": "VERDICT section 5: \"the `memory` rung ties JetStream's default in TS (0.57 against 0.55 ms) and wins only in Rust (0.33 ms)\". Section 8, item 2: \"An empty list rests on the native step (0.33 ms in Rust, [E-02])\". Section 0: \"The first kill test: `nats bench js` against JetStream's default p99 of 0.55 ms.\"",
+     "evidence": "PERF-01 says 'tie only where both sit at the measured floor'. The memory rung's floor is about one loopback RTT (0.06 ms), so 0.57 against 0.55 is not a tie. It is a non-win. PERF-01's win needs a p99 below about 0.30 ms (see S1), so Rust's 0.33 ms (range 0.33 to 0.35) is not a win either. Both E-02 numbers also flatter fero. They were taken at 50,000 writes/s in an in-process pipeline. They have no client hop, no gateway (whose CPU PERF-01 counts), and they leave out the 1 ms tick wait (E-02 times 'from the tick that made a write'). So no measurement in the study shows any rung of any row winning PERF-04's default single-publisher row. COMP's cell can stay open, since E-02 never ran one write in flight. But if E-02's pipeline is read as the ceiling rule 1 names, then COMP, SPLIT, DRAFT and CELL fail PERF-04 too. I re-ran B that way: every row is out, and DRAFT, SPLIT and COMP are level by rule 2. Accepting the loss gives MIN-P (OUTCOME B.3).",
+     "fix": "Replace 'ties' and 'wins only in Rust' with: 'neither the TS (0.57 ms) nor the Rust (0.33 ms) pipeline figure wins by PERF-01's rule. A win needs a single-publisher p99 below about 0.30 ms with the client hop and the gateway included. No such number exists yet.' In item 2, say that the empty loss list rests on an untested hope, not on a measurement. Give the kill test's bar as about 0.30 ms, not 0.55 ms. Section 9's row 4b already states the spread correctly."
+    },
+    {
+     "id": "S3",
+     "severity": "changes a reported number or claim",
+     "claim": "VERDICT section 2: F-05's handover clause is failed as worded by 'the 15 Raft rows', because \"etcd's own handover pauses its group 9.7 to 9.8 ms at the median and 24 to 31 ms at worst\". The F-05 cells call this a measured ceiling with gap 1.44, saying 'a port of the same Raft can only approach that'. Section 0 and A.2: 'the fallback rule then puts ISR first'. Section 4: 'F-05 kept as worded, the rest restated → SLOG, by rule 2'.",
+     "evidence": "Four things go against this cell. (1) AMENDMENTS 1.3's own F-05 line ends 'state it as \"C plus the box's normal longest gap between commits plus 5 ms\", or it stays open'. It says open, not fails. (2) E-13 reads its own result as 'met at the median on this disk and not at the tail' and 'the TS bar of 10 ms is reachable but not with margin'. (3) E-13's quiet window, with no handover at all, had a longest gap of 5.5 ms (range 4.4 to 22.9 ms). The handover adds about 4 ms. The 24.4 and 30.8 ms worst cases sit inside the disk's own stall range (E-01: 20 to 50 ms flush stalls), so they measure the disk, not the handover. (4) The figure is from etcd's Go server, not the rows' port, and it is not a pipeline floor. I re-ran outcome A with F-05 open as worded: the first place becomes a three-way tie of DRAFT, SPLIT and ISR at 4 MUSTs and a gap sum of 1.77. ISR is no longer first alone, and the 'F-05 kept as worded → SLOG' line disappears.",
+     "fix": "Score F-05's handover clause as open as worded for the 15 Raft rows, as AMENDMENTS 1.3 and E-13 say. Re-run A.2 and the section 4 sweep. Restate section 0's outcome-A sentence as 'level: DRAFT, SPLIT, ISR'. Drop section 8 item 8's 'SLOG first' effect."
+    },
+    {
+     "id": "S4",
+     "severity": "changes a reported number or claim",
+     "claim": "VERDICT section 2 and AMENDMENTS 1.3: F-17 is failed as worded by 'the 15 Raft rows': \"5 of 280 five-node partial partitions stayed stuck with a connected majority, by Raft's own vote rule\" (a counterexample).",
+     "evidence": "E-38 defines 'connected majority' as a star: one server with two-way links to a majority. It records the stricter reading too, a majority in which every pair talks both ways. I read experiments/E38-raft-gray-failures/results/sweep5.jsonl.gz. All 5 stuck runs have CliqueMajority = false. Of 299 five-node runs with a clique majority, and 159 three-node ones, none got stuck. Under the clique reading, the only clause that failed is the 2E time: 23 and 15 clique runs became writable only later, with etcd's timers. A-02's CheckQuorum constant, which every Raft row takes, fixes that on the named cases (1.52 E), and the sweeps were not re-run. So 'fails as worded' depends on E-38's choice of reading. F-17's text does not define the term. I re-ran A with both F-05 and F-17 open as worded: DRAFT and SPLIT are level first (3 MUSTs, 1.77). B does not change.",
+     "fix": "Add 'connected majority: star or clique' to section 8 as a user reading. Under the clique reading, score F-17 as open as worded (no counterexample; the 2E clause waits for the sweep re-run with E/4). Report outcome A under both readings."
+    },
+    {
+     "id": "S5",
+     "severity": "changes a reported number or claim",
+     "claim": "VERDICT section 1: 'AMENDMENTS section 1.3 lists clauses that the evidence shows no row can meet as worded'. Section 2: F-15 is failed by 'the 8 slot rows whose restore mark lives in the object store'; 'DRAFT, SRV, RLOG and EMB-V8 move slots too, but ... the home of their restore mark is not decided, so F-15 stays open for them'. Section 0: 'forbid a slot move to wait while the object store is down and SPLIT wins'.",
+     "evidence": "F-15 is not a clause no row can meet. OUTCOME A.1 shows 12 rows open or met on it as worded. The open cells also contradict MECHANISMS.md section 2. That table lists 'Restore mark in the store's manifest' as a settled novel mechanism of DRAFT, SRV, RLOG, EMB-V8 and SPLIT, the very home that, by the F-15 cells' own step-by-step argument, makes every slot move wait. A-08 applies the mark to every row with #meta, and E-33 says 'every row's OPS-07 holds only with the restore's high-water epoch'. Read the same way for every row, DRAFT, SRV, RLOG and EMB-V8 fail F-15 as worded too. I re-ran B with F-15 as worded on that reading: SPLIT is the only row in. SPLIT's F-15 cell says 'No slot moves'. But a split also hands keys to new groups whose lock tokens must keep rising (P-10) above anything a restore can reuse (E-33's R2), so it plausibly needs the same mark before use (reasoned, not modelled). If so, F-15 as worded gives a level of DRAFT, SPLIT and COMP (computed). One more gap: combining the two choices section 0 names (accept the JetStream loss and forbid the wait) gives SRV as the winner under the current cells. The verdict does not report that.",
+     "fix": "In section 1, say F-15's restatement is a design choice of the store-mark rows, not a clause no row meets. Make the F-15 cells and MECHANISMS agree on where each row's mark lives, and score F-15 the same way for every row that moves slots, or that splits, with that mark. In section 0 and item 11, report: F-15 as worded gives SPLIT only if a split needs no mark write before use; otherwise DRAFT, SPLIT and COMP are level. Add the combined case: both choices the other way give SRV today, and SPLIT on a consistent reading."
+    },
+    {
+     "id": "S6",
+     "severity": "changes a reported number or claim",
+     "claim": "Section 0: \"The margin is thin: COMP leads SPLIT by exactly rule 3's threshold ..., so one more for COMP alone, or one fewer for SPLIT, hands the win to SPLIT.\" Section 4 and section 9 row 1 say the same, resting on 'pairs 278 against 283'.",
+     "evidence": "The referee kept SPLIT's SC-04 open with: 'the row shrinks through the merge, at that price' (SC.settled.json). But judging/mechanisms.json gives `merge-record` to PD alone. SPACE's own rows (lines 319 and 387) say SPLIT has 'no shrink until merges'. So SPLIT's 278 pairs leave out the merge that keeps its SC-04 open. I counted with the tool's pair rule (two units touch one piece of state and one writes it) over mechanisms.json: SPLIT plus `merge-record` has 295 pairs, more than COMP's 283. With 295, COMP+1 novel and SPLIT−1 novel both keep COMP first (computed). Without the merge, judge 2 is right that SC-04 fails, SPLIT is out, and COMP's only rival in B is DRAFT, 3 novel mechanisms apart. Then the F-15-as-worded line gives DRAFT, not SPLIT (computed). The 'one mechanism undoes it' claim fails under both readings that are consistent. Section 6 already says 'Either way COMP's lead holds' but does not carry this into sections 0, 4 and 9.",
+     "fix": "Pick one reading. If SPLIT keeps the merge, add `merge-record` to SPLIT (295 pairs) and drop 'one more for COMP or one fewer for SPLIT hands the win to SPLIT'; the lead then falls only to a change of 2. If SPLIT has no merge, fail its SC-04, and report F-15 as worded → DRAFT. Either way, correct the 'thin margin' sentence and section 9's first overturn row."
+    },
+    {
+     "id": "S7",
+     "severity": "wording or clarity",
+     "claim": "VERDICT section 2: P-05 is failed by all 20 rows as worded, because 'E-08's relay alone had p99 1.2 ms (Node) and 3.5 ms (Rust) at 1,000 subscribers'. The cells call this a measured ceiling with gap 0.45.",
+     "evidence": "E-08 measured that p99 'at a load where each relay used about half a core' (1,723 records/s in Node, 3,337 in Rust). It was one prototype's operating point, not a floor. Rust being slower than Node shows the build set it, not the language or the protocol. E-08 frames the result as a latency budget (how long a room coalesces), not a ceiling. Every row carries the same cell, so no order changes. Only the label 'fails as worded' is too strong.",
+     "fix": "Call P-05's as-worded cell 'open, bar likely missed above light load (E-08)', or keep it failed but give the basis as 'measured at half a core', not 'ceiling'. The ranking is unchanged either way."
+    }
+   ],
+   "verdict_survives": true,
+   "summary": "The winner holds, but several numbers and claims behind it need fixing. Outcome B, with AMENDMENTS 1.3 restated, still gives COMP on the settled cells. Here is what I checked and what I found.\n\nThe cells that put rows out mostly hold:\n- **PERF-04 for the persisted-only rows** is the cell that decides everything. Every row with 3 or 4 novel mechanisms would beat COMP on pairs if let back in. The fail is right, but for a reason the cells never state (S1). 'C = 0.73 ms is the floor' is a sum of two p99s. E-01's own fsync data puts a 2-of-3 commit's p99 at about 0.34 to 0.36 ms. The fail holds only through PERF-01's spread rule: JetStream's runs spread 0.25 ms, so a win needs a p99 under about 0.30 ms.\n- **The same rule hurts COMP's `memory` rung (S2).** The verdict says it 'ties in TS and wins in Rust'. Under PERF-01's rule neither 0.57 nor 0.33 ms wins, and both leave out the client hop and the gateway. So no measured number supports an empty loss list. If E-02's pipeline were read as a ceiling, outcome B would become a three-way level of DRAFT, SPLIT and COMP.\n- **The structural fails of LANE, ISR and PD hold as their rows are defined.** LANE has no rule that removes a lane, and its range moves are 'later'. ISR's partition count is fixed up front. PD's F-22 fail is realistic, because a Raft log that checksums still cuts a bad tail as torn (reasoned). CELL and ISR are not decisive anyway: COMP beats them under rule 3.\n\nThe 'fails as worded' clauses are weaker than reported:\n- **F-05 (S3).** AMENDMENTS 1.3 itself says 'or it stays open', and E-13 says the 10 ms bar is 'met at the median'. The 24 to 31 ms worst cases sit inside the quiet window's own disk stalls (up to 22.9 ms).\n- **F-17 (S4).** All 5 stuck E-38 runs lack a majority in which every pair talks both ways (I checked the raw file). Under that reading there is no counterexample.\n- **Effect on outcome A.** Scoring both as open (open as worded) changes A's first place from ISR alone to a tie of DRAFT, SPLIT and ISR (F-05 only), or to DRAFT and SPLIT (both).\n\nTwo consistency problems change the sensitivity lines:\n- **F-15 (S5).** It is not a clause no row can meet. The open F-15 cells of DRAFT, SRV, RLOG and EMB-V8 contradict MECHANISMS.md, which puts their restore mark in the store's manifest. Combining the two user choices the verdict names gives SRV as the winner today, which the verdict does not mention.\n- **SPLIT's merge (S6).** SPLIT's SC-04 is kept open by a merge that its pair count leaves out. With the merge record, SPLIT has 295 pairs, not 278, so the 'one mechanism hands the win to SPLIT' claim is false. Without the merge, SPLIT is out. Either way COMP's lead over SPLIT is sturdier than the verdict says.\n\nScratch scripts that reproduce every computation are in /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/skeptic/ (scen.py, scen2.py, scen3.py, scen4.py, with common.py)."
+  },
+  {
+   "label": "check: E-41 prices",
+   "lens": "prices",
+   "verdict_survives": true,
+   "summary": "Plain answer: Fly's and Tigris's prices are now read from the vendors' own docs sources, and 10 of the 10 match E-41. One thing E-41 got wrong: it assumed data sent from Fly to Tigris is free, but Fly says this traffic is billed. The 13 AWS prices could not be read: the AWS hosts are not on this session's allowed network list. No DEP-21 verdict changes, and the winners do not move: ISR in part A, COMP in part B. The margins get thinner. PD's cell is now the one most likely to move, from open to fails.\n\nHow the prices were read (2026-11-10). The rendered pages fail from this session: WebFetch got \"host not found\" for fly.io/docs/about/pricing/, fly.io/pricing/ and www.tigrisdata.com/docs/pricing/. The session's environment (get_environment) allows only the package registries, dl.redpanda.com and repo.clojars.org. So I read the vendors' own published sources through the git proxy instead. Fly: the source of fly.io/docs/about/pricing/ in github.com/superfly/docs, commit ed9082f9 of 2026-11-09 (files about/pricing.mdx, about/billing.mdx and snippets/RegionPricingSelector.jsx, which holds the per-second rates). Tigris: Tigris's own docs, github.com/tigrisdata/tigris-os-docs, commit 358b7edb of 2026-11-10 (docs/ai-agents/tigris-vs-cloudflare-r2.md lines 98-101 and tigris-vs-s3.md line 88). Tigris's price page itself is on www.tigrisdata.com, which cannot be reached. After two hosts failed, I did not try the AWS hosts: the fetch tool says to stop, and the allowed list shows they are blocked.\n\nEach price E-41 uses (E-41 value -> what the vendor says -> match?):\n- fly.shared1x.256: 2.19 -> \"$2.19/month\", shared-cpu-1x 256MB, iad/ewr, per 30 days (pricing.mdx line 21) -> matches.\n- fly.ram.gb: 6.00 -> \"$6.00/GB/month\" (line 27); exact rate $0.000002316/GB-s = $6.0031 per 30 days -> matches.\n- fly.shared.cpu: 0.69, derived -> $0.0000008465/vCPU-s including 256 MB = $2.1941, minus 0.25 GB of RAM = $0.6934. The page also lists 512MB at $3.69 and 1GB at $6.70 -> matches.\n- fly.perf.cpu: 21 -> performance-1x 2GB \"$33.00/month\" (line 25); $0.000012732/vCPU-s = $33.001, minus 2 GB of RAM = $20.995 -> matches.\n- fly.volume.gb: 0.15 -> \"$0.15/GB/month\", provisioned (line 29) -> matches.\n- fly.rootfs.gb: 0.15 -> \"$0.15/GB/month of rootfs\" (line 28; billing.mdx line 41) -> matches, now from Fly itself, not third-party copies.\n- fly.egress.gb: 0.02 / 0.04 / 0.12 -> the same for NA+EU / APAC, Oceania, South America / Africa, India (line 34) -> matches.\n- fly.private.gb: 0 -> same-region transfer is free \"for organizations using granular data transfer rates\" (line 236). That is every organization made after 18 July 2024; older ones can opt in -> matches, with a condition E-41 leaves out.\n- E-41's note \"traffic from Fly to Tigris is free\" -> line 276: \"You will be billed separately for data transfer to these external third-party services, including Tigris Object Storage.\" No rate is named -> does NOT match.\n- tigris.storage.gb: 0.02 -> \"$0.02/GB/month\" -> matches. E-41 had marked it \"NOT confirmed\".\n- tigris.put.k: 0.005 -> Class A writes \"$0.005/1K\" -> matches. E-41 does not use these, but for the record: Class B is $0.0005/1K, and the free tier is 5 GB, 10K Class A and 100K Class B.\n- The 13 AWS prices (aws.t4g.nano 0.0042, t4g.small 0.0168, c7g.medium 0.0363, c7g.large 0.0725, gp3 0.08, inter-AZ 0.02, internet egress 0.09, s3.storage 0.023, s3.put.k 0.005, s3.get.k 0.0004, s3x.storage 0.11, s3x.put.k 0.00113, s3x.upload 0.0032) -> not read; still unconfirmed. Tigris's docs quote S3 Standard at $0.023/GB-month and internet egress at $0.09/GB, which agree, but that is a third party.\n\nWhat changes in the model. I re-ran E-41's cost.py on a scratch copy with three changes: Fly's exact rates, Fly's 730-hour month (it bills per second; its list prices are per 30 days), and the Fly-to-Tigris upload billed at $0.006 to $0.02 per GB. Results at 10 writes/s with subscribers inside, iad:\n- MIN's shape (MIN, MIN-TS, MIN-P, RUST, SIDE, LEAN, ISR, COMP): $7.36 to $7.89 (was $7.26).\n- DRAFT's family: $5.01 to $5.54. SLOG and RLOG: $5.07 to $5.60. EMB-V8: $5.86 to $6.38. V4: $7.12.\n- SRV $11.81 to $12.34. PD $18.48 to $19.01. BUY $16.14. OBJ $135.87 to $136.39.\n- Asleep: unchanged, $0.00 to $0.60.\n- At 5,000 writes/s the upload is 13,140 GB a month, so MIN goes from $118 to $198-$382. Under the $0.02 rate, BUY ($136) becomes the cheapest row, because it keeps no log in the object store.\n\nDEP-21 cells, all 20 in judging/DEP.settled.json:\n- OBJ still fails, at 13.6 times the bar.\n- The 19 open cells stay open. Each cell's closing condition still needs the user to say where the 100 subscribers run.\n- The price half of that condition is now met for Fly and Tigris. But cost.py needs the Tigris line, and AWS is still unread (no DEP-21 cell uses AWS numbers).\n- Margins shrink from \"1.4 to 2 times\" to \"1.3 to 2 times\".\n- In other Fly regions, MIN's shape goes over $10 even with the subscribers inside: São Paulo $11.86-12.52, Johannesburg $10.70-12.54. J's first regions, iad and ams, stay under.\n- SRV's \"one app machine, $9.45\" fallback becomes $9.58 to $10.11.\n- PD's last price reason is gone. Even with one app machine it costs $16.26 to $16.78, 1.6 times the bar, so a referee could rule it fails. That does not move the winner: PD is 17th in part A, and in part B it is already out on three MUSTs.\n\nAlso missing: DEP-21 asks VERDICT.md for a written reason for each row over 2 times the cheapest, and VERDICT.md has none.\n\nFiles I wrote, all in the scratchpad (no repo file was edited):\n- Vendor sources: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/e41-price-check/fly-docs and /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/dl/e41-price-check/tigris-docs\n- Re-run scripts: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/recheck.py, /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/floors.py and /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/regions.py\n- Their raw output: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/results/recheck.md, /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/results/floors.md and /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/e41-recheck/results/regions.md\n\nTo read the AWS pages, the user would have to allow aws.amazon.com and pricing.us-east-1.amazonaws.com in the session's network settings. The same goes for fly.io and www.tigrisdata.com, to read the rendered pages themselves.",
+   "findings": [
+    {
+     "id": "P-1",
+     "severity": "changes a reported number or claim",
+     "claim": "E-41 inputs.md, tigris.storage.gb row: \"Traffic from Fly to Tigris is free (Fly docs, search summary)\". cost.py has no line for the bytes uploaded to the object store. Every Fly figure that keeps a day of log in Tigris is therefore low. That includes the DEP-21 cells' margin \"1.4 to 2 times\" and VERDICT.md line 305, \"DEP-21: $135.80 a month against $10\".",
+     "evidence": "Cited: Fly's docs source, superfly/docs commit ed9082f9 (2026-11-09), about/pricing.mdx line 276: \"You **will** be billed separately for data transfer to these external third-party services, including Tigris Object Storage. See our data transfer pricing\". No separate rate is named; the page's rates run from $0.006/GB (private, between regions, NA/EU) to $0.02/GB (internet, NA/EU). Computed on a scratch copy of cost.py (scratchpad/e41-recheck/results/recheck.md, runs D and E). The upload is 26.28 GB a month at 10 writes/s and 13,140 GB at 5,000. At 10 writes/s, iad: MIN $7.26 -> $7.52-7.89, DRAFT $4.94 -> $5.17-5.54, SRV $11.64 -> $11.97-12.34, OBJ $135.80 -> $136.02-136.39. At 5,000 writes/s: MIN $118 -> $198-382, DRAFT $96 -> $176-360, EMB-V8 $79 -> $158-342, OBJ $1,389 -> $1,468-1,652. BUY ($136) and V4 upload nothing.",
+     "fix": "Add a cited price to cost.py: Fly to Tigris transfer, $0.006 to $0.02/GB, from pricing.mdx line 276. Apply it to every row that uploads the log, then re-run. Update E-41's tables, 'What the money goes on' and its Q-41 line. Change the DEP-21 cells' 'why' from '1.4 to 2 times' to 'about 1.3 to 2 times'. Change VERDICT.md line 305 to 'about $136 a month against $10'."
+    },
+    {
+     "id": "P-2",
+     "severity": "changes a reported number or claim",
+     "claim": "E-41 README: \"no price was read from the vendor's own page\"; \"Three are weaker still: Fly's price for a stopped machine's disk (third-party copies only), Tigris's prices (not confirmed; set equal to S3 Standard)\". Every DEP-21 cell's why2 rests the open verdict partly on \"prices E-41 read from search summaries\". VERDICT.md line 172 still lists \"every price re-read on the vendor's page\" as an open item.",
+     "evidence": "Read 2026-11-10 from the vendors' own docs sources (the rendered pages fail: fly.io and www.tigrisdata.com give 'host not found'). Fly, superfly/docs ed9082f9 (2026-11-09), about/pricing.mdx: shared-cpu-1x 256MB $2.19 (line 21); 512MB $3.69; 1GB $6.70; performance-1x 2GB $33.00 (line 25); extra RAM $6.00/GB (line 27); stopped rootfs $0.15/GB (line 28, and billing.mdx line 41); volume $0.15/GB (line 29); internet egress $0.02 / $0.04 / $0.12 (line 34); same-region free (line 236). snippets/RegionPricingSelector.jsx lines 25-27 give the per-second rates: shared $0.0000008465/vCPU-s, performance $0.000012732/vCPU-s, RAM $0.000002316/GB-s. Those make 0.6934 for fly.shared.cpu (E-41: 0.69), 20.995 for fly.perf.cpu (21) and 6.0031 for fly.ram.gb (6.00). Tigris, tigris-os-docs 358b7edb (2026-11-10), docs/ai-agents/tigris-vs-cloudflare-r2.md lines 98-101: storage $0.02/GB-month, Class A $0.005/1K, Class B $0.0005/1K. So all 8 Fly prices and both Tigris prices match.",
+     "fix": "In E-41 inputs.md and cost.py, change 'how it was read' for the 8 Fly and 2 Tigris prices to the vendor's docs source, with the commit and date. Keep E-41 'partial' for the AWS prices only. Remove 'on prices read from search summaries' from the DEP-21 cells' why2 for the Fly figures. Narrow VERDICT.md line 172 to: where the 100 subscribers run; the region; the AWS prices; cost.py re-run with the Tigris transfer line."
+    },
+    {
+     "id": "P-3",
+     "severity": "changes a reported number or claim",
+     "claim": "PD's DEP-21 cell stays open because \"the margin is under two times and rests on prices read from search summaries and on assumed machine counts\". SRV's cell says \"With one app machine it would be $9.45, so this is not a failure by design.\"",
+     "evidence": "Computed from scratchpad/e41-recheck/results/floors.md, with page rates, a 730-hour month and the Tigris upload. PD as E-41 shapes it costs $18.48-19.01 (1.85-1.90 times the bar). With one app machine it is $16.26-16.78 (1.63-1.68 times). It reaches $9.58-10.11 only if the placement driver moves inside the stores, which is no longer PD's shape. So the price reason is gone, and even PD's smallest own shape is 1.6 times over. SRV with one app machine moves from $9.45 to $9.58-10.11, and crosses $10 at the $0.02/GB transfer rate. Neither moves a winner: in part A PD is 17th either way, and in part B PD is already out on F-22, PERF-04 and SC-05, and SRV on PERF-04.",
+     "fix": "Have the referee re-rule PD's DEP-21 cell with the price reason removed (fails, on its shape, at 1.6 times or more). Change SRV's why2 to 'With one app machine it would be $9.58 to $10.11, at or just over the bar'. No change to OUTCOME's winners."
+    },
+    {
+     "id": "P-4",
+     "severity": "changes a reported number or claim",
+     "claim": "E-41: \"DEP-21 is met by MIN's family, LEAN, DRAFT's family, SLOG, RLOG, ISR and EMB-V8 on Fly\". The DEP-21 cells say these rows sit \"1.4 to 2 times under $10\" with the subscribers inside. Both use only the cheapest Fly regions (iad, ewr), and nothing says so.",
+     "evidence": "Cited: pricing.mdx line 15, 'Machine prices in this table are for Ashburn ... and Secaucus ..., our lowest-priced regions'. RegionPricingSelector.jsx lines 3-21 give machine markups of 1.0 (iad, ewr), 1.038 (ams), 1.15 (fra), 1.25 (ord, dfw), 1.27 (sin, syd), 1.30 (jnb), 1.31 (nrt) and 1.615 (gru). Computed from scratchpad/e41-recheck/results/regions.md, 10 writes/s, subscribers inside. MIN's shape (also COMP's and ISR's) costs $7.52-7.89 in iad, $11.86-12.52 in gru and $10.70-12.54 in jnb, so it is over the bar there. DRAFT's family stays under everywhere ($5.17-9.52). REQUIREMENTS SC-14 names J's first regions as iad and ams, where the bar holds (ams markup 1.038).",
+     "fix": "Add a region line to E-41 ('prices are iad/ewr; MIN's shape passes $10 in gru and jnb'). Add 'the region' to DEP-21's closing condition in the cells and in VERDICT.md line 172, or restate the bar as 'in J's home regions (iad, ams)'."
+    },
+    {
+     "id": "P-5",
+     "severity": "changes a reported number or claim",
+     "claim": "DEP-21 says: \"A candidate more than 2× the cheapest at any load needs a written reason in VERDICT.md.\" E-41's verdict lists OBJ (both loads), SRV, PD and BUY at 10 writes/s as owing that reason. VERDICT.md has no such reason: no line mentions 'cheapest' or the 2× threshold.",
+     "evidence": "grep of VERDICT.md: E-41 is cited only at lines 172, 305 and 421. Re-computed ratios to the cheapest non-reference row (scratchpad/e41-recheck/results/recheck.md, runs C to E). At 10 writes/s the cheapest is DRAFT's family at $5.01-5.54: SRV is 2.2-2.4 times, PD 3.4-3.7, BUY 2.9-3.2 and OBJ 24.6-27.1. At 5,000 writes/s only OBJ passes 2 times: 17.6 times with no transfer line, 9.3 times at $0.006/GB, 4.8 times at $0.02/GB. So the list of rows owing a reason is unchanged by the re-check.",
+     "fix": "Add one short paragraph to VERDICT.md. OBJ: a PUT for every commit window. SRV, PD and BUY at 10 writes/s: the app runs on machines of its own beside the servers (and PD adds three placement-driver machines). Quote the re-checked ratios above."
+    },
+    {
+     "id": "P-6",
+     "severity": "changes a reported number or claim",
+     "claim": "E-41: \"DEP-21's ... 5,000 writes/s\" table puts EMB-V8 cheapest ($79), says MIN's bill is mostly machines ($99 of $118), and says \"No row with its own disks is far from another\".",
+     "evidence": "Computed (recheck.md run E, transfer at $0.02/GB). Uploading a day of log to Tigris costs $263 a month at 5,000 writes/s, more than MIN's three machines ($100). BUY, which keeps its history on its own disks, becomes cheapest overall at $136, against $342-393 for every fero row that uploads. At the $0.006/GB lower bound the upload is $79, and EMB-V8 stays the cheapest fero row at $158. OBJ against the cheapest non-reference row falls from 17.5 times to 4.8-9.3 times. SLOG against MIN stays about 1.0 times, so 'the hosted shape is not reopened' still stands.",
+     "fix": "In E-41, add the upload to 'What the money goes on' at 5,000 writes/s. Note that on Fly the object-store copy of the log, not the machines, is the largest item at that load, and that BUY beats every fero row there only because it uploads nothing. Reasoned: compression, or less log kept in the store, would cut it."
+    },
+    {
+     "id": "P-7",
+     "severity": "wording or clarity",
+     "claim": "E-41: \"On Fly, traffic between machines in one region is free, so replication costs nothing there\". The DEP-21 restated bar rests on subscribers 'inside' costing nothing to reach.",
+     "evidence": "Cited: pricing.mdx line 236 makes same-region transfer free only 'for organizations using granular data transfer rates'. Line 241 says organizations made after 18 July 2024 get those rates automatically and older ones can opt in. Without them, all transfer except inbound traffic and traffic 'from apps without an assigned IP address' (line 237) is billed at the internet rate. Reasoned arithmetic: at 10 writes/s, 100 subscribers inside would then cost 2,628 GB x $0.02 = $52.56, the same as outside.",
+     "fix": "Add the condition to E-41's 'Bytes across failure domains' rule and to the DEP-21 restated bar: the platform's Fly organization must use granular data-transfer rates."
+    },
+    {
+     "id": "P-8",
+     "severity": "wording or clarity",
+     "claim": "cost.py uses H = 730 hours a month but takes Fly's machine prices as monthly. E-41: free project awake all month, one copy, for DRAFT's family, SLOG and RLOG: \"2.19 ok\".",
+     "evidence": "Cited: pricing.mdx line 17: 'Monthly Machine prices assume 30 days of continuous runtime. Machines are billed by the second ..., so an always-on Machine costs slightly more in a 31-day month.' Computed: a 730-hour month adds 1.4% to every Fly machine line. MIN at 10 writes/s goes from $7.26 to $7.36. One always-on smallest machine costs $2.22 in an average month, against J's $2.19 bar. That column is E-41's extra, not one of DEP-21's three loads, so no DEP-21 cell changes.",
+     "fix": "In cost.py, scale Fly machine prices by 730/720, or price per second. In E-41, say the $2.19 bar is the 30-day price, so a free project awake all month is about $0.03 over it in an average month."
+    },
+    {
+     "id": "P-9",
+     "severity": "wording or clarity",
+     "claim": "E-41's 13 AWS prices (EC2 t4g.nano, t4g.small, c7g.medium, c7g.large; gp3; inter-AZ $0.02; internet egress $0.09 'from memory'; S3 Standard storage, PUT and GET; S3 Express One Zone storage, PUT and upload) and REQUIREMENTS DEP-21's '$0.01 per GB each way between zones' are still unconfirmed.",
+     "evidence": "Not read in this session. get_environment shows a limited network (package registries, dl.redpanda.com, repo.clojars.org). fly.io and www.tigrisdata.com failed with 'host not found', and the fetch tool says to stop after a second host fails that way, so aws.amazon.com and pricing.us-east-1.amazonaws.com were not tried. Tigris's own docs (tigris-vs-s3.md lines 79-80) quote S3 Standard at $0.023/GB-month and AWS internet egress at $0.09/GB, matching E-41, but that is a third party. No DEP-21 cell's margin uses an AWS figure: all of them cite Fly.",
+     "fix": "Keep E-41 marked partial for AWS only, and say no DEP-21 verdict rests on it. To finish, the user allows aws.amazon.com and pricing.us-east-1.amazonaws.com in the session's network settings; then re-read the 13 prices, or pull them from the public Price List offer files."
+    }
+   ]
+  },
+  {
+   "label": "skeptic: alternatives",
+   "lens": "The strongest case for a different answer: (a) the MIN family, SPLIT, DRAFT, ISR, BUY; (b) designs the space missed or pruned (Kafka on object stores, FoundationDB, Calvin and Fauna, Delos and LogDevice, Restate, CRDT-first); (c) requirements read too strictly.",
+   "findings": [
+    {
+     "id": "S1",
+     "severity": "changes the winner",
+     "claim": "Section 0: \"COMP ... wins\" in outcome B. Section 5 says COMP is \"MIN-P with each group's leader healing its own replicas, the loop on #meta's leader kept only to propose slot moves, and a memory rung\". No one scored the smaller change: MIN-P plus the memory rung only, with MIN-P's controller still healing (C = cent-co). Call it H1.",
+     "evidence": "Computed (scratch scripts, repo untouched). (1) In the settled files, COMP and MIN-P get the same verdict on every cell but PERF-04, in both outcomes. In B: MIN-P fails PERF-04, COMP has it open. Same 5 SHOULDs met, 4 not met, 7 open (celldiff.py COMP MIN-P). So leader healing earns COMP no cell. (2) The study's own pair rule (judging.py pairs) gives H1 264 pairs against COMP's 283. The whole gap is the control plane: healing-self (25 pairs), planner-hints (16) and slow-leader-self (11) make 49 distinct pairs; controller-commands (21) and slow-leader-controller (9) make 30 (pairdelta.py). Even with a planner-hints unit added, H1 has 280 against 283. (3) Novel mechanisms: settled 3 against 3, counter a 3 against 3, counter b 3 against 5. (4) Rule 3: the counts are less than 2 apart, the SHOULDs are level, so fewer pairs wins: H1. Rerunning judging.outcome with H1 as a 21st row (MIN-P's settled cells, PERF-04 taken from COMP's cell) gives winner H1 in B. It holds for judge 1 alone, judge 2 alone, open SHOULDs counted either way, SHOULDs first, counter a, counter b (there 3 against 5, so H1 wins outright), each SHOULD left out, and 39 of 42 ±2 swings. The exceptions: PERF-01 losses accepted (MIN-P wins), the 'other' readings (level), and COMP −2 / H1 +2 (h1rank.py). AMENDMENTS 2 (axis C) claims cent-co has 'one more interacting pair'. In the composed row the code shows 19 fewer. AMENDMENTS 4 line 413 already says 'COMP becomes MIN-P with a memory rung' if self is 2 mechanisms above cent-co, but it missed the pair tie-break at equal counts. Reasoned extra: H1 has no K-07 (section 9's first model to write) and no K-27. Its slow-leader rule takes the controller form, which has a precedent, so it avoids two of MECHANISMS 4.5's close calls (planner hints and the leader's own slow-leader rule).",
+     "fix": "Score 'MIN-P + maj-m' (COMP with C = cent-co) as a row. Unless a cell is found where leader healing beats the controller, name it the outcome-B winner. Rewrite sections 0, 3, 5 and 8 item 2: the PERF-01 choice then decides only whether the winner carries the memory rung (accepted loss: MIN-P; no accepted loss: MIN-P + maj-m). It no longer decides between COMP and MIN-P."
+    },
+    {
+     "id": "S2",
+     "severity": "changes the winner",
+     "claim": "Section 1 and AMENDMENTS 4 present COMP as 'the option the evidence favours on each axis', then apply rule 3 only to the 20 submitted rows. But the axes were chosen by other measures: E-16's rule count for C (14 against 18) and E-17's rule count for P (28 against 37). Rule 3 counts novel mechanisms, then SHOULDs, then pairs, not rules. So COMP is not rule 3's best row even on the study's own menu.",
+     "evidence": "Computed (h2rank.py, allrank.py, allrank_par.py). The slot move is novel (MECHANISMS 3). split-record, merge-record, range-table, split-policy and lineage are all settled not novel (TiKV and CockroachDB precedents). COMP and SPLIT differ on only three cells (DEP-15 S, P-17, TEST-12), none of which puts a row out or changes a SHOULD met. H2 is COMP with split+merge instead of slot moves: 2 novel, 267 pairs, beats COMP (one apart, SHOULDs level, fewer pairs). H5 is MIN-P + maj-m + split+merge, a CockroachDB-shaped row: 2 novel, 251 pairs, unbeaten against COMP, H1, H2, SPLIT, DRAFT and H4. With the par variants that VERDICT section 4 already admits, H5+par is unbeaten and COMP places 8th of 10. Split rows also keep SC-03 open above F_w = 135, where slot rows fail (VERDICT section 4, last table).",
+     "fix": "Either search the option menu with rule 3 itself (one axis at a time from COMP, scored with judging.py's tally, rank and pair code) and report what it finds; or say plainly that the study trusts rule counts and model results more than rule 3's tie-breaks, and amend rule 3 to say so. Until one of these is done, section 0 cannot say COMP is 'the answer that answers everything'."
+    },
+    {
+     "id": "S3",
+     "severity": "changes the winner",
+     "claim": "VERDICT says only outcome A ranks rows by how little was tested ('ISR leads because its F-05 and F-17 were never run'). Outcome B has the same flaw. A published shape with COMP's own non-novel fixes beats COMP there, while carrying far more open MUSTs.",
+     "evidence": "Computed (h4rank.py). In B, PD (TiKV's shape, 0 novel) fails only F-22, PERF-04 and SC-05. Each is fixed by a non-novel option on COMP's own line: Z rejoin (AMENDMENTS A-28 says it meets F-22 M), Q maj-m (the same PERF-04 'open' as COMP) and S +tier (SC-05 open as for COMP). H4 is PD + disk-incarnation + tier + restore-mark + memory-rung: 0 MUSTs failed, 1 novel (the restore mark), 244 pairs. Rule 3: 1 against 3 is 2 apart, so H4 beats COMP outright. But it has 121 MUSTs open against COMP's 97, because 'PD's family was never built or modelled here' (PD's cells). SPACE 4.3 pruned FoundationDB's shape and Calvin by reasoning on goal G4, not by the rule. By DEV-10, a published shape counts 0 novel.",
+     "fix": "Section 4 should state that rule 3 ignores open MUSTs in B too, so an untested published shape with COMP's fixes would win. Either add a guard to the rule (for example, a row must have a built and run prototype, or a cap on open MUSTs), or judge a TiKV-shaped or FoundationDB-shaped row with COMP's fixes before naming a winner."
+    },
+    {
+     "id": "S4",
+     "severity": "changes a reported number or claim",
+     "claim": "Section 0: 'The margin is thin ... one more for COMP alone, or one fewer for SPLIT, hands the win to SPLIT.' Section 3: 'if the counts were less than 2 apart, the pairs would pick SPLIT.' Section 4: 'A precedent for any one of SPLIT's three makes SPLIT the winner.' Section 3's table gives SPLIT 278 pairs.",
+     "evidence": "The SC-04 ruling (judging/SC.rulings.json) keeps SPLIT open only because 'the row shrinks through the merge'. It adds: 'if SPLIT keeps the merge, DEV-01 counts it for SPLIT, and if it does not, SC-04 fails'. But mechanisms.json gives merge-record to PD only, so the arithmetic uses the open SC-04 without the merge's pairs. With merge-record added to SPLIT, its pairs are 295 (computed). Then COMP +1, +2 or +3 and SPLIT −1, −2 or −3 all keep COMP first in B (whatif.py). Under the other branch (no merge, SC-04 fails), only DRAFT and COMP are in, and COMP still wins under every swing tried. VERDICT section 6 says 'either way COMP's lead holds', but sections 0, 3, 4 and 9 still state the thin margin.",
+     "fix": "Add merge-record to SPLIT's rows (295 pairs). Rewrite the margin lines: against SPLIT, COMP's lead now rests on pairs (283 against 295), not on the 2-mechanism threshold. Section 9's first overturn row holds only if the new mechanism adds 13 or more pairs to COMP."
+    },
+    {
+     "id": "S5",
+     "severity": "changes the winner",
+     "claim": "MECHANISMS 3 and VERDICT section 4: log replicas, 'lead only to repair', are novel, and 'TiKV's witness could not be checked by either counter'. The dedup window is novel because 'the set ... is the draft's own'.",
+     "evidence": "Cited. TiKV RFC PR #106, 'RFC: support witness (log only replica)' (github.com/tikv/rfcs/pull/106/files), says: 'witness can be elected as leader if the other voter's log is out of date'; 'To let the witness replicate the log to the lagged voter, the witness should be elected as the leader'; 'After voter(p1) receives the up-to-date log from witness(p2), voter(p1) is able to become the leader'; while it leads 'all reads and writes are rejected with error IsWitness'; and 'PD scheduler would file a transfer leader to one of the healthy voters'. The tracking issue tikv/tikv#11499 lists 'Leader election: leader replica failure and witness replica has latest log case'. A web search reports that TiKV's configuration docs list a witness setting introduced in v6.6.0. I could not open docs.pingcap.com (the host is outside this session's network), so the v6.6 shipping date rests on the search result. This is the same state, rules and role; fero's 2 × election.ms wait and its self hand-off are details of the kind the referee accepted for healing-self. Computed on the files as they stand: with log-replicas not novel, SPLIT has 4 and B's winner becomes SPLIT (whatif.py). The same happens with dedup-window not novel, or dormant-groups not novel. On the dedup window the standard is uneven. Its parts are each cited (Kafka KIP-98 producer sequence with 5 cached batches; deadlines cut at each hop), and it includes forward-once. COMP's client-sessions carries forward-once too and is judged not novel, and the memory rung was judged not novel from a set of three precedents.",
+     "fix": "Settle log-replicas as not novel, with TiKV RFC #106 as the precedent (DRAFT 5, SPLIT 4, CELL 4, LANE 3). Re-judge dedup-window by the same set-of-precedents standard used for the memory rung. Apply this together with S4: with SPLIT's merge counted, COMP still beats SPLIT on pairs (283 against 295), though H1 and H5 still beat COMP."
+    },
+    {
+     "id": "S6",
+     "severity": "changes a reported number or claim",
+     "claim": "Section 4: 'Outcome B's winner does not depend on which judge was right ... or on either counter', with the 88.9% agreement given as the basis for confidence.",
+     "evidence": "The leading rows hardly differ on cells. COMP and MIN-P differ only on PERF-04, COMP and DRAFT only on DEP-15 S, and COMP and SPLIT only on DEP-15 S, P-17 and TEST-12 (celldiff.py). So the order among them is set by the mechanism catalogue and the pair counts, not by the judges. The pairs come from reads and writes lists written once in judging/mechanism-list.json. The two blind counters judged only key, novel, precedent, rows and why: their judgment files have no reads or writes. Every corrected case above (S1, S2, S4) is decided by pairs, with margins of 3 to 19 pairs.",
+     "fix": "Section 4 should say that the top of the ranking rests on the novelty catalogue and on a reads/writes annotation that no second agent checked. Have a second agent check the reads and writes of the units that separate the top rows: healing-self, planner-hints, slow-leader-self and slow-leader-controller, controller-commands, memory-rung, slot-move, slot-table, move-policy, split-record, merge-record, dedup-window, client-sessions."
+    },
+    {
+     "id": "S7",
+     "severity": "changes the winner",
+     "claim": "Section 0 names COMP. But section 4's last table says 'Rule 3 as written would rank [COMP+par] above COMP', and the rule in force is 'rule 3 in the order written' (section 1).",
+     "evidence": "VERDICT section 4: par-repair is settled not novel, so COMP+par keeps 3 novel mechanisms and meets F-22 (S), one more SHOULD. No MUST is shown failed (rule 1: not modelled means open). Section 8 item 3 says 'COMP follows rule 4', but rule 4 is not the rule in force. Computed: with par, H1+par (274 pairs) still beats COMP+par (293), and H5+par wins overall (allrank_par.py).",
+     "fix": "Either name COMP+par (better, H1+par or H5+par) as rule 3's winner, or state that the user's rule-4 ordering is assumed, and list it in section 8 as a choice that changes the winner."
+    },
+    {
+     "id": "S8",
+     "severity": "changes a reported number or claim",
+     "claim": "Section 0 bullet 4 and section 8 item 2: 'accept by name the loss of JetStream's default row and MIN-P wins'. This is presented as one of the two choices that can change the answer.",
+     "evidence": "PERF-04's own text asks for 'sync matched where the server allows always-sync'. The default-row MUST comes from PERF-01's clause that 'fero's matching rung must win'. That reading forces a memory rung whose win is shown only in Rust (0.33 ms), at 50,000 writes a second, not with one write in flight and not through the gateway. In TS it reads 0.57 ms against 0.55 ms, and its safety is not modelled (K-09; E-02, E-09b). With S1 applied, this choice decides only whether the memory rung is added to the same row (MIN-P alone against MIN-P + maj-m). It no longer picks between design families (computed: with PERF-01 losses accepted, MIN-P beats H1, 252 against 264 pairs).",
+     "fix": "Restate item 2: 'Accept the loss: the winner is MIN-P. Do not accept it: the winner is MIN-P plus the memory rung, which then owes K-09 and the native step.' Say that the strict reading is what puts the simpler row out."
+    },
+    {
+     "id": "S9",
+     "severity": "wording or clarity",
+     "claim": "Section 10 ('What the skeptics said') and section 6 do not say where the outside designs fall. The prompt names Kafka on object stores, FoundationDB, Calvin and Fauna, Delos and LogDevice, Restate, and CRDT-first.",
+     "evidence": "Mapping, cited and reasoned. WarpStream and Bufstream map to OBJ, which is out on P-01 and others. WarpStream's own docs give p99 produce under 150 ms on S3 Express, about 50 ms with Lightning Topics (docs.warpstream.com low-latency clusters; warpstream.com S3 Express benchmark), against a bar of C + 5 ms = 5.73 ms. AutoMQ is Kafka's partition writer with a WAL on EBS multi-attach, fenced by NVMe reservation locks, plus S3 (docs.automq.com WAL storage). Replication is outsourced to a cloud disk, which no SPACE option covers and which a solo node or a plain host cannot use. Its S3-WAL mode has OBJ's latency (reasoned). Restate's Bifrost (a segmented virtual log; seal, then a new segment; an epoch bump on failover; docs.restate.dev/references/architecture), Delos and LogDevice map to SLOG: out on PERF-04, and 5 novel even with a memory rung. Calvin and Fauna map to R calvin: 10 ms epochs against P-01, and methods must declare read and write sets (SPACE 4.3). CRDT-first maps to V4 and crdt+c: V4 fails P-14 by measurement. FoundationDB (Zhou et al., SIGMOD 2021; unbundled sequencer, resolvers and log servers; one recovery path, reported under 5 s in production by a secondary summary) maps to PD for transactions and G clus. It was pruned by reasoning, never judged, and would count 0 novel. So only the published TiKV, CockroachDB and FoundationDB family threatens COMP under the rule (S2, S3). Unchecked lead for dormant groups: Neon safekeepers evict inactive timelines and bring them back on access (PRs #9428 and #9485); not verified at the source.",
+     "fix": "Add this mapping to section 10. Add an FDB- or TiKV-shaped row with COMP's fixes to the next judging round, or state why rule 3 should not reward it (see S3)."
+    }
+   ],
+   "verdict_survives": false,
+   "summary": "COMP does not survive as the winner of outcome B under the study's own rule.\n\n**The main problem.** One step from COMP toward MIN-P beats it: MIN-P plus the memory rung, keeping MIN-P's controller for healing (H1). The judges gave MIN-P and COMP the same verdict on every cell except PERF-04, so leader healing earns COMP no cell. The novel counts tie (3 against 3), and so do the SHOULDs (5 against 5). The study's own pair code gives 264 pairs against COMP's 283. All 19 extra pairs come from COMP's leader healing, its planner hints and its own slow-leader rule. So rule 3 picks H1.\n\nH1 wins under every line of OUTCOME's sweep that keeps COMP the winner. Under counter b's counts it wins outright, 3 novel mechanisms against 5. It also has no K-07 crossing (section 9's first model to write) and no K-27 crossing.\n\n**COMP is not rule 3's best row even on the study's own menu.** AMENDMENTS chose each axis by counting rules (E-16 for healing, E-17 for slots), not by rule 3. Swapping slot moves for split+merge (none of those units is novel) gives a row with 2 novel mechanisms and 251 pairs (MIN-P's controller, split+merge, memory rung). It beats every other row. A TiKV-shaped row with three of COMP's own non-novel fixes has 1 novel mechanism and also beats COMP. But it has 121 MUSTs open against COMP's 97: the same \"less tested ranks first\" effect the verdict names only for outcome A.\n\n**Checks on the margin against SPLIT.**\n- I found a precedent for SPLIT's \"log replicas\": TiKV RFC #106, a log-only witness that leads only to repair. On the files as they stand, that flips outcome B to SPLIT.\n- SPLIT's 278 pairs leave out the merge record. The referee's own SC-04 ruling relies on that merge. Counted, SPLIT has 295 pairs, and then COMP stays ahead of SPLIT under any swing of up to 3 novel mechanisms.\n- So the \"thin margin\" lines in sections 0, 3, 4 and 9 are wrong in COMP's favour. But its lead then rests on pair counts.\n- Those pair counts come from reads and writes lists written once; no second agent checked them. The leading rows differ on only one to three cells each, so these counts, not the judges, set the order.\n\n**The other answers.**\n- The strict PERF-01 reading (fero's matching rung must beat each competitor's default) is what keeps the MIN family out. With H1, that choice only decides whether the memory rung is added.\n- The verdict's own section 4 already ranks COMP+par above COMP under the rule in force.\n- WarpStream and Bufstream map to OBJ, Restate, Delos and LogDevice to SLOG, Calvin and Fauna to `calvin`, CRDT-first to V4. All are out.\n- FoundationDB and TiKV's shape were pruned before judging, by reasoning. They are the only outside designs that could win under rule 3.\n- BUY and ISR stay out on structural failures.\n\n**What I could not check.** docs.pingcap.com is outside this session's network, so TiKV witness shipping in v6.6 rests on a search result, not the docs page.\n\n**Files.** Every computation reuses tools/judging.py's own functions from scratch scripts. Nothing in the repo changed. The scripts are in /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/skeptic-alt/:\n- whatif.py: precedent changes and the merge fix\n- celldiff.py: cells where two rows differ\n- pairdelta.py: where COMP's extra pairs come from\n- hybrids.py: novel count and pairs of each hybrid row\n- h1rank.py: MIN-P plus the memory rung as a 21st row, with OUTCOME's full sweep\n- h2rank.py: COMP with split+merge, and both swaps together\n- h4rank.py: TiKV's shape with COMP's fixes\n- allrank.py: every hybrid ranked at once\n- allrank_par.py: the same, with the par variants"
+  }
+ ],
+ "recheck": {
+  "lens": "Newcomer read of VERDICT.md, checked line by line against the study files. I rebuilt the outcome in a scratch copy and re-derived every count with independent scripts in /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/vcheck/scripts/ (pairs_check.py, sweep2.py, cells_check.py, rerule2.py, keep_worded.py, letback.py). Those scripts reuse only judging.py's tally, rank and pair rule.",
+  "findings": [
+   {
+    "id": "V-01",
+    "severity": "changes a reported number or claim",
+    "claim": "SPLIT2 \"3 novel, 6 SHOULDs, 266 pairs\" and \"wins on pairs, by 8\" (sections 0, 4, 6, 9 step 1, and 10 at 3-S2 and 3-S6). Section 1 defines SPLIT2 as \"SPLIT made like COMP2: client sessions, no log replicas, the controller heals, its merge counted, par\".",
+    "evidence": "The scratch script that built the number, verdict-fix/far.py S2, also removes `tenant-budget`. In mechanisms.json that mechanism sits on axis N (`tier`), and SPLIT's N is `tier` (SPACE 4 / AMENDMENTS 3 Y-M-Z-N table). So the 266 quietly switches SPLIT's N to `proc`, and section 1 never says so. Built exactly as section 1 describes it, SPLIT2 has 270 pairs (pairs_check.py), so its lead over COMP2 is 4, not 8. Changing N also changes SPLIT's OPS-14 cell under the shared-tier choice: SPLIT's alt is `fails`, COMP's has none. That makes a fourth cell assigned by reasoning.",
+    "fix": "Either add \"N `proc` (no tenant budget)\" to SPLIT2's line in section 1 and count OPS-14 among its reasoned cells, or keep N `tier` and report 270 pairs and a 4-pair lead everywhere 266 and \"by 8\" appear (sections 0, 4, 6, 9, 10)."
+   },
+   {
+    "id": "V-02",
+    "severity": "changes a reported number or claim",
+    "claim": "PD+fix: \"PD's cells, with COMP's F-22 (M), PERF-04 and SC-05: three cells assigned by reasoning, and PD's own cells for the other 145\"; \"119 MUSTs open, 13 met\" (sections 0, 1, 4, 6; item 24).",
+    "evidence": "PD+fix adds the object-store tier. Two PD cells it copies as `met` rest on PD having no store. F-15's reason is \"This row has no object store on any path, so nothing can wait for one\" (F.settled.json). OPS-14's reason is \"no log tier and no object store among its options\" (TEST-OPS.settled.json). COMP, which has a tier, is `open` on OPS-14 because \"the hosted object store holds many projects\". With those two cells moved to `open`, PD+fix has 121 open and 11 met. It still ranks first on the count (0 novel).",
+    "fix": "Assign PD+fix's F-15 and OPS-14 from a row with a tier (COMP's OPS-14; DRAFT-style `open` for F-15). Say five cells are assigned by reasoning, and report 121 open and 11 met."
+   },
+   {
+    "id": "V-03",
+    "severity": "changes a reported number or claim",
+    "claim": "Section 10 re-ruling: \"DEP-21 (M), PD, both readings: open → fails (structural: its shape's machines)\", resting on \"$18.48 to $19.01 as E-41 shapes it, $16.26 to $16.78 with one app machine\". Also P-3 \"Taken\", and the claim that only the DATA-01 re-ruling puts PD+fix out.",
+    "evidence": "The same price-check output, e41-recheck/results/floors.md, prices a third PD shape: \"PD, PD inside the stores, one app $9.58 / $9.74 / $10.11\". That is under or at the $10 bar except at the internet-rate upload. So the bar is not missed structurally; only E-41's assumed shape misses it. Also, if this re-ruling were taken, PD+fix (which copies PD's DEP-21 cell and adds a tier and a rung) would fail DEP-21 too. Neither the section 10 table nor item 24 says that.",
+    "fix": "Keep PD's DEP-21 open, or re-rule it only for E-41's shape, and cite the $9.58 to $10.11 shape. If the re-ruling stays, add that it also puts PD+fix out."
+   },
+   {
+    "id": "V-04",
+    "severity": "changes a reported number or claim",
+    "claim": "Section 6 and item 26: COMP2's shape is \"over [$10] in São Paulo ($11.86 to $12.52) and Johannesburg ($10.70 to $12.54)\". P-4 is marked \"Fixed\".",
+    "evidence": "e41-recheck/results/regions.md puts MIN's shape at $9.81 to $10.46 in nrt (Tokyo) and $9.55 to $10.21 in sin/syd (Singapore and Sydney), both over $10 at the internet-rate upload. Only DRAFT's family stays under $10 everywhere except jnb at the top of its range.",
+    "fix": "Name nrt and sin/syd as over $10 at the upper end, in section 6 and in item 26."
+   },
+   {
+    "id": "V-05",
+    "severity": "changes a reported number or claim",
+    "claim": "DEP-21 for COMP2 is discussed only against the $10 bar (section 5's closer, section 6, item 26). The COMP cell says \"Asleep every row costs $0.00 to $0.60 against $2.19\".",
+    "evidence": "REQUIREMENTS DEP-21 sets the free bar as \"$2.19 a month (J's figure for a free project with a live app)\". E-41's DEP-21 table, column \"free project awake all month, one copy\", has \"MIN family ... 2.34 over by the volume's $0.15\" and \"DRAFT family ... 2.19 ok\". E-41 point 6 says: \"A row that needs its own volume is over by $0.15 when the project is awake all month.\" COMP2 has MIN-P's shape. If \"live app\" means awake and a judge rules this structural, every MIN-P-shaped row is out (COMP2, COMP, MIN-P+m, COMP+par), DRAFT and SPLIT stay in, and SPLIT wins. On cited prices the judges would more likely keep it open.",
+    "fix": "Add the awake free-tier figure ($2.34 against $2.19) to section 5's DEP-21 closer and to section 6. Add the reading (asleep or awake) as a user choice under item 26, saying it can move the winner to SPLIT."
+   },
+   {
+    "id": "V-06",
+    "severity": "wording or clarity",
+    "claim": "\"DEP-21's written reasons\" (section 6) and P-5 \"Fixed\". DEP-21 asks for a written reason for every row \"more than 2× the cheapest at any load\".",
+    "evidence": "The section covers only Fly at 10 and 5,000 writes a second. Two more cases are not covered. (1) The sleeping load: EMB-V8 costs $0.00, so every other row is more than 2×. E-41 says \"a ratio says nothing there\", but the page does not say that. (2) E-41's AWS table: OBJ 20.5× and 2.3×, SRV 2.5×, PD 3.9×, BUY 2.5× at 10 writes a second.",
+    "fix": "Add one line on the sleeping load (cheapest is $0, so ratios are void; give the dollars), and one line saying the AWS ratios have the same causes as on Fly."
+   },
+   {
+    "id": "V-07",
+    "severity": "changes a reported number or claim",
+    "claim": "Item 9: \"an idle `pslot` resource is 0.4 to 1.2 KB at 1 to 10 touched slots and passes 2 KB near 100 ([E-36])\".",
+    "evidence": "E-36 measured sparse per-slot state at 241, 1,008 and 8,464 B for 1, 10 and 100 touched slots, about 85 B a slot. So it passes 2 KB at about 20 touched slots. At 100 it is about 8.5 KB, four times the bar. AMENDMENTS 1.3 says it \"fails at 100 (8.8 KB)\".",
+    "fix": "Say \"passes 2 KB at about 20 touched slots, and is about 8.5 KB at 100\"."
+   },
+   {
+    "id": "V-08",
+    "severity": "wording or clarity",
+    "claim": "Section 4: the neighbour sweep \"flips in these lines\". The only novel-count line listed is \"COMP2 alone given 2 more novel mechanisms → COMP+par\".",
+    "evidence": "In sweep2.py the same \"each row ±2 novel\" sweep that OUTCOME runs has three more flips: COMP −2 → COMP, COMP+par −2 → COMP+par, MIN-P+m −2 → MIN-P+m. None is printed or explained.",
+    "fix": "Add one row: \"any one of COMP, COMP+par or MIN-P+m given 2 fewer novel mechanisms → that row\", or state the sweep's result as 4 flipping lines out of 50."
+   },
+   {
+    "id": "V-09",
+    "severity": "wording or clarity",
+    "claim": "Section 4: \"19 or more pairs moved between the two control planes ... → COMP+par\". Sections 0 and 3 present the C-axis margin as 19 pairs (49 against 30).",
+    "evidence": "Adding 19 to COMP2 gives 293 against 293. That is a tie, since beats() returns 0, so a flip needs 20 added, or 10 moved from one row to the other (sweep2.py). Also, 16 of the 19 pairs are `planner-hints`, which COMP carries and COMP2 is assumed not to need, because its hints are \"inputs to that loop\" and uncounted (AMENDMENTS 4). COMP2 with the same hint mechanism has 290 against COMP+par's 293, so the margin is 3. COMP2 still wins.",
+    "fix": "Write \"20 or more added to COMP2 (or 10 moved)\". In section 4, say that 16 of the 19 pairs come from counting hints as a mechanism in `self` and not in `cent-co`, and that counting them in both leaves a 3-pair margin."
+   },
+   {
+    "id": "V-10",
+    "severity": "wording or clarity",
+    "claim": "Section 7 table: column \"Placed (model or argument)\", e.g. COMP2 \"195 (71.2 %)\".",
+    "evidence": "195 = 79 in a model + 29 simulated only + 87 argued, so the column includes the simulation-only pairs. pairs.md section 3 item 6 counts those apart (\"a judge who requires an exhaustive model should move them to open\"). By model or argument alone: COMP2 166 (60.6 %), COMP 167 (59.0 %), SPLIT 147 (52.9 %), DRAFT 173 (56.0 %), MIN-P 162 (64.3 %), ISR 112 (52.3 %), SLOG 161 (59.2 %).",
+    "fix": "Rename the column \"Placed (model, simulation or argument)\", or drop the simulated pairs from it."
+   },
+   {
+    "id": "V-11",
+    "severity": "wording or clarity",
+    "claim": "Section 2 and item 23: \"5 of 280 five-node partial partitions stayed stuck\" against \"read that way, 0 of 299 five-node and 0 of 159 three-node runs got stuck\".",
+    "evidence": "Counted from E-38's sweep5 and sweep3: the 280 are runs with the leader up and a star majority. The 299 and 159 include the leader-crash runs, so a clique count (299) looks larger than the star count it is a subset of. Like for like: 0 of 188 five-node runs and 0 of 111 three-node runs with the leader up and a clique majority.",
+    "fix": "Quote 0 of 188 (five nodes) and 0 of 111 (three nodes) with the leader up, and give 299 and 159 only as \"including leader-crash runs\"."
+   },
+   {
+    "id": "V-12",
+    "severity": "wording or clarity",
+    "claim": "Section 0 line 2: \"No judge scored COMP2 as a row, but every one of its cells was scored\". Section 1: COMP2 is named because it is the best row \"whose every cell a judge has already scored\".",
+    "evidence": "COMP2's deciding cell, F-22 (S) met, was never scored `met` by any judge. No row held `par`. Both judges scored COMP's F-22 (S) `not`, and the `met` is read from their text (\"Only Z `par` keeps the group writable ... no row holds it\") plus E-37. SPLIT2 is held back for the same kind of assignment.",
+    "fix": "Say \"every cell but F-22 (S), which both judges' text and E-37 decide\", so the line between COMP2 and SPLIT2 is drawn honestly."
+   },
+   {
+    "id": "V-13",
+    "severity": "wording or clarity",
+    "claim": "Section 3: the ten PERF-04 rows, let back in alone, \"against COMP2 each loses on F-22 (S)\".",
+    "evidence": "letback.py: SLOG loses to COMP2 on the novel count (5 against 3, 2 apart), not on F-22 (S). Section 6 says this correctly for SLOG.",
+    "fix": "Write \"each loses on F-22 (S), SLOG on the novel count\"."
+   },
+   {
+    "id": "V-14",
+    "severity": "wording or clarity",
+    "claim": "Section 0 line 7: \"the three models COMP2 rests on (...)\".",
+    "evidence": "Section 9 step 1 says \"four models\" and lists (a) to (d). The fourth is the move cut to one or two commits plus the re-run of the slot move's TLA+ model.",
+    "fix": "Make section 0 line 7 match section 9 step 1."
+   },
+   {
+    "id": "V-15",
+    "severity": "wording or clarity",
+    "claim": "REQUIREMENTS rule 1: \"VERDICT.md lists every open MUST with the experiment or build phase that closes it.\"",
+    "evidence": "Section 5 lists all 97 for COMP2. I checked the set: it is complete, with no extras and no duplicates. No other row's open MUSTs, nor SPLIT2's or PD+fix's, are listed, and the page never points to judging/rows/<ROW>.md, where they are.",
+    "fix": "Add one sentence, in section 6 or rule 1's paraphrase, saying every other row's open MUSTs and closers are in judging/rows/<ROW>.md."
+   },
+   {
+    "id": "V-16",
+    "severity": "wording or clarity",
+    "claim": "SC-14 asks: \"Writes homed in several regions are out of scope for v5, and VERDICT.md says so.\"",
+    "evidence": "Section 1 lists \"one region per group\" among the values in force, and item 20 lists the alternative. The page never says that multi-region writes are out of scope for v5.",
+    "fix": "Add that sentence to section 1's \"numbers in force\"."
+   },
+   {
+    "id": "V-17",
+    "severity": "wording or clarity",
+    "claim": "Section 3: a two-of-three persisted commit plus the client hop is \"about 0.42 ms ... (computed here by sampling E-01's ... distribution, p99 481 µs ...)\". Section 10 names the scripts this revision used.",
+    "evidence": "No script among those named computes it. I reproduced it from E01-floors/results/fdatasync-1w-cdf.txt: the second-fastest of {leader fsync, follower fsync + 58 µs, follower fsync + 58 µs} has p99 0.364 ms, plus 58 µs gives 0.422 ms. The number holds. Note that the pooled table's own p99 is 539 µs, not the 481 µs quoted.",
+    "fix": "Save the sampling script beside the others and name it in section 10. Say the 481 µs is E-01's per-run median p99, while the sampled table pools all runs."
+   },
+   {
+    "id": "V-18",
+    "severity": "wording or clarity",
+    "claim": "Sections 3 and 8 (item 3): \"`par-repair` is settled not novel (MECHANISMS 4.2), so `par` adds no novel mechanism\".",
+    "evidence": "MECHANISMS 4.2: `par-repair` was added by counter a only (\"b: not listed\"). E-37's own verdict and AMENDMENTS 2 and 4 count it +1, with novelty open. If it is novel, COMP2 has 4 against MIN-P+m's 3. That is 1 apart, so the SHOULD count decides, and COMP2 still wins (checked). Under rule 4's strict reading, \"fewer novel first\", MIN-P+m would win.",
+    "fix": "Add `par-repair` to section 4's close calls: one counter judged it, and counted novel it still leaves COMP2 first under rule 3 as written."
+   }
+  ],
+  "verdict_survives": true,
+  "summary": "The arithmetic checks out. Rebuilding judging/OUTCOME.md, outcome.json and pairs.json in a scratch copy gives the same files byte for byte. These all match the files: every number in sections 2 and 3, the agreement table, the full gap table (complete, all 33 entries), COMP's differing cells (MIN-P 1, DRAFT 1, SPLIT 3), COMP2's 3 novel / 6 SHOULDs / 274 pairs, COMP+par 293, MIN-P+m 264, MIN-P+par 261, SPLIT with merge 295, PD+fix 238 and the 49 against 30 control-plane pairs. So do every section 10 re-ruling result, every line of \\\"Changes the sweeps do not print\\\" (F-15 readings to SPLIT, SRV or level; F-05 to SLOG), the let-back placements, and section 5's 97 open MUSTs (exact set, 13+8+20+32+22+2). Every flip in OUTCOME A.3 and B.3 is explained.\n\nCOMP2 stays the winner under rule 3 among fully judged rows, and \\\"not final\\\" is still the right label. No finding changes that. What is wrong is smaller:\n- SPLIT2's 266 pairs silently drop the tenant budget (N `tier` to `proc`). As described it has 270, a 4-pair lead, not 8.\n- PD+fix copies PD's F-15 and OPS-14 as `met` because PD has no object store, yet PD+fix adds one. That makes 121 open and 11 met, not 119 and 13.\n- PD's DEP-21 \\\"fails (structural)\\\" re-ruling ignores the price check's own PD shape at $9.58 to $10.11.\n- COMP2's cost misses two things: Tokyo and Singapore/Sydney also pass $10, and E-41 puts MIN-P's shape at $2.34 against the $2.19 free bar when the app is awake. Read that way and ruled a failure, the second could move the winner to SPLIT.\n- The E-36 figure in item 9 is wrong: it passes 2 KB at about 20 touched slots, not near 100.\n- Smaller clarity points: three ±2 flips in the neighbour sweep go unlisted; 19 added pairs give a tie, not a flip; 16 of the 19-pair C margin are the uncounted hint path (margin 3 if counted); the \\\"Placed (model or argument)\\\" column includes simulation; E-38's clique count mixes in leader-crash runs; \\\"three\\\" against \\\"four\\\" models; SLOG's reason; the one cell (F-22 S) COMP2 takes from the judges' text; rule 1's other rows' open MUSTs and SC-14's out-of-scope line are missing; the 0.42 ms script is not named."
+ }
+}
