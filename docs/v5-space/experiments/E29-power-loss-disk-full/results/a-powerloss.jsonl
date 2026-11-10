@@ -1,0 +1,12 @@
+{"scenario":"clear","mutant":null,"seed":1,"rounds":400,"acked":974,"writtenUnsynced":972,"lostUnsynced":972,"keptUnsynced":0,"cuts":0,"crashes":0,"recovered":196903,"violations":0,"first":[]}
+{"scenario":"recycle","mutant":null,"seed":1,"rounds":400,"acked":1002,"writtenUnsynced":1004,"lostUnsynced":865,"keptUnsynced":139,"cuts":127,"crashes":0,"recovered":5368,"violations":0,"first":[]}
+{"scenario":"torn-op","mutant":null,"seed":1,"rounds":40,"acked":236,"writtenUnsynced":80,"lostUnsynced":80,"keptUnsynced":0,"cuts":40,"crashes":40,"recovered":236,"violations":0,"first":[]}
+{"scenario":"torn-seq","mutant":null,"seed":1,"rounds":40,"acked":981,"writtenUnsynced":127,"lostUnsynced":115,"keptUnsynced":12,"cuts":23,"crashes":27,"recovered":993,"violations":0,"first":[]}
+{"scenario":"clear","mutant":null,"seed":2,"rounds":400,"acked":1009,"writtenUnsynced":1021,"lostUnsynced":1019,"keptUnsynced":2,"cuts":0,"crashes":0,"recovered":200579,"violations":0,"first":[]}
+{"scenario":"recycle","mutant":null,"seed":2,"rounds":400,"acked":1039,"writtenUnsynced":979,"lostUnsynced":805,"keptUnsynced":174,"cuts":139,"crashes":0,"recovered":5086,"violations":0,"first":[]}
+{"scenario":"torn-op","mutant":null,"seed":2,"rounds":40,"acked":236,"writtenUnsynced":86,"lostUnsynced":86,"keptUnsynced":0,"cuts":40,"crashes":40,"recovered":236,"violations":0,"first":[]}
+{"scenario":"torn-seq","mutant":null,"seed":2,"rounds":40,"acked":1108,"writtenUnsynced":115,"lostUnsynced":95,"keptUnsynced":20,"cuts":21,"crashes":26,"recovered":1128,"violations":0,"first":[]}
+{"scenario":"clear","mutant":null,"seed":3,"rounds":400,"acked":1014,"writtenUnsynced":963,"lostUnsynced":963,"keptUnsynced":0,"cuts":0,"crashes":0,"recovered":197286,"violations":0,"first":[]}
+{"scenario":"recycle","mutant":null,"seed":3,"rounds":400,"acked":971,"writtenUnsynced":988,"lostUnsynced":863,"keptUnsynced":125,"cuts":125,"crashes":0,"recovered":5491,"violations":0,"first":[]}
+{"scenario":"torn-op","mutant":null,"seed":3,"rounds":40,"acked":282,"writtenUnsynced":66,"lostUnsynced":66,"keptUnsynced":0,"cuts":40,"crashes":40,"recovered":282,"violations":0,"first":[]}
+{"scenario":"torn-seq","mutant":null,"seed":3,"rounds":40,"acked":1168,"writtenUnsynced":113,"lostUnsynced":102,"keptUnsynced":11,"cuts":21,"crashes":26,"recovered":1179,"violations":0,"first":[]}

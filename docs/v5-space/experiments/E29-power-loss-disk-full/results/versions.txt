@@ -1,0 +1,5 @@
+node v22.22.0
+kernel 6.18.44-fc-v338
+LazyFS 0.3.1, git 045a0b3
+fusermount3 version: 3.14.0
+mke2fs 1.47.0 (5-Feb-2023)

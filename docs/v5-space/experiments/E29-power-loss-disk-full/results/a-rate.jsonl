@@ -1,0 +1,2 @@
+{"rate":"through LazyFS","appendsWithSyncPerSec":11155,"loadavg":"4.07 7.62 9.57 5/192 5267"}
+{"rate":"plain disk","appendsWithSyncPerSec":3379,"loadavg":"4.07 7.62 9.57 10/203 5280"}
