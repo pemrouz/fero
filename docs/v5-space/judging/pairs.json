@@ -5,9 +5,9 @@
   "RUST": 253,
   "SRV": 267,
   "LEAN": 255,
-  "CELL": 262,
+  "CELL": 277,
   "LANE": 232,
-  "SPLIT": 278,
+  "SPLIT": 295,
   "PD": 209,
   "ISR": 214,
   "SLOG": 272,
@@ -10159,6 +10159,14 @@
    ],
    [
     "raft-term-vote",
+    "planner-hints",
+    [
+     "group.leader",
+     "group.transfer"
+    ]
+   ],
+   [
+    "raft-term-vote",
     "log-replicas",
     [
      "group.config",
@@ -10441,6 +10449,13 @@
    ],
    [
     "raft-config",
+    "planner-hints",
+    [
+     "group.config"
+    ]
+   ],
+   [
+    "raft-config",
     "log-replicas",
     [
      "group.config",
@@ -10714,6 +10729,13 @@
    ],
    [
     "raft-prevote-checkquorum",
+    "planner-hints",
+    [
+     "group.leader"
+    ]
+   ],
+   [
+    "raft-prevote-checkquorum",
     "log-replicas",
     [
      "group.config",
@@ -10775,6 +10797,13 @@
     "healing-self",
     [
      "group.config",
+     "group.transfer"
+    ]
+   ],
+   [
+    "raft-leader-transfer",
+    "planner-hints",
+    [
      "group.transfer"
     ]
    ],
@@ -10871,6 +10900,14 @@
      "group.config",
      "group.learners",
      "link.ping"
+    ]
+   ],
+   [
+    "link-pings",
+    "planner-hints",
+    [
+     "link.ping",
+     "meta.members"
     ]
    ],
    [
@@ -10988,6 +11025,13 @@
    ],
    [
     "slow-leader-self",
+    "planner-hints",
+    [
+     "group.transfer"
+    ]
+   ],
+   [
+    "slow-leader-self",
     "log-replicas",
     [
      "group.transfer"
@@ -11024,6 +11068,13 @@
    [
     "meta-members",
     "healing-self",
+    [
+     "meta.members"
+    ]
+   ],
+   [
+    "meta-members",
+    "planner-hints",
     [
      "meta.members"
     ]
@@ -11083,6 +11134,13 @@
     "healing-self",
     [
      "meta.catalog"
+    ]
+   ],
+   [
+    "meta-catalog",
+    "planner-hints",
+    [
+     "meta.members"
     ]
    ],
    [
@@ -11198,6 +11256,16 @@
    ],
    [
     "healing-self",
+    "planner-hints",
+    [
+     "group.config",
+     "group.placement",
+     "group.transfer",
+     "meta.members"
+    ]
+   ],
+   [
+    "healing-self",
     "log-replicas",
     [
      "group.config",
@@ -11259,6 +11327,50 @@
     "forks",
     [
      "meta.catalog"
+    ]
+   ],
+   [
+    "planner-hints",
+    "log-replicas",
+    [
+     "group.config",
+     "group.transfer",
+     "meta.members"
+    ]
+   ],
+   [
+    "planner-hints",
+    "writer-judging",
+    [
+     "group.transfer"
+    ]
+   ],
+   [
+    "planner-hints",
+    "fold-version",
+    [
+     "meta.members"
+    ]
+   ],
+   [
+    "planner-hints",
+    "route-forward",
+    [
+     "group.transfer"
+    ]
+   ],
+   [
+    "planner-hints",
+    "cluster-version",
+    [
+     "meta.members"
+    ]
+   ],
+   [
+    "planner-hints",
+    "cluster-credentials",
+    [
+     "meta.members"
     ]
    ],
    [
@@ -13673,6 +13785,13 @@
    ],
    [
     "raft-log",
+    "merge-record",
+    [
+     "group.log"
+    ]
+   ],
+   [
+    "raft-log",
     "writer-judging",
     [
      "group.log"
@@ -13830,6 +13949,13 @@
    ],
    [
     "raft-term-vote",
+    "merge-record",
+    [
+     "group.leader"
+    ]
+   ],
+   [
+    "raft-term-vote",
     "split-policy",
     [
      "group.leader"
@@ -13977,6 +14103,13 @@
    [
     "raft-commit",
     "split-record",
+    [
+     "group.commit"
+    ]
+   ],
+   [
+    "raft-commit",
+    "merge-record",
     [
      "group.commit"
     ]
@@ -14238,6 +14371,13 @@
    ],
    [
     "raft-snapshot",
+    "merge-record",
+    [
+     "group.log"
+    ]
+   ],
+   [
+    "raft-snapshot",
     "writer-judging",
     [
      "group.log"
@@ -14397,6 +14537,13 @@
    [
     "raft-prevote-checkquorum",
     "split-record",
+    [
+     "group.leader"
+    ]
+   ],
+   [
+    "raft-prevote-checkquorum",
+    "merge-record",
     [
      "group.leader"
     ]
@@ -14641,6 +14788,13 @@
    ],
    [
     "dormant-groups",
+    "merge-record",
+    [
+     "meta.directory"
+    ]
+   ],
+   [
+    "dormant-groups",
     "memory-rung",
     [
      "durable.log"
@@ -14796,6 +14950,13 @@
    ],
    [
     "meta-catalog",
+    "merge-record",
+    [
+     "meta.directory"
+    ]
+   ],
+   [
+    "meta-catalog",
     "split-policy",
     [
      "meta.catalog"
@@ -14867,6 +15028,13 @@
     [
      "group.config",
      "group.learners"
+    ]
+   ],
+   [
+    "meta-directory",
+    "merge-record",
+    [
+     "meta.directory"
     ]
    ],
    [
@@ -15054,6 +15222,13 @@
    ],
    [
     "split-record",
+    "merge-record",
+    [
+     "range.table"
+    ]
+   ],
+   [
+    "split-record",
     "range-table",
     [
      "range.table",
@@ -15139,6 +15314,64 @@
     "presence-rows",
     [
      "group.rows"
+    ]
+   ],
+   [
+    "merge-record",
+    "range-table",
+    [
+     "merge.record",
+     "range.table"
+    ]
+   ],
+   [
+    "merge-record",
+    "split-policy",
+    [
+     "range.table"
+    ]
+   ],
+   [
+    "merge-record",
+    "lineage",
+    [
+     "range.table"
+    ]
+   ],
+   [
+    "merge-record",
+    "fold-all",
+    [
+     "group.rows"
+    ]
+   ],
+   [
+    "merge-record",
+    "subscribe",
+    [
+     "meta.directory"
+    ]
+   ],
+   [
+    "merge-record",
+    "route-forward",
+    [
+     "meta.directory",
+     "range.table"
+    ]
+   ],
+   [
+    "merge-record",
+    "presence-rows",
+    [
+     "group.rows"
+    ]
+   ],
+   [
+    "merge-record",
+    "forks",
+    [
+     "meta.directory"
     ]
    ],
    [
@@ -34454,6 +34687,7 @@
     "group.log"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -35056,6 +35290,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -35149,6 +35384,7 @@
     "group.leader"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -35879,6 +36115,7 @@
     "group.commit"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -36504,6 +36741,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -37097,6 +37335,7 @@
     "group.log"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -37763,6 +38002,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -37853,6 +38093,7 @@
     "group.leader"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -38260,6 +38501,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -38674,6 +38916,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -38953,6 +39196,16 @@
   },
   {
    "a": "dormant-groups",
+   "b": "merge-record",
+   "state": [
+    "meta.directory"
+   ],
+   "rows": [
+    "SPLIT"
+   ]
+  },
+  {
+   "a": "dormant-groups",
    "b": "memory-rung",
    "state": [
     "durable.log"
@@ -39154,6 +39407,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -39285,6 +39539,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -39560,6 +39815,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -39676,6 +39932,7 @@
     "meta.directory"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -40064,6 +40321,7 @@
     "meta.directory"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -40270,6 +40528,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -40685,6 +40944,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT"
    ]
@@ -40719,6 +40979,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -40732,6 +40993,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -40745,6 +41007,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -40758,6 +41021,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -40771,6 +41035,7 @@
    ],
    "rows": [
     "DRAFT",
+    "CELL",
     "LANE",
     "SPLIT",
     "COMP"
@@ -41997,6 +42262,7 @@
     "range.table"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42161,6 +42427,7 @@
     "range.table"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42171,7 +42438,18 @@
     "range.table"
    ],
    "rows": [
+    "SPLIT",
     "PD"
+   ]
+  },
+  {
+   "a": "merge-record",
+   "b": "lineage",
+   "state": [
+    "range.table"
+   ],
+   "rows": [
+    "SPLIT"
    ]
   },
   {
@@ -42191,6 +42469,7 @@
     "group.rows"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42201,6 +42480,7 @@
     "meta.directory"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42212,6 +42492,7 @@
     "range.table"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42243,6 +42524,7 @@
     "group.rows"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },
@@ -42253,6 +42535,7 @@
     "meta.directory"
    ],
    "rows": [
+    "SPLIT",
     "PD"
    ]
   },

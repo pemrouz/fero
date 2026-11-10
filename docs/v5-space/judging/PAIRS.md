@@ -1,6 +1,6 @@
 # Interacting pairs of mechanisms (DEV-02)
 
-Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json). Two mechanisms interact when both touch one piece of state and at least one of them writes it.
+Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json), with the referee's later re-rulings of [closure/rerulings.mech.json](closure/rerulings.mech.json) applied. Two mechanisms interact when both touch one piece of state and at least one of them writes it.
 
 | Row | Mechanisms carried | Interacting pairs |
 |---|---|---|
@@ -9,9 +9,9 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | RUST | 48 | 253 |
 | SRV | 50 | 267 |
 | LEAN | 48 | 255 |
-| CELL | 48 | 262 |
+| CELL | 49 | 277 |
 | LANE | 47 | 232 |
-| SPLIT | 52 | 278 |
+| SPLIT | 53 | 295 |
 | PD | 46 | 209 |
 | ISR | 45 | 214 |
 | SLOG | 49 | 272 |
@@ -293,41 +293,53 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | healing-self | disk-incarnation | disk.incarnation | DRAFT, CELL, LANE, SPLIT, COMP |
 | healing-self | fold-version | group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | healing-self | forks | meta.catalog | DRAFT, CELL, LANE, SPLIT, COMP |
+| healing-self | planner-hints | group.config, group.placement, group.transfer, meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
 | healing-self | route-forward | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | healing-self | writer-judging | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | healing-self | writer-time | group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | learners | healing-self | group.config, group.learners | DRAFT, CELL, LANE, SPLIT, COMP |
 | link-pings | healing-self | group.config, group.learners, link.ping | DRAFT, CELL, LANE, SPLIT, COMP |
+| link-pings | planner-hints | link.ping, meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
 | link-pings | slow-leader-self | link.ping | DRAFT, CELL, LANE, SPLIT, COMP |
 | meta-catalog | healing-self | meta.catalog | DRAFT, CELL, LANE, SPLIT, COMP |
+| meta-catalog | planner-hints | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
 | meta-directory | healing-self | group.config, group.learners | DRAFT, CELL, LANE, SPLIT, COMP |
 | meta-members | healing-self | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
+| meta-members | planner-hints | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
+| planner-hints | cluster-credentials | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
+| planner-hints | cluster-version | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
+| planner-hints | fold-version | meta.members | DRAFT, CELL, LANE, SPLIT, COMP |
+| planner-hints | route-forward | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
+| planner-hints | writer-judging | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | quiet-groups | healing-self | group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | quiet-groups | slow-leader-self | group.quiet | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-commit | healing-self | group.commit, group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-commit | slow-leader-self | group.commit | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-config | healing-self | group.config, group.learners | DRAFT, CELL, LANE, SPLIT, COMP |
+| raft-config | planner-hints | group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-leader-transfer | healing-self | group.config, group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
+| raft-leader-transfer | planner-hints | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-leader-transfer | slow-leader-self | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-log | healing-self | group.config, group.learners, group.log | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-prevote-checkquorum | healing-self | group.config, group.leader | DRAFT, CELL, LANE, SPLIT, COMP |
+| raft-prevote-checkquorum | planner-hints | group.leader | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-prevote-checkquorum | slow-leader-self | group.leader | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-readindex | healing-self | group.config | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-snapshot | healing-self | group.config, group.learners, group.log | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-term-vote | healing-self | group.config, group.leader, group.learners, group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
+| raft-term-vote | planner-hints | group.leader, group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | raft-term-vote | slow-leader-self | group.leader, group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | slow-leader-self | admission-credits | client.credit | DRAFT, CELL, LANE, SPLIT, COMP |
 | slow-leader-self | healing-self | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
+| slow-leader-self | planner-hints | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | slow-leader-self | route-forward | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | slow-leader-self | writer-judging | group.transfer | DRAFT, CELL, LANE, SPLIT, COMP |
 | writer-judging | dedup-window | writer.logend | DRAFT, LANE, SPLIT, SLOG, V4 |
 | dedup-window | saga-intents | issuer.table | DRAFT, LANE, SPLIT, SLOG |
 | dedup-window | writer-time | time.writer | DRAFT, LANE, SPLIT, SLOG |
 | healing-self | log-replicas | group.config, group.learners, group.transfer | DRAFT, CELL, LANE, SPLIT |
-| healing-self | planner-hints | group.config, group.placement, group.transfer, meta.members | DRAFT, LANE, SPLIT, COMP |
 | learners | log-replicas | group.config, group.learners | DRAFT, CELL, LANE, SPLIT |
 | link-pings | log-replicas | group.config, group.learners | DRAFT, CELL, LANE, SPLIT |
-| link-pings | planner-hints | link.ping, meta.members | DRAFT, LANE, SPLIT, COMP |
 | log-replicas | cluster-credentials | group.config | DRAFT, CELL, LANE, SPLIT |
 | log-replicas | fold-version | group.config | DRAFT, CELL, LANE, SPLIT |
 | log-replicas | route-forward | group.transfer | DRAFT, CELL, LANE, SPLIT |
@@ -341,31 +353,22 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | memory-rung | journal | durable.log | DRAFT, CELL, SPLIT, COMP |
 | memory-rung | tier | durable.log | DRAFT, CELL, SPLIT, COMP |
 | meta-catalog | memory-rung | meta.catalog | DRAFT, CELL, SPLIT, COMP |
-| meta-catalog | planner-hints | meta.members | DRAFT, LANE, SPLIT, COMP |
 | meta-catalog | route-smart | meta.directory, slot.table | SRV, PD, ISR, EMB-V8 |
 | meta-catalog | worker-map | meta.directory | SRV, PD, EMB-V8, SIDE |
 | meta-directory | log-replicas | group.config, group.learners | DRAFT, CELL, LANE, SPLIT |
 | meta-directory | route-smart | meta.directory | SRV, PD, ISR, EMB-V8 |
 | meta-directory | worker-map | meta.directory | SRV, PD, EMB-V8, SIDE |
 | meta-members | log-replicas | meta.members | DRAFT, CELL, LANE, SPLIT |
-| meta-members | planner-hints | meta.members | DRAFT, LANE, SPLIT, COMP |
-| planner-hints | cluster-credentials | meta.members | DRAFT, LANE, SPLIT, COMP |
-| planner-hints | cluster-version | meta.members | DRAFT, LANE, SPLIT, COMP |
-| planner-hints | fold-version | meta.members | DRAFT, LANE, SPLIT, COMP |
-| planner-hints | route-forward | group.transfer | DRAFT, LANE, SPLIT, COMP |
-| planner-hints | writer-judging | group.transfer | DRAFT, LANE, SPLIT, COMP |
+| planner-hints | log-replicas | group.config, group.transfer, meta.members | DRAFT, CELL, LANE, SPLIT |
 | quiet-groups | log-replicas | group.config | DRAFT, CELL, LANE, SPLIT |
 | raft-commit | dedup-window | group.commit | DRAFT, LANE, SPLIT, SLOG |
 | raft-commit | log-replicas | group.commit, group.config | DRAFT, CELL, LANE, SPLIT |
 | raft-commit | memory-rung | durable.log, group.commit | DRAFT, CELL, SPLIT, COMP |
 | raft-config | log-replicas | group.config, group.learners | DRAFT, CELL, LANE, SPLIT |
-| raft-config | planner-hints | group.config | DRAFT, LANE, SPLIT, COMP |
 | raft-leader-transfer | log-replicas | group.config, group.transfer | DRAFT, CELL, LANE, SPLIT |
-| raft-leader-transfer | planner-hints | group.transfer | DRAFT, LANE, SPLIT, COMP |
 | raft-log | log-replicas | group.config, group.learners, group.log | DRAFT, CELL, LANE, SPLIT |
 | raft-log | memory-rung | group.log | DRAFT, CELL, SPLIT, COMP |
 | raft-prevote-checkquorum | log-replicas | group.config, group.contact, group.leader | DRAFT, CELL, LANE, SPLIT |
-| raft-prevote-checkquorum | planner-hints | group.leader | DRAFT, LANE, SPLIT, COMP |
 | raft-prevote-checkquorum | route-smart | group.leader | SRV, PD, ISR, EMB-V8 |
 | raft-readindex | log-replicas | group.config | DRAFT, CELL, LANE, SPLIT |
 | raft-snapshot | dedup-window | issuer.table | DRAFT, LANE, SPLIT, SLOG |
@@ -373,11 +376,9 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-snapshot | memory-rung | group.log | DRAFT, CELL, SPLIT, COMP |
 | raft-term-vote | log-replicas | group.config, group.leader, group.learners, group.term-vote, group.transfer, group.witness | DRAFT, CELL, LANE, SPLIT |
 | raft-term-vote | memory-rung | durable.log | DRAFT, CELL, SPLIT, COMP |
-| raft-term-vote | planner-hints | group.leader, group.transfer | DRAFT, LANE, SPLIT, COMP |
 | raft-term-vote | route-smart | group.leader | SRV, PD, ISR, EMB-V8 |
 | route-smart | forks | meta.directory | SRV, PD, ISR, EMB-V8 |
 | slow-leader-self | log-replicas | group.transfer | DRAFT, CELL, LANE, SPLIT |
-| slow-leader-self | planner-hints | group.transfer | DRAFT, LANE, SPLIT, COMP |
 | worker-map | forks | meta.directory | SRV, PD, EMB-V8, SIDE |
 | controller-commands | controller-sessions | member.session | PD, ISR, SLOG |
 | dormant-groups | memory-rung | durable.log | DRAFT, CELL, SPLIT |
@@ -388,15 +389,23 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | memory-rung | tenant-budget | durable.log | DRAFT, CELL, SPLIT |
 | meta-members | controller-sessions | member.session, meta.members | PD, ISR, SLOG |
 | move-policy | worker-map | meta.directory | SRV, EMB-V8, SIDE |
-| planner-hints | log-replicas | group.config, group.transfer, meta.members | DRAFT, LANE, SPLIT |
 | slot-move | fold-leader | group.rows, move.record | LEAN, OBJ, SIDE |
 | worker-map | disk-incarnation | durable.log | SRV, EMB-V8, SIDE |
 | writer-judging | fold-leader | group.rows | LEAN, OBJ, SIDE |
 | writer-time | fold-leader | group.rows | LEAN, OBJ, SIDE |
 | healing-self | move-policy | group.config | DRAFT, COMP |
 | healing-self | slot-move | group.config | DRAFT, COMP |
+| merge-record | fold-all | group.rows | SPLIT, PD |
+| merge-record | forks | meta.directory | SPLIT, PD |
+| merge-record | presence-rows | group.rows | SPLIT, PD |
+| merge-record | range-table | merge.record, range.table | SPLIT, PD |
+| merge-record | route-forward | meta.directory, range.table | SPLIT, PD |
+| merge-record | split-policy | range.table | SPLIT, PD |
+| merge-record | subscribe | meta.directory | SPLIT, PD |
+| meta-catalog | merge-record | meta.directory | SPLIT, PD |
 | meta-catalog | project-groups | meta.catalog, meta.directory, slot.table | MIN-P, COMP |
 | meta-catalog | split-policy | meta.catalog | SPLIT, PD |
+| meta-directory | merge-record | meta.directory | SPLIT, PD |
 | meta-directory | project-groups | meta.directory, slot.table | MIN-P, COMP |
 | move-policy | route-smart | meta.directory | SRV, EMB-V8 |
 | planner-hints | move-policy | move.lease | DRAFT, COMP |
@@ -409,16 +418,21 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | project-groups | slot-table | slot.table | MIN-P, COMP |
 | project-groups | subscribe | slot.table | MIN-P, COMP |
 | raft-commit | fold-leader | group.commit | LEAN, SIDE |
+| raft-commit | merge-record | group.commit | SPLIT, PD |
 | raft-commit | split-record | group.commit | SPLIT, PD |
 | raft-log | fold-leader | group.log | LEAN, SIDE |
+| raft-log | merge-record | group.log | SPLIT, PD |
 | raft-log | split-record | group.log | SPLIT, PD |
 | raft-prevote-checkquorum | fold-leader | group.leader | LEAN, SIDE |
+| raft-prevote-checkquorum | merge-record | group.leader | SPLIT, PD |
 | raft-prevote-checkquorum | split-policy | group.leader | SPLIT, PD |
 | raft-prevote-checkquorum | split-record | group.leader | SPLIT, PD |
 | raft-readindex | fold-leader | group.rows | LEAN, SIDE |
 | raft-snapshot | fold-leader | group.log, group.rows, group.snapshot | LEAN, SIDE |
+| raft-snapshot | merge-record | group.log | SPLIT, PD |
 | raft-snapshot | split-record | fence.table, group.log, issuer.table, srchi.marks | SPLIT, PD |
 | raft-term-vote | fold-leader | group.leader | LEAN, SIDE |
+| raft-term-vote | merge-record | group.leader | SPLIT, PD |
 | raft-term-vote | split-policy | group.leader | SPLIT, PD |
 | raft-term-vote | split-record | group.leader | SPLIT, PD |
 | range-table | route-forward | range.table | SPLIT, PD |
@@ -431,6 +445,7 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | split-record | caller-keys | fence.table, issuer.table | SPLIT, PD |
 | split-record | consumer-groups | fence.table | SPLIT, PD |
 | split-record | fold-all | group.rows | SPLIT, PD |
+| split-record | merge-record | range.table | SPLIT, PD |
 | split-record | presence-rows | group.rows | SPLIT, PD |
 | split-record | range-table | range.table, split.record | SPLIT, PD |
 | split-record | route-forward | range.table | SPLIT, PD |
@@ -463,6 +478,7 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | dedup-window | v4-ring | v4.owner | V4 |
 | disk-incarnation | loglet | durable.log | SLOG |
 | dormant-groups | loglet | durable.log, group.commit | SLOG |
+| dormant-groups | merge-record | meta.directory | SPLIT |
 | dormant-groups | rekey | meta.directory | CELL |
 | fence-tokens | outside-log | outside.log | BUY |
 | fold-all | high-watermark | group.commit | ISR |
@@ -526,25 +542,17 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | loglet-seal | writer-epoch-slog | writer.epoch | SLOG |
 | lsm-store | input-recorder | durable.log | PD |
 | lsm-store | worker-map | durable.log | PD |
-| merge-record | fold-all | group.rows | PD |
-| merge-record | forks | meta.directory | PD |
-| merge-record | presence-rows | group.rows | PD |
-| merge-record | range-table | merge.record, range.table | PD |
-| merge-record | route-forward | meta.directory, range.table | PD |
+| merge-record | lineage | range.table | SPLIT |
 | merge-record | route-smart | meta.directory, range.table | PD |
-| merge-record | split-policy | range.table | PD |
-| merge-record | subscribe | meta.directory | PD |
 | merge-record | two-phase-commit | range.table | PD |
 | merge-record | worker-map | meta.directory | PD |
 | meta-catalog | ktxn-coordinator | meta.directory | ISR |
 | meta-catalog | lanes | meta.catalog | LANE |
 | meta-catalog | leader-calls | meta.directory, slot.table | SIDE |
-| meta-catalog | merge-record | meta.directory | PD |
 | meta-catalog | rekey | meta.catalog, meta.directory | CELL |
 | meta-directory | ktxn-coordinator | meta.directory | ISR |
 | meta-directory | leader-calls | meta.directory | SIDE |
 | meta-directory | leader-epoch | group.leader | ISR |
-| meta-directory | merge-record | meta.directory | PD |
 | meta-directory | obj-manifest | store.objects | OBJ |
 | meta-directory | obj-writer-lease | group.leader | OBJ |
 | meta-directory | rekey | meta.directory | CELL |
@@ -580,7 +588,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-commit | loglet-chain | group.commit | SLOG |
 | raft-commit | loglet-seal | group.log | SLOG |
 | raft-commit | lsm-store | durable.log | PD |
-| raft-commit | merge-record | group.commit | PD |
 | raft-commit | mvcc | group.commit | PD |
 | raft-commit | producer-state | group.commit | ISR |
 | raft-commit | read-lease | group.commit | PD |
@@ -611,7 +618,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-log | loglet-chain | group.log | SLOG |
 | raft-log | loglet-seal | group.log | SLOG |
 | raft-log | lsm-store | group.log | PD |
-| raft-log | merge-record | group.log | PD |
 | raft-log | rekey | group.log | CELL |
 | raft-log | side-seam | group.log | SIDE |
 | raft-log | wal-per-group | group.log | ISR |
@@ -625,7 +631,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-prevote-checkquorum | leader-epoch | group.leader, group.log | ISR |
 | raft-prevote-checkquorum | loglet | group.log | SLOG |
 | raft-prevote-checkquorum | loglet-seal | group.log | SLOG |
-| raft-prevote-checkquorum | merge-record | group.leader | PD |
 | raft-prevote-checkquorum | read-lease | group.contact, group.leader | PD |
 | raft-prevote-checkquorum | rekey | group.leader | CELL |
 | raft-prevote-checkquorum | side-seam | group.leader | SIDE |
@@ -642,7 +647,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-snapshot | loglet-chain | group.log | SLOG |
 | raft-snapshot | loglet-seal | group.log | SLOG |
 | raft-snapshot | lsm-store | group.log | PD |
-| raft-snapshot | merge-record | group.log | PD |
 | raft-snapshot | rekey | fence.table, group.log, session.table, srchi.marks | CELL |
 | raft-snapshot | side-seam | group.log | SIDE |
 | raft-snapshot | wal-per-group | group.log | ISR |
@@ -656,7 +660,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | raft-term-vote | loglet | durable.log, group.commit, group.log | SLOG |
 | raft-term-vote | loglet-seal | group.log | SLOG |
 | raft-term-vote | lsm-store | durable.log, group.term-vote | PD |
-| raft-term-vote | merge-record | group.leader | PD |
 | raft-term-vote | read-lease | group.leader, group.term-vote | PD |
 | raft-term-vote | rekey | group.leader | CELL |
 | raft-term-vote | side-seam | group.leader | SIDE |
@@ -710,7 +713,6 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | split-record | dedup-window | issuer.table | SPLIT |
 | split-record | fence-tokens | fence.table | SPLIT |
 | split-record | lineage | range.table, split.record | SPLIT |
-| split-record | merge-record | range.table | PD |
 | split-record | route-smart | range.table | PD |
 | split-record | saga-intents | fence.table, issuer.table | SPLIT |
 | split-record | two-phase-commit | range.table | PD |
