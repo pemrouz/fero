@@ -1,0 +1,691 @@
+{
+ "group": "F",
+ "cells": 460,
+ "same": 432,
+ "decisive": 7,
+ "minor": 21,
+ "disagreements": [
+  {
+   "req": "F-01",
+   "part": "M",
+   "row": "PD",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-37",
+     "E-29"
+    ],
+    "why": "The commit rule is Raft's, but PD keeps Z `crash` and an LSM store. E-37 shows a committed write lost with one bad entry under `crash`, and no power-loss run covered its store.",
+    "closes": "a LazyFS run on its store and the sim's disk model; none is planned for this row"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-14c"
+    ],
+    "why": "Raft with its write-ahead log synced on a majority before the answer keeps every committed entry by construction; this is TiKV's published shape, and A-01's rules reach it by reasoning. One bad entry on a voter is F-22's case, which PD fails; it is not one of F-01's faults."
+   }
+  },
+  {
+   "req": "F-01",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [],
+    "why": "v4's ledger lists a commit stranded on a cut-off owner (STATUS.md). Whether a `persisted` write can be lost by it was not run in this study.",
+    "closes": "v4's own sweeps with a lost-write monitor; not planned"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "STATUS.md pins it red in v4's own sim (sim/scale-probes.test.ts). Step 1: a node writes a row and leaves; another removes the row; tombstone GC and compaction both run. Step 2: the remove is gone from its lane but the old write is still in the leaver's lane, so a durable member that restarts from its disk has the row again. So an acknowledged remove does not survive a restart.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "row": "ISR",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-20"
+    ],
+    "why": "`pid` holds in E-20's model after A-22's two fixes, given one writer and a committed prefix across a failover. The in-sync-set failover that must give those was not modelled here.",
+    "closes": "a model of the ISR leader change under E-20's scenarios"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22",
+     "E-22b",
+     "E-30",
+     "E-17c"
+    ],
+    "why": "Every dedup option holds 'no attempt twice' and 'a refused attempt never commits later' in every state of E-20's model: lost answers, a failover or a move mid-retry, a restart, expiry, with `forward.once` under `fwd`. Porcupine and real Knossos pass every partition history once a refusal waits for its commit (A-04), and `srchi-slot` marks keep derived outputs once past the horizon (A-05, E-30). Keyed method re-runs are reasoned, not modelled."
+   }
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-20"
+    ],
+    "why": "`win` holds in E-20's model given one writer at a time. SLOG's writer change (seal and CAS) was not modelled, and a late append by the old writer is the case that matters.",
+    "closes": "a model of the seal and writer change under E-20's scenarios"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22",
+     "E-22b",
+     "E-30",
+     "E-17c"
+    ],
+    "why": "Every dedup option holds 'no attempt twice' and 'a refused attempt never commits later' in every state of E-20's model: lost answers, a failover or a move mid-retry, a restart, expiry, with `forward.once` under `fwd`. Porcupine and real Knossos pass every partition history once a refusal waits for its commit (A-04), and `srchi-slot` marks keep derived outputs once past the horizon (A-05, E-30). Keyed method re-runs are reasoned, not modelled."
+   }
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "row": "OBJ",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-20"
+    ],
+    "why": "`sess` holds in E-20's model given one writer at a time. OBJ's writer change by a lease and a manifest CAS was not modelled.",
+    "closes": "a model of the lease and manifest CAS under E-20's scenarios"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22",
+     "E-22b",
+     "E-30",
+     "E-17c"
+    ],
+    "why": "Every dedup option holds 'no attempt twice' and 'a refused attempt never commits later' in every state of E-20's model: lost answers, a failover or a move mid-retry, a restart, expiry, with `forward.once` under `fwd`. Porcupine and real Knossos pass every partition history once a refusal waits for its commit (A-04), and `srchi-slot` marks keep derived outputs once past the horizon (A-05, E-30). Keyed method re-runs are reasoned, not modelled."
+   }
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22"
+    ],
+    "why": "E-20's rules hold for writes. But SIDE runs calls at the leader (U `ldr`), and a call in flight across a handover was never modelled; SPACE counts it as one novel rule.",
+    "closes": "an E-20-style model of calls in flight across a handover"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22",
+     "E-22b",
+     "E-30",
+     "E-17c"
+    ],
+    "why": "Every dedup option holds 'no attempt twice' and 'a refused attempt never commits later' in every state of E-20's model: lost answers, a failover or a move mid-retry, a restart, expiry, with `forward.once` under `fwd`. Porcupine and real Knossos pass every partition history once a refusal waits for its commit (A-04), and `srchi-slot` marks keep derived outputs once past the horizon (A-05, E-30). Keyed method re-runs are reasoned, not modelled."
+   }
+  },
+  {
+   "req": "F-03",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step by step: (1) v4 is leaderless, any replica takes writes and cells merge by last-writer-wins (SPACE R `lww`). (2) SPACE names writes on both sides of a split as what v4 keeps. (3) STATUS.md pins a commit made by a cut-off owner that the new owner then makes again. So two writers can commit to one partition at once, and a cut-off side does not refuse.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [],
+    "why": "v4's ring gives each partition one owner per view, a held minority is read-only, and V4-55 closed the four pinned ways its kernel could split (STATUS.md). No TLA+ of it exists; the commit stranded on a cut-off owner that STATUS.md still pins is judged under F-02.",
+    "closes": "Not planned (a reference row): a TLA+ model of v4's views and ownership."
+   }
+  },
+  {
+   "req": "F-04",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-31"
+    ],
+    "why": "E-31 covers the subscribe protocol above a correct log. SLOG's own log (seal and CAS) was not modelled, so \"committed\" is not shown for it.",
+    "closes": "a model of the seal and CAS"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-31",
+     "E-22",
+     "E-22b",
+     "E-46",
+     "E-17c"
+    ],
+    "why": "With A-06 a subscriber's view stays a prefix of the committed log on ten bounds explored in full: a leader crash, a follower's reload, a dropped link, a slot move and a relay, up to 7.6 million states (E-31). Reads passed Porcupine and real Knossos (E-22, E-22b), and ReadIndex and log reads on the TS port were linearizable in every Maelstrom run (E-46)."
+   }
+  },
+  {
+   "req": "F-04",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [],
+    "why": "STATUS.md names a row that leaves a client's screen after a resync and comes back later, taken on purpose. No run here judged it against this monitor.",
+    "closes": "v4's M12 monitor read against F-04; not planned"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Per-cell last-writer-wins has no committed log for a reader to be a prefix of. STATUS.md pins the case (sim/scale-probes.test.ts, monitor M6): three nodes show a remove, collect its tombstone, then take an older write from a healed member, so the remove that readers saw is undone.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "F-09",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [],
+    "why": "The requirement's own source names v4 going read-only with no message. STATUS.md today pins three shapes that stay read-only until an operator acts; whether each says so was not checked here.",
+    "closes": "one test per v4 failure kind; not planned"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "STATUS.md: a dead static host holds the first view with no line ('silently': a closed port and a cut look alike), and a host list whose members disagree on the name forms one cluster per name with nothing printed (`nameReject` prints nothing since V4-3). So a loss of writability can show with no health row and no stderr line.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "F-11",
+   "part": "M",
+   "row": "BUY",
+   "decisive": false,
+   "j1": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-44"
+    ],
+    "why": "Three JetStream servers with three file replicas and an fsync before the ack: 900 writes, none lost through a kill of the stream's leader (E-44). The two-machine health line would be fero's own."
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-44"
+    ],
+    "why": "Three nats-server processes with three file replicas lost none of 900 writes through a kill of the stream's leader (E-44). The two-machine health line is not built.",
+    "closes": "Not planned (a reference row): the two-machine health line on JetStream."
+   }
+  },
+  {
+   "req": "F-12",
+   "part": "M",
+   "row": "OBJ",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-15",
+     "E-33",
+     "E-37"
+    ],
+    "why": "The slot move stays safe through one unclean recovery in both checkers (E-15, up to 7.5 million states), and a restore refuses a cursor its history does not hold (E-33). The operator command itself was not built or modelled: listing what may be lost, refusing while a dropped voter answers, and lock fence tables after an unclean recovery, which E-24 left out.",
+    "closes": "recovery tests in phase 3; a model of unclean recovery with lock fence tables and the `memory` rung (K-09)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [],
+    "why": "No group has voters: every commit is an object in the store, and the writer is whoever holds the lease. So there is no majority to lose, and nothing for the command to do."
+   }
+  },
+  {
+   "req": "F-14",
+   "part": "M",
+   "row": "EMB-V8",
+   "decisive": false,
+   "j1": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-07"
+    ],
+    "why": "User code runs in V8 isolates; the Rust kernel has its own threads, so a stalled or throwing isolate cannot hold them. E-07 measured the same split between two threads in Node."
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-03"
+    ],
+    "why": "User code runs in V8 isolates inside the Rust server, apart from the kernel's threads by design. But no stall and no throw was injected into an isolate: E-03 timed the calls only (2.6 ns an op).",
+    "closes": "A 5 s isolate stall and a throw on E-03's deno_core prototype."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "MIN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "RUST",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "SRV",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "LEAN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [],
+    "why": "v4 copies only what a member lacks by digests. But STATUS.md has 10 of 100 cut-and-restart schedules that are not live, and three shapes that stay read-only until an operator acts; whether a plain cut-off member is among them was not checked here.",
+    "closes": "v4's sweeps with partitions from 10 s to 1 h; not planned"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "STATUS.md. Step 1: sim/leave-sweep.test.ts pins 10 of the 100 cut-and-restart schedules as wedged for good (safe, not live), which a longer window does not change. Step 2: a member cut off and voted out can also leave the copies split for good after the heal, when its old write beats a newer remove (monitor M6 red). So a returning member does not always rejoin by itself.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "MIN-P",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "MIN-TS",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "RLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "EMB-V8",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "row": "COMP",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-16",
+     "E-13"
+    ],
+    "why": "On etcd's spec a member that was replaced while away recovers (R2-1 on commit), and healing finishes with grow first: 0 stuck states of 340,671 and of 235,702 (E-14c). Both healing options are safe and live with 4 members and two faults (E-16). Not shown: partitions as such, the full runs (G-10), and that a member back after an hour copies only what it lacks once the log is cut.",
+    "closes": "the phase-2 sim's partitions from 10 s to 1 h, with retention and snapshot catch-up"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   }
+  },
+  {
+   "req": "F-19",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-44"
+    ],
+    "why": "F-19 asks that a kill of 1,000 groups meets F-05. One JetStream stream already takes 5.2 to 7.2 s to fail over, against 2.5 s, and the timer is not fero's; a thousand at once cannot be faster.",
+    "proof": "ceiling",
+    "gap": 1.08
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-39",
+     "E-44"
+    ],
+    "why": "JetStream gives a publisher no credit window; fero's client could hold one, as E-39's clients did. Nothing was run at twice capacity, and failover alone takes 5.2 to 7.2 s (E-44).",
+    "closes": "Not planned (a reference row): E-39's overload run against JetStream."
+   }
+  },
+  {
+   "req": "F-20",
+   "part": "M",
+   "row": "ISR",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-29",
+     "E-12"
+    ],
+    "why": "It keeps a log file per group (S `walg`). E-29 measured the reserve for one journal per process; a reserve per group file was not run.",
+    "closes": "E-29(b)'s steps run on this row's own storage"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-29"
+    ],
+    "why": "E-29 ran F-20's own test on a journal of L0's shape and on a three-process pipeline, on 64 MB tmpfs and ext4. The 80 % line printed once; at the hard limit data writes were refused `disk-full` with a retry-after while reads, 500 removes, 200 term changes, a member change, a snapshot and a retention pass went on from the reserve; a full follower stopped acknowledging, said so, and caught up by itself in 348 to 513 ms. A-09's six format rules are what make it hold; an election on a full disk was sized (56 B a vote), not run."
+   }
+  },
+  {
+   "req": "F-20",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-29"
+    ],
+    "why": "Its log nodes can take A-09's rules, but a full log node under a write quorum and a seal was not run.",
+    "closes": "E-29(b)'s steps run on this row's own storage"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-29"
+    ],
+    "why": "E-29 ran F-20's own test on a journal of L0's shape and on a three-process pipeline, on 64 MB tmpfs and ext4. The 80 % line printed once; at the hard limit data writes were refused `disk-full` with a retry-after while reads, 500 removes, 200 term changes, a member change, a snapshot and a retention pass went on from the reserve; a full follower stopped acknowledging, said so, and caught up by itself in 348 to 513 ms. A-09's six format rules are what make it hold; an election on a full disk was sized (56 B a vote), not run."
+   }
+  },
+  {
+   "req": "F-21",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "v4 has no leader and no total order per partition, so there is no committed offset to name. Its digests compare lanes, not folded state, and the row-comes-back bug passes them (STATUS.md).",
+    "closes": "a state-hash check for v4; not planned"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: v4's anti-entropy compares log digests between nodes, not folded state. Step 2: STATUS.md pins copies that disagree with nothing said: after a fresh member's seed, three members show a deleted row and the fourth does not, at one writable view (2 runs of 2). So a divergence of the fold is not caught.",
+    "proof": "structural"
+   }
+  }
+ ]
+}
