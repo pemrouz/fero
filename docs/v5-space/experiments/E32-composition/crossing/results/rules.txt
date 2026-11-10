@@ -1,0 +1,123 @@
+guard  write.open                 route   the group holds the slot open by its committed log
+guard  write.nofence              move    no write once fenced is in the log, committed or not
+guard  write.dedup                dedup   
+guard  write.fence                fence   [>=] 
+guard  write.above                dedup   [>=] NEW E-20 sess: apply only at or above the session's floor
+guard  write.mark                 dedup   [>] NEW E-30 srchi-slot: a derived output applies only above the slot's mark
+update write.pos                  stamp   stamp the slot's next sequence, from the log end
+update write.floor                dedup   NEW E-20 sess: the entry records the floor its copy carried
+update write.src                  dedup   NEW E-30 srchi-slot: the source sequence is written in the output's own entry
+update write.append               answer  
+guard  refuse.open                route   
+guard  refuse.dedup               dedup   
+guard  refuse.stale               fence   [<] 
+guard  refuse.above               dedup   [>=] NEW E-20 sess: a copy below the floor is answered stale, never judged; E-17's refusal reads the outcomes, and E-20 forgets them below the floor
+update refuse.answer              answer  
+guard  read.committed             cursor  
+guard  read.after                 cursor  [>] 
+guard  read.next                  cursor  
+update read.take                  cursor  
+update read.cursor                cursor  
+guard  export.open                move    A exports only a slot its committed log holds open
+guard  export.nofence             move    
+guard  export.one                 move    one move of a slot at a time
+update export.append              move    
+guard  import.expcom              move    B acts on a committed exporting
+guard  import.new                 move    B refuses a name it has imported or aborted
+update import.append              move    
+guard  copy.impcom                perf    B commits importing, then copies
+guard  copy.noabort               perf    
+guard  copy.once                  idem    one bulk copy; the rest comes after the fence
+update copy.recs                  perf    
+update copy.append                perf    
+guard  fence.ready                perf    A fences on B's report of a committed copy
+guard  fence.expcom               move    A owns the move once exporting commits; the name is the position of that exporting in A's committed log, so a stale name is ignored
+guard  fence.nocancel             move    A never fences once cancel is in its log
+guard  fence.open                 move    
+guard  fence.nofence              move    
+guard  fence.once                 idem    
+update fence.N                    stamp   N is the slot's last sequence in A's log (its end, not its commit)
+update fence.append               move    
+guard  final.fencom               move    only once fenced commits does A send the delta and END(N)
+guard  final.imp                  move    B has committed importing
+guard  final.noabort              move    
+guard  final.once                 idem    
+update final.recs                 carry   the rows and records of the slot
+update final.outs                 carry   the dedup outcomes tagged with the slot
+update final.tok                  carry   the highest lock token
+update final.seq                  carry   the slot's sequence
+update final.floor                carry   NEW E-20 sess: the session's floor
+update final.mark                 carry   NEW E-30 srchi-slot: the slot's mark
+update final.end                  move    END(N)
+update final.append               move    
+guard  open.cpcom                 move    B opens once the delta, END(N) and the carried state commit
+guard  open.noabort               move    B never opens once abort is in its log
+guard  open.once                  idem    
+update open.N                     stamp   
+update open.append                move    
+guard  abort.imp                  move    B gives up only a move it is importing
+guard  abort.noopen               move    B aborts only while its log has no open
+guard  abort.once                 idem    
+update abort.append               move    
+guard  unfence.abcom              move    A reopens only on B's committed abort
+guard  unfence.fen                move    
+guard  unfence.once               idem    
+update unfence.N                  stamp   reopen at N
+update unfence.append             move    
+guard  cancel_on_abort.abcom      move    
+guard  cancel_on_abort.nofen      move    
+guard  cancel_on_abort.once       idem    
+update cancel_on_abort.append     move    
+guard  snap.com                   snap    [<=] NEW a snapshot is cut at or below the commit offset
+guard  snap.nomove                snap    NEW DESIGN-V5 4.1: no slot move is still copying from it
+update snap.held                  snap    NEW which slots the group holds open
+update snap.seq                   snap    NEW each slot's sequence
+update snap.recs                  snap    NEW each slot's rows and records
+update snap.outs                  snap    NEW each slot's dedup outcomes
+update snap.floor                 snap    NEW the session floor
+update snap.tok                   snap    NEW each slot's highest lock token
+update snap.mark                  snap    NEW each slot's srchi-slot mark
+update snap.cfg                   snap    NEW the group's config
+update snap.f_exp                 snap    NEW the moves this group exports
+update snap.f_imp                 snap    NEW the moves this group imports
+update snap.f_cp                  snap    NEW which copies it holds, and their END
+update snap.f_fen                 snap    NEW its fences, with N
+update snap.f_can                 snap    NEW its cancels
+update snap.f_unf                 snap    NEW its unfences
+update snap.f_open                snap    NEW its opens
+update snap.f_abort               snap    NEW its aborts
+update snap.cut                   snap    NEW the log below the offset is dropped
+guard  add.leader                 raft    only a working leader proposes
+guard  add.idle                   raft    one change at a time (etcd)
+guard  add.cand                   target  a live member the leader reaches
+guard  add.new                    target  this replica is not already in the config (a member back with a new disk is a new replica)
+guard  add.need                   target  a voter is gone to the leader
+update add.append                 step    
+guard  promote.leader             raft    
+guard  promote.idle               raft    
+guard  promote.learner            target  
+guard  promote.live               target  
+guard  promote.caught             swap    its log reaches the commit offset
+guard  promote.need               target  
+guard  promote.odd                target  [<] promote only from three voters (to four, for the swap)
+update promote.append             step    
+guard  remove.leader              raft    
+guard  remove.idle                raft    
+guard  remove.voter               target  
+guard  remove.gone                target  the voter is gone to the leader
+guard  remove.four                swap    [>=] a swap promotes first, then removes (A-01 rule 5: grow before shrink)
+guard  remove.newok               swap    the new voter holds the commit offset again
+update remove.append              step    
+guard  surplus.leader             raft    
+guard  surplus.idle               raft    
+guard  surplus.voter              target  
+guard  surplus.four               target  [>=] 
+guard  surplus.nogone             target  no voter is gone: the gone one came back
+guard  surplus.last               target  the voter the ring ranks last
+guard  surplus.allheld            swap    the voters left answer and hold the commit offset
+update surplus.append             step    
+guard  dropl.leader               raft    
+guard  dropl.idle                 raft    
+guard  dropl.learner              target  
+guard  dropl.gone                 target  
+update dropl.append               step    

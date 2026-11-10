@@ -9,6 +9,8 @@
 #   ./run.sh mutants      DEV-10 (d): the one-rule mutants of the composed model as designed
 #   ./run.sh ablate       DEV-10 (c): the rules added at the crossing (every other rule kept)
 #   ./run.sh report       results/*.md from the checkpoints
+#   ./run.sh review       the review's checks: re-runs, the source's log drop mid-move, the review
+#                         bounds, the election probe, four planted bugs (results/review.txt)
 #   ./run.sh union        NOT RUN (CPU budget): the smallest composed model, from the single
 #                         experiments' smallest sets, and its mutants
 #
@@ -108,6 +110,45 @@ step_union() {    # not run for this README (CPU budget); kept so the next agent
         | tee -a "$W/mutants-small.log"
 }
 
+step_review() {   # the review's checks (README, "Review"); about 1 CPU-hour
+    { echo "# E-32 (b) review: every check the review ran (README, \"Review\"), raw output"
+      echo
+      echo "## 1. re-runs of the smallest bound and two larger ones (compare with results/design.txt)"
+      for b in src slots-dst heal2-src; do
+          timeout 1780 $HEAVY python3 model/crun.py --design "$W/review-rerun.json" --only "$b" --limit 3000000
+      done | grep -v ' expanded, '
+      [ -f "$W/design.json" ] && python3 -c "
+import json, sys
+a, b = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+for k in b:
+    print(f'{k:10} state digest {\"SAME as\" if a[k][\"digest\"] == b[k][\"digest\"] else \"DIFFERENT from\"} the stored run')
+" "$W/design.json" "$W/review-rerun.json"
+      echo
+      echo "## 2. DESIGN-V5 4.1's guard (snap.nomove) dropped: the source may drop its log while a move copies from it"
+      for b in src dst dst-src src-dst floor-src twice-src twice-dst slots-src heal2-src; do
+          timeout 1780 $HEAVY python3 model/crun.py --bound "$b" --drop snap.nomove --all --limit 4000000 | head -1
+      done
+      echo
+      echo "## 3. the review bounds (cbounds.py REVIEW): in full with liveness, or partial where marked"
+      for b in read2-src read2-dst crash2-src; do
+          timeout 1780 $HEAVY python3 model/crun.py --design "$W/review-bounds.json" --only "$b" --limit 3000000
+      done | grep -v ' expanded, '
+      echo
+      echo "## 4. does any election ever see a live voter behind the log?"
+      $HEAVY python3 model/creview.py stale src dst crash-src crash-dst giveup-dst crash2-src
+      $HEAVY python3 model/creview.py stale all --limit 1000000
+      echo
+      echo "## 5. four planted bugs (model/creview.py): each on src, then on the smallest bound that reaches it"
+      $HEAVY python3 model/creview.py plant --work "$W/plant"
+      echo
+      echo "## 6. mutants equivalent on the 18 sweep bounds, run on bounds outside the sweep"
+      $HEAVY python3 model/crun.py --bound read2-src --drop read.next | head -1
+      for f in write.above refuse.above; do
+          timeout 1780 $HEAVY python3 model/crun.py --bound floor-src --flip "$f" | head -1
+      done
+    } | tee results/review.txt
+}
+
 step_report() {
     python3 model/cmut.py --out "$W/mutants.json" --report > results/mutants.md
     python3 model/creport.py ablation "$W/abl-added.json" > results/ablation.md
@@ -123,6 +164,7 @@ case "${1:-all}" in
     mutants) step_mutants ;;
     ablate) step_ablate ;;
     union) step_union ;;
+    review) step_review ;;
     report) step_report ;;
     all) step_base; step_design; step_found; step_carry; step_mutants; step_ablate; step_report ;;
     *) echo "unknown step: $1" >&2; exit 2 ;;

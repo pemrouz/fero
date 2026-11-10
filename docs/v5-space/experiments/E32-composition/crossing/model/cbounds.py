@@ -28,6 +28,8 @@ Keys beyond E-17's (layouts, attempts, crashes, faults, reader):
   serial   the client sends one write at a time (the next only once the
            one before is acknowledged)
   never    members that never come back once they fail
+  remit    E-30's `dup` answer is on (an output at or below the slot's mark,
+           re-emitted under a new id, is answered "already applied")
 """
 
 import os
@@ -132,6 +134,23 @@ BOUNDS = {
     'all': B(attempts=W1, sess=S1, fail=(0, 1, 2), heal=(0, 1), dropg=(0, 1), drops=2, giveup=True, reader=True,
              crashes=1, faults=1),
 }
+
+# --- added by the review (README, "Review"). No bound above changes. Each is the smallest bound where a
+# property the README claims can first fail:
+#   read2-*    a reader with two session writes. With one write (read-*) no record can be skipped, so P4's
+#              "no gap" could not fail (mutant G read.next is equivalent on all 18 sweep bounds);
+#   crash2-src two crashes: member 1 (a voter of A) may crash and come back, member 0 (A's leader) may crash
+#              for good. With one member fault no election ever has a live voter behind the log, so Raft's
+#              log check, and E-14's LC and QL through it, could not fail. Here member 1 can miss a commit,
+#              come back, and stand when A's leader is gone. (The same with any voter crashing and coming
+#              back passes 3 million states: too big to finish here.)
+REVIEW = {
+    'read2-src': side('src', attempts=W2, sess=S2, serial=True, reader=True),
+    'read2-dst': side('dst', attempts=W2, sess=S2, serial=True, reader=True),
+    'crash2-src': B(attempts=W1, sess=S1, fail=(0, 1), kinds=('crash',), never=(0,), mfaults=2, heal=(0,),
+                    dropg=(0,)),
+}
+BOUNDS.update(REVIEW)
 
 # The bounds the mutants and the ablation run on, cheapest first. The six marked * joined on resuming
 # (the mutant run had finished its differential pass on the other twelve; cmut.py runs every mutant not
