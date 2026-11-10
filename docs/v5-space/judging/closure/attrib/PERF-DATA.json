@@ -1,0 +1,715 @@
+{
+ "group": "PERF-DATA",
+ "by": "a closure attribution session, from judging/PERF-DATA.settled.json (each cell's why, why2 and ev). Overrides mark V4 cells that follow v4 as built (no group commit, its relay code, its codec and Fault tests, its open row-freeze bug), which no axis tag expresses.",
+ "parts": [
+  {
+   "req": "PERF-01",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: the floors are measured (C = 0.73 ms, E-01), each competitor ran with its own tool 3 times, and E-45 names a driver for each row, but the gateways only drove a simulator, 6 to 54 times below Redis (E-09a2), so no row is won yet. Wins and losses are scored in PERF-02 to PERF-07."
+   }
+  },
+  {
+   "req": "PERF-02",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.96,
+     "basis": "BUY's `persisted` is JetStream with a sync before each ack: about 3,700 messages a second here, one fsync per message whatever the batching (E-09b), against Redis's 88,600 to 91,600 matched SETs a second (E-09a2). fero on top can only be slower."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Redis matched: 91,600 SETs a second, p99 4.9 ms (memtier, E-09a, E-09a2). E-02's pipeline ceilings sit 5 to 60 times above the matched rows and 3 to 5 times above the default rows, so no build is stopped, but no fero kernel ran through the RESP gateway at speed (E-45). The held-row clause holds: 81 ns in process against a 1.26 ms GET (E-44). A row with no `memory` rung meets Redis's default with `persisted`: a thin margin, not a measured loss."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.997,
+     "basis": "v4's shell as built syncs the disk once per write step: about 250 persisted writes a second per member (STATUS, v4 measured), against Redis's 88,600 matched SETs a second; closing it needs group commit, 'which v4 as it is does not have'. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "Only BUY and V4 differ. BUY follows R `outside` (JetStream's own store). V4 follows v4's build, not an option, so it is an override."
+  },
+  {
+   "req": "PERF-03",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY's `none` rung is core NATS itself: each fero publish is one NATS publish plus fero's client and gateway work, and the gateway's CPU counts, so fero's rate and p99 cannot beat NATS's by more than the spread (E-44, E-09b)."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "NATS core here: 2.25 M msgs a second one to one, 4.13 M deliveries a second to 16, p99 0.27 ms (E-09b). E-02's `none` ceiling with no sockets is 4.3 M a second in TS (1.9 times NATS, the thinnest margin) and 18.6 M in Rust; a Node relay pushed 0.57 to 1.50 M deliveries a second per core (E-08). No `none` path ran through `nats bench`, so the row is neither won nor lost."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.996,
+     "basis": "v4 as built relays a record at about 110 µs of CPU, about 9,000 deliveries a second per relay core, and no rung of v4 skips that path; v4's ladder has no `none` rung (DESIGN-V5 sections 8 and 9, v4 measured), against NATS's 2.25 M msgs a second. No axis tag expresses this: V4's Q `mix` is the same tag as the draft's, which carries a `none` rung, and the relay rate is v4's code (no per-shard index, no encode-once path)."
+    }
+   },
+   "why": "Only BUY and V4 differ. BUY follows R `outside`. V4 follows v4's relay and ladder as built, so it is an override."
+  },
+  {
+   "req": "PERF-04",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY's log is JetStream itself: each fero publish is one JetStream publish plus fero's gateway work, so fero cannot beat JetStream by more than the spread; goal 2 fails by construction (E-44, E-09b)."
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ],
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.43,
+     "basis": "every commit is a conditional PUT: on MinIO on this disk one writer gets 698 PUTs a second at p99 2.67 ms (E-28), against JetStream's 1,228 acks a second at p99 1.31 ms with a sync before each ack and 0.55 ms at its default (E-09b). OBJ loses both single-publisher rows by its own floor."
+    },
+    {
+     "when": {
+      "Q": [
+       "mix"
+      ]
+     },
+     "v": "open",
+     "basis": "Q `mix` has a `memory` rung, the matching rung for JetStream's default (p99 0.55 ms). E-02's bare pipeline reads 0.57 ms in TS, a tie, and 0.33 ms in Rust, a win, at 50,000 writes a second and never with one write in flight, so the native step carries the default row; the matched one-publisher row (1.31 ms) is open in both phases (E-09b, E-02)."
+    },
+    {
+     "when": {
+      "Q": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "Q `isr` acks from memory at the in-sync set, so the row has a rung that matches JetStream's default and the default row is not lost by a floor. No ISR-shaped pipeline ran (E-02's memory rung reads 0.57 ms TS, 0.33 ms Rust), and waiting for the slowest in-sync replica widens the tail."
+    },
+    {
+     "when": {
+      "Q": [
+       "maj-d",
+       "maj-d(log nodes)"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "PERF-01 losses",
+     "alt": "open",
+     "gap": 0.33,
+     "basis": "the row's only durable rung is `persisted`, whose floor on this box is C = 0.73 ms (E-01). JetStream's default acks one publisher at p99 0.55 ms, below that floor (E-09b), so the default single-publisher row cannot be won, and PERF-01 allows no loss while the user's list of accepted losses is empty. The matched rows stay open (JetStream 1,228 acks a second, p99 1.31 ms)."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no judged row holds this mix of R and Q (Q `put` without R `obj` breaks SPACE 2's 'needs R obj'); nothing was measured for it."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.93,
+     "basis": "V4 holds Q `mix` like the draft, but both judges failed it on its build: v4 syncs once per write step, about 250 persisted writes a second per member (STATUS), against JetStream's 1,228 to 3,700 acks a second with a sync before each ack; v4 has no group commit to close it. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "The judges split the Raft rows by Q, the rung that meets JetStream's 0.55 ms default: `mix` (a `memory` rung) and `isr` are open, `maj-d` alone fails on the persisted floor. OBJ follows its commit, a PUT (R `obj`, Q `put`). V4 shares Q `mix` with the open rows but fails on its build, so it is an override."
+  },
+  {
+   "req": "PERF-05",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.96,
+     "basis": "JetStream with a sync before each ack takes 3,194 records a second of 1 KiB here, one fsync per message (E-09b), against Kafka's matched 86,344 a second (E-09c). fero on JetStream cannot pass JetStream's own ceiling."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Kafka here: matched 86,344 records a second of 1 KiB, default 240,043 (E-09c). E-02's persisted ceiling is 284,000 a second in TS (3.3 times the matched row, only 1.18 times the default) and 349,000 in Rust; E-02 has no 1 KiB `memory` run, and the Kafka gateway has only driven a simulator (E-45)."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.997,
+     "basis": "v4 as built reaches about 250 persisted writes a second per member, one disk sync per write step (STATUS), against Kafka's matched 86,344 records a second; v4 has no group commit to close it. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "Only BUY and V4 differ: BUY by R `outside`, V4 by its build (override)."
+  },
+  {
+   "req": "PERF-06",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.98,
+     "basis": "JetStream with a sync before each ack takes 3,194 records a second of 1 KiB here (E-09b), against Redpanda's 175,420 (E-09d). fero on JetStream cannot pass JetStream's own ceiling."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Redpanda here: 175,420 records a second of 1 KiB with an fsync at a majority, p99 43 ms at half rate (E-09d). E-02's persisted ceiling is 1.62 times above it in TS (the thinnest matched margin, with no CPU margin) and 1.99 times in Rust. No fero kernel ran behind the Kafka gateway at speed."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.999,
+     "basis": "v4 as built reaches about 250 persisted writes a second per member, one disk sync per write step (STATUS), against Redpanda's 175,420 records a second; v4 has no group commit to close it. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "Only BUY and V4 differ: BUY by R `outside`, V4 by its build (override)."
+  },
+  {
+   "req": "PERF-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.84,
+     "basis": "JetStream with a sync before each ack tops out near 3,700 a second (3,275 acks to 16 publishers), against etcd's 22,800 puts a second at 1,000 clients (E-09b, E-09e); a conditional write on BUY is a client read plus a publish, about 4 ms, against etcd's compare-and-set at p50 1.22 ms (E-44)."
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ],
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.38,
+     "basis": "one client's put is one conditional PUT: 698 a second at p99 2.67 ms on MinIO on this disk (E-28), against etcd's 1,118 puts a second at p99 1.73 ms for one client (E-09e). OBJ's own floor is below the bar on both metrics, and a real store is slower still (cited)."
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ],
+      "W": [
+       "any"
+      ]
+     },
+     "v": "fails",
+     "gap": 0.99,
+     "basis": "v4 has no conditional write to set against `txn-put` and no linearizable read for the `range` rows (DESIGN-V5 section 8: none): leaderless last-writer-wins (R `lww`) gives no writer to judge a condition, and W `any` has no read index. On top, v4 as built reaches about 250 persisted writes a second per member (STATUS) against etcd's 22,800 at 1,000 clients; the gap is that measured one."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "etcd here: 1,118 puts a second at one client (p99 1.73 ms) and 22,800 at 1,000 clients (E-09e). E-02's ceilings are 40 to 120 times above the throughput rows, but its TS tail (2.4 to 4.3 ms) is above etcd's one-client p99 and Rust's is 1.58 ms, read at 10,000 to 50,000 writes a second, never one in flight. The etcd gateway has only driven a simulator (E-45)."
+   },
+   "why": "BUY follows R `outside`, OBJ its PUT commit (R `obj`, Q `put`). V4's reasons name two causes: its build (250 a second) and its replication, R `lww` with W `any`, which has no conditional write and no linearizable read; the second alone fails the txn and range rows, so V4 is a rule on R and W."
+  },
+  {
+   "req": "PERF-08",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PERF-08 names no load for the pin (judge 1): JetStream with a sync before each ack answers one publisher at p99 1.31 ms, inside 5.73 ms, but 16 publishers at 9.2 ms, over it, because it syncs each message alone (E-09b). So BUY fails only under a pin with writers in line, judge 2's reading."
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ],
+      "Q": [
+       "put"
+      ],
+      "L": [
+       "ts→rs",
+       "rs+napi",
+       "rs+v8",
+       "rs-srv",
+       "rs-srv + ts",
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "other",
+     "alt": "open",
+     "gap": 1.17,
+     "basis": "OBJ's commit is one conditional PUT: with the store on this box's loopback a 1 KB PUT takes p50 1.37 ms and p99 2.67 ms (E-28), over the native bar C + 0.5 ms = 1.23 ms at any load (E-01), and a real store only adds to it. The row names a native step (L), and that step carries the verdict; judged on its TS phase alone the cell is open, because the PUT is inside 5.73 ms (judge 1). A row with R `obj` and L `ts` has no native bar and falls to else."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "TS bar C + 5 ms = 5.7 ms: E-02's bare pipeline reads p99 4.3 ms (3.7 ms with the kernel on a worker), but E-11's real TS Raft on a simple host read 10 to 11 ms at 10,000 writes a second. Native bar 1.23 ms: the Rust pipeline reads 1.58 ms on this one shared disk and 0.67 ms with emulated separate disks; etcd itself reads 1.73 ms. A `ts→rs` row is judged on the TS bar first. ISR's WAL per group is a weak point (p99 9 to 147 ms from 256 groups, E-12) but the pin names no group count; PD's LSM write path was not measured."
+   },
+   "overrides": {
+    "V4": {
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "the reasons are v4's build: no p99 commit was ever measured on v4, and the pin names no load, so a lone write may sit inside 5.73 ms (judge 1); but v4 syncs once per write step and tops out near 250 persisted writes a second per member (STATUS), so any pin with writes in line fails by queueing (judge 2: 10,000 writes not all persisted in 20 s). No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "BUY follows R `outside`. OBJ follows its PUT commit (R `obj`, Q `put`) and its native step (L): the referee says the native bar carries the verdict and the TS bar alone leaves it open. V4 follows v4's build (override)."
+  },
+  {
+   "req": "PERF-09",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "not",
+     "basis": "JetStream with a sync before each ack takes about 3,700 messages a second here, one fsync per message, against 50,000 (E-09b)."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-02's bare pipeline commits 2.8 M appends a second in TS (1.53 M with a client front, E-39), 30 to 56 times the TS bars, and 2.2 to 4.1 M in Rust on this disk against 500,000 per process and 2 M per writer; these are ceilings with no Raft core, L2 or fold, and the real TS Raft ran only at 10,000 writes a second (E-11). ISR's file per group reaches 0.29 to 1.27 times the journal's rate (E-12); SLOG's loglet write quorum and OBJ's batching into large PUTs (E-28) were not run."
+   },
+   "overrides": {
+    "V4": {
+     "v": "not",
+     "basis": "v4 as built measured about 250 persisted writes a second per member, one disk sync per write step (STATUS), against 50,000. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+    }
+   },
+   "why": "Only BUY and V4 differ: BUY by R `outside`, V4 by its build (override)."
+  },
+  {
+   "req": "PERF-10",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY's writer is the outside server, which cannot run fero's conditions or ops: a conditional op is a client read plus a publish, each a round trip, about 4 ms an op with 34 % of publishes wasted at 8 writers (E-44); one loopback round trip alone is 31 to 58 µs (E-01), over the 3 µs bar, and no method call can have the writer as its caller."
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ],
+      "W": [
+       "any"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4 is leaderless last-writer-wins (R `lww`), so a condition has no agreed order to be judged against (two claims both committed and both were told ok, DESIGN-V5 section 9): no conditional op at a writer. And there is no read index (W `any` only), so no linearizable `fresh` read. Two of the four pins have nothing to measure unless the row takes consensus, another row's option."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "one clause is measured: a held-row read costs 81 ns through data (E-44), under 100 ns. The conditional op (3 µs) and the method call at the writer (10 µs) were not timed on any v5 kernel (E-02 spends 0.26 µs per extra append; data's fold 0.22 to 1.90 µs a record, E-05). Where the row holds W `ridx` or `lease`, a `fresh` read is one round and no fsync by construction. U `cli` rows (SRV, PD) have no method-at-the-writer case; SIDE's call to its daemon costs about 33 µs over a socket (E-03), a weak point, not a measured ceiling."
+   },
+   "why": "BUY follows R `outside` (the writer is not fero). V4 follows R `lww` and W `any`, both named in its reasons (no writer to judge a condition, no read index)."
+  },
+  {
+   "req": "PERF-11",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "W": [
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's row holds W `lease ridx` and no subscription option, so no relay of its shape was measured and 'each record encoded once' is not shown for it (judge 2). That E-08's Rust number (11.9 to 13.4 M a second against 3 M) would carry if PD ran fero's own relay is judge 1's reasoning, not a measurement."
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ],
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's log carries kernel commands and two-phase-commit intents, so a change stream must first be cut from the store's commits before any relay can fan it out; no relay of that shape was measured."
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-08's one-thread Node relay, which encodes each room's records once and writes that one buffer to every subscriber, pushed 0.57 to 1.50 M deliveries a second per core with no added wait, 6 to 15 times the TS bar, and keeps 0.89 to 0.95 of that over WebSocket (E-40); the Rust relay pushed 11.9 to 13.4 M, 4 times the native bar. For a `ts→rs` row the TS phase carries the verdict. BUY's relay is the NATS server: 2.5 M deliveries per server core-second, each message encoded once."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0.91,
+     "basis": "v4 as built measured about 9,000 deliveries a second per relay core, about 110 µs per relayed record (DESIGN-V5 section 8), against 100,000; 'v4 as it is has no per-shard index and no encode-once path'. That is v4's relay code, not an axis option: every other row's relay is E-08's."
+    }
+   },
+   "why": "PD's reasons name W (no subscription option) and K with X (its log holds kernel commands and 2PC intents); either one leaves the relay unshown. V4 follows its relay as built (override)."
+  },
+  {
+   "req": "PERF-12",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "C": [
+       "self",
+       "self+p",
+       "self+mv",
+       "cent-co"
+      ]
+     },
+     "v": "met",
+     "basis": "with quiet groups (A-12), 2,000 idle groups sent nothing of their own and cost 0.15 % of a core on the TS Raft port, 0.10 % on etcd's raft in Go and 0.04 % on raft-rs (E-11). With one ping per member pair, a Node member with 99 links pinged every 500 ms plus 2,000 quiet groups used 0.95 % of a core (0.33 % in Rust), and n = 100 makes 19,800 frames a second (E-25). It holds, narrowly in TS and only up to n = 100."
+    },
+    {
+     "when": {
+      "R": [
+       "raft"
+      ],
+      "C": [
+       "cent"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: raft-rs with quiet groups costs 0.04 % (E-11), but PD's groups also report to the controller on a timer (hibernating regions, heartbeats to its controller), which nobody counted at n = 100."
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "Kafka-style idle follower fetches are pairwise each way every 500 ms, so above about 10,000 partitions ISR sends 34,456 to 39,700 frames a second at n = 100, over the cap of about 20,000 (E-25, a count). The fetch wait is a constant: a weak point, not a failure by design."
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "sessions to the controller make 400 frames a second at n = 100 (E-25), far under the cap, but what 2,000 idle loglets cost one process was not measured."
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ sends no frames, but each group's writer lease is renewed by a conditional PUT: about 1,000 PUTs a second for 2,000 idle groups (E-25, a count), so an idle group sends something of its own unless leases go quiet, which the row does not yet say."
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ],
+      "G": [
+       "res"
+      ]
+     },
+     "v": "open",
+     "basis": "v4's idle traffic at n = 100 is about 20,000 frames a second (DESIGN-V5 section 8), at the cap; each v4 resource is its own cluster with its own heartbeats, and what 2,000 idle resources cost one process was not measured."
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "the idle cost is JetStream's: each replicated stream is a Raft group of NATS's own, and 2,000 idle streams on one server were not measured here."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no judged row holds this mix of replication and control plane; nothing was counted for it."
+   },
+   "why": "The met rows are the Raft and rlog rows whose groups go quiet (A-12) and whose failure detector is one ping per member pair; PD's controller (C `cent`) adds reports on a timer. The other open rows follow R. V4's reason also names G `res` (one cluster per resource)."
+  },
+  {
+   "req": "PERF-13",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "v4's logs are its state, and its compaction rescans every large lane (the per-origin logs of R `lww`) on each heartbeat to find each cell's last-writer-wins winner, so its cost per tick grows with the records held: 43 % of CPU in a two-member run of 100,000 writes, in compaction's `winner` (DESIGN-V5 sections 3.4, 8 and 9, v4 measured). The pin asks for a flat cost from 1e3 to 1e7 rows."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no experiment timed retention or compaction per tick. By design retention drops or uploads whole segments, flat by intent, but snapshot layers, their merging and TTL expiry were not priced from 1e3 to 1e7 rows. PD's LSM compacts in the background, work that grows with data written and kept: a weak point, still open."
+   },
+   "why": "V4's reason is the compaction of its per-origin lanes to an LWW winner, which belongs to R `lww` (the catalogue's lanes and compaction frontiers), so the rule names R."
+  },
+  {
+   "req": "PERF-14",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "a process rule, the same for every row: no pinned quiet runner exists (this box moved up to 36 % between boots, E-09a2), and no v5 pin exists yet; no design stops them."
+   }
+  },
+  {
+   "req": "DATA-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ],
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "v4 replicates by per-cell last-writer-wins with Lamport stamps over per-origin logs (R `lww`, O `lamp`): a replica keeps the cell with the higher stamp whatever order records arrive in, which is a last-writer-wins compare, and no partition has one log order. DATA-01 forbids exactly that."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "judge 2 was right: E-22's prototype found every caught-up replica's rows equal to a fresh fold of the log on every seed, but on one TS thread with rows by value only; views over the same rows (a float `sum`, tie order) differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10). Rows kept off the V8 heap were checked only by E-05's digest. SRV and PD fold natively and need DATA-09's differential test; ISR's Kafka-style transactions make the fold hold records back, not designed; no monitor compares folds on BUY."
+   },
+   "why": "V4's reasons name R `lww` and O `lamp`; both are listed."
+  },
+  {
+   "req": "DATA-02",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "met",
+    "basis": "a layering rule no option breaks: one TypeScript module imports data's one entry, and a native server imports none. Checked by search: only proto/seam.ts in E-22's prototype, only buy.mjs in E-44's, and api/substrate.ts in v4 today. The guard test itself is phase-1 work, but it guards a fact the prototypes already show."
+   }
+  },
+  {
+   "req": "DATA-03",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "K": [
+       "kern"
+      ],
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD, harder than the rest: with K `kern` and X `2pc` its log entries are kernel commands and intents, so a data record must ride unchanged inside them (a prewrite); that format was not designed and no test exists (E-45)."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "the designs carry data's change records as log entries under a header that wraps them (about 3.9 B a record, E-19), and E-22's prototype folds records verbatim. But the v5 header and codec are phase-1 work: byte values must be allowed (E-45), a view stream may carry data's `move` records (E-22), and a format V8 decodes whole is planned (A-13). No v5 codec has a round-trip test."
+   },
+   "overrides": {
+    "V4": {
+     "v": "met",
+     "basis": "v4 has it today: fero's records cross the wire and the WAL in data's shape, applied verbatim through data's lane, and both repos hold codec round-trip tests (kernel/codec.test.ts; CLAUDE.md, 'The two seams'). The cell follows v4 being built, which no axis tag expresses: a new row with v4's options would still owe its codec and its tests."
+    }
+   },
+   "why": "PD's reason names K `kern` and X `2pc`. V4 is met because its code and tests exist today, so it is an override."
+  },
+  {
+   "req": "DATA-04",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "data's debt, the same for every row (A-10): its 18 clauses run in fero's battery today, but two data commits that both say SCHEDULE_VERSION 4 fold differently (E-43), the merge contract (E-23) and a restore rule (E-06) are not written, and the 4 to 5 bump fero needs is not published."
+   }
+  },
+  {
+   "req": "DATA-05",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "data's debt, the same for every row: views stay data's operators, but data's `group` rebuilds a touched bucket on each commit (2,574 µs a record at 1e6 rows against 1 µs per affected view, E-05), equal top-k views are not shared, and `top-k` and `sum` need the merge contract (E-23)."
+   }
+  },
+  {
+   "req": "DATA-06",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "in BUY fero's client folds on the app's thread; E-44's client has no Fault path (a throw inside its fold loop stops the fold) and ran no test with user code that throws, and the probe on E-22's prototype let a throwing tap's AggregateError into the apply step."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "judge 2 was right: no check in E-22 has user code that throws, and a probe on its prototype let a throwing tap's AggregateError out of the seam into the replica's apply step, and the run stopped. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5."
+   },
+   "overrides": {
+    "V4": {
+     "v": "met",
+     "basis": "v4 has the rule and its tests today (V4-47): what user code throws while data closes a commit goes to the composer's Fault in api/substrate.ts (CLAUDE.md, the two seams). The cell follows v4 being built, which no axis tag expresses; E-07's worker argument does not carry it, since v4 runs on one loop (M `loop`)."
+    }
+   },
+   "why": "BUY's own reason (E-44's client) follows R `outside`. V4 is met because its rule and tests exist today, so it is an override."
+  },
+  {
+   "req": "DATA-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "E-44's client hands rows out through data's handle with no freeze and ran no mutation test; on E-22's prototype a row read through a `filter` view after a field-level write was not frozen. So immutable rows on every hand-out path are not shown."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "judge 2 was right: a mutation probe on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others). The seam freezes rows on `get` and `snapshot` only, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown."
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "basis": "v4 as it is hands out the stored objects themselves (`f.snapshot`, `await data`, view rows) with no freeze or copy on the way out, so a program that writes into a row it read changes what that node holds and serves while other copies keep the old value (STATUS, an open bug: the probe read 1 on the writer and 99 elsewhere). That is a bug in v4's code, which no axis tag expresses."
+    }
+   },
+   "why": "BUY's own reason (E-44's client) follows R `outside`. V4 fails on an open bug in its code, so it is an override."
+  },
+  {
+   "req": "DATA-08",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "a process rule, the same for every row: fero's CI runs no perf suite today, data's included, because no pinned quiet runner exists; no design stands in the way."
+   }
+  },
+  {
+   "req": "DATA-09",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "L": [
+       "ts"
+      ]
+     },
+     "v": "met",
+     "basis": "TypeScript for good: no layer ever moves to native code, so the fold is always data's own code (V4, MIN-TS)."
+    },
+    {
+     "when": {
+      "L": [
+       "rs+napi"
+      ]
+     },
+     "v": "met",
+     "basis": "the Rust core holds the log; L2, rules and data's fold stay in JavaScript, called on the JS thread or in batches (A-30), so the fold's results are data's by identity. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43)."
+    },
+    {
+     "when": {
+      "L": [
+       "rs+v8"
+      ],
+      "F": [
+       "all(isolates)"
+      ]
+     },
+     "v": "met",
+     "basis": "data's own code folds inside V8 isolates in the server (deno_core), at 0.80 times Node's cost (E-03); E-43 found no V8-version effect on data's fold between Node 22 and 26."
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv + ts"
+      ],
+      "F": [
+       "ldr(app folds)"
+      ]
+     },
+     "v": "met",
+     "basis": "the daemon holds the log and fan-out; the app's Node process folds with data's own code, fed through a shared-memory ring at 15 ns a record (E-03)."
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ],
+      "L": [
+       "ts client"
+      ]
+     },
+     "v": "met",
+     "basis": "fero's side is a TypeScript client and data folds there; the outside log is native but never folds (E-44)."
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "`ts→rs` rows: in the TS phase nothing is native, and the native step carries the verdict. It either keeps data folding in JS (holds by construction, E-03) or holds rows natively, as DESIGN-V5's native fold would, which needs the differential test; that test was not run (E-43's 1e6-record stream and E-04's state-comparing guard are ready inputs). SRV's and PD's servers fold plain rows natively (PD in a multi-version LSM store), and the test was not run for them either."
+   },
+   "why": "The cell follows where data's fold runs once a layer is native: L, and for the two rows whose footnotes say where the fold runs (EMB-V8's isolates, SIDE's app process) F as well. BUY's rule also names R `outside`, since its reason is that the outside log never folds."
+  }
+ ]
+}

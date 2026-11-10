@@ -1,0 +1,1540 @@
+{
+ "about": "For each mechanism of judging/mechanisms.json, the axis options that carry it (judging/closure/README.md). A row carries a mechanism when any alternative in 'when' matches; an empty 'when' means no row of any options carries it. Each basis says why the options carry it, from the mechanism's own option, state, rules and source and the referee's reasons (MECHANISMS.md). Tag groups used often: Raft data groups = R raft, rlog; a log of fero's own with a metadata group = R raft, rlog, isr, slog, obj (not V4's lww, not BUY's outside).",
+ "mechanisms": [
+  {
+   "key": "raft-log",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-term-vote",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-commit",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-config",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "learners",
+   "when": [
+    {
+     "V": [
+      "+lrn",
+      "+lrn +wit",
+      "+lrn(standby)",
+      "tier +lrn",
+      "tier +lrn(servers fold)"
+     ]
+    }
+   ],
+   "basis": "V +lrn in any form: non-voting replicas that copy the log and are promoted once caught up (A-01 (2)). SLOG's and RLOG's 'tier +lrn' make the servers learners. V full (ISR, V4) and plain tier (OBJ) have none."
+  },
+  {
+   "key": "raft-snapshot",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-prevote-checkquorum",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-leader-transfer",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    },
+    {
+     "I": [
+      "port(meta)"
+     ]
+    }
+   ],
+   "basis": "A Raft unit (etcd's raft, A-01, A-02). Some group runs Raft when the data groups do (R raft; R rlog runs Raft groups on its log members) or when only the metadata group does (I port(meta): SPACE footnote 4, ISR and SLOG). OBJ, V4 and BUY run no Raft at all (I '-')."
+  },
+  {
+   "key": "raft-readindex",
+   "when": [
+    {
+     "W": [
+      "any ridx",
+      "lease ridx",
+      "ridx; any for logs"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    }
+   ],
+   "basis": "A crossing: W names ridx (Raft thesis 6.4, one round to a majority), and the read is on a Raft data group. ISR and SLOG run Raft only for metadata and read with W any; OBJ reads by lease."
+  },
+  {
+   "key": "link-pings",
+   "when": [
+    {
+     "C": [
+      "self",
+      "self+p",
+      "self+mv",
+      "cent-co"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    }
+   ],
+   "basis": "The failure detector sub-choice of SPACE 2 C: one ping per member pair, standing in for the heartbeats of quiet Raft groups (A-12). Rows where members decide (self, self+p, self+mv) or where the decider is #meta's own leader (cent-co) use it. A separate controller (cent: PD, ISR, SLOG) uses sessions to the controller instead; OBJ has leases, V4 its own kernel."
+  },
+  {
+   "key": "quiet-groups",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    }
+   ],
+   "basis": "Multi-Raft: a quiet Raft data group sends nothing while idle (A-12; CockroachDB, TiKV's hibernate for PD). Rows whose data path is not Raft (isr, slog, obj, lww, outside) do not carry it."
+  },
+  {
+   "key": "dormant-groups",
+   "when": [
+    {
+     "G": [
+      "shard",
+      "res"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "slog"
+     ],
+     "P": [
+      "fixN",
+      "fixN(lanes)",
+      "fixN+rekey",
+      "ring",
+      "slot",
+      "slot+rule",
+      "split"
+     ]
+    },
+    {
+     "G": [
+      "shard",
+      "res"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "slog"
+     ],
+     "P": [
+      "split+merge"
+     ],
+     "C": [
+      "cent(manifest CAS)",
+      "cent(writers)",
+      "cent-co",
+      "self",
+      "self+mv",
+      "self+p"
+     ]
+    },
+    {
+     "G": [
+      "shard",
+      "res"
+     ],
+     "R": [
+      "isr"
+     ],
+     "P": [
+      "fixN(lanes)",
+      "fixN+rekey",
+      "ring",
+      "slot",
+      "slot+rule",
+      "split"
+     ]
+    },
+    {
+     "G": [
+      "shard",
+      "res"
+     ],
+     "R": [
+      "isr"
+     ],
+     "P": [
+      "split+merge"
+     ],
+     "C": [
+      "cent(manifest CAS)",
+      "cent(writers)",
+      "cent-co",
+      "self",
+      "self+mv",
+      "self+p"
+     ]
+    }
+   ],
+   "basis": "A-15: 'G shard, when each resource starts with its own group or groups', so an idle resource needs its groups to sleep (E-36, E-26; reasoned for SPLIT and SLOG). G res (one log per resource) is that case too; V4 holds res but no Raft group (R lww). Not under pslot or lane (groups are shared), not R obj (no group in memory). Two judged rows are left out by name, and each exclusion needs every tag its reason names. ISR: 'N partitions per resource, not priced' (R isr with P fixN; SC-13 open). PD: 'its published cross-table merge', run by PD itself (P split+merge with C cent). No tag says 'cross-table'; a split+merge row with fero's own controller merges inside one resource and still needs dormant groups, as VERDICT's SPLIT2 keeps them."
+  },
+  {
+   "key": "slow-leader-controller",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ],
+     "C": [
+      "cent",
+      "cent-co"
+     ]
+    }
+   ],
+   "basis": "A-03 in the controller's form: a Raft data group whose controller (cent, cent-co) moves leadership off a slow leader (TiKV PD's evict-slow-store). ISR, SLOG and OBJ have a controller but no Raft data groups."
+  },
+  {
+   "key": "slow-leader-self",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog"
+     ],
+     "C": [
+      "self",
+      "self+p",
+      "self+mv"
+     ]
+    }
+   ],
+   "basis": "A-03 in the leader's own form: a Raft data group with no controller that heals (self, self+p, self+mv); AMENDMENTS 4 says COMP can use only this form. V4 (C self) has no Raft leader."
+  },
+  {
+   "key": "meta-members",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "meta-catalog",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "meta-directory",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "healing-self",
+   "when": [
+    {
+     "C": [
+      "self",
+      "self+p",
+      "self+mv"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ]
+    }
+   ],
+   "basis": "C self, self+p and COMP's self+mv: each Raft group's leader heals its own replicas by membership entries (A-19, A-01 (5)). V4 also has C self, but heals by its own ballot views (v4-views), not by Raft membership."
+  },
+  {
+   "key": "controller-commands",
+   "when": [
+    {
+     "C": [
+      "cent",
+      "cent(manifest CAS)",
+      "cent(writers)",
+      "cent-co"
+     ]
+    }
+   ],
+   "basis": "Every controller form (cent, cent-co, and SLOG's and OBJ's footnoted cent): the controller writes a command naming the group's config epoch, and the group re-checks it (A-20)."
+  },
+  {
+   "key": "planner-hints",
+   "when": [
+    {
+     "C": [
+      "self+p",
+      "self+mv"
+     ]
+    }
+   ],
+   "basis": "C self+p (DRAFT, LANE, SPLIT), and COMP's self+mv, which owes the same hint path for DEP-17 (AMENDMENTS 4, footnote 15). CELL's plain self has no planner."
+  },
+  {
+   "key": "log-replicas",
+   "when": [
+    {
+     "V": [
+      "+lrn +wit"
+     ]
+    }
+   ],
+   "basis": "V +wit: log-only voters that lead only to repair (SPACE 2 V)."
+  },
+  {
+   "key": "project-groups",
+   "when": [
+    {
+     "G": [
+      "pslot"
+     ]
+    }
+   ],
+   "basis": "G pslot: groups belong to the project and hold slot sets of many resources."
+  },
+  {
+   "key": "lanes",
+   "when": [
+    {
+     "G": [
+      "lane"
+     ]
+    }
+   ],
+   "basis": "G lane: a fixed number of logs per project that every resource hashes into."
+  },
+  {
+   "key": "slot-table",
+   "when": [
+    {
+     "P": [
+      "slot",
+      "slot+rule"
+     ]
+    }
+   ],
+   "basis": "P slot (and DRAFT's slot + rule): fixed slots in a table in #meta, moved by one protocol, under one move policy (A-16, A-17, A-18; the policy is counted wherever it lives)."
+  },
+  {
+   "key": "slot-move",
+   "when": [
+    {
+     "P": [
+      "slot",
+      "slot+rule"
+     ]
+    }
+   ],
+   "basis": "P slot (and DRAFT's slot + rule): fixed slots in a table in #meta, moved by one protocol, under one move policy (A-16, A-17, A-18; the policy is counted wherever it lives)."
+  },
+  {
+   "key": "move-policy",
+   "when": [
+    {
+     "P": [
+      "slot",
+      "slot+rule"
+     ]
+    }
+   ],
+   "basis": "P slot (and DRAFT's slot + rule): fixed slots in a table in #meta, moved by one protocol, under one move policy (A-16, A-17, A-18; the policy is counted wherever it lives)."
+  },
+  {
+   "key": "rekey",
+   "when": [
+    {
+     "P": [
+      "fixN+rekey"
+     ]
+    }
+   ],
+   "basis": "P fixN + rekey: grow by copying into a new generation, then flip (CELL)."
+  },
+  {
+   "key": "split-record",
+   "when": [
+    {
+     "P": [
+      "split",
+      "split+merge"
+     ]
+    }
+   ],
+   "basis": "P split, with or without merge: groups split by key or load and keep a range table."
+  },
+  {
+   "key": "merge-record",
+   "when": [
+    {
+     "P": [
+      "split+merge"
+     ]
+    }
+   ],
+   "basis": "P split + merge only, as settled (PD). VERDICT section 10 asks to re-rule it onto SPLIT too; that would need a re-ruling file, not a change here."
+  },
+  {
+   "key": "range-table",
+   "when": [
+    {
+     "P": [
+      "split",
+      "split+merge"
+     ]
+    }
+   ],
+   "basis": "P split, with or without merge: groups split by key or load and keep a range table."
+  },
+  {
+   "key": "split-policy",
+   "when": [
+    {
+     "P": [
+      "split",
+      "split+merge"
+     ]
+    }
+   ],
+   "basis": "P split, with or without merge: groups split by key or load and keep a range table."
+  },
+  {
+   "key": "slot-sequence",
+   "when": [
+    {
+     "O": [
+      "slot"
+     ]
+    }
+   ],
+   "basis": "O slot: a sequence per slot, compared as (epoch, seq) (DEV-10 (a)'s own example)."
+  },
+  {
+   "key": "lineage",
+   "when": [
+    {
+     "O": [
+      "off+lin"
+     ]
+    }
+   ],
+   "basis": "O off+lin: offsets plus split lineage, kept for ever."
+  },
+  {
+   "key": "closed-timestamps",
+   "when": [
+    {
+     "O": [
+      "hlc"
+     ]
+    }
+   ],
+   "basis": "O hlc: hybrid-logical-clock positions need closed timestamps."
+  },
+  {
+   "key": "writer-judging",
+   "when": [
+    {
+     "K": [
+      "lib",
+      "lib(srv)",
+      "kern",
+      "hyb"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj",
+      "lww"
+     ]
+    }
+   ],
+   "basis": "Every K option judges at fero's one writer (A-04: 'every row that judges at a writer, every row but BUY'). BUY holds K lib, but its log is outside (R outside): no fero writer judges there."
+  },
+  {
+   "key": "dedup-window",
+   "when": [
+    {
+     "D": [
+      "win"
+     ]
+    }
+   ],
+   "basis": "D win: issuer window, floor, outcomes by id, per-hop time budgets."
+  },
+  {
+   "key": "client-sessions",
+   "when": [
+    {
+     "D": [
+      "sess"
+     ]
+    }
+   ],
+   "basis": "D sess: client sessions (Raft thesis 6.3) with forward.once under fwd (A-21)."
+  },
+  {
+   "key": "producer-state",
+   "when": [
+    {
+     "D": [
+      "pid"
+     ]
+    }
+   ],
+   "basis": "D pid: producer id, epoch and per-partition sequence (KIP-98, A-22)."
+  },
+  {
+   "key": "caller-keys",
+   "when": [
+    {}
+   ],
+   "basis": "A-10: caller keys ride beside every D option, in every row (BUY in its L5 library)."
+  },
+  {
+   "key": "srchi-marks",
+   "when": [
+    {}
+   ],
+   "basis": "A-05: every row adds srchi marks, whatever its D, since no horizon option survives a long restart."
+  },
+  {
+   "key": "writer-time",
+   "when": [
+    {
+     "T": [
+      "clamp"
+     ]
+    }
+   ],
+   "basis": "T clamp at window 0 (A-23): the writer's time is the members' median."
+  },
+  {
+   "key": "timestamp-oracle",
+   "when": [
+    {
+     "T": [
+      "tso"
+     ]
+    }
+   ],
+   "basis": "T tso: a central timestamp oracle (PD)."
+  },
+  {
+   "key": "lock-rows",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj",
+      "outside"
+     ]
+    }
+   ],
+   "basis": "P-10's locks, 'in every row that can judge a condition', and the saga's locks (BUY runs them in fero's L5 library). R lww cannot judge a condition (SPACE 5: lww forbids conditions), so V4 has none."
+  },
+  {
+   "key": "fence-tokens",
+   "when": [
+    {
+     "X": [
+      "saga"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj",
+      "outside"
+     ]
+    },
+    {
+     "K": [
+      "hyb"
+     ]
+    }
+   ],
+   "basis": "X saga's fences (A-24), and K hyb's fences in the kernel (ISR, X ktxn). PD (2pc, kern) has none. Under R lww SPACE 5 allows 'X at most saga without fences', so lww needs both."
+  },
+  {
+   "key": "saga-intents",
+   "when": [
+    {
+     "X": [
+      "saga"
+     ]
+    }
+   ],
+   "basis": "X saga: an intent row per unit, with its direction (A-24)."
+  },
+  {
+   "key": "two-phase-commit",
+   "when": [
+    {
+     "X": [
+      "2pc"
+     ]
+    }
+   ],
+   "basis": "X 2pc (with D txn): transaction records and intents."
+  },
+  {
+   "key": "mvcc",
+   "when": [
+    {
+     "X": [
+      "2pc"
+     ]
+    }
+   ],
+   "basis": "X 2pc forces multi-version state (SPACE 5)."
+  },
+  {
+   "key": "ktxn-coordinator",
+   "when": [
+    {
+     "X": [
+      "ktxn"
+     ]
+    }
+   ],
+   "basis": "X ktxn: Kafka's transaction coordinator and commit markers."
+  },
+  {
+   "key": "ktxn-markers",
+   "when": [
+    {
+     "X": [
+      "ktxn"
+     ]
+    }
+   ],
+   "basis": "X ktxn: Kafka's transaction coordinator and commit markers."
+  },
+  {
+   "key": "memory-rung",
+   "when": [
+    {
+     "Q": [
+      "mix"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog"
+     ]
+    }
+   ],
+   "basis": "Q mix holds the maj-m rung: commit in memory at a majority, a clean-stop mark per replica. V4's mix is its own per-write ladder (v4-confirm-ladder, R lww), not this rung."
+  },
+  {
+   "key": "none-rung",
+   "when": [
+    {}
+   ],
+   "basis": "P-06 asks for the none rung in every row."
+  },
+  {
+   "key": "journal",
+   "when": [
+    {
+     "S": [
+      "jrnl +tier",
+      "jrnl +tier(store)"
+     ]
+    }
+   ],
+   "basis": "S jrnl: one journal per process, then per-group segments (A-25)."
+  },
+  {
+   "key": "wal-per-group",
+   "when": [
+    {
+     "S": [
+      "walg",
+      "walg +tier"
+     ]
+    }
+   ],
+   "basis": "S walg: a WAL per group (ISR, V4)."
+  },
+  {
+   "key": "lsm-store",
+   "when": [
+    {
+     "S": [
+      "lsm"
+     ]
+    }
+   ],
+   "basis": "S lsm: an LSM store (PD)."
+  },
+  {
+   "key": "tier",
+   "when": [
+    {
+     "S": [
+      "jrnl +tier",
+      "jrnl +tier(store)",
+      "walg +tier",
+      "tier + obj"
+     ]
+    }
+   ],
+   "basis": "S +tier: old segments and snapshot layers in an object store. SLOG's 'tier + obj' keeps them there too; OBJ's plain obj is the store itself, and PD's lsm has no tier."
+  },
+  {
+   "key": "restore-mark",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ],
+     "T": [
+      "clamp",
+      "—"
+     ]
+    },
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ],
+     "D": [
+      "pid",
+      "sess",
+      "win"
+     ]
+    }
+   ],
+   "basis": "A-08's restore mark, in every row with a metadata group, except where both its pieces are covered: the referee left PD out because its positions and lock tokens are the oracle's timestamps (T tso keeps its high-water outside the restored data) and D txn has no sessions to cut. A row with only one of the two still needs the mark."
+  },
+  {
+   "key": "fold-all",
+   "when": [
+    {
+     "F": [
+      "all",
+      "all(isolates)",
+      "all(servers)",
+      "all(srv)"
+     ]
+    }
+   ],
+   "basis": "F all in every form: each full replica folds."
+  },
+  {
+   "key": "fold-leader",
+   "when": [
+    {
+     "F": [
+      "ldr",
+      "ldr + lazy",
+      "ldr(app folds)"
+     ]
+    }
+   ],
+   "basis": "F ldr in every form: the leader and one warm standby fold (A-26)."
+  },
+  {
+   "key": "fold-lazy",
+   "when": [
+    {
+     "F": [
+      "ldr + lazy"
+     ]
+    }
+   ],
+   "basis": "F lazy: followers fold behind or on first read (OBJ's ldr + lazy)."
+  },
+  {
+   "key": "fold-version",
+   "when": [
+    {}
+   ],
+   "basis": "A-10, OPS-12: the fold-version entry is in every row."
+  },
+  {
+   "key": "subscribe",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Every row that serves subscriptions from a log of fero's own (A-06); PD has no W any but must serve them. V4 keeps v4's own kernel (it takes no option fix, AMENDMENTS 3), and BUY's subscriptions are its outside log's."
+  },
+  {
+   "key": "read-lease",
+   "when": [
+    {
+     "W": [
+      "lease any",
+      "lease ridx"
+     ]
+    }
+   ],
+   "basis": "W lease: leader reads under a time lease (PD, OBJ)."
+  },
+  {
+   "key": "route-forward",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj",
+      "lww"
+     ]
+    }
+   ],
+   "basis": "Y fwd is the base in every row, because browsers need it (AMENDMENTS 2 Y), so smart rows carry it too. BUY's writes go to the outside log by its own client (R outside)."
+  },
+  {
+   "key": "route-smart",
+   "when": [
+    {
+     "Y": [
+      "smart"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj",
+      "lww"
+     ]
+    }
+   ],
+   "basis": "Y smart: the client caches slot to leader. BUY is smart too, but that is JetStream's client, inside outside-log."
+  },
+  {
+   "key": "worker-map",
+   "when": [
+    {
+     "M": [
+      "kwN"
+     ]
+    }
+   ],
+   "basis": "M kwN: a group-to-worker map (SPACE 2 M)."
+  },
+  {
+   "key": "side-seam",
+   "when": [
+    {
+     "H": [
+      "side"
+     ]
+    }
+   ],
+   "basis": "H side: the local seam between the daemon and the app."
+  },
+  {
+   "key": "leader-calls",
+   "when": [
+    {
+     "U": [
+      "ldr"
+     ]
+    }
+   ],
+   "basis": "U ldr: a call runs at its partition's leader, across a handover."
+  },
+  {
+   "key": "admission-credits",
+   "when": [
+    {}
+   ],
+   "basis": "A-07: admission credits in every row."
+  },
+  {
+   "key": "tenant-budget",
+   "when": [
+    {
+     "N": [
+      "tier",
+      "pool"
+     ]
+    }
+   ],
+   "basis": "A-29: a process or tier that pools tenants (N tier, pool) needs a byte budget per tenant."
+  },
+  {
+   "key": "disk-incarnation",
+   "when": [
+    {
+     "Z": [
+      "rejoin",
+      "par"
+     ]
+    }
+   ],
+   "basis": "Z rejoin's incarnation and checksum (A-28). Z par keeps them: AMENDMENTS 4 prices par as rejoin plus 5 rules and 1 mechanism (7 rules against 2), and the same rule still brings back as new a replica that stopped uncleanly under the memory rung (DESIGN-V5 4.1, the memory-rung regrouping)."
+  },
+  {
+   "key": "genesis-conditional-create",
+   "when": [
+    {
+     "S": [
+      "jrnl +tier(store)",
+      "tier + obj",
+      "obj"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "A-08: rows that require an object store across boxes found by a conditional create in the store. The S tag says so: footnote 1's jrnl +tier(store), SLOG's tier + obj, OBJ's obj."
+  },
+  {
+   "key": "genesis-init",
+   "when": [
+    {
+     "S": [
+      "jrnl +tier",
+      "walg +tier",
+      "walg",
+      "lsm"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "A-08: rows that need no object store across boxes found by one fero init (PD and ISR by their own explicit step). V4 and BUY have no metadata group to found."
+  },
+  {
+   "key": "writer-epoch-rlog",
+   "when": [
+    {
+     "R": [
+      "rlog"
+     ]
+    }
+   ],
+   "basis": "R rlog: a server writes by a committed writer epoch (A-14)."
+  },
+  {
+   "key": "loglet",
+   "when": [
+    {
+     "R": [
+      "slog"
+     ]
+    }
+   ],
+   "basis": "R slog: loglets on log nodes, sealed and chained by metadata CAS; the controller changes writers (footnote 5)."
+  },
+  {
+   "key": "loglet-seal",
+   "when": [
+    {
+     "R": [
+      "slog"
+     ]
+    }
+   ],
+   "basis": "R slog: loglets on log nodes, sealed and chained by metadata CAS; the controller changes writers (footnote 5)."
+  },
+  {
+   "key": "loglet-chain",
+   "when": [
+    {
+     "R": [
+      "slog"
+     ]
+    }
+   ],
+   "basis": "R slog: loglets on log nodes, sealed and chained by metadata CAS; the controller changes writers (footnote 5)."
+  },
+  {
+   "key": "writer-epoch-slog",
+   "when": [
+    {
+     "R": [
+      "slog"
+     ]
+    }
+   ],
+   "basis": "R slog: loglets on log nodes, sealed and chained by metadata CAS; the controller changes writers (footnote 5)."
+  },
+  {
+   "key": "controller-sessions",
+   "when": [
+    {
+     "C": [
+      "cent",
+      "cent(writers)"
+     ]
+    }
+   ],
+   "basis": "The failure detector sub-choice 'sessions to the controller': a separate controller (PD, ISR, SLOG) hears from members. cent-co uses link pings, and OBJ's manifest CAS has no members to hear from."
+  },
+  {
+   "key": "isr-log",
+   "when": [
+    {
+     "R": [
+      "isr"
+     ]
+    }
+   ],
+   "basis": "R isr: Kafka's leader, in-sync set and leader epochs (KIPs 101, 279, 320, 841, 903, 966)."
+  },
+  {
+   "key": "isr-set",
+   "when": [
+    {
+     "R": [
+      "isr"
+     ]
+    }
+   ],
+   "basis": "R isr: Kafka's leader, in-sync set and leader epochs (KIPs 101, 279, 320, 841, 903, 966)."
+  },
+  {
+   "key": "high-watermark",
+   "when": [
+    {
+     "R": [
+      "isr"
+     ]
+    },
+    {
+     "Q": [
+      "isr"
+     ]
+    }
+   ],
+   "basis": "Q isr and R isr: the in-sync set's commit point is ISR's high watermark (state group.commit), whatever acks a write asks."
+  },
+  {
+   "key": "leader-epoch",
+   "when": [
+    {
+     "R": [
+      "isr"
+     ]
+    }
+   ],
+   "basis": "R isr: Kafka's leader, in-sync set and leader epochs (KIPs 101, 279, 320, 841, 903, 966)."
+  },
+  {
+   "key": "eligible-leaders",
+   "when": [
+    {
+     "R": [
+      "isr"
+     ]
+    }
+   ],
+   "basis": "R isr: Kafka's leader, in-sync set and leader epochs (KIPs 101, 279, 320, 841, 903, 966)."
+  },
+  {
+   "key": "obj-log",
+   "when": [
+    {
+     "R": [
+      "obj"
+     ]
+    }
+   ],
+   "basis": "R obj: the object store is the log; a commit is a PUT; the writer holds a lease by CAS on the manifest."
+  },
+  {
+   "key": "obj-manifest",
+   "when": [
+    {
+     "R": [
+      "obj"
+     ]
+    }
+   ],
+   "basis": "R obj: the object store is the log; a commit is a PUT; the writer holds a lease by CAS on the manifest."
+  },
+  {
+   "key": "obj-writer-lease",
+   "when": [
+    {
+     "R": [
+      "obj"
+     ]
+    }
+   ],
+   "basis": "R obj: the object store is the log; a commit is a PUT; the writer holds a lease by CAS on the manifest."
+  },
+  {
+   "key": "v4-lanes",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-stamps",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    },
+    {
+     "O": [
+      "lamp"
+     ]
+    }
+   ],
+   "basis": "R lww's per-cell last-writer-wins, and O lamp: a Lamport stamp per cell."
+  },
+  {
+   "key": "v4-digests",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-tombstones",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-frontiers",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-orphans",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-sheds",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-latches",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-teachers",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-floors",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-feed-words",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ]
+    }
+   ],
+   "basis": "R lww as v4 builds it: v4's own kernel (REQUIREMENTS section 5)."
+  },
+  {
+   "key": "v4-in-sync-sets",
+   "when": [],
+   "basis": "No option carries it. The referee searched v4's kernel and found no such state: the name came from the third v5 draft's Kafka in-sync sets and was joined to v4's list by mistake (MECHANISMS 4.1). V4 holds R lww and does not carry it, and ISR's own units are isr-set and eligible-leaders. So no row of any options carries it."
+  },
+  {
+   "key": "v4-eligible-leaders",
+   "when": [],
+   "basis": "No option carries it. The referee searched v4's kernel and found no such state: the name came from the third v5 draft's Kafka in-sync sets and was joined to v4's list by mistake (MECHANISMS 4.1). V4 holds R lww and does not carry it, and ISR's own units are isr-set and eligible-leaders. So no row of any options carries it."
+  },
+  {
+   "key": "v4-views",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ],
+     "C": [
+      "self"
+     ]
+    }
+   ],
+   "basis": "C self as v4 has it: membership by ballots among leaderless members. A crossing: a Raft row's self heals by membership entries (healing-self) instead."
+  },
+  {
+   "key": "v4-ring",
+   "when": [
+    {
+     "P": [
+      "ring"
+     ]
+    }
+   ],
+   "basis": "P ring: the ring over the current view picks each row's one owner."
+  },
+  {
+   "key": "v4-confirm-ladder",
+   "when": [
+    {
+     "R": [
+      "lww"
+     ],
+     "Q": [
+      "mix"
+     ]
+    }
+   ],
+   "basis": "Q mix as v4 has it: a per-write ladder of holder attestations. A crossing: a Raft row's mix is the memory rung."
+  },
+  {
+   "key": "outside-log",
+   "when": [
+    {
+     "R": [
+      "outside"
+     ]
+    }
+   ],
+   "basis": "R outside: BUY's bought log, judged as one published unit."
+  },
+  {
+   "key": "dir-lease",
+   "when": [
+    {
+     "S": [
+      "jrnl +tier",
+      "jrnl +tier(store)",
+      "walg +tier",
+      "walg",
+      "tier + obj"
+     ],
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Every row whose members keep their own dirs (the draft's L0). The referee left out PD (S lsm: RocksDB's own lock), OBJ (S obj: no durable dir of its own), V4 (R lww: v4 has only the lock with a lease, which is published) and BUY."
+  },
+  {
+   "key": "par-repair",
+   "when": [
+    {
+     "Z": [
+      "par"
+     ]
+    }
+   ],
+   "basis": "Z par: a damaged entry is repaired from a peer (E-37). No judged row holds it."
+  },
+  {
+   "key": "consumer-groups",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "P-08's library on fero's own log. V4 is left out (no conditions under lww) and BUY (JetStream's own consumers)."
+  },
+  {
+   "key": "presence-rows",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Every row that serves presence from its own log: rows bound to a session in #sessions. Not V4 or BUY."
+  },
+  {
+   "key": "cluster-version",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "cluster-credentials",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "queue-claims",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Every row that serves P-09 by a claim at its own writer. BUY's claim is JetStream's ack wait (inside outside-log); V4 cannot judge a claim."
+  },
+  {
+   "key": "forks",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Lives in the metadata group (#meta, or the row's own metadata store for PD, ISR, SLOG and OBJ). Every row with a log of fero's own has one. V4 (R lww: a cluster per resource, ballot views, no #meta) and BUY (R outside) have none."
+  },
+  {
+   "key": "input-recorder",
+   "when": [
+    {
+     "R": [
+      "raft",
+      "rlog",
+      "isr",
+      "slog",
+      "obj"
+     ]
+    }
+   ],
+   "basis": "Every row with a deterministic kernel of fero's own (OPS-11 d, E-42). E-42 names only BUY and V4 as rows that cannot have it."
+  }
+ ]
+}

@@ -1,0 +1,667 @@
+{
+ "group": "SC",
+ "by": "a closure attribution session, from judging/SC.settled.json (each cell's why, why2 and ev) and REQUIREMENTS.md's SC rows. Rules follow the axes the judges name: P, G and C for the writer floor (SC-03, SC-10), S and V for sleep with lost disks (SC-05), N for tenancy (SC-11), G and P for many resources (SC-13), S for big records (SC-15), and R `outside` for BUY. Four V4 overrides follow v4 as built: timed today (SC-01), its n = 100 sim tier (SC-07), its pinned double-commit bug (SC-08), its own frames and limits (SC-15)",
+ "parts": [
+  {
+   "req": "SC-01",
+   "part": "M",
+   "why": "Only BUY and V4 differ. BUY follows R `outside` (both judges: the log is an outside server fero does not ship). V4 follows v4 being built and timed today, which is an override. Every other row is open for the same reason: no v5 stack was timed on example 01, whatever H, L or the store.",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: BUY's log is an outside server (JetStream) that fero neither holds nor ships (SPACE 4.2), so `node app.ts` alone has nothing to write to until someone installs and starts nats-server: a setup step and a second program, against 'one process, no setup' (E-44)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no v5 stack was timed on example 01. The nearest prototype, E-26's TS Raft host, starts three processes in 265 to 318 ms but holds about 96 MB a process against the 100 MB bar, and quiet groups idle near 0 CPU (E-11). Rows with a native server (H srv, side) work only if npm ships the binary and fero(name) spawns it, and that spawn was not timed (SPACE 4.2)"
+   },
+   "overrides": {
+    "V4": {
+     "v": "met",
+     "basis": "v4 runs today: J shows example 01 'ready in 0.8 s' with no config file, DEP-13 cites v4 at 70 to 100 MB empty, and one process alone has no peer to ping. The cell follows v4 being built and measured, which no axis tag expresses: a new row with v4's options would still have to be timed"
+    }
+   }
+  },
+  {
+   "req": "SC-02",
+   "part": "M",
+   "why": "Open for all 20, for one reason: the example series was never run unchanged at 1, 3 and 5 processes and hosted on any row. The judges call `fero init` (A-08) a weak point, not a fail.",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "every row decides roles by node config, but no v5 example series exists to run at 1, 3 and 5 processes or hosted. E-33 changed the first start across boxes: a conditional create in the object store, or one `fero init`, which both judges call a weak point, not a fail, because the files stay the same. v4's series and BUY's four E-44 patterns were not run as one set at each size either"
+   }
+  },
+  {
+   "req": "SC-03",
+   "part": "M",
+   "why": "As worded every row fails at 12 to 22 effective writers (AMENDMENTS 1.3). What decides the restated cell is how partitions map onto groups and whether a mover follows load: P (fixed count, ring, lanes or rekey fail; slots and splits stay open), G (`lane` fixes the count per project; `pslot` adds K-04), C (the loop or controller that moves slots by A-18's policy; the judges name it for every slot row) and R `outside` (one stream, one writer). A plain slot row with a C no judge saw beside it (`self`, `self+p`) falls to the else: AMENDMENTS 2 calls the mover under `self` undecided, so it keeps the slot row's open restated cell and is marked for judging. The gap is the as-worded 0.66, except CELL (0.77, its restated count) and BUY (0.98).",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.98,
+     "basis": "referee: in BUY a resource is one JetStream stream, one replicated group with one leader (E-44), so every write goes through one writer and more servers add none. Spreading a resource over streams is a count chosen by hand. 1 effective writer against F_w = 64, as worded and restated; it holds by construction"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.77,
+     "basis": "CELL: 16 cells filled by hash with no load-aware move give 7 to 15 writers' worth under skew, with or without the app split (E-18 B2), and a re-key only picks a new fixed count filled the same way. Fails restated too (gap 0.77 at F_w = 64)"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN",
+       "fixN(lanes)",
+       "ring"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.66,
+     "basis": "placement blind to load. ISR: P `fixN` fixes the count at define, which SC-03 says nobody chooses (E-17), and hash alone gives max/mean 1.58 at 16 groups even with the app split (E-18 B2). LANE: 64 lanes per project filled by hash give one resource 23 to 53 writers' worth with the split, and no move adds a lane (E-18, E-17b). V4 (referee): P `ring` gives each partition its writer by ring hash and no move follows load (kernel/ring.ts reads no load), so it is load-blind like a fixed count, effective number under 16. The gap given is the as-worded one"
+    },
+    {
+     "when": {
+      "G": [
+       "lane"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.66,
+     "basis": "LANE: G `lane` fixes 64 logs per project, shared by every resource, so one resource gets 23 to 53 writers' worth under skew even with the app split (E-18 B2), and no move adds a lane (E-17b). Fails restated too; the gap is the as-worded one"
+    },
+    {
+     "when": {
+      "P": [
+       "slot"
+      ],
+      "C": [
+       "cent-co",
+       "cent",
+       "cent(writers)",
+       "cent(manifest CAS)",
+       "self+mv"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "AMENDMENTS 1.3 'SC-10 and SC-03': as worded every design reaches 12 to 22 effective writers under Zipf 0.99, below F_w = 64 (E-18), because nothing splits the hottest partition. Restated with the app split, a slot row states 135 at 4,096 slots, moved one slot at a time by one loop (A-16, A-18; in cent and cent-co rows the mover is the controller, in COMP the loop on #meta's leader). It stays open: 0.7 x n was never run on real processes and the loop saw exact loads (G-32); for `pslot` rows E-18 never balanced many resources in shared groups (K-04), and for COMP the loop never ran beside healing leaders (K-07)"
+    },
+    {
+     "when": {
+      "P": [
+       "slot+rule"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "DRAFT: as worded it fails like every row (1.3 line, 12 to 22 against 64). Restated it is open: 135 at 4,096 slots needs a mover that balances; DRAFT's halving rule left max/mean at 1.5 to nearly 2, and the one-move policy run by each leader alone was never simulated (A-18)"
+    },
+    {
+     "when": {
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "SPLIT, PD: as worded it fails like every row (1.3 line). Restated it is open: key-level splits balance within 5% of slots to 64 groups and grow with no fixed ceiling (E-18 part A, E-17b; TiKV grows this way, cited), but the effective count with the app split was not run for ranges"
+    }
+   ],
+   "else": {
+    "v": "fails",
+    "depends_on": "restated",
+    "alt": "open",
+    "gap": 0.66,
+    "basis": "no judged row: a slot row whose mover is not one the judges saw (for example C `self+p` with plain P `slot`). As worded it fails like every row (1.3 line). Restated, who decides the moves is undecided (AMENDMENTS 2, P: 'no experiment ran self with any mover'), so open, and the cell is flagged as unsupported"
+   }
+  },
+  {
+   "req": "SC-04",
+   "part": "M",
+   "why": "Only LANE and ISR fail, both structurally: the group count is fixed for good (G `lane`, P `fixN`). A re-key (CELL), splits with merge (SPLIT, PD), slot moves and v4's ballot leave can all shrink, so they stay open: no 7-day cycle ran.",
+   "rules": [
+    {
+     "when": {
+      "G": [
+       "lane"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: G `lane` fixes 64 groups per project for good and no option LANE holds adds or removes a lane, so a project pays 64 groups whatever its load; range moves between lanes do not change that (E-17b)"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN(lanes)"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: the 64 lanes are a fixed N per project; no rule ever removes one, so the group count cannot follow load down (E-17b)"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: P `fixN` fixes N partitions per resource at define, sized for the peak; nothing merges or removes a partition's group, so the count stays at its peak (E-17 part 1: 'groups never go away')"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "the same slot move that grows a resource empties a group (E-17 `shrink` holds, model-checked, crash-only), and the one-move policy has a margin against flapping (E-18: without it two pieces swapped for ever in 48 of 300 cases); a re-key can go down (E-17), split + merge shrinks (E-17b), v4 leaves by ballot. But no 7-day load cycle was simulated, and nothing ran the rule that decides when to add or drop a group"
+   }
+  },
+  {
+   "req": "SC-05",
+   "part": "M",
+   "why": "Two things decide it. (1) Whether any copy survives when every server stops and loses its disk: S with no object-store tier and V with no log tier fail (PD's `lsm`, V4's `walg`; the judges name both 'no +tier' and 'no log tier'), and BUY's JetStream file store fails. (2) Whether the row folds rows in Node, which brings in the 1.3 line on the 10 GB wake: SRV's server folds plain rows in Rust (its footnote on F and K), so its open cell does not depend on the restatement.",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "basis": "referee: JetStream keeps each stream in the file store of its replicas' servers, and nats-server 2.10.22 has file and memory storage only, no object-store tier (E-44). With every server stopped and its disk lost, no copy is left. The 1.3 line also covers BUY (its client folds in Node); restating it does not change this"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm",
+       "walg"
+      ],
+      "V": [
+       "full",
+       "+lrn",
+       "+lrn +wit",
+       "+lrn(standby)"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: the row keeps its log and state only on each server's own disk (PD: S `lsm`; V4: S `walg`), with no `+tier` and no log tier (SPACE 4.1). SC-05's test stops every server and wakes with servers that lost their disks, so no copy is left and acknowledged writes are lost"
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ],
+      "K": [
+       "lib(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the server folds plain rows in Rust, off the V8 heap (footnote 2), so E-34's Node figure (86 to 122 s for 10 GB) and the 1.3 line do not apply. A native wake of 10 GB was not measured (E-34 reasons it is faster), and no sleep-and-wake test ran against a store"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "depends_on": "restated",
+    "alt": "open",
+    "basis": "AMENDMENTS 1.3 'SC-05 at 10 GB': one Node process wakes 10 GB of 2 KB rows in 86 to 122 s against 60 s (5 GB in 36 s, E-34). The time is v4's JS crc32c and decode, not the design, and A-13's faster wake is planned and not built, so it is open. Restated per storage form it is still open: no sleep-and-wake test ran against an S3-compatible store, with disks kept or lost"
+   }
+  },
+  {
+   "req": "SC-06",
+   "part": "S",
+   "why": "PD is met by construction: its kernel state lives in an LSM store on disk and its regions spread a resource over servers (the judges cite TiKV). BUY is not: one stream sits whole on every replica. Every other row designs cold rows and spreading but never ran 3 x RAM.",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "not",
+     "basis": "referee: in BUY a resource is one stream, and a stream sits whole on each of its replicas (E-44), so a resource cannot pass one server's disk without a hand-chosen number of streams; E-44's client also folds the whole stream in memory"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ],
+      "G": [
+       "shard",
+       "pslot"
+      ],
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "met",
+     "basis": "PD: S `lsm` holds state larger than memory by construction (SPACE 2, S), as TiKV and CockroachDB do in production, and regions spread a resource over servers (G `shard`). A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28). Not measured here. K `kern` is named because the LSM is the state only where the kernel's state machine holds it (TiKV's shape); under K `lib` the state is `data`'s in-memory fold (X15), which no judge priced with an LSM"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "by design only: cold rows read through from snapshot layers (opt in), and groups spread a resource over servers (DESIGN-V5 4.1, 'later'). No experiment ran a data set at 3 x RAM, and a cold row cannot be a sync read (X15). V4 spreads a resource by `replicas: N` with no cold rows; it is open too (referee)"
+   }
+  },
+  {
+   "req": "SC-07",
+   "part": "M",
+   "why": "Only BUY and V4 differ. BUY follows R `outside` (the sim cannot run nats-server). V4 follows v4's own battery, which runs the n = 100 tier today: an override.",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "referee, structural: SC-07's test is an n = 100 sim sweep, the members of a BUY cluster are nats-server processes, and fero's simulator cannot run their bytes (E-44 gap 10; SPACE 4.2), so no such sweep can exist at any size"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "the idle cost at n = 100 is stated or counted (E-25: 0.95% of a core in Node and 19,800 frames a second with quiet groups for the Raft rows; counts for ISR, SLOG, OBJ), and the knob past 100 is A-12's peer bound. But no v5 kernel ran a sim sweep at n = 100, and E-25 injected no failure"
+   },
+   "overrides": {
+    "V4": {
+     "v": "met",
+     "basis": "v4's sim runs its n = 100 scale tier in `npm test` and `npm run sim:scale` (the test SC-07 names), and DESIGN-SCALE pins its idle frames at n = 100 and states 1 to 100 members. The cell follows v4 being built and tested, which no axis tag expresses: a new row with v4's options would still need its own sweep"
+    }
+   }
+  },
+  {
+   "req": "SC-08",
+   "part": "M",
+   "why": "P decides it. Slot rows meet AMENDMENTS 1.3's SC-08(b) line (a three-commit move is unwritable 16.7 ms at p99), so their cell depends on the restatement. CELL's re-key fails (b) and (f) in E-17c's model. Rows whose partitions never move between groups (lanes, fixN) or that split (split, split+merge) are open with no restatement. C is named because COMP's judges add K-07 (healing leaders beside the move loop) and K-27 (no give-up decider). V4 fails on a bug pinned in v4's own sim: an override.",
+   "rules": [
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "fails",
+     "basis": "counterexample: E-17c's model of CELL's re-key fails on every bound. A write to a partition that never moves waits for the re-key's cut-over (L8, against (b) 'while others go on'), and that partition's rows are copied to the new generation (F8, against (f))"
+    },
+    {
+     "when": {
+      "P": [
+       "slot"
+      ],
+      "C": [
+       "self+mv"
+      ]
+     },
+     "v": "open",
+     "depends_on": "restated",
+     "alt": "open",
+     "basis": "COMP: the 1.3 line 'SC-08(b)' as for every slot row (a three-commit move is unwritable 16.7 ms at p99, E-13; A-17's cut was never model-checked with unclean recovery, K-03), and also: leaders that heal beside a loop on #meta that moves slots were never modelled together (K-07), and nobody decides a move's give-up when the target group is gone (K-27). Restated to a p50 plus a load-tied p99 it is open for the same reasons"
+    },
+    {
+     "when": {
+      "P": [
+       "slot",
+       "slot+rule"
+      ]
+     },
+     "v": "open",
+     "depends_on": "restated",
+     "alt": "open",
+     "basis": "AMENDMENTS 1.3 'SC-08(b), every slot row': a three-commit slot move is unwritable 16.7 ms at p99 under 10,000 writes a second against 10 ms; one commit stays at or under 4.7 ms (E-13). A-17 cuts the move to one or two commits, but that cut was never model-checked with unclean recovery (K-03). (a), (d), (f) hold in the move's models (E-15, E-17c) and E-18's run; (c) was never pinned and no sweep ran moves with membership changes (K-01). For OBJ each commit is a PUT (E-28). Restated to a p50 plus a load-tied p99 it is open for the same reasons"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not named by the 1.3 line: partitions never move between groups (LANE, ISR: a scale change is a replica change only), or a split copies nothing and touches only what it moves (E-17c: L8 and F8 hold) while a merge freezes its group (E-17b, reasoned), or TiKV's online moves (cited), or BUY's operator-driven reassignment. No timing and no sweep with scale events exist"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "basis": "referee: a join moves ring ownership, and v4's own simulator pins a join with one slow member in which one attempt commits twice, at the old owner and the new one (sim/scoped-sweep.test.ts KNOWN_UNSAFE 'A2-slow-owner-join' seed 9; STATUS: 'one forwarded write can commit twice across an ownership move'), against (a). That is a bug in v4's code, which no axis tag expresses: P `ring` itself does not force it, since SPACE counts `ring` as `slot` with groups pinned to vnodes, and a new ring row would carry its dedup with the move (A-17)"
+    }
+   }
+  },
+  {
+   "req": "SC-09",
+   "part": "M",
+   "why": "Open for all 20: no row has the warnings built and tested, and no row's design blocks them.",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "any row can give each limit a health row and a stderr line at 80%, but no row has the warnings built and tested; only E-29's prototype printed its disk line once. No row's design blocks it; v4 as built has none, and BUY's layer could warn only on limits it can read from NATS"
+   }
+  },
+  {
+   "req": "SC-10",
+   "part": "M",
+   "why": "The same axes as SC-03, since the writer floor is the same E-18 number: P and G (fixed, ring or lane placement fails restated), C (the mover behind the 135 figure) and R `outside`. One more axis is named for ISR by both judges: S `walg`, whose log file per group 'loses to a shared journal well before the 2,000-group floor' (E-12). It is ISR's second reason, not its deciding one, so S is named only to mark a slot row with `walg` for judging. The gap is the as-worded 0.66, except CELL (0.77) and BUY (0.98).",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.98,
+     "basis": "referee: in BUY a resource is one JetStream stream with one leader (E-44), so the ceiling on writers per resource is 1, below F_w = 64, as worded and restated. It holds by construction"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.77,
+     "basis": "CELL: 16 cells filled by hash give 7 to 15 writers' worth with the app split (E-18 B2), below 64 (gap 0.77), and no move rebalances them"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN",
+       "fixN(lanes)",
+       "ring"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.66,
+     "basis": "placement blind to load. ISR: partitions filled by hash alone pass max/mean 1.25 before 16 groups even with the app split (E-18 B2: 1.58 at 16). LANE: 64 lanes give one resource 23 to 53 writers' worth with the split (E-18 B2). V4 (referee): writers placed by ring hash with no move that follows load, max/mean 1.58 at 16 groups and 1.95 at 64 (E-18 B2), effective number under 16. All below F_w = 64 restated; the gap is the as-worded one"
+    },
+    {
+     "when": {
+      "G": [
+       "lane"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.66,
+     "basis": "LANE: 64 lanes shared by a project give one resource 23 to 53 writers' worth under skew with the app split (E-18), below the floor; it would pass only at F_w of 23 or less"
+    },
+    {
+     "when": {
+      "P": [
+       "slot"
+      ],
+      "C": [
+       "cent-co",
+       "cent",
+       "cent(writers)",
+       "cent(manifest CAS)",
+       "self+mv"
+      ],
+      "S": [
+       "walg",
+       "walg +tier"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "no judged row. Both ISR judges add that a log file per group 'loses to a shared journal well before the 2,000-group floor' (E-12: p99 9 to 186 times worse at 2,000). That is ISR's second reason, not its deciding one, and the DEP-12 and PERF-08 judges call the same tail a weak point, not a fail. So a slot row with S `walg` keeps the slot row's cell here, and S is named so that such a row is marked for judging rather than given a cell no judge gave it"
+    },
+    {
+     "when": {
+      "P": [
+       "slot"
+      ],
+      "C": [
+       "cent-co",
+       "cent",
+       "cent(writers)",
+       "cent(manifest CAS)",
+       "self+mv"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "AMENDMENTS 1.3 'SC-10 and SC-03': as worded the effective writer count is 12 to 22 for every design, below F_w = 64 (E-18). Restated with the app split the stated ceiling is 135 writers at 4,096 slots (72 at 1,024), the E-18 figure under A-18's one-move policy run by the loop or controller; prototypes hold 2,000 groups a process (E-11, E-12) and 100 members (E-25). It stays open: no ceiling is pinned and the price of 4,096 slots is reasoned only (G-06). It also depends on F_w and N_res"
+    },
+    {
+     "when": {
+      "P": [
+       "slot+rule"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "DRAFT: as worded it fails like every row (1.3 line). Restated, slot rows state 135 at 4,096 slots, but no ceiling is pinned and the 4,096-slot cursor and table sizes are reasoned only (G-06); open"
+    },
+    {
+     "when": {
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.66,
+     "basis": "SPLIT, PD: as worded it fails like every row (1.3 line). Restated it is open: key splits balance within 5% of slots to 64 groups (E-18), but SPLIT states no writer ceiling and keeps lineage for ever with no stated bound, TiKV's limits were not listed here, and nothing is pinned"
+    }
+   ],
+   "else": {
+    "v": "fails",
+    "depends_on": "restated",
+    "alt": "open",
+    "gap": 0.66,
+    "basis": "no judged row: a slot row whose mover is not one the judges saw (for example C `self+p` with plain P `slot`). As worded it fails like every row (1.3 line); restated, who decides the moves is undecided (AMENDMENTS 2, P), so open, and the cell is flagged as unsupported"
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "why": "N decides it. A shared tier or pool (N `tier`, `pool`) needs A-29's tenant budget and the user's yes on J, so the cell depends on 'shared tier'. A process per project (N `proc`) is open on the 10% clause alone (referee). BUY's tenancy is the outside system's.",
+   "rules": [
+    {
+     "when": {
+      "N": [
+       "tier",
+       "pool"
+      ]
+     },
+     "v": "open",
+     "depends_on": "shared tier",
+     "alt": "open",
+     "basis": "a tier or pooled process holds 1,000 sleeping projects with 0 messages (E-26; CELL needs A-15's dormant groups to fit). But on a shared journal a tenant at its quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) was not built, and the shared tier needs the user's yes on J (OPS-14)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "referee: with N `proc` nothing is resident and nothing is sent for a sleeping project (E-26), but the 10% clause rests on a promise: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each) and marks `proc` 'reasoned, not tested', and a cloud volume shared by tenants will not keep them apart (G-17). BUY: tenancy is the outside log's, not tested"
+   }
+  },
+  {
+   "req": "SC-12",
+   "part": "S",
+   "why": "Met wherever the edge is E-27's Node server or E-08's Rust relay. V4 is open: judge 2 names M `loop` (one event loop also folds and runs user code), judge 1 that no run held the counts on v4. BUY's edge is the outside server.",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "the edge is nats-server. E-09b measured its fan-out to 16 subscribers (4.13 million deliveries a second), not 10,000 idle links or 1,000 subscribers on a core"
+    },
+    {
+     "when": {
+      "M": [
+       "loop"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: 10,000 idle links were not measured on a kernel that answers every link's heartbeat on the one event loop that also folds and runs user code (M `loop`, judge 2); J shows 1,240 browser links, and v4's fan-out was measured at about 9,000 deliveries a second (judge 1)"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "one Node server held 10,000 idle links in 89 MB at 0.88% of a core, and 1,000 active subscribers at 10 messages a second cost 8.8% of a core (17% over TLS) with p99 2.0 ms (E-27); native edges: E-08's one-thread Rust relay served 1,000 and 10,000 sockets at 13.4 and 11.9 million deliveries a second (the referee gives PD the same as SRV). A-11 puts a TLS terminator in front"
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "why": "G and P decide it. V4 fails because each resource is its own cluster (G `res`, judge 2). Slot rows meet AMENDMENTS 1.3's 'SC-13's small' line (per-slot state, about 85 B a touched slot), so they depend on the restatement. The non-slot rows depend on N_res. C is named because COMP's referee adds the move loop over many resources in shared groups (K-04).",
+   "rules": [
+    {
+     "when": {
+      "G": [
+       "res"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: every resource is its own cluster: each `fero(name)` server binds its own port, votes its own views and sends its own heartbeats every tick (README; G `res`), against 'sends no frames of its own'; and 100,000 resources on one member need 100,000 listening ports, more than one address has"
+    },
+    {
+     "when": {
+      "P": [
+       "slot"
+      ],
+      "G": [
+       "pslot"
+      ],
+      "C": [
+       "self+mv"
+      ]
+     },
+     "v": "open",
+     "depends_on": "restated",
+     "alt": "open",
+     "basis": "COMP (referee): the 1.3 line 'SC-13's small, pslot too': 0.4 to 1.2 KB at 1 to 10 touched slots in about 16 project groups with no dormant groups, a create in 1.6 to 1.8 ms against 10.7 ms; past 2 KB only near 100 touched slots, and the text does not say whether that is 'small'. Open as worded and restated: the cold open is reasoned, E-36 priced one slot map per project (G-16), a drop out of a shared group never ran (K-06), and for COMP the move loop over many resources in shared groups is open too (K-04)"
+    },
+    {
+     "when": {
+      "P": [
+       "slot",
+       "slot+rule"
+      ]
+     },
+     "v": "open",
+     "depends_on": "restated",
+     "alt": "open",
+     "basis": "referee, AMENDMENTS 1.3 'SC-13's small' (pslot too): with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, about 85 B a touched slot (E-36); with `pslot` 0.4 to 1.2 KB at 1 to 10 slots with no dormant groups. The text does not say what 'small' is, so that is no measured ceiling below the bar. Open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the 1e5 create-and-drop sim never ran; `pslot`'s cold open is reasoned and E-36 priced one slot map per project (G-16), a loglet's idle cost (SLOG) and OBJ's create on a store were not measured"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "depends_on": "N_res",
+    "alt": "open",
+    "basis": "not a slot row, and not priced at N_res = 100,000: CELL's 16 dormant groups a resource (reasoned from E-26), LANE's 0.2 KB with its drop out of a shared lane log not run (E-36), SPLIT's range table, PD's cross-table merge (cited), ISR's N partitions each with its own log file (A-15: 'SC-13 is open for it'), BUY's 1e5 streams"
+   }
+  },
+  {
+   "req": "SC-14",
+   "part": "M",
+   "why": "Open for all 20, depending on region scope: no row ran far links, and writes homed in several regions would turn the row into WAN bars nobody tested.",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "depends_on": "region scope",
+    "alt": "open",
+    "basis": "no sim ran with 80 to 150 ms links, so false failover, the lease and TTL checks and the far-read lag bar are unshown. A relay or learner with any delay keeps every subscribe property (E-31, model-checked; lag not modelled), and writer time as the median ran for one group only (E-21). If the user wants writes homed in several regions the bars change, and it stays open"
+   }
+  },
+  {
+   "req": "SC-15",
+   "part": "M",
+   "why": "S decides it. On a shared journal (S `jrnl`) and a log file per group (S `walg`, ISR) the ratio sits at E-35's bar, so the cell depends on the deploy target's fsync figure. An LSM store (PD), loglets (SLOG), PUT commits (OBJ) and JetStream (BUY) were not run by E-35, so they are open with no such dependence. G is named too: in `pslot` and `lane` rows the big record also sits in a group's batch shared by other resources, which no experiment ran (K-06). V4's cell follows v4's own path and limits as built: an override.",
+   "rules": [
+    {
+     "when": {
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)"
+      ],
+      "G": [
+       "pslot",
+       "lane"
+      ]
+     },
+     "v": "open",
+     "depends_on": "fsync figure",
+     "alt": "open",
+     "basis": "on the shared journal the ratio was 1.18 and 1.26 times in two sets of runs, against 1.2 (E-35): at the bar. Here groups are shared by many resources, so the big record also sits in the same group's batch as other resources' records, which was never run (K-06); the size limits were not built"
+    },
+    {
+     "when": {
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)"
+      ]
+     },
+     "v": "open",
+     "depends_on": "fsync figure",
+     "alt": "open",
+     "basis": "on the shared journal a 1 MiB record ten times a second raised other partitions' p99 by 1.18 times in one set of three runs and 1.26 in another, against 1.2 (E-35): at the bar, inside this disk's run-to-run spread. The test was at the journal, not inside one Raft group's batch (K-06), and the 1 MB, 64 MB and `too-large` limits were not built"
+    },
+    {
+     "when": {
+      "S": [
+       "walg",
+       "walg +tier"
+      ]
+     },
+     "v": "open",
+     "depends_on": "fsync figure",
+     "alt": "open",
+     "basis": "ISR: with a log file per group, E-35's `own` variant gave 1.16 times, but its victims were already 1.19 times slower alone, and a file per group costs more from 256 groups (E-12). The size limits were not built"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-35's journal was not this row's write path: PD's log and state sit in an LSM store; SLOG's commits land on log nodes' loglets; OBJ's commit is a PUT (7 to 11 ms at 1 MB on MinIO, E-28) and what a 1 MB record does to its PUT window was not measured; BUY's NATS `max_payload` is about 1 MB and neighbours were not measured. The size limits were not built"
+   },
+   "overrides": {
+    "V4": {
+     "v": "open",
+     "basis": "both judges read V4 from v4's own path as built, not from the fsync figure: 'v4's own path was not run with 1 MB records, and E-43 found that one 41-byte record can make a 10 MB row with nothing refusing it' (judge 1); 'its own frames and limits were not tested' (judge 2). ISR, on the same S `walg` shape and the same E-35 `own` variant, depends on the fsync figure. No axis tag says a row's frames and size limits are v4's existing code"
+    }
+   }
+  }
+ ]
+}

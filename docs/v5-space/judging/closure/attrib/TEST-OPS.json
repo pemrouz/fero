@@ -1,0 +1,1267 @@
+{
+ "group": "TEST-OPS",
+ "by": "a closure attribution session, from judging/TEST-OPS.settled.json (each cell's why, why2 and ev) and REQUIREMENTS.md's TEST and OPS rows. Rules follow the axes the judges name: the timed and checked kernels for TEST-01, TEST-02, TEST-10 and TEST-13 (R, K, I, L, T and the PD and SRV tags), K for the tape (TEST-05), F for data's undo (TEST-07), K, O and P for the shuffle (TEST-12), P and C for counts (OPS-01), S for the recorder (OPS-11 S), N and S for a shared tier (OPS-14), and R outside for BUY. Five V4 overrides follow v4 as built: its opt-in scoped replication (OPS-01), its door (OPS-03, OPS-05, OPS-06) and E-42's listing (OPS-11 S)",
+ "parts": [
+  {
+   "req": "TEST-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY (by construction): its log, replication and failover are nats-server, a separate program that fero reaches only over sockets (E-44), so no socketless solo node can hold the whole stack; a fake log in its place is other code, which TEST-10 rules out. E-44 lists TEST-01 among BUY's gaps"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: E-22's prototype is K lib over a Raft-shaped log; no solo node of ISR's shape (a leader, an in-sync set and a controller in one process, with dedup and fences in the kernel, K hyb) was timed"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: E-22's prototype is K lib over a Raft-shaped log; no solo node of ISR's shape (a leader, an in-sync set and a controller in one process, with dedup and fences in the kernel, K hyb) was timed"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): both timings come from kernels with a Raft-shaped log (E-22, E-04). SLOG's solo stack is a server, its loglets and a metadata group in one process, and no such node was timed"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ (referee): both timings come from kernels with a Raft-shaped log (E-22, E-04). OBJ's solo node commits by a PUT under a lease taken by compare-and-swap on the manifest, and no such node was timed"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ (referee): both timings come from kernels with a Raft-shaped log (E-22, E-04). OBJ's solo node commits by a PUT under a lease taken by compare-and-swap on the manifest, and no such node was timed"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ (referee): both timings come from kernels with a Raft-shaped log (E-22, E-04). OBJ's solo node commits by a PUT under a lease taken by compare-and-swap on the manifest, and no such node was timed"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4 has a socketless solo node (listen: false), but nothing in this study timed it against the 5 ms and 1 s bars; the timings here come from Raft-shaped kernels, and v4's is LWW"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: no experiment built a PD-shaped kernel (a Rust kernel holding all of L2, K kern; an LSM store; a timestamp oracle; two-phase commit) or ran it in one process. E-04's WASM result is for a small log kernel and raft-rs only"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: no experiment built a PD-shaped kernel (a Rust kernel holding all of L2, K kern; an LSM store; a timestamp oracle; two-phase commit) or ran it in one process. E-04's WASM result is for a small log kernel and raft-rs only"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: no experiment built a PD-shaped kernel (a Rust kernel holding all of L2, K kern; an LSM store; a timestamp oracle; two-phase commit) or ran it in one process. E-04's WASM result is for a small log kernel and raft-rs only"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: no experiment built a PD-shaped kernel (a Rust kernel holding all of L2, K kern; an LSM store; a timestamp oracle; two-phase commit) or ran it in one process. E-04's WASM result is for a small log kernel and raft-rs only"
+    },
+    {
+     "when": {
+      "I": [
+       "raft-rs or etcd raft"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): SRV is two variants, and a met must hold for the one that gets built. E-04 covers the Rust variant's core only (raft-rs as WASM); no Go server ran in one process, and SRV's own Rust row fold and L2 (K lib(srv), F all(srv)) were in no timed run"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): SRV is two variants, and a met must hold for the one that gets built. E-04 covers the Rust variant's core only (raft-rs as WASM); no Go server ran in one process, and SRV's own Rust row fold and L2 (K lib(srv), F all(srv)) were in no timed run"
+    },
+    {
+     "when": {
+      "K": [
+       "lib(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): SRV is two variants, and a met must hold for the one that gets built. E-04 covers the Rust variant's core only (raft-rs as WASM); no Go server ran in one process, and SRV's own Rust row fold and L2 (K lib(srv), F all(srv)) were in no timed run"
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): SRV is two variants, and a met must hold for the one that gets built. E-04 covers the Rust variant's core only (raft-rs as WASM); no Go server ran in one process, and SRV's own Rust row fold and L2 (K lib(srv), F all(srv)) were in no timed run"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "K": [
+       "lib"
+      ],
+      "I": [
+       "port"
+      ],
+      "L": [
+       "ts",
+       "ts→rs"
+      ]
+     },
+     "v": "met",
+     "basis": "E-22's prototype (K lib over a Raft-shaped log) ran the whole stack in one process with no sockets: a fresh node plus a scenario 3.6 ms at p99 (bar 5 ms), 200 chaos seeds in 0.65 s (bar 1 s); E-04's sim with the real TS port of etcd's raft took 0.40 s for 200 seeds. T's cafe itself was not run"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "K": [
+       "lib"
+      ],
+      "I": [
+       "raft-rs"
+      ],
+      "L": [
+       "rs+napi",
+       "rs+v8",
+       "rs-srv + ts"
+      ]
+     },
+     "v": "met",
+     "basis": "E-04 ran raft-rs 0.7.0 as WASM as the sim's kernel, with data's fold in JS: 200 chaos seeds in 384 ms and a fresh node plus a scenario at 0.053 ms p99. It holds only with one WASM instance per test worker (A-30). The layers above the kernel are E-22's"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "Met rests on two timed kernels: E-22's K lib prototype over a Raft-shaped log with the TS port (I port, L ts or ts→rs), and E-04's raft-rs as WASM (I raft-rs, native L with data folding in JS). The judges hold every other kernel shape open by name: ISR (R isr, K hyb), SLOG (R slog), OBJ (R obj, Q put, the manifest CAS), V4 (R lww), PD (K kern, S lsm, T tso, X 2pc), SRV's Go variant and Rust row fold (I, L, K lib(srv), F all(srv)). BUY fails by construction (R outside)."
+  },
+  {
+   "req": "TEST-02",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: the writer's time and every election timer belong to nats-server, which no seed controls (E-44); a run is byte-identical only against a stand-in log, which was not built"
+    },
+    {
+     "when": {
+      "T": [
+       "theirs"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: the writer's time and every election timer belong to nats-server, which no seed controls (E-44); a run is byte-identical only against a stand-in log, which was not built"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: writer time comes from a timestamp oracle (T tso) and positions from hybrid clocks (O hlc); no experiment ran either under a world's clock and seed"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: writer time comes from a timestamp oracle (T tso) and positions from hybrid clocks (O hlc); no experiment ran either under a world's clock and seed"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4's sim is seeded and replays a schedule, but fero.now(), fero.id(), ctx.now() and ctx.id() are fero test's pieces, not v4 calls, and v4 has no writer time (its T cell is empty)"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): the Rust variant replays a seed exactly as WASM (E-04), but the row has not chosen, and the Go variant never ran under a seed: Go's scheduler and map order are not fixed by a seed. A met must hold for the variant that gets built"
+    },
+    {
+     "when": {
+      "I": [
+       "raft-rs or etcd raft"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV (referee): the Rust variant replays a seed exactly as WASM (E-04), but the row has not chosen, and the Go variant never ran under a seed: Go's scheduler and map order are not fixed by a seed. A met must hold for the variant that gets built"
+    },
+    {
+     "when": {
+      "T": [
+       "clamp"
+      ]
+     },
+     "v": "met",
+     "basis": "E-22 ran each seed twice in 200 worlds with the same trace hash and client history, with the four calls on the world's clock; writer time is the median of the members' clocks (T clamp, A-23), which E-21 ran under seeded clocks; a Rust kernel in WASM also replayed a seed exactly (E-04). The referee carries it to ISR, SLOG and OBJ: the time rule (T clamp) and a TypeScript kernel first are what TEST-02 touches"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "T decides: the writer's time rule (clamp) ran under seeded clocks; an oracle (PD's T tso, with O hlc), no writer time (V4's T empty) and JetStream's own clock (BUY) were never seeded. SRV's Go variant (L, I) never ran under a seed."
+  },
+  {
+   "req": "TEST-03",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: the retried-call chaos phase with zero doubles was never run; E-22 checked one keyed call with no faults and one smoke re-run, and E-20 did not model keyed calls apart (G-12)"
+   }
+  },
+  {
+   "req": "TEST-04",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: bind, the config cascade and the loud unbound error are design text (API.md, DESIGN-V5 4.5) and E-22 did not build them; the piece sits above the kernel, so no row differs on it"
+   }
+  },
+  {
+   "req": "TEST-05",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: a tape maps onto a JetStream stream with a 14-day age limit, but E-44 built four other patterns, not tapes"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4 keeps no ordered log with a time window: cells merge by last-writer-wins (R lww), lanes are compacted, and a partition has no total order (O lamp). A tape as plain rows was not built or tested"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4 keeps no ordered log with a time window: cells merge by last-writer-wins (R lww), lanes are compacted, and a partition has no total order (O lamp). A tape as plain rows was not built or tested"
+    },
+    {
+     "when": {
+      "K": [
+       "kern",
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "PD and ISR: E-22's tape runs on K lib's five operations; no L4 of this row's shape (semantics partly or wholly in the kernel, K hyb or kern) was built, so the record-then-replay test did not run on it"
+    },
+    {
+     "when": {
+      "K": [
+       "lib",
+       "lib(srv)"
+      ]
+     },
+     "v": "met",
+     "basis": "E-22 built the tape as an L5 library on the L4 verbs of K lib: record, find by match key, replay in order and forget past the window passed in 300 of 300 worlds in each mode, with a leader change and a slot move forced in. One tape is one partition, so replay order is that partition's log order"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "K decides: E-22's tape ran on K lib. V4's judges name its LWW cells and Lamport order (R lww, O lamp); BUY's names JetStream (R outside)."
+  },
+  {
+   "req": "TEST-06",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: a fork as one record pointing at immutable snapshots and segments is design text (DESIGN-V5 6.2); E-22 did not build fork, E-06 measured only the memory side (O(rows) for a fork that runs), and no row counted the bytes of a 1 GB fork"
+   }
+  },
+  {
+   "req": "TEST-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY (referee): E-06 timed data's undo only. In BUY the state that judges a write, the stream's sequences and its dedup window (E-44), lives in nats-server and not in data, so undoing data's records does not put the log back"
+    },
+    {
+     "when": {
+      "S": [
+       "theirs"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY (referee): E-06 timed data's undo only. In BUY the state that judges a write, the stream's sequences and its dedup window (E-44), lives in nats-server and not in data, so undoing data's records does not put the log back"
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the servers fold plain rows in Rust, not in data (F all(srv)). E-06 timed data's undo and snapshots, so it does not cover the server's own state; a native undo was not run"
+    },
+    {
+     "when": {
+      "K": [
+       "lib(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the servers fold plain rows in Rust, not in data (F all(srv)). E-06 timed data's undo and snapshots, so it does not cover the server's own state; a native undo was not run"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the servers fold plain rows in Rust, not in data (F all(srv)). E-06 timed data's undo and snapshots, so it does not cover the server's own state; a native undo was not run"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: the servers fold natively into an LSM store with many versions per row, not in data, so E-06's timings do not cover them; nothing was run"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: the servers fold natively into an LSM store with many versions per row, not in data, so E-06's timings do not cover them; nothing was run"
+    },
+    {
+     "when": {
+      "F": [
+       "all",
+       "ldr",
+       "ldr + lazy",
+       "all(isolates)",
+       "all(servers)",
+       "ldr(app folds)"
+      ]
+     },
+     "v": "met",
+     "basis": "E-06 measured it through fero's real seam with data: undoing a rerun's records costs 0.03 to 0.05 ms at every size up to 1e6 rows, and a rerun from a snapshot 0.6 to 1.2 ms at the cafe's size, against 10 ms. It holds wherever data folds the state (F), in tape order (A-10)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "E-06 timed data's undo, so it holds where data folds the state that judges a write (F). The judges hold it open where that state is folded outside data: SRV's Rust row fold (F all(srv), K lib(srv), its native L), PD's native LSM (S lsm, L rs-srv), and BUY's nats-server (R outside, S theirs)."
+  },
+  {
+   "req": "TEST-08",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: captures with log positions lined up in the viewer were not built on any row"
+   }
+  },
+  {
+   "req": "TEST-09",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY (by construction): its replication layer is nats-server, a separate Go program with its own sockets, disk and timers, which fero's simulator cannot run or schedule (E-44); a sim over a stand-in log is not the real layer"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-22 ran methods as seeded sim steps with kills, races and resends over data's real fold but a modelled log, not the real replication layer; no run had a planner whose hints arrive stale, duplicated and out of order (G-09). Open for every row fero builds"
+   },
+   "why": "Only BUY differs: its replication is nats-server (R outside)."
+  },
+  {
+   "req": "TEST-10",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY (by construction): the server's replication code is nats-server, a Go binary fero does not own and its simulator cannot load or schedule (E-44), so the sim must run a stand-in, a second implementation nothing makes byte-identical"
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: it folds plain rows natively beside data's fold on clients, a second implementation for good, and A-30's guard ran only on E-04's two small twins"
+    },
+    {
+     "when": {
+      "K": [
+       "lib(srv)"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: it folds plain rows natively beside data's fold on clients, a second implementation for good, and A-30's guard ran only on E-04's two small twins"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the Go variant has no sim build at all, and the row has not chosen"
+    },
+    {
+     "when": {
+      "I": [
+       "raft-rs or etcd raft"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV: the Go variant has no sim build at all, and the row has not chosen"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: a Rust server that holds all of L2, an LSM store, an oracle and two-phase commit; no experiment built any of it for a sim, and its native fold needs A-30's guard against data (reasoned)"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: a Rust server that holds all of L2, an LSM store, an oracle and two-phase commit; no experiment built any of it for a sim, and its native fold needs A-30's guard against data (reasoned)"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: a Rust server that holds all of L2, an LSM store, an oracle and two-phase commit; no experiment built any of it for a sim, and its native fold needs A-30's guard against data (reasoned)"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: a Rust server that holds all of L2, an LSM store, an oracle and two-phase commit; no experiment built any of it for a sim, and its native fold needs A-30's guard against data (reasoned)"
+    },
+    {
+     "when": {
+      "L": [
+       "ts"
+      ]
+     },
+     "v": "met",
+     "basis": "One TypeScript kernel for good (L ts): the sim, the site and the server run the same source, and there is no second implementation to compare. MIN-TS by construction (E-42 replayed 18 of 18 real-socket runs, E-46 ran the port unchanged, E-10 matches Go on 4,000 scripts); V4's sim runs the same kernel bytes its shell runs on real TCP (CLAUDE.md)"
+    },
+    {
+     "when": {
+      "L": [
+       "ts→rs"
+      ]
+     },
+     "v": "open",
+     "basis": "The TS phase holds by construction, but the row plans a native step and its second kernel does not exist: raft-rs cannot run etcd's interaction files, a Rust port was not tried (E-10, G-24), and E-04's 1,000 clean seeds come from two 300-line twins by one author. AMENDMENTS (axis I) calls the later half open"
+    },
+    {
+     "when": {
+      "L": [
+       "rs+napi",
+       "rs+v8",
+       "rs-srv + ts"
+      ]
+     },
+     "v": "open",
+     "basis": "One Rust source is not yet one kernel's bytes: the sim runs the WASM build and the server the native build, and E-04 never compared the two; WASM's 32-bit sizes are the kind of trap E-04 planted, which showed in 101 of 1,000 seeds"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "L decides: one TS kernel for good (L ts) is met by construction; a TS-then-native row (ts→rs) and a Rust row run in WASM in the sim (rs+napi, rs+v8, rs-srv + ts) have no compared second build. SRV's native row fold (F all(srv), K lib(srv)) and Go variant (L, I), and PD's kernel (S lsm, T tso, X 2pc, L rs-srv) are named too. BUY fails (R outside)."
+  },
+  {
+   "req": "TEST-11",
+   "part": "S",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: fero test --perf was not built on any row"
+   }
+  },
+  {
+   "req": "TEST-12",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: fero's client could shuffle what it folds from the stream, but E-44 did not build it"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4 has no shuffle today, and its Lamport stamps give no total order per partition to keep (O lamp, under R lww)"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: v4 has no shuffle today, and its Lamport stamps give no total order per partition to keep (O lamp, under R lww)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern",
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "PD and ISR: no prototype ran the 22 examples on K kern or K hyb; the shuffle ran on E-22's K lib prototype only"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its oracle timestamps order writes across partitions, so the premise of the shuffle differs, and the row lists no follower subscriptions (W lease, ridx)"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its oracle timestamps order writes across partitions, so the premise of the shuffle differs, and the row lists no follower subscriptions (W lease, ridx)"
+    },
+    {
+     "when": {
+      "W": [
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its oracle timestamps order writes across partitions, so the premise of the shuffle differs, and the row lists no follower subscriptions (W lease, ridx)"
+    },
+    {
+     "when": {
+      "O": [
+       "off",
+       "off+lin"
+      ],
+      "P": [
+       "fixN+rekey",
+       "fixN(lanes)",
+       "split",
+       "split+merge",
+       "slot",
+       "slot+rule",
+       "ring"
+      ]
+     },
+     "v": "open",
+     "basis": "With one offset per group (O off), a log reader's cursor is exact only if delivery inside a group keeps log order (E-22, API-NOTES C7), so the log-mode shuffle cannot part two partitions of one group, yet a later re-key, split or range move (P) does part them. CELL, SPLIT and LANE (referee: SPACE 4.2's range moves, priced in E-17b)"
+    },
+    {
+     "when": {
+      "K": [
+       "lib",
+       "lib(srv)"
+      ],
+      "O": [
+       "slot"
+      ]
+     },
+     "v": "met",
+     "basis": "E-22 ran all 22 pattern checks under 100 seeds of the shuffle with a leader change and a slot move forced in: all pass, and the planted two-partition app fails in 25 of 100 seeds and never without it. In log mode the shuffle is per slot (O slot), so a cursor stays one position per slot, and two partitions of one slot never part"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "Met rests on E-22's K lib prototype with slot positions (K, O). The judges name O off with a P that later parts partitions (CELL, LANE, SPLIT), K kern and hyb (PD, ISR), PD's oracle order (O hlc, T tso, W), V4's Lamport stamps (O lamp, R lww) and BUY (R outside)."
+  },
+  {
+   "req": "TEST-13",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4: leaderless LWW per cell (R lww) lets two members each take a conditional write on one row and both answer ok (DESIGN-V5 9 measured two sells of the last item, both ok), and STATUS.md pins a later remove lost after a heal and one forwarded write committed twice. No linear order explains them; the judges name the root as the row's R option"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY: Maelstrom carries every node-to-node message itself and its nemesis cuts only those (E-46); BUY's replication runs inside nats-server over its own TCP routes, so no adapter can put it under the partition nemesis from phase 1. E-44 also counted a retried incr twice, a history Porcupine rejects"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: its dedup was modelled (pid, E-20), but no client history from an ISR-shaped prototype ever met a checker, and its data path is not Raft"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG and OBJ: E-22's histories come from a Raft-shaped kernel model and E-46's from etcd's raft, which covers only a metadata group (I port(meta)); no history from the row's own log (loglets with a seal, or PUT commits with a lease) was recorded or checked"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG and OBJ: E-22's histories come from a Raft-shaped kernel model and E-46's from etcd's raft, which covers only a metadata group (I port(meta)); no history from the row's own log (loglets with a seal, or PUT commits with a lease) was recorded or checked"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG and OBJ: E-22's histories come from a Raft-shaped kernel model and E-46's from etcd's raft, which covers only a metadata group (I port(meta)); no history from the row's own log (loglets with a seal, or PUT commits with a lease) was recorded or checked"
+    },
+    {
+     "when": {
+      "I": [
+       "port(meta)",
+       "—"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG and OBJ: E-22's histories come from a Raft-shaped kernel model and E-46's from etcd's raft, which covers only a metadata group (I port(meta)); no history from the row's own log (loglets with a seal, or PUT commits with a lease) was recorded or checked"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc",
+       "ktxn"
+      ]
+     },
+     "v": "open",
+     "basis": "PD and ISR: no prototype of this row's kernel recorded a history; its transactions (two-phase commit, or a coordinator with commit markers) would be checked by the same Elle workload, which was not run on them"
+    },
+    {
+     "when": {
+      "I": [
+       "raft-rs",
+       "raft-rs or etcd raft"
+      ]
+     },
+     "v": "open",
+     "basis": "RUST, EMB-V8, SIDE and SRV (referee): E-22's checkers ran over a modelled log, and the one run that put a real core under Maelstrom's nemesis is E-46, which drove the TS port only. raft-rs is a drifted fork that cannot run etcd's files (E-10), and Go's etcd raft did not run there either"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "I": [
+       "port"
+      ],
+      "X": [
+       "saga"
+      ]
+     },
+     "v": "met",
+     "basis": "E-22's histories passed Porcupine on 183,159 partitions, the fencing checker on every log and Elle with A-24's rule (0 G0 in 300 histories); real Knossos and real Elle agree (E-22b). E-46's 273-line Maelstrom adapter ran the TS port of etcd's raft (I port) linearizably in 26 of 26 runs under partitions and pauses"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "Met needs the core that met a checker under Maelstrom (E-46: the TS port, I port, on a Raft data path, R raft or rlog) and the multi-partition units Elle checked (X saga). The judges name raft-rs and Go's raft (I), the non-Raft data paths (R isr, slog, obj; Q put; I port(meta) or none) and 2PC or Kafka transactions (X). V4 fails on R lww, BUY on R outside."
+  },
+  {
+   "req": "OPS-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: a stream takes a replica count with a default, but one stream has one leader and JetStream does not split a stream, so growing writers needs fero to cut subjects over more streams, which it did not build (E-44)"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ],
+      "C": [
+       "self"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "F_w",
+     "alt": "met",
+     "gap": 0,
+     "basis": "CELL (referee): the cell count is fixed at define, 16 by default (P fixN); 16 cells give 7 to 15 writers' worth under skew (E-18 B4), below F_w = 64, and the only growth is a re-key whose count 'is chosen per re-key' (E-17). Nothing in the row chooses it: P has no '+ rule' and C is self (healing only, no planner). If F_w is lowered to 7 or less, the default 16 is enough: met"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: partitions are fixed when a resource is defined (P fixN) and never move, split or re-key, and SPACE gives no default count; if the default gives fewer writers than F_w, a count must be chosen up front, as in Kafka"
+    },
+    {
+     "when": {
+      "P": [
+       "slot",
+       "slot+rule"
+      ]
+     },
+     "v": "met",
+     "basis": "No count exists to choose: the 4,096 slots are fixed by fero (A-16), copies defaults to 3, full replicas default to every server up to 5, and groups grow and shrink by slot moves under one policy (A-18; E-18 simulated it to 64 groups). E-22's 22 examples set no count"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN(lanes)"
+      ]
+     },
+     "v": "met",
+     "basis": "LANE: the 64 lanes per project are fixed by fero and copies is one project default; its writer ceiling is SC-03's matter, not a number the user picks"
+    },
+    {
+     "when": {
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "met",
+     "basis": "SPLIT and PD: groups (regions) split, and in PD merge, by size and load by themselves (decision 20a; TiKV's shape, cited), and the replica count has a default"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0,
+     "basis": "v4 as built: with no replicas key every member holds every row and applies every write, and the only way to grow is scoped replication, turned on by replicas: N (v4 README); v4's own example 16 sets replicas: 2, so 'the examples set none' fails today. That is v4's opt-in scoped mode, not an option of the map: no axis tag says partial replication needs a user count"
+    }
+   },
+   "why": "P decides how a resource grows: fixed slots with one move policy, fixed lanes and self-splitting groups need no count; CELL's re-key needs one because nothing chooses it (P fixN+rekey with C self, both named by the referee); ISR's fixed partitions have no stated default. V4 fails on its built opt-in scoped replication (override)."
+  },
+  {
+   "req": "OPS-02",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: health per resource with every wait and its reason is design text; no health test per failure ran on any row"
+   }
+  },
+  {
+   "req": "OPS-03",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: fero's cascade stays for its own keys, but the cluster's keys (replicas, election timers, the sync interval) are nats-server's settings, changed by its own tools; not examined"
+    },
+    {
+     "when": {
+      "L": [
+       "rs-srv",
+       "rs-srv or go-srv"
+      ]
+     },
+     "v": "open",
+     "basis": "SRV and PD: online cluster keys are designed, not built; also the cascade reads project files written in TypeScript or JavaScript, which a server with no JS engine cannot load, and the client handing them to the binary it spawns is not built"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "The cascade and its one importer are v4's and sit above the kernel, so they carry over; changing cluster keys online through #meta with range and cross-key checks is designed (DESIGN-V5 4.5) but not built or modelled"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0,
+     "basis": "referee, from v4's records: every v4 server says its cluster values in its first frame and two servers whose values differ refuse to link (README; STATUS.md; DESIGN-DOOR 4), so a key changed online splits the cluster until every member and client restarts. That is v4's door as built, not an option of the map; closing it needs a new mechanism, which is not v4 as it is"
+    }
+   },
+   "why": "V4 fails on its built door (override). Every other row is open; the judges name the server with no JS engine (L rs-srv) and JetStream's own settings (R outside), and #meta's online keys for the v5 kernels (R)."
+  },
+  {
+   "req": "OPS-04",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: a debugger that opens captures and live clusters with log positions was not built for any v5 row"
+   }
+  },
+  {
+   "req": "OPS-05",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: the kernel is nats-server, which has its own rolling upgrade; fero cannot gate a cluster version on it, and nothing here tested a roll"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "Frames with a protocol version, and a cluster version in #meta that rises only when every member runs the new kernel, are designed (DESIGN-V5 4.2; CockroachDB's cluster versions); no roll across two kernel builds was run. For a ts→rs row the native step is itself such a roll"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0,
+     "basis": "referee: v4 has no cluster version and V4-14 says mixed versions are unsupported; its door's proof label was raised so an old and a new member both fail bad-proof (kernel/door.ts, V4-55), so the first restarted member is refused and the roll test fails. That is v4's build, not an option of the map"
+    }
+   },
+   "why": "V4 fails on its built door and decision V4-14 (override); the other rows are open, by #meta's cluster version for the v5 kernels and nats-server's own upgrade for BUY (R)."
+  },
+  {
+   "req": "OPS-06",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: NATS has TLS, accounts and signed user tokens of its own; fero's door, claims and admin key would have to map onto them, and E-44 used none of them"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "The door is v4's (V4-30) and E-40 ran a pipelined door on a prototype client; TLS was measured for cost only (E-27, E-39). Client tokens with claims, the admin key and rotation through #meta (a current and a next secret) are designed, not built or modelled"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0,
+     "basis": "referee: v4's door admits a peer only if it proves the one configured secret, with no second key and no window (DESIGN-DOOR), so changing the secret is a full stop and start of every member and client (README; STATUS.md), and v4 has no TLS, tokens with claims or admin key. That is v4's door as built, not an option of the map"
+    }
+   },
+   "why": "V4 fails on its built door (override); the other rows are open, by #meta's rotation design for the v5 kernels and NATS's own security for BUY (R)."
+  },
+  {
+   "req": "OPS-07",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: restore with new epochs, fence tokens above every earlier one and a portable export were not built or run on any row"
+   }
+  },
+  {
+   "req": "OPS-08",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: per-copy numbers for machines are design text; no API test ran"
+   }
+  },
+  {
+   "req": "OPS-09",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: one owner per dir with a lease is v4's (V4-59), but a dir that names its cluster and project and refuses another's was not built or tested"
+   }
+  },
+  {
+   "req": "OPS-10",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: signed client tokens checked on every write, call and forwarded record, with revocation within one ping.ms, were not built; no hostile-client suite ran"
+   }
+  },
+  {
+   "req": "OPS-11",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY (by construction): clause (d) asks for a recorder of every kernel input whose dump replays in the sim; BUY's kernel is nats-server, so fero sees none of its inputs and the sim cannot run its bytes (E-42, E-44)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Only (d) was run, on E-02's TS pipeline (18 of 18 recordings replayed byte for byte, E-42), with no elections, ticks or object-store completions; the metrics with the latency split, the trace context and the slow-op log are not built. Open for every row fero builds"
+   },
+   "why": "Only BUY differs: its kernel is nats-server (R outside)."
+  },
+  {
+   "req": "OPS-11",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "not",
+     "basis": "BUY has no kernel of its own to record: the inputs are nats-server's (E-42, E-44)"
+    },
+    {
+     "when": {
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)"
+      ]
+     },
+     "v": "met",
+     "basis": "E-42 measured it on E-02's TS pipeline at 50,000 appends a second: 1.1 to 1.7 % of a core per process (bar 3 %) and 0.15 to 0.4 % of the journal's bytes. Its cheap ref form refers to the one shared journal that holds every bulk input in arrival order; the stated disk budget is that journal kept for the window (8.8 GB a day at 1,000 appends a second, 441 GB at 50,000)"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: E-42 does not list it; its bulk bytes sit in an LSM store with several kernel threads, not in a journal the recorder can refer to"
+    },
+    {
+     "when": {
+      "S": [
+       "walg +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: E-42's cost was measured on one shared journal, and ISR keeps a log file per group"
+    },
+    {
+     "when": {
+      "S": [
+       "tier + obj",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG and OBJ: the servers keep no local journal (the bytes sit on the log tier or in the object store), so the ref form has nothing to point at, and E-42 recorded no object-store completions"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "overrides": {
+    "V4": {
+     "v": "not",
+     "basis": "v4 as built has no recorder of kernel inputs, only a 4,096-row journal ring that turns over in about 34 minutes under a redial loop (STATUS.md), and E-42 lists V4 as a row that cannot get the always-on recorder, naming no option as the cause (the OPS-11 M judges note it gives no reason). No axis tag carries it"
+    }
+   },
+   "why": "S decides: E-42's cheap form refers to one shared journal per process (S jrnl). The judges hold it open for an LSM, a log file per group, a log tier and the object store. BUY has no kernel (R outside); V4 follows E-42's listing of v4 as built (override)."
+  },
+  {
+   "req": "OPS-12",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: no format-compatibility corpus, no roll from build A to B and back, and the fold's version as a committed log entry was not built on any row (E-43 only pins what it must name)"
+   }
+  },
+  {
+   "req": "OPS-13",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20: erase across history, tapes, forks, snapshots and backups, and per-project keys for crypto-shredding, were not built or tested on any row"
+   }
+  },
+  {
+   "req": "OPS-14",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: tenancy is theirs (N theirs). One NATS cluster per project keeps projects apart at 2.4 to 3.7 times the cost at small loads (E-41); a shared cluster would lean on NATS accounts, which fero does not control. Not tested"
+    },
+    {
+     "when": {
+      "N": [
+       "tier",
+       "pool"
+      ]
+     },
+     "v": "open",
+     "depends_on": "shared tier",
+     "alt": "fails",
+     "gap": 0,
+     "basis": "The hosted shape pools projects on one log tier (N tier; for OBJ the object store itself) or one process (N pool, with isolation by V8 isolates never tested, G-25): on a shared journal a tenant at its quota raised another's p99 1.40 to 1.59 times against 1.1 (E-35), so it takes a byte budget per tenant (A-29), which was not built, and keys per project are not designed. If J is not changed, the shared tier is not allowed and the row fails as it stands"
+    },
+    {
+     "when": {
+      "N": [
+       "proc"
+      ],
+      "S": [
+       "lsm",
+       "walg"
+      ]
+     },
+     "v": "met",
+     "basis": "By construction nothing holds more than one project: one cluster and one set of processes and disks per project (N proc), with no log tier and no object store among its options (S lsm, S walg)"
+    },
+    {
+     "when": {
+      "N": [
+       "proc"
+      ],
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)",
+       "walg +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "No log tier and no pooled process (N proc): one process and one volume per project, as J promises (E-35 reasons it keeps tenants off one disk; not tested). But the hosted object store (S +tier) holds many projects, and keys per project at rest and the lack of any read path across projects are not designed in any row"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: no judged row holds this mix of tags on the deciding axes"
+   },
+   "why": "N and S decide where projects share bytes: a pooled tier or process (N tier, pool) is open on the restated J and fails if J stays; a project's own processes with an object-store tier (N proc, S +tier) are open on the store; with neither (N proc, S lsm or walg) nothing is shared, met. BUY is theirs (R outside)."
+  }
+ ]
+}
