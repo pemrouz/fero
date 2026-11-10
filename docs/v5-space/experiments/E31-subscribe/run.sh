@@ -30,7 +30,11 @@ if want ablate; then
   n=0
   until [ -f $R/fixed-ablation.json ]; do
     n=$((n + 1)); [ $n -le 10 ] || { echo "ablation did not end in 10 holds" >&2; exit 1; }
-    $HEAVY timeout 1500 python3 $CLI models/subscribe.py fixed --ablate $R/fixed-ablation.json --limit 3000000 || true
+    # E-16's engine on the sweep bounds, then the snapshot and expired paths put back
+    # as groups for the verify bounds (ablate_groups.py says why), then mutants
+    $HEAVY timeout 1500 python3 ablate_groups.py models/subscribe.py fixed $R/fixed-ablation.json \
+      --group snapshot=snap.req,snap.loaded,snap.holds,snap.cursor,snap.send,gotsnap.is,gotsnap.clear,gotsnap.rows,gotsnap.cursor,gotsnap.loaded,gotsnap.credit \
+      --group expired=expire.on,expire.loaded,expire.lost,expire.send,gotexp.is,gotexp.dead,gotexp.leave,gotexp.credit || true
   done
 fi
 if want report; then
