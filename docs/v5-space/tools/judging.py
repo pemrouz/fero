@@ -6,6 +6,8 @@ cell by cell and the verdict is arithmetic, not prose. Run from docs/v5-space.
   python3 tools/judging.py check FILE            check one judge's file
   python3 tools/judging.py diff GROUP            compare judging/GROUP.j1.json with .j2.json
   python3 tools/judging.py settle GROUP          agreed cells + the referee's rulings -> GROUP.settled.json
+  python3 tools/judging.py mechanisms            check judging/mechanisms.json and count novel mechanisms per row
+  python3 tools/judging.py pairs                 mechanisms that share state -> judging/pairs.json and PAIRS.md
   python3 tools/judging.py verdict               every settled group -> judging/outcome.json and OUTCOME.md
 
 A judge's file:
@@ -159,10 +161,15 @@ def settle(group):
     errs, cells = [], []
     for k in ca:
         va, vb = ca[k], cb[k]
-        if va['v'] == vb['v']:
+        if va['v'] == vb['v'] and k in rul and not rul[k].get('overrules'):
+            errs.append('%s %s %s: the judges agree; a ruling here needs "overrules": true and a source' % k); continue
+        if va['v'] == vb['v'] and k not in rul:
             v = dict(va); v['why2'] = vb['why']; by = 'both'
             if va['v'] == 'fails' and va.get('proof') != vb.get('proof'):
                 v['proof2'] = vb.get('proof')
+        elif va['v'] == vb['v']:
+            v = {x: y for x, y in rul[k].items() if x not in ('req', 'part', 'row', 'overrules')}
+            check_verdict(v, k[1], '%s %s %s ruling' % k, errs); by = 'referee, against both judges'
         else:
             if k not in rul:
                 errs.append('%s %s %s: the judges differ and there is no ruling' % k); continue
@@ -178,7 +185,78 @@ def settle(group):
             print('  -', e)
         sys.exit(1)
     dump('%s/%s.settled.json' % (J, group), {'group': group, 'cells_total': d['cells'], 'same': d['same'], 'decisive': d['decisive'], 'minor': d['minor'], 'cells': cells})
-    print('%s settled: %d cells, %d by both judges, %d by the referee' % (group, len(cells), sum(c['by'] == 'both' for c in cells), sum(c['by'] == 'referee' for c in cells)))
+    print('%s settled: %d cells, %d by both judges, %d by the referee where they differed, %d by the referee against both'
+          % (group, len(cells), sum(c['by'] == 'both' for c in cells), sum(c['by'] == 'referee' for c in cells), sum(c['by'].startswith('referee,') for c in cells)))
+
+# ---- mechanisms (DEV-01) and interacting pairs (DEV-02) ----
+
+def mechanisms():
+    """judging/mechanisms.json: every mechanism (DEV-10 a), who carries it, and whether it is novel (DEV-10 b),
+    as two counters judged it on their own (a, b) and as settled. This command checks the file and counts."""
+    d, errs = load(J + '/mechanisms.json'), []
+    keys = [m.get('key') for m in d.get('mechanisms', [])]
+    for k in set(keys):
+        if keys.count(k) > 1: errs.append('%s: key appears %d times' % (k, keys.count(k)))
+    for m in d.get('mechanisms', []):
+        w = str(m.get('key'))
+        for f in ('name', 'state', 'rules'):
+            if not str(m.get(f, '')).strip(): errs.append('%s: %s is empty' % (w, f))
+        for f in ('reads', 'writes', 'rows'):
+            if not isinstance(m.get(f), list): errs.append('%s: %s must be a list' % (w, f))
+        for r in m.get('rows') or []:
+            if r not in ROWS: errs.append('%s: unknown row %r' % (w, r))
+        if not isinstance(m.get('novel'), bool): errs.append('%s: novel must be true or false' % w)
+        if m.get('novel') is False and not str(m.get('precedent', '')).strip():
+            errs.append('%s: not novel needs a precedent (a paper or a production system with the same state and rules in the same role)' % w)
+        for who in ('a', 'b'):
+            x = m.get(who)
+            if not isinstance(x, dict) or not isinstance(x.get('novel'), bool) or not isinstance(x.get('rows'), list):
+                errs.append('%s: needs "%s": {"novel": true|false, "rows": [...]} (that counter\'s own judgment; use rows [] if the counter did not list it)' % (w, who))
+    if errs:
+        print('%d problems' % len(errs))
+        for e in errs[:60]: print('  -', e)
+        sys.exit(1)
+    counts = {'a': {r: 0 for r in ROWS}, 'b': {r: 0 for r in ROWS}, 'settled': {r: 0 for r in ROWS}}
+    carried = {r: 0 for r in ROWS}
+    for m in d['mechanisms']:
+        for r in m['rows']:
+            carried[r] += 1
+            counts['settled'][r] += bool(m['novel'])
+        for who in ('a', 'b'):
+            for r in m[who]['rows']:
+                counts[who][r] += bool(m[who]['novel'])
+    d['counts'], d['carried'] = counts, carried
+    dump(J + '/mechanisms.json', d)
+    print('%d mechanisms. Novel mechanisms per row (counter a / counter b / settled), and all mechanisms carried:' % len(d['mechanisms']))
+    for r in ROWS:
+        print('  %-7s %2d / %2d / %2d   carried %2d' % (r, counts['a'][r], counts['b'][r], counts['settled'][r], carried[r]))
+
+def pairs():
+    """DEV-02: two mechanisms interact when both touch one piece of state and at least one of them writes it."""
+    d = load(J + '/mechanisms.json')
+    ms = d['mechanisms']
+    def shared(a, b):
+        ta, tb = set(a['reads']) | set(a['writes']), set(b['reads']) | set(b['writes'])
+        return sorted((set(a['writes']) & tb) | (set(b['writes']) & ta))
+    distinct, per = {}, {r: [] for r in ROWS}
+    for a, b in itertools.combinations(ms, 2):
+        sh = shared(a, b)
+        if not sh: continue
+        rows = [r for r in ROWS if r in a['rows'] and r in b['rows']]
+        if not rows: continue
+        distinct[(a['key'], b['key'])] = {'a': a['key'], 'b': b['key'], 'state': sh, 'rows': rows}
+        for r in rows: per[r].append([a['key'], b['key'], sh])
+    dump(J + '/pairs.json', {'pairs': {r: len(per[r]) for r in ROWS}, 'detail': per, 'distinct': list(distinct.values())})
+    o = ['# Interacting pairs of mechanisms (DEV-02)', '',
+         'Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json). Two mechanisms interact when both touch one piece of state and at least one of them writes it.', '',
+         '| Row | Mechanisms carried | Interacting pairs |', '|---|---|---|']
+    for r in ROWS:
+        o.append('| %s | %d | %d |' % (r, sum(r in m['rows'] for m in ms), len(per[r])))
+    o += ['', '## Every distinct pair', '', '| Mechanism | Mechanism | Shared state | Rows that carry both |', '|---|---|---|---|']
+    for x in sorted(distinct.values(), key=lambda x: (-len(x['rows']), x['a'], x['b'])):
+        o.append('| %s | %s | %s | %s |' % (x['a'], x['b'], ', '.join(x['state']), ', '.join(x['rows']) if len(x['rows']) < len(ROWS) else 'all'))
+    open(J + '/PAIRS.md', 'w').write('\n'.join(o) + '\n')
+    print('%d distinct pairs; per row: %s' % (len(distinct), ' '.join('%s=%d' % (r, len(per[r])) for r in ROWS)))
 
 # ---- the verdict: REQUIREMENTS, judging rules 1 to 3, as arithmetic ----
 
@@ -320,5 +398,7 @@ if __name__ == '__main__':
     elif cmd == 'check': check(sys.argv[2])
     elif cmd == 'diff': diff(sys.argv[2])
     elif cmd == 'settle': settle(sys.argv[2])
+    elif cmd == 'mechanisms': mechanisms()
+    elif cmd == 'pairs': pairs()
     elif cmd == 'verdict': verdict()
     else: print(__doc__)
