@@ -1,0 +1,5 @@
+{"loadavg":"7.90 9.64 10.46 6/218 31583","check":"dedup"}
+{"check":"a retried attempt lands once inside the dedup window","ok":true,"first":1,"retry":{"ok":true,"version":1,"duplicate":true}}
+{"check":"gap: F-02 a retried attempt lands once whenever it comes","ok":false,"why":"after the window (2 minutes by default; 1 s here) the same message id is stored again","retryAfterWindow":{"ok":true,"version":2,"duplicate":false}}
+{"check":"an incr retried at once is counted once","ok":true,"n":1}
+{"check":"gap: F-02 an incr retried after another write to the row is counted once","ok":false,"why":"the attempt id lives only in the row's last message; one later write hides it, and the retry runs again (the message id cannot help: it must change with each check-and-write try, see msgid_probe.mjs)","counterIs":3,"shouldBe":2}

@@ -1,0 +1,6 @@
+   164  buy.mjs
+   164  total
+    31  shared (connect, retry, publish, read latest)
+    50  resource: P-01 and P-14
+    21  lock: P-10
+    62  queue: P-09

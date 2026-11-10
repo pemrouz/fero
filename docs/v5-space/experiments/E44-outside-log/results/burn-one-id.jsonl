@@ -1,0 +1,2 @@
+{"loadavg":"7.65 5.94 7.51 13/226 22789","check":"burn-one-id"}
+{"check":"every increment answered ok is in the counter (8 clients, no fault), ONE message id per attempt","ok":false,"answeredOk":200,"counter":142,"lost":58,"retries":515,"answersMarkedDuplicate":58}

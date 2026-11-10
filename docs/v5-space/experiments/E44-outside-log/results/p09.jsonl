@@ -1,0 +1,9 @@
+{"loadavg":"8.22 8.49 9.07 9/219 16988","check":"p09"}
+{"check":"P-09 an enqueue retried with its id lands once (inside the dedup window)","ok":true,"duplicatesDropped":300}
+{"check":"P-09 every good job acked, none lost, across worker crashes and a leader kill (n1)","ok":true,"good":294,"ackedOnce":294,"ackedTwice":0,"handedOutMoreThanOnce":49,"seconds":16.3}
+{"check":"P-09 never two live leases on one message","ok":true,"doubleLease":0,"leaseMs":2500,"leaderKilledAtMs":272,"handedOutAgainInsideTheLease":[]}
+{"check":"P-09 after 3 deliveries a job goes to the dead-letter queue, and only then","ok":true,"poison":6,"inDeadQueue":6,"leftInQueue":0,"poisonHandouts":"3,3,3,3,3,3","goodJobsHandedOut3Times":[{"job":130,"acked":1,"handouts":3},{"job":188,"acked":1,"handouts":3},{"job":194,"acked":1,"handouts":3}]}
+{"check":"P-09 an empty take writes nothing to the stream","ok":true,"lastSeq":[300,300]}
+{"check":"gap: P-09 a job that used up its deliveries always reaches the dead-letter queue","ok":false,"why":"JetStream announces \"max deliveries\" once on a plain subject; if no mover hears it, the job stays in the stream and is never handed out again","stuckInQueue":1,"inDeadQueue":0,"handedOutAgain":0,"movedByAScan":1,"afterScan":{"queue":0,"dead":1}}
+{"check":"gap: P-09 FIFO per partition with 4 workers, one shared consumer","ok":false,"done":60,"twoInFlightInOnePartition":13,"finishedOutOfOrder":12,"seconds":1.2,"why":"a shared consumer hands the next message of a partition to another worker while the first is still held"}
+{"check":"P-09 FIFO per partition with 4 workers, one consumer per partition","ok":true,"done":60,"twoInFlightInOnePartition":0,"finishedOutOfOrder":0,"seconds":2.4,"cost":"a take is one pull per partition; a consumer per partition on the server"}

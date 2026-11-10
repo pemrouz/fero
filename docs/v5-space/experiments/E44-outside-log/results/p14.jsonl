@@ -1,0 +1,6 @@
+{"loadavg":"9.23 9.64 10.39 13/253 3867","check":"p14"}
+{"check":"P-14 two sells of the last item through two servers: exactly one ok","ok":true,"rounds":100,"exactlyOne":100}
+{"check":"P-14 bounds hold under 8 writers and a leader kill (n1): 100 ok, 300 refused, 0 left","ok":true,"oks":100,"refused":300,"left":0,"checkAndWriteRetries":454,"ms":7116}
+{"check":"P-14 cost of judging at the client (rough): 200 decrements of one row","ok":true,"oneClient100":{"ms":415,"publishes":100},"eightClients200":{"ms":1278,"publishes":305,"retries":105,"wastedShare":0.34}}
+{"check":"P-14 a refused conditional write says why and never shows up","ok":true,"refusal":{"ok":false,"why":"version"}}
+{"check":"gap: P-14 a condition over more than one row (a partition of several rows)","ok":false,"why":"Nats-Expected-Last-Subject-Sequence checks one subject; 2.10 has no check over a subject set, so a partition must be one row, or the whole stream (Nats-Expected-Last-Sequence), which any other write breaks"}

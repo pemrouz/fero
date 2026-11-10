@@ -1,0 +1,9 @@
+[31513] 2026/11/10 03:27:01.052329 [INF] Server is ready
+[31513] 2026/11/10 03:27:01.492316 [INF] JetStream cluster new metadata leader: n1/e44
+[31533] 2026/11/10 03:27:01.093789 [INF] Server is ready
+[31533] 2026/11/10 03:27:01.492766 [INF] JetStream cluster new metadata leader: n1/e44
+nats-server: v2.10.22
+v22.22.0
+  "version": "2.29.3",
+    "version": "deno run -A bin/update-transport-version.ts && git add src/node_transport.ts",
+63fea66

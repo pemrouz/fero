@@ -1,0 +1,7 @@
+{
+ "name": "e44-npm",
+ "private": true,
+ "dependencies": {
+  "nats": "2.29.3"
+ }
+}

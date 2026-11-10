@@ -1,0 +1,7 @@
+{"loadavg":"7.84 9.57 10.42 10/227 31697","check":"p01"}
+{"check":"P-01 every client folds to the same rows, and a new client too","ok":true,"rows":50}
+{"check":"P-01 no acknowledged write lost across a leader kill (n2)","ok":true,"writes":900,"duplicatesStoppedByMsgId":0}
+{"check":"P-01 read your writes","ok":true,"checked":900}
+{"check":"P-01 others' changes arrive live","ok":true,"commitsSeenByClientA":900}
+{"check":"P-01 write latency through BUY (rough, box shared; one fsync per message on 3 servers)","ok":true,"p50ms":4.04,"p99ms":21.21,"maxMs":44248.3}
+{"check":"P-01 a held-row read is a local read (no round trip)","ok":true,"nsPerReadThroughSnapshot":8031,"nsPerReadThroughHandle":81}
