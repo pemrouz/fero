@@ -1,0 +1,4 @@
+# subscribe: the bounds that do not finish, option fixed, each stopped at 3,000,000 states, 2026-11-10T01:22:00Z, Python 3.13.17, 4 vCPU, load 3.53 3.13 2.77
+fixed mvrl-state: 3,000,001 states, 230.1s: all hold (STOPPED AT THE STATE LIMIT)
+fixed all-state: 3,000,001 states, 230.5s: all hold (STOPPED AT THE STATE LIMIT)
+fixed all-log: 3,000,002 states, 317.9s: all hold (STOPPED AT THE STATE LIMIT)

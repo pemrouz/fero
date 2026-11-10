@@ -1,0 +1,3228 @@
+{
+ "bounds": [
+  "fo-log",
+  "fo-state",
+  "mv-log",
+  "mv-state",
+  "rl-log",
+  "rl-state"
+ ],
+ "verify": [
+  "fo2-state",
+  "fo2-log",
+  "mvrl-log"
+ ],
+ "pinned": [
+  "bopen.phase",
+  "rec.held",
+  "diff.held",
+  "open.held"
+ ],
+ "base": {
+  "fo-log": {
+   "states": 5467,
+   "secs": 0.25,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5467,
+    16882,
+    12120907668015851737
+   ],
+   "judged": {
+    "P5": [
+     5467,
+     0
+    ]
+   }
+  },
+  "fo-state": {
+   "states": 8081,
+   "secs": 0.46,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    8081,
+    26786,
+    5077825415002948116
+   ],
+   "judged": {
+    "P5": [
+     8081,
+     0
+    ]
+   }
+  },
+  "mv-log": {
+   "states": 18646,
+   "secs": 0.94,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    18646,
+    66116,
+    13472294831413359598
+   ],
+   "judged": {
+    "P5": [
+     18646,
+     0
+    ]
+   }
+  },
+  "mv-state": {
+   "states": 24989,
+   "secs": 1.47,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    24989,
+    91038,
+    3750003218914939384
+   ],
+   "judged": {
+    "P5": [
+     24989,
+     0
+    ]
+   }
+  },
+  "rl-log": {
+   "states": 54404,
+   "secs": 3.66,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    54404,
+    211065,
+    1052121013184045222
+   ],
+   "judged": {
+    "P5": [
+     54404,
+     0
+    ]
+   }
+  },
+  "rl-state": {
+   "states": 390164,
+   "secs": 35.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    390164,
+    1672795,
+    17921462911028879869
+   ],
+   "judged": {
+    "P5": [
+     390164,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "snap.req",
+   "dropped"
+  ],
+  [
+   "snap.holds",
+   "dropped"
+  ],
+  [
+   "diff.req",
+   "dropped"
+  ],
+  [
+   "diff.holds",
+   "dropped"
+  ],
+  [
+   "diff.send",
+   "dropped"
+  ],
+  [
+   "open.req",
+   "dropped"
+  ],
+  [
+   "open.loaded",
+   "dropped"
+  ],
+  [
+   "open.holds",
+   "dropped"
+  ],
+  [
+   "rec.on",
+   "dropped"
+  ],
+  [
+   "rec.holds",
+   "dropped"
+  ],
+  [
+   "moved.notholds",
+   "dropped"
+  ],
+  [
+   "notready.unready",
+   "dropped"
+  ],
+  [
+   "expire.on",
+   "dropped"
+  ],
+  [
+   "expire.loaded",
+   "dropped"
+  ],
+  [
+   "gotsnap.loaded",
+   "dropped"
+  ],
+  [
+   "gotmoved.is",
+   "dropped"
+  ],
+  [
+   "gotretry.is",
+   "dropped"
+  ],
+  [
+   "gotend.is",
+   "dropped"
+  ],
+  [
+   "gotexp.dead",
+   "dropped"
+  ],
+  [
+   "gotexp.leave",
+   "dropped"
+  ],
+  [
+   "gotexp.credit",
+   "dropped"
+  ],
+  [
+   "connect.alive",
+   "dropped"
+  ],
+  [
+   "bopen.segs",
+   "dropped"
+  ],
+  [
+   "snap.send",
+   "dropped in the final pass"
+  ],
+  [
+   "diff.loaded",
+   "dropped in the final pass"
+  ],
+  [
+   "diff.behind",
+   "dropped in the final pass"
+  ],
+  [
+   "open.on",
+   "dropped in the final pass"
+  ],
+  [
+   "moved.send",
+   "dropped in the final pass"
+  ],
+  [
+   "expire.lost",
+   "dropped in the final pass"
+  ],
+  [
+   "expire.send",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.add",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.del",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.cursor",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotmoved.leave",
+   "dropped in the final pass"
+  ],
+  [
+   "gotmoved.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotend.leave",
+   "dropped in the final pass"
+  ],
+  [
+   "gotend.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotexp.is",
+   "dropped in the final pass"
+  ],
+  [
+   "snap.loaded",
+   "dropped in the final pass"
+  ],
+  [
+   "snap.cursor",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.clear",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.rows",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.cursor",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.is",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.is",
+   "dropped in the final pass"
+  ],
+  [
+   "snapshot",
+   "group put back: snap.req, snap.loaded, snap.holds, snap.cursor, snap.send, gotsnap.is, gotsnap.clear, gotsnap.rows, gotsnap.cursor, gotsnap.loaded, gotsnap.credit"
+  ],
+  [
+   "expired",
+   "group put back: expire.on, expire.loaded, expire.lost, expire.send, gotexp.is, gotexp.dead, gotexp.leave, gotexp.credit"
+  ],
+  [
+   "snap.req",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "snap.holds",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "expire.on",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "expire.loaded",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "gotsnap.loaded",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "gotsnap.credit",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "gotexp.leave",
+   "dropped in the final pass on the sweep and verify bounds"
+  ],
+  [
+   "gotexp.credit",
+   "dropped in the final pass on the sweep and verify bounds"
+  ]
+ ],
+ "removed": [
+  "diff.req",
+  "diff.holds",
+  "diff.send",
+  "open.req",
+  "open.loaded",
+  "open.holds",
+  "rec.on",
+  "rec.holds",
+  "moved.notholds",
+  "notready.unready",
+  "gotmoved.is",
+  "gotretry.is",
+  "gotend.is",
+  "connect.alive",
+  "bopen.segs",
+  "diff.loaded",
+  "diff.behind",
+  "open.on",
+  "moved.send",
+  "gotdiff.add",
+  "gotdiff.del",
+  "gotdiff.cursor",
+  "gotdiff.credit",
+  "gotmoved.leave",
+  "gotmoved.credit",
+  "gotend.leave",
+  "gotend.credit",
+  "gotdiff.is",
+  "snap.req",
+  "snap.holds",
+  "expire.on",
+  "expire.loaded",
+  "gotsnap.loaded",
+  "gotsnap.credit",
+  "gotexp.leave",
+  "gotexp.credit"
+ ],
+ "put_back": [
+  [
+   "group snapshot: snap.req, snap.loaded, snap.holds, snap.cursor, snap.send, gotsnap.is, gotsnap.clear, gotsnap.rows, gotsnap.cursor, gotsnap.loaded, gotsnap.credit",
+   "put back as a group: without it the smallest sweep model breaks P5 on fo2-state in 4 steps"
+  ],
+  [
+   "group expired: expire.on, expire.loaded, expire.lost, expire.send, gotexp.is, gotexp.dead, gotexp.leave, gotexp.credit",
+   "put back as a group: without it the smallest sweep model breaks P5 on fo2-state in 4 steps"
+  ]
+ ],
+ "sweep_removed": [
+  "snap.req",
+  "snap.holds",
+  "diff.req",
+  "diff.holds",
+  "diff.send",
+  "open.req",
+  "open.loaded",
+  "open.holds",
+  "rec.on",
+  "rec.holds",
+  "moved.notholds",
+  "notready.unready",
+  "expire.on",
+  "expire.loaded",
+  "gotsnap.loaded",
+  "gotmoved.is",
+  "gotretry.is",
+  "gotend.is",
+  "gotexp.dead",
+  "gotexp.leave",
+  "gotexp.credit",
+  "connect.alive",
+  "bopen.segs",
+  "snap.send",
+  "diff.loaded",
+  "diff.behind",
+  "open.on",
+  "moved.send",
+  "expire.lost",
+  "expire.send",
+  "gotsnap.credit",
+  "gotdiff.add",
+  "gotdiff.del",
+  "gotdiff.cursor",
+  "gotdiff.credit",
+  "gotmoved.leave",
+  "gotmoved.credit",
+  "gotend.leave",
+  "gotend.credit",
+  "gotexp.is",
+  "snap.loaded",
+  "snap.cursor",
+  "gotsnap.clear",
+  "gotsnap.rows",
+  "gotsnap.cursor",
+  "gotdiff.is",
+  "gotsnap.is"
+ ],
+ "minimal": {
+  "fo-log": {
+   "states": 6222,
+   "secs": 0.32,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    6222,
+    22817,
+    8439884586299583576
+   ],
+   "judged": {
+    "P5": [
+     6222,
+     0
+    ]
+   }
+  },
+  "fo-state": {
+   "states": 8247,
+   "secs": 0.46,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    8247,
+    31065,
+    17612635028385456084
+   ],
+   "judged": {
+    "P5": [
+     8247,
+     0
+    ]
+   }
+  },
+  "mv-log": {
+   "states": 15557,
+   "secs": 0.89,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    15557,
+    60536,
+    17083372195236374917
+   ],
+   "judged": {
+    "P5": [
+     15557,
+     0
+    ]
+   }
+  },
+  "mv-state": {
+   "states": 21545,
+   "secs": 1.3,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    21545,
+    89154,
+    12473147229150245688
+   ],
+   "judged": {
+    "P5": [
+     21545,
+     0
+    ]
+   }
+  },
+  "rl-log": {
+   "states": 112276,
+   "secs": 8.44,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    112276,
+    576985,
+    13526817062544266539
+   ],
+   "judged": {
+    "P5": [
+     112276,
+     0
+    ]
+   }
+  },
+  "rl-state": {
+   "states": 190246,
+   "secs": 15.51,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    190246,
+    1015727,
+    1840271025184856454
+   ],
+   "judged": {
+    "P5": [
+     190246,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "fo2-state": {
+   "states": 90711,
+   "secs": 5.87,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    90711,
+    418457,
+    14194873884276248596
+   ],
+   "judged": {
+    "P5": [
+     90711,
+     0
+    ]
+   }
+  },
+  "fo2-log": {
+   "states": 68172,
+   "secs": 4.08,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    68172,
+    297897,
+    11322429496905026967
+   ],
+   "judged": {
+    "P5": [
+     68172,
+     0
+    ]
+   }
+  },
+  "mvrl-log": {
+   "states": 871859,
+   "secs": 73.71,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    871859,
+    4999615,
+    120641865711901874
+   ],
+   "judged": {
+    "P5": [
+     871859,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "snap.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "snap.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a replica answers only once its snapshot has loaded; a relay only once its upstream snapshot has landed",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P3",
+    2,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "id": "snap.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a shard serves a slot only while it holds it open",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "snap.cursor",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "never before its fold has reached the subscriber's cursor",
+   "cmp": ">=",
+   "alone": [
+    "fo-state",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "drop",
+     "cl"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "snap.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "a snapshot of exactly the slot at the fold",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "id": "diff.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "diff.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a replica answers only once its snapshot has loaded; a relay only once its upstream snapshot has landed",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P3",
+    6,
+    [
+     "P3"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "diff.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a shard serves a slot only while it holds it open",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "diff.behind",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "fo-state",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "diff.held",
+   "kind": "guard",
+   "role": "serve",
+   "note": "a diff from the cursor needs the records after it; else a snapshot replaces",
+   "cmp": "<=",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "diff.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "deltas since the cursor, conflated per row",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "open.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "open.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a replica answers only once its snapshot has loaded; a relay only once its upstream snapshot has landed",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "open.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a shard serves a slot only while it holds it open",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "open.held",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "it holds the record after the cursor",
+   "cmp": "<=",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "open.on",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "rec.on",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "rec.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a replica answers only once its snapshot has loaded; a relay only once its upstream snapshot has landed",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P3",
+    7,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P3",
+    6,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA"
+    ],
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "rec.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a shard serves a slot only while it holds it open",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "rec.committed",
+   "kind": "guard",
+   "role": "serve",
+   "note": "only up to its fold, which holds committed records only",
+   "cmp": "<",
+   "alone": [
+    "fo-log",
+    "P1",
+    4,
+    [
+     "P1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "rec.held",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": "<=",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "rec.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "the next record, carrying its slot sequence",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "moved.notholds",
+   "kind": "guard",
+   "role": "answer",
+   "note": "A answers moved(B) once its fence commits, and ends what it streamed",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "moved.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv-log",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "notready.unready",
+   "kind": "guard",
+   "role": "answer",
+   "note": "an unloaded replica answers moved, naming a ready one; B answers retry until it opens",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "notready.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "id": "expire.on",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "expire.loaded",
+   "kind": "guard",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "expire.lost",
+   "kind": "guard",
+   "role": "answer",
+   "note": "it no longer holds the record after the cursor (a reload, or a relay that started later)",
+   "cmp": ">",
+   "alone": [
+    "fo-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "expire",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotexp",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "expire.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "draft: a replica that lacks the record ends log subscriptions with expired; fixed: with END, so the reader goes elsewhere, and only the holding group's leader, whose log is the group's retention, says expired",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "notready",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.clear",
+   "kind": "update",
+   "role": "replace",
+   "note": "a snapshot replaces the whole view",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.rows",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.loaded",
+   "kind": "update",
+   "role": "ready",
+   "note": "a relay is loaded once its snapshot landed",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotsnap.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotdiff.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotdiff.add",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotdiff.del",
+   "kind": "update",
+   "role": "replace",
+   "note": "a conflated diff carries removals",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotdiff.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotdiff.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-state",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotrec.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotrec.apply",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P1",
+    7,
+    [
+     "P1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotrec.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P1",
+    7,
+    [
+     "P1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotrec.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P1",
+    8,
+    [
+     "P1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P1",
+    7,
+    [
+     "P1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotmoved.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotmoved.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "resubscribe elsewhere with the cursor",
+   "cmp": null,
+   "alone": [
+    "mv-log",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotmoved.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv-log",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotretry.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotretry.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "try again, here or elsewhere, with the cursor",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "id": "gotretry.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "id": "gotend.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotend.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotend.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotexp.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "notready",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotexp",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "gotexp.dead",
+   "kind": "update",
+   "role": "answer",
+   "note": "the reader throws 'expired' to the app",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-log",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "id": "gotexp.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gotexp.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "connect.alive",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "connect.link",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "bopen.phase",
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv-log",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "bopen.fold",
+   "kind": "update",
+   "role": "carry",
+   "note": "B starts from A's rows at N",
+   "cmp": null,
+   "alone": [
+    "mv-log",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "bopen.segs",
+   "kind": "update",
+   "role": "carry",
+   "note": "... and the names of A's segments below N, so it can serve log readers from before N",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "resolve.committed",
+   "kind": "guard",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.seen",
+   "kind": "guard",
+   "role": "write",
+   "note": "a write resolves once its writer's subscription has passed its position",
+   "cmp": ">=",
+   "alone": [
+    "fo-log",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.res",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2-state",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": []
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "snap.loaded",
+   "caught": [
+    "fo2-state",
+    "P3",
+    2,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "snap.cursor",
+   "caught": [
+    "fo2-state",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "drop",
+     "cl"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "snap.send",
+   "caught": [
+    "fo2-state",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "rec.loaded",
+   "caught": [
+    "fo2-state",
+    "P3",
+    6,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA"
+    ],
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 1))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "rec.committed",
+   "caught": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "rec.send",
+   "caught": [
+    "fo2-log",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "notready.send",
+   "caught": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.lost",
+   "caught": [
+    "fo2-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "expire",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotexp",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.send",
+   "caught": [
+    "fo2-log",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.is",
+   "caught": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "notready",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.clear",
+   "caught": [
+    "fo2-state",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.rows",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.cursor",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotrec.is",
+   "caught": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotrec.apply",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotrec.cursor",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotrec.credit",
+   "caught": [
+    "fo2-log",
+    "P1",
+    7,
+    [
+     "P1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.leave",
+   "caught": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.credit",
+   "caught": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 2))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotexp.is",
+   "caught": [
+    "fo2-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "notready",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotexp",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotexp.dead",
+   "caught": [
+    "fo2-log",
+    "P5",
+    4,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "connect.link",
+   "caught": [
+    "fo2-state",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "bopen.fold",
+   "caught": [
+    "fo2-state",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.committed",
+   "caught": [
+    "fo2-state",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo2-state",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.res",
+   "caught": [
+    "fo2-state",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "snap.cursor",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "flip",
+   "rule": "rec.committed",
+   "caught": [
+    "fo2-state",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "rec",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotrec",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "expire.lost",
+   "caught": [
+    "fo2-log",
+    "P7",
+    3,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "expire",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotexp",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo2-state",
+    "P5",
+    6,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: clear <-> rows",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: clear <-> cursor",
+   "caught": [
+    "fo2-state",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "snap",
+     "(('who', 'cl'), ('x', 0))"
+    ],
+    [
+     "gotsnap",
+     "(('who', 'cl'), ('x', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: rows <-> cursor",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "gotrec: apply <-> cursor",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "gotrec: apply <-> credit",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "gotrec: cursor <-> credit",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "gotretry: leave <-> credit",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "mutants_note": "verify bounds first; equivalence judged on the verify bounds",
+ "option": "fixed",
+ "secs": 0
+}

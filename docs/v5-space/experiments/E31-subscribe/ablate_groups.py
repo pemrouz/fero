@@ -90,8 +90,10 @@ def main():
         for name, rules in groups:
             rs = [r for r in rules if r in removed]
             removed = [r for r in removed if r not in rs]
-            back.append([name, rs, f'put back as a group: without it the smallest sweep model breaks '
-                                   f'{ff[1]} on {ff[0]} in {ff[2]} steps'])
+            # a pair, as the engine writes put_back (report.py reads pairs)
+            back.append([f'group {name}: {", ".join(rs)}',
+                         f'put back as a group: without it the smallest sweep model breaks '
+                         f'{ff[1]} on {ff[0]} in {ff[2]} steps'])
             greedy.append([name, 'group put back: ' + ', '.join(rs)])
         ff2 = first_fail(ab.per(Mutation(drop=removed), vnames, True))
         if ff2:
