@@ -30,9 +30,9 @@ Then a seeded simulation writes list-append histories with concurrent readers, a
 
 **The world (not counted).**
 - Data partitions p and q (and r in one bound), each in its own group, so a unit's steps land in up to three groups. `#locks` and `#sagas` share one more group, M. Every group is an abstract Raft group with one writer: a write is judged and applied at once, and the answer reaches the caller in the same step. E-14 and E-15 check Raft and moves; this model asks what the saga library needs on top.
-- A unit's step i appends the unit's id to the list at its partition (Elle's list-append, the form E-22's P-15 workload writes). An append is "push if absent", so it is idempotent, and its undo removes the id. A re-run of a step that is applied answers its first outcome (dedup by attempt id). A step's condition may fail (budget). The writer judges it against the data when the write arrives, and the data can change between attempts (a budget is topped up), so a step refused for one holder may pass for another holder later, or be refused again.
+- A unit's step i appends the unit's id to the list at its partition (Elle's list-append, the form E-22's P-15 workload writes). An append is "push if absent", so it is idempotent, and its undo removes the id. A re-run of a step that is applied answers its first outcome (dedup by attempt id). A step's condition may fail (budget). The writer judges it against the data when the write arrives. A refused step is refused again until its data changes (a **top-up**: a budget is topped up); after a top-up it may pass, for any holder, a paused one included. A re-run of a step that is applied answers "applied", never a refusal.
 - Each unit has an original holder (`a`, which never restarts) and a later holder (`b`, the app calling `saga(steps, { id })` again; it restarts after a crash).
-- **Faults** (budgets): a crash at any point; a lease that lapses while its holder is alive (the paused holder, who acts later with its old tokens); a step whose condition fails. A crashed or finished holder's lease lapses with time. In the options that follow `#locks`, each writer's view of `#locks` lags by any amount (a calm step brings it up to date).
+- **Faults** (budgets): a crash at any point; a lease that lapses while its holder is alive (the paused holder, who acts later with its old tokens); a step whose condition fails; a top-up of a refused step's data. A crashed or finished holder's lease lapses with time. In the options that follow `#locks`, each writer's view of `#locks` lags by any amount (a calm step brings it up to date).
 
 **The saga program (counted, DEV-10).** Claim the unit's locks in key order (a claim succeeds if the lock row is absent or lapsed; the new version is the token). Read `#sagas`: begin (write the intent `run` if absent), continue a unit found unfinished in its recorded direction, or skip a unit already ended. Run each step under its partition lock's fence; on a failed condition record `undo` and undo. Record `done` or `undone`. Every write to M carries the holder's tokens and M checks them against the lock rows. A holder that finds its lock has a newer version gives up, releases what it still holds, and retries.
 
@@ -52,19 +52,19 @@ Then a seeded simulation writes list-append histories with concurrent readers, a
 |---|---|
 | A1 | All or nothing: a unit recorded `done` has its id in every list of its steps; one recorded `undone` in none. Checked in every state, so a paused holder's late write after the end is caught. |
 | A2 | No write cycle between units (Elle's G0): two units in the same two lists are in the same order in both. |
-| L1 | AG EF: every unit can end `done` or `undone` once faults stop. It asks every unit to end, not only those begun, so a model that never begins a unit fails. |
+| L1 | AG EF: every unit can end `done` or `undone` once faults stop. It asks every unit to end, not only those begun, so a model that never begins a unit fails. A top-up is a fault, so once faults stop a refused step stays refused: a unit with a refused step can end only by its undo (a holder that kept retrying the step would never end). |
 
 **Bounds.**
 
-| Bound | Units | Holders | Crashes | Paused leases | Failed conditions |
-|---|---|---|---|---|---|
-| `one` | 1 on p, q | a1, b1 | 1 | 1 | 1 |
-| `two` | 1 and 2, both on p, q | a1, a2, b1 | 0 | 1 | 0 |
-| `sub` | 1 on p, q; 2 on q | a1, a2, b1 | 0 | 1 | 1 |
-| `three` | 1 on p, q, r | a1, b1 | 1 | 2 | 1 |
-| `one2` (verify) | 1 on p, q | a1, b1 | 2 | 2 | 1 |
-| `two-f` (verify) | 1 and 2 on p, q | a1, a2, b1, b2 | 1 | 1 | 1 |
-| `sub-f` (verify) | 1 on p, q; 2 on q | a1, a2, b1, b2 | 1 | 1 | 1 |
+| Bound | Units | Holders | Crashes | Paused leases | Failed conditions | Top-ups |
+|---|---|---|---|---|---|---|
+| `one` | 1 on p, q | a1, b1 | 1 | 1 | 1 | 1 |
+| `two` | 1 and 2, both on p, q | a1, a2, b1 | 0 | 1 | 0 | 0 |
+| `sub` | 1 on p, q; 2 on q | a1, a2, b1 | 0 | 1 | 1 | 1 |
+| `three` | 1 on p, q, r | a1, b1 | 1 | 2 | 1 | 1 |
+| `one2` (verify) | 1 on p, q | a1, b1 | 2 | 2 | 1 | 1 |
+| `two-f` (verify) | 1 and 2 on p, q | a1, a2, b1, b2 | 1 | 1 | 1 | 1 |
+| `sub-f` (verify) | 1 on p, q; 2 on q | a1, a2, b1, b2 | 1 | 1 | 1 | 1 |
 
 ### 2. RAMP-Fast ([models/ramp.py](models/ramp.py))
 
@@ -98,28 +98,33 @@ A seeded random simulation, built from the rules the models check: units over 2 
 
 | Option | one | two | sub | three | one2 | two-f | sub-f |
 |---|---|---|---|---|---|---|---|
-| `draft` | A1, 11 steps | A2, 17 steps | A1, 11 steps | A1, 13 steps | A1, 11 steps | A1, 11 steps | A1, 9 steps |
-| `owned` | A1, 11 steps | holds | A1, 10 steps | A1, 13 steps | A1, 11 steps | A1, 11 steps | A1, 9 steps |
+| `draft` | A1, 12 steps | A2, 17 steps | A1, 12 steps | A1, 14 steps | A1, 12 steps | A1, 12 steps | A1, 10 steps |
+| `owned` | A1, 12 steps | holds | A1, 11 steps | A1, 14 steps | A1, 12 steps | A1, 12 steps | A1, 10 steps |
 | `bump` | holds | holds | holds | holds | holds | holds | holds |
 | `fullundo` | holds | holds | holds | holds | holds | holds | holds |
 | `raise` | holds | holds | holds | holds | holds | holds | holds |
-| states (`fullundo`) | 9,310 | 1,858 | 6,831 | 283,698 | 256,407 | 1,582,962 | 801,204 |
-| seconds (`fullundo`) | 0.5 | 0.1 | 0.3 | 26.2 | 20.4 | 155.3 | 94.3 |
+| states (`fullundo`) | 13,373 | 1,858 | 9,916 | 391,613 | 354,098 | 2,205,596 | 1,153,221 |
+| seconds (`fullundo`) | 0.7 | 0.1 | 0.5 | 23.8 | 19.5 | 152.6 | 78.8 |
 
-`bump` explores 10,735 / 2,628 / 7,699 / 285,392 / 279,680 / 2,100,092 / 1,101,025 states on the same bounds, `raise` 7,538 / 1,858 / 5,935 / 216,043 / 206,918 / 1,348,312 / 700,411. Every run that holds is complete (every reachable state explored); a run that breaks stops at its first, shortest counterexample.
+`bump` explores 14,529 / 2,628 / 11,046 / 368,929 / 370,595 / 2,902,536 / 1,572,041 states on the same bounds, `raise` 11,490 / 1,858 / 9,126 / 327,109 / 307,736 / 2,042,268 / 1,045,794. Every run that holds is complete (every reachable state explored); a run that breaks stops at its first, shortest counterexample. All of `fullundo`'s runs together take under 5 minutes on one core.
 
-**A note on the model, and when `owned` would be enough.** A step's condition is judged by the partition's writer against the data when the write arrives. That data can change between two attempts at the same step (a budget is topped up), so the model lets a step refused for one holder pass for another later. An earlier version of the model made a refusal final (refused again for every later holder). That rule forbids exactly the paused holder's late step, so it hid the A1 trace below: in that version `draft` broke only A2 and `owned` held on `one`, `two` and `sub` ([results/design-saga-sticky.txt](results/design-saga-sticky.txt), a partial run). So `owned` is enough only for apps whose step conditions never change their answer, which `saga` cannot know. The model also says that a re-run of a step that is applied answers "applied" (dedup by attempt id, the saga id and the step), never a refusal.
+**A note on the model, and when `owned` would be enough.** How a refused step behaves later decides what the checker can see, and two earlier versions of this model got it wrong in opposite ways:
+- **A refusal final for good** (refused again for every later holder, whatever happens to the data). That forbids exactly the paused holder's late step, so it hides the A1 trace below: in that version `draft` broke only A2 and `owned` held on `one`, `two` and `sub` ([results/design-saga-sticky.txt](results/design-saga-sticky.txt), a partial run).
+- **A refused step free to pass at any time.** Then liveness can be met by retrying a refused step until it passes, so nothing forces an undo: that version's ablation dropped every lock, fence and undo rule and kept 13 rules of a saga that never undoes (model-checked here, output kept in `$SP/e24/stale2/`, not in the repo).
+
+The model now makes the change of data a fault with a budget (a **top-up**): the checker sees the paused holder's late step after a top-up, and liveness must hold when a refused step stays refused. So `owned` is enough only for apps whose step conditions never change their answer, which `saga` cannot know.
 
 **The draft's write cycle (A2, G0), 17 steps: E-22's finding, now exhaustive.** Holder a1 claims p and q and begins unit 1, then pauses (its lease lapses). Holder a2 claims both locks (tokens 2) and begins unit 2; the draft does not look at unit 1. a1, still paused in its own mind, appends 1 at p with token 1: p's writer has not yet followed `#locks` to version 2 and has seen no token for p, so it accepts. a2 appends 2 at p and at q and ends. Later holder b1 (tokens 3) finds unit 1 unfinished and finishes it: 1 goes to q. Now p is [1, 2] and q is [2, 1]: unit 1 is before unit 2 on p and after it on q.
 
-**The paused holder's write after an undo (A1), 11 steps: it breaks both `draft` and `owned`.**
+**The paused holder's write after an undo (A1), 12 steps: it breaks both `draft` and `owned`.**
 1. a1 claims p and q (tokens 1), and pauses; its lease lapses.
 2. b1 (the app retrying the same saga id) claims both (tokens 2) and begins the unit.
 3. a1 wakes, reads `#sagas`, finds the unit running, and continues it.
 4. b1's step at p is refused by its condition. A refused write commits nothing, so p's writer never sees token 2.
-5. a1 appends at p with token 1. p's fence is 0 and p's writer has not yet followed `#locks` to version 2, so it accepts.
-6. b1 records `undo`; its failed step was the first, so it has nothing to undo, and it records `undone`.
-7. The unit is `undone`, yet its id is in p's list.
+5. p's data changes (a top-up), so the same step would now pass.
+6. a1 appends at p with token 1. p's fence is 0 and p's writer has not yet followed `#locks` to version 2, so it accepts.
+7. b1 records `undo`; its failed step was the first, so it has nothing to undo, and it records `undone`.
+8. The unit is `undone`, yet its id is in p's list.
 
 The draft's answer to this is "every shard's writer follows `#locks`" (DESIGN-V5 5.3), with the claim that "the holder's lease margin (a round trip plus `skew.max`) covers" the follow lag. In this model the lag is any length, as it is for a paused process: a pause can outlast any margin, and a write can sit in a socket buffer. So **following `#locks` is not enough** without a bound on message delay. It is also **not needed**: `bump`, `fullundo` and `raise` hold on every bound with no following at all. All three make the same thing true: **whoever ends a unit has written every one of its partitions with its own token**, so a paused holder's later write is refused by that partition's own fence table.
 - `fullundo` gets it free on the happy path: a forward run writes every partition anyway, and an undo now undoes every step, applied or not.
@@ -140,7 +145,17 @@ States (`ramp`): 3,344 / 5,114 / 845 / 1,008 / 294,450 / 20,730 on `two` to `gc-
 - **Read atomicity (RA), at most two rounds (R2), monotonic reads (MONO) and KEEP hold** on every bound, with a client crash between prepares and markers, a lagging follower, garbage collection and a slot move (register semantics: a version is its unit's value; see 3 for operations).
 - **A crashed client leaves its unit half committed, and a reader can see it.** `noserve` fails L in 4 steps and V in 9: unit 2 prepares at p and q, commits at p, and its client crashes. A reader sees 2 at p and fetches q's pending version 2 in round 2, as RAMP says. But q's lastCommit stays at 0 forever, so the same process's next read of q (which must not go back, fero's read rule) waits forever (L), and any other reader of q alone sees the older value (V: what one reader saw is undone for the next). RAMP's paper leaves completing a failed client's commit to recovery; here, **a round-2 fetch of a pending version commits it at the writer** (two updates: the marker and lastCommit), and every property holds.
 
-@@RAMPABL@@
+**DEV-10 for `ramp`** ([results/ramp-ablation.json](results/ramp-ablation.json), [results/summary.md](results/summary.md)): **17 rules needed** of 42 written (2 more are pinned world steps), and 17 of 17 non-equivalent mutants caught (4 swaps are equivalent). The smallest model holds on the verify bounds `fol-move` (207,132 states) and `gc-move` (9,752).
+
+| Group | Rules needed | Published or novel |
+|---|---|---|
+| RAMP-Fast's writer | `prepare.vers`, `prepare.ack`, `commit.allprep` (markers only after every prepare is acked), `commit.newer` (lastCommit only moves up), `commit.last` | published (Bailis et al. 2014, Algorithm 1) |
+| RAMP-Fast's reader | `r1.unread`, `r1.get`, `plan.all`, `plan.plan`, `r2.stage`, `r2.get`, `finish.stage`, `finish.complete` | published |
+| **serve** | `r2.last`: a round-2 fetch of a pending version raises lastCommit at the writer (completes a crashed client's commit) | **novel, 1 rule** (the paper leaves a failed client's commit to recovery) |
+| the slot move's copy | `move.pending` (carry pending versions), `move.last` (carry lastCommit) | 2 conditions on fero's own move (E-15's carried state): novel only if the move does not already copy every stored version |
+
+- Dropped, and why: garbage collection (`gc.*`) drops out because no property needs it to run; its two guards (keep the lastCommit version and every pending one) are needed whenever it runs, which the design check shows with GC on (counted by reasoning: **2 more rules**, published as RAMP's own GC rule). `r2.commit` (the marker) drops out: raising lastCommit alone is enough. `r1.mono` (fero's "never go back" read rule) drops out because `r2.last` already keeps a seen version from going back.
+- **So RAMP-Fast holds read atomicity in register semantics with 1 novel rule** (serve), plus the move's copy carrying pending versions and lastCommit. **For fero's operations it needs `rampv`'s vector** (section 3): at least 2 more rules (stamp each version with the newest unit per co-written sibling; repeat round 2 while one names a newer unit), one more novel mechanism, and no fixed bound on rounds. That count is reasoned from the simulation, not model-checked: the exhaustive model has register semantics only.
 
 ### 3. Elle (real Elle 0.2.8, [results/elle.md](results/elle.md), [results/elle-sim.txt](results/elle-sim.txt))
 
