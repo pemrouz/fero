@@ -1,0 +1,1309 @@
+{
+ "group": "F",
+ "by": "an attribution agent, from judging/F.settled.json (the why and why2 of each cell, and the referees' rulings)",
+ "parts": [
+  {
+   "req": "F-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4 (referee, from v4's own sim, sim/scale-probes.test.ts 'short lane (durable)', pinned red): a member writes row x and leaves; another removes x; tombstone GC and compaction drop the remove from the remover's lane while the old write stays the last entry of the leaver's lane; after a restart from its own disk the remover shows x again. So an acknowledged remove does not survive a restart. This is the LWW lane protocol (R lww: per-origin lanes, tombstone collection, merge by stamp); v4 takes no fix (AMENDMENTS 3)"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: JetStream with three file replicas and an fsync before each ack lost none of 900 writes through a kill -9 of the stream's leader (E-44). A power loss of every machine and a lost disk were not run"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: a commit is every member of the in-sync set under an outside controller (R isr, Q isr). This study never modelled or ran the in-sync set, its epochs or its recovery after a power loss"
+    },
+    {
+     "when": {
+      "Q": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: a commit is every member of the in-sync set under an outside controller (R isr, Q isr). This study never modelled or ran the in-sync set, its epochs or its recovery after a power loss"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: a commit is a write quorum of log nodes (Q maj-d(log nodes)), and a seal with a metadata compare-and-swap changes the set (R slog). SPACE counts 3 to 4 novel mechanisms there, and no experiment modelled them"
+    },
+    {
+     "when": {
+      "Q": [
+       "maj-d(log nodes)"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: a commit is a write quorum of log nodes (Q maj-d(log nodes)), and a seal with a metadata compare-and-swap changes the set (R slog). SPACE counts 3 to 4 novel mechanisms there, and no experiment modelled them"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: an acknowledged write is a finished conditional PUT (R obj, Q put), but the manifest compare-and-swap (C cent(manifest CAS)) and the writer lease that tie an answer to a PUT were only timed (E-28), never modelled"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: an acknowledged write is a finished conditional PUT (R obj, Q put), but the manifest compare-and-swap (C cent(manifest CAS)) and the writer lease that tie an answer to a PUT were only timed (E-28), never modelled"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: an acknowledged write is a finished conditional PUT (R obj, Q put), but the manifest compare-and-swap (C cent(manifest CAS)) and the writer lease that tie an answer to a PUT were only timed (E-28), never modelled"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD (referee): one bad entry is F-22's fault, not F-01's, and Raft's commit rule keeps a synced entry (E-14c, reasoned for raft-rs). But F-01 also needs the store to give back after a power cut what it synced: E-29's journal lost an acknowledged batch in 2 of 1,200 rounds through a recovery bug, though it synced before it answered. PD's store is an LSM (S lsm), and no experiment ran it (AMENDMENTS 2, S)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)"
+      ]
+     },
+     "v": "met",
+     "basis": "A persisted write is on disk at a majority of voters before the answer, which is Raft's own commit rule (R raft; RLOG's log group is Raft). TLC on etcd's spec lost no committed entry through crashes and a lost disk replaced under a new id (E-14c), nor with one bad entry under rejoin (E-37). A journal of L0's shape (S jrnl) lost 0 of 10,020 acknowledged batches in 2,640 LazyFS power cuts (E-29). It holds by construction; the phase-2 sweeps on the real kernel are owed"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a Raft row on a store other than E-29's journal of L0's shape (say S walg) was never power-cut here, and PD's referee holds F-01 open when the store was not run. Open until a LazyFS run on that store"
+   },
+   "why": "The judges name the commit path (R, with Q and C for the families whose commit is not a Raft majority) and the store (S: E-29's journal for the met rows, the untested LSM for PD). PD's referee rules Z out: one bad entry is F-22's ground, not F-01's."
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4: v4's own scoped sweep pins it (STATUS.md, KNOWN_UNSAFE, A2 seed 9). A forwarded write commits at its owner; the owner is cut off before the commit leaves it; the issuer retries and the new owner commits it again; after the heal both commits stand, since LWW merge keeps both (R lww). A write issued from a tap is also committed twice. D win is not the cause: DRAFT, LANE and SPLIT hold D win and are met"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "BUY, measured on JetStream (E-44): a retried attempt lands twice once the dedup window has passed, and an incr whose answer was lost was counted again (3 where 2 was right). The attempt id lives only in the row's last message, and fero cannot change the log"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR (referee): pid holds in E-20's model with A-22's two fixes (16 rules), but E-20's groups are abstract Raft. ISR's own leader change (in-sync set, leader epochs, a controller) was never modelled, so an attempt cannot be shown to land once across it"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): win holds in E-20's model, whose groups are Raft. SLOG changes writers by a seal and a metadata compare-and-swap, never modelled; a late append by the old writer is the case that matters"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ (referee): sess holds in E-20's model, whose groups are Raft. OBJ changes writers by a lease and a compare-and-swap on the manifest (C cent(manifest CAS)), which no experiment modelled (E-28 timed the PUT only)"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ (referee): the writer change by lease and compare-and-swap on the manifest was never modelled under E-20's scenarios"
+    },
+    {
+     "when": {
+      "D": [
+       "txn"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its dedup is transaction ids under two-phase commit (D txn, X 2pc; Percolator, published), but no experiment here modelled it: E-20 ran win, sess, pid and keys"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its dedup is transaction ids under two-phase commit (D txn, X 2pc; Percolator, published), but no experiment here modelled it: E-20 ran win, sess, pid and keys"
+    },
+    {
+     "when": {
+      "U": [
+       "ldr"
+      ]
+     },
+     "v": "open",
+     "basis": "SIDE (referee): E-20's rules hold for its writes, but it runs each call at its partition's leader (U ldr), and SPACE counts one novel rule there: calls in flight across a handover. F-02 names method re-runs, and no experiment modelled that rule"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "D": [
+       "sess",
+       "win",
+       "pid"
+      ]
+     },
+     "v": "met",
+     "basis": "Each dedup option held ONCE and REFUSED in every state of E-20's exhaustive model on Raft groups: lost answers, a failover or a move mid-retry, a restart, expiry, with forward.once under fwd (sess 13 rules, 14 under fwd; win 17 and 19; pid 16 with A-22). Porcupine and real Knossos pass once a refusal waits for its commit (A-04, E-22b), and srchi-slot marks keep derived outputs once past the horizon (A-05, E-30)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a dedup option or a writer change that E-20 did not model"
+   },
+   "why": "The judges hold the dedup option (D) shown on Raft groups and open it where the writer change under it was never modelled (R isr, slog, obj; C cent(manifest CAS)), where it is 2PC (D txn, X 2pc), or where calls run at the leader (U ldr). V4 and BUY fail on their own logs (R)."
+  },
+  {
+   "req": "F-03",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4 (referee, from v4's code): open genesis is multi-writer LWW by design (sim/monitors.ts exempts epoch 0); an owner commits alone, before any other member holds the write, whenever its own link table shows a majority (kernel/membership.ts gate); so no lease and no majority round orders an old owner's last commit before the new owner's first. More than one writer can commit to a partition at a time"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: a stream has one Raft leader, and two sells of the last item gave exactly one ok in 100 rounds of 100 (E-44). A cut-off minority and its refusal were not run, and fencing is by convention"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: one writer rests on leader epochs and an outside controller (the KIP composition). The in-sync set was not modelled or run under partitions"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: one writer per loglet rests on sealing a loglet and a metadata compare-and-swap. SPACE counts them as novel, and no experiment modelled them"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: one writer rests on a lease held by compare-and-swap on the store's manifest (R obj, C cent(manifest CAS)), and reads use a time lease that needs bounded clock drift (W lease any). Neither was modelled (E-28 timed the CAS only)"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: one writer rests on a lease held by compare-and-swap on the store's manifest (R obj, C cent(manifest CAS)), and reads use a time lease that needs bounded clock drift (W lease any). Neither was modelled (E-28 timed the CAS only)"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: one writer rests on a lease held by compare-and-swap on the store's manifest (R obj, C cent(manifest CAS)), and reads use a time lease that needs bounded clock drift (W lease any). Neither was modelled (E-28 timed the CAS only)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "P": [
+       "slot",
+       "slot+rule",
+       "fixN+rekey",
+       "fixN(lanes)",
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "met",
+     "basis": "One Raft leader per term commits and a minority cannot: TLC on etcd's spec keeps one leader per term with A-01's campaign guard (E-14, E-14c), and the TS port was linearizable in 26 of 26 Maelstrom runs under partitions (E-46). A move keeps one writing group per partition by its fence and open entries: the slot move in 7.5 million states with an unclean recovery (E-15), re-key, split and lanes on E-17's harness (E-17c), RLOG's writer epoch in E-16 (9 rules, all needed). A cut-off member refuses at once with a redirect (A-02, a rule)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a Raft row whose partitions map by an option whose move was not modelled (E-15 and E-17c cover slot, re-key, split and lanes)"
+   },
+   "why": "The judges name the writer's guard (R: a Raft leader per term, or the families whose writer change was never modelled, with OBJ's C and W) and the move's fence (P: E-15 and E-17c ran slot, split, re-key and lanes). C is not deciding: Raft rows with self, self+p, cent and cent-co are all met."
+  },
+  {
+   "req": "F-04",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4 (referee, from v4's sim, sim/scale-probes.test.ts 'zombie lane', pinned red): a member commits x = v2 as its links sever and is voted out; the others remove x and collect the tombstone; when the link heals they take the old member's older write and show v2 again. Readers saw a write that later disappeared, on both sides. This is the LWW lane merge (R lww)"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: four patterns passed their checks through a leader kill and four clients ended with the same 50 rows (E-44), but no reader history was checked by Porcupine, and no partition or power-loss run was made"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: a reader is safe only below the high watermark, which rests on leader epochs across a failover (R isr, Q isr; KIP-320). E-31 covers the protocol above a correct log and did not model the in-sync set's truncation on a leader change"
+    },
+    {
+     "when": {
+      "Q": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: a reader is safe only below the high watermark, which rests on leader epochs across a failover (R isr, Q isr; KIP-320). E-31 covers the protocol above a correct log and did not model the in-sync set's truncation on a leader change"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): E-31's model takes the committed log as given. SLOG's own log, a write quorum of log nodes (Q maj-d(log nodes)) changed by a seal and a metadata compare-and-swap (R slog), was never modelled, so a reader's view cannot be shown to be a prefix of it"
+    },
+    {
+     "when": {
+      "Q": [
+       "maj-d(log nodes)"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): E-31's model takes the committed log as given. SLOG's own log, a write quorum of log nodes (Q maj-d(log nodes)) changed by a seal and a metadata compare-and-swap (R slog), was never modelled, so a reader's view cannot be shown to be a prefix of it"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: state reads use a time lease at the writer (W lease any), which needs bounded clock drift and was never tested (G-25), and the commit-by-PUT path under a paused writer (R obj, Q put, the manifest CAS of C cent(manifest CAS)) was not modelled"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: state reads use a time lease at the writer (W lease any), which needs bounded clock drift and was never tested (G-25), and the commit-by-PUT path under a paused writer (R obj, Q put, the manifest CAS of C cent(manifest CAS)) was not modelled"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: state reads use a time lease at the writer (W lease any), which needs bounded clock drift and was never tested (G-25), and the commit-by-PUT path under a paused writer (R obj, Q put, the manifest CAS of C cent(manifest CAS)) was not modelled"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: reads by a leader's time lease need bounded clock drift, and no experiment tested them (G-25). PD's and OBJ's judges both name it"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: reads go by leader leases (W lease ridx) over multi-version state with MVCC timestamps (O hlc, the intents of X 2pc), as TiKV publishes. Nothing here modelled them, and a lease needs bounded clock drift (G-25)"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: reads go by leader leases (W lease ridx) over multi-version state with MVCC timestamps (O hlc, the intents of X 2pc), as TiKV publishes. Nothing here modelled them, and a lease needs bounded clock drift (G-25)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "W": [
+       "any ridx",
+       "ridx; any for logs",
+       "any"
+      ]
+     },
+     "v": "met",
+     "basis": "Readers are served committed records at a position. With A-06's END answer a subscriber's view stays a prefix of the committed log on ten bounds explored in full (a leader crash, a follower's reload, a dropped link, a slot move, a relay; up to 7.6 million states, E-31: W any). Reads passed Porcupine and real Knossos (E-22, E-22b), and ReadIndex and log reads on the TS port were linearizable in every Maelstrom run (E-46: W ridx). Judged for the persisted rung"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a read path that E-31 and E-46 did not cover"
+   },
+   "why": "The judges name the read path (W: E-31's any and E-46's ridx are shown, lease is not) and the log it reads (R, with Q and C for the families whose commit was never modelled; O hlc and X 2pc for PD's multi-version reads)."
+  },
+  {
+   "req": "F-05",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 1.08,
+     "basis": "BUY: three kills of the stream's leader on JetStream left writes waiting 5.2, 5.4 and 7.2 s, against 2.5 s (E-44, measured). The election timer is JetStream's own, and fero cannot change it"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 1.44,
+     "basis": "AMENDMENTS 1.3, F-05's handover clause: etcd's own leader transfer pauses its group 9.7 to 9.8 ms at the median and 24 to 31 ms at worst on this disk, against 10 ms (TS) and 2 ms (native); a port of the same Raft can only approach that (E-13; gap from 24.4 ms against 10 ms). Restated as 'C plus the longest normal gap between commits plus 5 ms' it is open: the port's handover was not timed, and failover at E = 2 s with 0.25 E jitter sums to 2.5 s with no margin (reasoned, not run; at E = 1 s one native failover took 1.42 s against 1.25 s)"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: a controller picks the new leader from the in-sync set after a session timeout, which SPACE names as a delay. Neither a failover nor a handover was timed for this family (E-09c ran Kafka for speed only)"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: a writer change is a seal plus a metadata compare-and-swap plus a new writer. No experiment timed a writer's crash or a planned change"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: a handover or a failover is at least one conditional PUT on the manifest (R obj, Q put, C cent(manifest CAS)) plus the lease wait: 2.7 ms p99 on MinIO here, about 30 ms typical on S3 Standard (cited in E-28), over the 10 ms handover bar on a real store; the lease-based failover was not timed. Both judges hold it open"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: a handover or a failover is at least one conditional PUT on the manifest (R obj, Q put, C cent(manifest CAS)) plus the lease wait: 2.7 ms p99 on MinIO here, about 30 ms typical on S3 Standard (cited in E-28), over the 10 ms handover bar on a real store; the lease-based failover was not timed. Both judges hold it open"
+    },
+    {
+     "when": {
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: a handover or a failover is at least one conditional PUT on the manifest (R obj, Q put, C cent(manifest CAS)) plus the lease wait: 2.7 ms p99 on MinIO here, about 30 ms typical on S3 Standard (cited in E-28), over the 10 ms handover bar on a real store; the lease-based failover was not timed. Both judges hold it open"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: there is no leader to fail over. DESIGN-V5 4.2 puts v4's eviction at about 4 s by default, over 2.5 s, but it is a setting (heartbeat.ms) and nothing in this study timed v4"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a writer change that no experiment timed"
+   },
+   "why": "The handover clause and its ceiling are Raft's own (etcd's transfer on this disk), so R decides; every row whose groups run Raft takes the same cell whatever its language (both judge texts, TS and native, give the same verdict). OBJ's judges also name its PUT commit and manifest CAS."
+  },
+  {
+   "req": "F-06",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "Open for all 20. Raft rows: the median clock (A-23) cost no failover in 60 runs and a kernel on a worker kept its heartbeat within 5 ms through main-thread pauses (E-21, E-07), but CheckQuorum every E/4 against pauses up to 1 s on kernel threads (K-28) and groups with fewer than three clocks (K-11) were not run. PD's T tso, ISR's and SLOG's controller sessions, OBJ's store lease, v4's main-loop GC pauses and JetStream's timers were not run with pauses or clock jumps either"
+   }
+  },
+  {
+   "req": "F-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4: STATUS.md, pinned in sim/leave-harness.ts (stopsOneByOne) and tests/stops.test.ts. Each clean leaver's dir holds the last view it saw, a view it is not in; the last view's only voter is the last to stop; so the first two back sit joining until that one returns, and no kernel rule can re-form them safely. This is v4's own membership by ballot, which comes with R lww (no other axis carries v4's membership)"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: JetStream's own Raft groups decide, and should return with any majority; E-44 killed one leader of three, but a full stop and a restart in every order were not run"
+    },
+    {
+     "when": {
+      "I": [
+       "port",
+       "port(meta)",
+       "raft-rs",
+       "raft-rs or etcd raft"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "gap": 0,
+     "basis": "Any group on Raft, data or metadata (I names a Raft core): from three voters up Raft elects once any majority is back (E-14b: no stuck state with a live majority, 5,165,341 states; E-14c with grow first). A-01 states one limit: while a group grows from two voters to three, for one message, a restart needs the old leader back (model-checked). Read as a two-voter group's limit it is open until v4's stopsOneByOne harness runs on a v5 kernel; read with no room for that window it fails (the alt). ISR and SLOG take the alt through their Raft metadata group, and their own restart orders (the last in-sync set, a loglet's write quorum) were not modelled"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: no group has voters; any process that reaches the store can take the writer lease by compare-and-swap, so restart order should not matter. The lease and the manifest were not modelled"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a row with no Raft group whose restart orders were not modelled"
+   },
+   "why": "The alt reading follows any Raft group, data or metadata: the ISR and SLOG judges say 'its metadata group is Raft and takes A-01's two-voter window (so the alt)'. I is the axis that says some group runs Raft. V4's failure is its own membership (R lww)."
+  },
+  {
+   "req": "F-08",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4: STATUS.md pins it red in v4's own tests. After tombstone GC and compaction a removed row comes back from a short lane; a write from an evicted member beats a newer remove after a heal; a fresh member's data: seed brings back a deleted seed row. All three are the LWW lane protocol: per-origin lanes, tombstone collection, merge by stamp (R lww)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Every other row folds one ordered log per partition, so a remove is an entry every copy folds and v4's lane bugs cannot arise (reasoned). But no experiment ran it: E-33 left erasure out of its restore model, snapshot layers against retention were never modelled, and PD's MVCC tombstones and JetStream's markers were not run either"
+   }
+  },
+  {
+   "req": "F-09",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "Every row fero builds can raise a health row and a stderr line, and E-29's pipeline shows two (the 80 % line, a full follower saying so). But no experiment tested a health row, and the evidence names waits that must speak: a member cut from its leader stalled its clients for 20 s on etcd (E-38c; A-02 refuses at once), healing waits while #meta has no leader (E-16), and the two-voter window (A-01). No test per failure kind exists"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: losses inside JetStream show as its own advisories, which fero would have to turn into health rows (not built); E-44 found one notice that can be missed: 'deliveries used up' is announced once, on a subject that is not stored"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a row with R lww that is not v4 as built. V4's own cell is an override (v4's print paths), so a new LWW row would owe its health lines like any other row"
+   },
+   "overrides": {
+    "V4": {
+     "v": "fails",
+     "gap": 0,
+     "basis": "The referee read v4's code: v4 prints a stderr line only for a door or contract refusal, a cut write loop and a fault in user code (api/index.ts); a member that turns read-only as minority or held only flips the writable row of cluster, and a first view that waits on a dead static host says nothing at all (kernel/node.ts). So a loss of writability can last with no line naming the cause and the fix. That is v4's code as built, which no axis tag expresses: a new row with v4's options would write its own health lines"
+    }
+   },
+   "why": "Every row is open but V4. The open cells rest on each family's own named waits (fero's kernel waits for the rows fero builds, JetStream's advisories for BUY), so R decides them; V4 fails on what its built code prints, not on an option, so it is an override."
+  },
+  {
+   "req": "F-10",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "depends_on": "restated",
+    "alt": "open",
+    "basis": "AMENDMENTS 1.3, F-10's line: the failed-fsync and directory-fsync clauses are untested for every row, because LazyFS cannot make a sync fail or lose a directory entry, and the line asks for no new wording, so both verdicts are open. The rest is shown for the Raft rows on a journal of L0's shape (E-29: 576 torn tails cut, 0 of 10,020 acknowledged batches lost; E-14b, E-37: a wiped disk never votes under its old id). Z crash rows (PD, ISR, OBJ, V4) rest on what F-22 judges, and are open too"
+   }
+  },
+  {
+   "req": "F-11",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ]
+     },
+     "v": "met",
+     "basis": "Two machines plus any third voter is a three-voter Raft group: either crash leaves a majority of two, and every acknowledged write is on two of three disks. On etcd's spec three voters with one crash break no invariant and have no stuck state (E-14b); etcd took writes again after a kill -9 of its leader (E-13); the port was linearizable on 3 nodes (E-46); RLOG's writer change holds in E-16. A small full server counts as the third voter, so no witness rule is needed (V not deciding). The two-voter health line is design, not a test"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "met",
+     "basis": "BUY (referee): three nats-server processes with three file replicas and an fsync before each ack lost none of 900 acknowledged writes through a kill of the stream's leader (E-44, measured on the real system). No row has built the two-machine health line, and both judges met the other rows without it"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: two data copies plus a controller quorum is the published shape, with commit by the in-sync set; the shrink of the set to one copy after a machine crash was not modelled or run"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: a third log node on a third domain gives a write quorum, but the seal rule when one is lost was not modelled or run"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the object store is the third domain and an acknowledged PUT outlives either machine, but the lease takeover by compare-and-swap after a crash was not modelled or run"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: STATUS.md: with two members a crash of one stops writes until it returns; with a third full member the majority rule should carry on, which nothing in this study ran"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a replication family no experiment crashed on two machines"
+   },
+   "why": "Every reason is about the replication family (R): plain Raft majorities are met by E-14b and E-13, JetStream by E-44's measured kill, the rest were not run."
+  },
+  {
+   "req": "F-12",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "obj"
+      ],
+      "V": [
+       "tier"
+      ],
+      "I": [
+       "—"
+      ],
+      "C": [
+       "cent(manifest CAS)"
+      ]
+     },
+     "v": "met",
+     "basis": "OBJ (referee): OBJ has no voters at all. A commit is an object in the store, the writer is whoever holds the lease, and the controller is a compare-and-swap on the manifest (R obj, V tier, C cent(manifest CAS), no Raft core: I —). So no majority can be lost and the command has nothing to do: it holds by construction"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Every row with voters needs the operator command, and none built or modelled it: listing what may be lost, refusing while a voter it would drop answers, and refusing stale cursors (DESIGN-V5 4.2 words it). E-15 keeps the slot move safe through one unclean recovery and E-33 refuses a cursor a restore does not hold, but CELL's, SPLIT's and LANE's moves, PD's unsafe-recover, ISR's unclean election, SLOG's loglets, v4's reform and JetStream's own commands were not run either"
+   },
+   "why": "The referee meets OBJ because nothing in it votes; the conjunction keeps every tag the referee names, so a row with a Raft group anywhere (I) or a voting replica kind (V) stays open."
+  },
+  {
+   "req": "F-13",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "Open for all 20. The bounds are named, not soaked: commits queued for a stalled main thread grow with the stall (5,000 in 5 s) and the heap must be sized from rows (E-07, A-13); credits bound the writes in flight (A-07, E-39); dedup state is per active client or producer, 309 to 2,133 B (E-20). No 24 h run and no test per bound exist. SPLIT's lineage table and ISR's per-group logs need bounds of their own; v4 and JetStream were not soaked"
+   }
+  },
+  {
+   "req": "F-14",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "U": [
+       "cli"
+      ]
+     },
+     "v": "met",
+     "basis": "SRV, PD: no user code runs on a server (U cli): methods, rules and views run in clients, so nothing of the user's shares a thread with replication or failure detection"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "met",
+     "basis": "BUY: replication and failure detection run in nats-server, which runs no user code; each client judges its own conditions (E-44), so one app's stall or throw stops only that app"
+    },
+    {
+     "when": {
+      "M": [
+       "loop"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4: v4 runs the kernel, the fold and user code on one event loop (M loop); a stalled loop sends no heartbeat and answers no write; E-07's control, the same kernel on the main thread, went silent for 5.1 s in a 5 s stall and 2.6 s under forced GCs. So a stalled main thread stalls replication and failure detection"
+    },
+    {
+     "when": {
+      "H": [
+       "side"
+      ]
+     },
+     "v": "open",
+     "basis": "SIDE: the daemon keeps replication and failure detection through an app stall, but L2 for the groups a host leads runs in the app's Node process (H side, F ldr(app folds)), so writes to those groups wait out a 5 s stall unless a handover rule moves them, and that rule is not written"
+    },
+    {
+     "when": {
+      "F": [
+       "ldr(app folds)"
+      ]
+     },
+     "v": "open",
+     "basis": "SIDE: L2 and the fold for the groups a host leads run in the app's Node process (F ldr(app folds), H side); a 5 s stall there was not shown to keep writes going"
+    },
+    {
+     "when": {
+      "L": [
+       "rs+v8"
+      ]
+     },
+     "v": "open",
+     "basis": "EMB-V8 (referee): E-07's stall test ran a Node kernel on a worker and names the M kw rows. EMB-V8 runs data, methods and rules in V8 isolates inside a Rust server (L rs+v8, F all(isolates)); E-03 only timed calls into an isolate, no stall or throw was injected, and where a writer rule waits on an isolate is not written"
+    },
+    {
+     "when": {
+      "F": [
+       "all(isolates)"
+      ]
+     },
+     "v": "open",
+     "basis": "EMB-V8 (referee): data folds inside V8 isolates in the server (F all(isolates)); no stall, slow rule or throw was injected there (E-03 timed calls only)"
+    },
+    {
+     "when": {
+      "M": [
+       "kw"
+      ]
+     },
+     "v": "met",
+     "basis": "The kernel runs on a worker (M kw, with A-27's byte batches and its row index off the V8 heap). Through a 5 s main-thread stall and forced GCs of 0.3 to 0.5 s it kept its heartbeat within 5 ms and write p99 at or under 4 ms, where a main-thread kernel went silent for 2.6 to 5.1 s (E-07; E-34 for the index). A throw goes to the reporter as in V4-47"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not shown: E-07's stall test names the M kw rows; a row whose user code runs on servers with N kernel workers, or on a thread layout E-07 did not run, has no stall test (the EMB-V8 referee: 'separate threads alone are a promise')"
+   },
+   "why": "The judges name where user code runs against the kernel's thread: U cli and BUY keep user code off the servers, M kw is E-07's shown form, M loop is E-07's control that fails, and H side, L rs+v8 and their F tags are the forms nobody stalled."
+  },
+  {
+   "req": "F-15",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0,
+     "basis": "OBJ: the object store is this row's log. A commit is a conditional PUT (R obj, Q put, S obj) and the writer's lease is a CAS on the manifest; with the store down no PUT and no CAS can finish, so writes and failover stop, which F-15 forbids. Adding slot moves to F-15's list (AMENDMENTS 1.3) does not change that"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0,
+     "basis": "OBJ: the object store is this row's log. A commit is a conditional PUT (R obj, Q put, S obj) and the writer's lease is a CAS on the manifest; with the store down no PUT and no CAS can finish, so writes and failover stop, which F-15 forbids. Adding slot moves to F-15's list (AMENDMENTS 1.3) does not change that"
+    },
+    {
+     "when": {
+      "S": [
+       "obj"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0,
+     "basis": "OBJ: the object store is this row's log. A commit is a conditional PUT (R obj, Q put, S obj) and the writer's lease is a CAS on the manifest; with the store down no PUT and no CAS can finish, so writes and failover stop, which F-15 forbids. Adding slot moves to F-15's list (AMENDMENTS 1.3) does not change that"
+    },
+    {
+     "when": {
+      "S": [
+       "jrnl +tier(store)",
+       "tier + obj"
+      ],
+      "P": [
+       "slot",
+       "slot+rule"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0,
+     "basis": "AMENDMENTS 1.3, F-15's line. This row requires an object store (S jrnl +tier(store), footnote 1; SLOG's tier + obj) and keeps its restore mark in the store's manifest (A-08's conditional-create rows). Every new epoch is recorded there before it is used (E-33, a needed rule); a slot move raises the slot's epoch (P slot); so no move can open while the store is down, and F-15 lets only wake, new replicas and old history wait. With slot moves added to that list it is open: writes and failover use local journals only, and E-33's store was always reachable"
+    },
+    {
+     "when": {
+      "S": [
+       "walg +tier"
+      ],
+      "P": [
+       "fixN"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: old segments are uploaded behind the local log (S walg +tier, Kafka's KIP-405), so a down store should only hold retention back, and no partition moves (P fixN). Not run here; local logs grow while uploads wait"
+    },
+    {
+     "when": {
+      "S": [
+       "jrnl +tier"
+      ]
+     },
+     "v": "open",
+     "depends_on": "restated",
+     "alt": "open",
+     "basis": "This row founds by fero init and requires no object store across boxes (S jrnl +tier), and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it; rows with no slot moves (CELL, SPLIT, LANE) have nothing on the write path that waits for the mark. Writes and failover use local journals only, by design; no sim ran with the store down"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm",
+       "walg",
+       "theirs"
+      ]
+     },
+     "v": "met",
+     "basis": "No object store is on any write, failover or new-replica path (PD's LSM, v4's WAL per group on local disks, JetStream's files on its servers), so nothing can wait for one. It holds by construction"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "depends_on": "restated",
+    "alt": "open",
+    "basis": "not judged: a storage form that needs the store, with a unit move other than a slot move; whether that move waits for the restore mark was not asked (AMENDMENTS 1.3's line names slot moves)"
+   },
+   "why": "The judges name the storage form (S: whether a store is required, optional or absent) and the slot move that raises an epoch (P); OBJ's judges name its PUT log (R, Q, S obj)."
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "Open for all 20. On the Raft rows the rejoin is shown only in part: E-16 cuts members off and heals them with no operator step, but its Raft is abstract and catch-up is one step; E-14c leaves out partitions as such (G-10); and after a long cut the leader's log is gone and the member takes a whole snapshot (5.2 to 6.9 s per GB, E-13), not only what it lacks (MIN's referee). Witness rows add log replicas that E-16 left out; ISR, SLOG, OBJ, v4 and JetStream were not run with partitions"
+   }
+  },
+  {
+   "req": "F-17",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0,
+     "basis": "AMENDMENTS 1.3, F-17's line: 5 of 280 five-node partial partitions stayed stuck for good with a connected majority, because the one server linked to a majority had a shorter log and Raft's vote rule refused it (E-38, simulated on etcd's own raft code; none with three nodes). The row takes no new election rule. Restated to 'a connected majority that includes an up-to-date replica' it is open: CheckQuorum every E/4 (A-02) gave 1.52 E at worst on the named cases only, and the sweeps were not rerun with it"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "AMENDMENTS 1.3 names the Raft rows. ISR's in-sync set, SLOG's loglets and controller sessions, OBJ's store links, v4's cut shapes and JetStream's own Raft were not run under partial partitions (a Raft metadata group alone does not carry the data path's cell, by both judges)"
+   },
+   "why": "The counterexample is Raft's vote rule on the data path (R); ISR and SLOG, whose metadata group alone is Raft, are open by both judges."
+  },
+  {
+   "req": "F-18",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "Open for all 20. Raft as published never gives up leadership for slowness (E-38c: a leader capped at 10 % CPU kept it for 20 E with p99 32 times worse); A-03 gives each Raft row a slow-leader rule and async leader writes, named, not built or modelled (G-03). ISR, SLOG, OBJ, v4 and JetStream were not run with a slow leader or writer, and no rule moves one"
+   }
+  },
+  {
+   "req": "F-19",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "gap": 1.08,
+     "basis": "BUY (referee): F-19 asks that a kill failing over 1,000 groups at once meets F-05, and one JetStream stream took 5.2, 5.4 and 7.2 s to take writes again, against 2.5 s (E-44, measured), on an election timer that is JetStream's own. A thousand streams on the same timer cannot be faster than one (reasoned)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "With A-07's credit window goodput at twice capacity was 79 to 82 % in TS and 88 to 89 % in Rust and recovery took 0 to 6 s (E-39, one group, a fixed client window). Not run: a grant handed out by the server, the TLS handshake budget (27 to 45 x p99 on a TS TLS edge), other groups and tenants, 1,000 groups failing over at once. v4 takes no credit window and was not run"
+   }
+  },
+  {
+   "req": "F-20",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: disk-full behaviour is nats-server's own, and it was not run"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: its store is an LSM (S lsm), not E-29's journal: a remove adds bytes and compaction needs free space, so the reserve is a different problem. E-29's reserve and refusal order were not run on it"
+    },
+    {
+     "when": {
+      "S": [
+       "walg",
+       "walg +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR (referee) and V4: E-29 ran F-20's test on one journal per process, whose reserve is one marked segment shared by its groups. A log file per group (S walg) puts the reserve somewhere else, and that was not run; v4 also takes none of A-09's format rules, and a full disk with no reserve cannot record a vote or a remove (E-29)"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR (referee): it commits by the in-sync set (R isr, Q isr), so what a full follower does to the set was not run"
+    },
+    {
+     "when": {
+      "Q": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR (referee): it commits by the in-sync set (R isr, Q isr), so what a full follower does to the set was not run"
+    },
+    {
+     "when": {
+      "S": [
+       "tier + obj"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): its storage is log nodes plus the object store (S tier + obj, not jrnl; it does not take A-25), and a full log node meets a write quorum, a seal and a metadata compare-and-swap (R slog), none of which was run or modelled"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG (referee): a full log node under a write quorum, a seal and a metadata compare-and-swap was not run or modelled"
+    },
+    {
+     "when": {
+      "S": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: it has no local log to fill (S obj, R obj): a full cache disk evicts, and the store has no hard limit of its own. E-29's journal is not this row's shape, and nothing was run"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the store is the disk and local space is a cache; what a full cache or a store quota does was not run"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "S": [
+       "jrnl +tier",
+       "jrnl +tier(store)"
+      ]
+     },
+     "v": "met",
+     "basis": "E-29(b) is the acceptance test, run on a journal of L0's shape (S jrnl) and on a three-process leader-and-followers pipeline, on 64 MB tmpfs and ext4. With A-09's six format rules writes were refused disk-full with a retry-after while reads, removes, 200 term changes, a member change, a snapshot and a retention pass went on from the reserve; a full follower stopped acknowledging, said so, and caught up by itself in 348 to 513 ms; 3,000 of 3,000 writes were taken once space was back. An election on a full disk was sized, not run"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: a store or a commit path that E-29(b) did not fill"
+   },
+   "why": "Every judge names the store (S: E-29 filled one shared journal; the LSM, a WAL per group, log nodes and the object store were not filled) and, for ISR and SLOG, the commit path a full member meets (R, Q)."
+  },
+  {
+   "req": "F-21",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4 (referee, from v4's code): members compare lane digests only; the rolling state hash is read by the sim and the debugger, never compared between members (kernel/node.ts stateHash). Copies whose lanes pass the digests can still show different rows (after a fresh member's seed, 2 runs of 2, STATUS.md), and no health row follows. The check as worded needs a leader and a committed offset, which R lww and O lamp do not have"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "V4 (referee, from v4's code): members compare lane digests only; the rolling state hash is read by the sim and the debugger, never compared between members (kernel/node.ts stateHash). Copies whose lanes pass the digests can still show different rows (after a fresh member's seed, 2 runs of 2, STATUS.md), and no health row follows. The check as worded needs a leader and a committed offset, which R lww and O lamp do not have"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "The hash is priced (1e6 rows in 259 ms on a worker that holds encoded rows, E-05) and E-43 fixes what to hash (rows, never views), but the check itself was not built and no wrong fold was injected in a sim (K-20). F ldr rows compare at most two hashes per group; PD's native store, and JetStream, where only clients fold, were not checked either"
+   },
+   "why": "The V4 referee names R lww and O lamp: the check needs a leader and a committed offset."
+  },
+  {
+   "req": "F-22",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "Z": [
+       "crash"
+      ]
+     },
+     "v": "fails",
+     "gap": 0,
+     "basis": "Z crash is Raft as published, with no checksum per entry. TLC on etcd's spec: a voter that keeps its id and cuts one bad entry as a torn tail votes for a lagging candidate, and the new leader overwrites a committed write (one fault, 32 states, E-37). The fix is another row's option (rejoin or par)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "Z": [
+       "rejoin",
+       "par"
+      ]
+     },
+     "v": "met",
+     "basis": "With Z rejoin (A-28) a checksum per entry finds the bad entry, the replica wipes itself and returns as a new one that never votes under its old id: TLC on etcd's spec explored all 27,985 states, all 10 invariants hold, no committed write is lost (E-37). PD's judges name par as the other fix: it repairs the entry from a peer and keeps the vote (E-37, 7 rules, three voters, no membership change). Whether one bad entry wipes one group or the whole journal is K-24"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: it takes A-28 by reasoning only: its data path is a write quorum of log nodes, not Raft, so E-37 did not check a damaged log node there"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: Z crash and not Raft; SPACE calls a corrupt entry undefined for it, and E-37 did not check the in-sync set (its Raft metadata group would lose a write by reasoning; neither was run)"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: no voter holds entries; objects carry the store's own checksums, and a bad cache block can be fetched again. E-37 did not check it"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: Z crash, and not checked here: v4's records carry a crc32c and a chain check at boot, but what a member does with one bad record below what it acknowledged was not run"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: the log and its checksums are JetStream's; no damaged-entry run was made on it"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "not judged: E-37 ran Raft only"
+   },
+   "why": "E-37 checked Raft's data path (R) under each storage-fault option (Z); every other family is open because E-37 did not check it."
+  },
+  {
+   "req": "F-22",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: not run on JetStream; the repair, if any, is its own"
+    },
+    {
+     "when": {
+      "Z": [
+       "rejoin"
+      ]
+     },
+     "v": "not",
+     "basis": "Z rejoin wipes each damaged replica, so one bad entry on each of two replicas is two lost voters of three: every such state is stuck without F-12's operator step (E-37, run rejoin2, 28 states). SLOG by the same definition: two log nodes that wipe leave a loglet below its write quorum (reasoned from SPACE and E-37)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "Z": [
+       "par"
+      ]
+     },
+     "v": "met",
+     "basis": "Z par keeps the group writable: 0 of 276 two-damage states stuck at 7 rules, each shown needed (E-37, on etcd's spec, three voters, no membership change). The judges of every rejoin row say 'only Z par keeps the group writable, and no row holds it'. Not modelled with a membership change, and damage above the commit point needs PAR's 'possibly committed' query (G-15)"
+    },
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "Z": [
+       "crash"
+      ]
+     },
+     "v": "not",
+     "basis": "PD: Z crash has no checksum and no repair; one bad entry already loses a committed write (E-37, 32 states), so the group can stay writable only by losing data, which is not what this asks"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Not checked: E-37 ran Raft only, and this row's storage-fault rule is undefined (Z crash on ISR, OBJ, V4) or not its own. An ISR follower may refetch from its leader, OBJ's store repairs its own objects, v4's digests may refill a lane (all reasoned)"
+   },
+   "why": "The judges name the storage-fault option (Z) and, for par and crash, E-37's Raft data path (R)."
+  }
+ ]
+}

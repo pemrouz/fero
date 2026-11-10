@@ -1,0 +1,889 @@
+{
+ "about": "The options that force or forbid others, for the closure pass (judging/closure/README.md). A row that matches 'if' must match 'then'. Sources: SPACE section 5 (the arrows read 'forces'), the 'needs' of SPACE section 2, AMENDMENTS sections 2 and 4, and the tags whose SPACE footnote ties them to their row's other options. Each says why the two options cannot work together; none rules a row out for being weak.",
+ "constraints": [
+  {
+   "id": "R-isr-C",
+   "if": {
+    "R": [
+     "isr"
+    ]
+   },
+   "then": {
+    "C": [
+     "cent",
+     "cent-co"
+    ]
+   },
+   "source": "SPACE 5: R isr forces C cent",
+   "why": "The in-sync set is changed by someone outside the group. cent-co is cent run as a loop by #meta's leader (its precedent is KRaft's combined mode), so it is outside the group too and is allowed."
+  },
+  {
+   "id": "R-slog-obj-V",
+   "if": {
+    "R": [
+     "slog",
+     "obj"
+    ]
+   },
+   "then": {
+    "V": [
+     "tier",
+     "tier +lrn"
+    ]
+   },
+   "source": "SPACE 5: R slog, obj (and rlog) force V tier",
+   "why": "Durability lives off the servers, on the log nodes or in the object store."
+  },
+  {
+   "id": "R-rlog-V",
+   "if": {
+    "R": [
+     "rlog"
+    ]
+   },
+   "then": {
+    "V": [
+     "tier +lrn(servers fold)"
+    ]
+   },
+   "source": "SPACE 5: R rlog forces V tier, with servers as learners; SPACE footnote 9",
+   "why": "The log members are the voters; servers are learners that fold, and the writer is a server holding a writer epoch."
+  },
+  {
+   "id": "R-nonraft-I",
+   "if": {
+    "R": [
+     "isr",
+     "slog",
+     "obj",
+     "lww"
+    ]
+   },
+   "then": {
+    "I": [
+     "port(meta)",
+     "—"
+    ]
+   },
+   "source": "SPACE 5: R not raft, I applies only to a metadata group",
+   "why": "The data groups do not run Raft, so a Raft core can only serve the metadata group (or there is none)."
+  },
+  {
+   "id": "R-raft-I",
+   "if": {
+    "R": [
+     "raft",
+     "rlog"
+    ]
+   },
+   "then": {
+    "I": [
+     "port",
+     "raft-rs",
+     "raft-rs or etcd raft"
+    ]
+   },
+   "source": "SPACE 2 I: the Raft core, when some group runs Raft",
+   "why": "The data groups run Raft, so the row needs a Raft core for them; port(meta) is Raft for metadata only, and '-' is none."
+  },
+  {
+   "id": "R-lww-X",
+   "if": {
+    "R": [
+     "lww"
+    ]
+   },
+   "then": {
+    "X": [
+     "none",
+     "saga"
+    ]
+   },
+   "source": "SPACE 5: R lww, X at most saga without fences",
+   "why": "Leaderless writes have no single writer to judge against, so no 2pc or ktxn coordinator can hold."
+  },
+  {
+   "id": "P-slot-O",
+   "if": {
+    "P": [
+     "slot",
+     "slot+rule"
+    ]
+   },
+   "then": {
+    "O": [
+     "slot",
+     "hlc"
+    ]
+   },
+   "source": "SPACE 5: P slot forces O slot (or hlc)",
+   "why": "Offsets and per-group state do not survive a slot move."
+  },
+  {
+   "id": "P-split-O",
+   "if": {
+    "P": [
+     "split",
+     "split+merge"
+    ]
+   },
+   "then": {
+    "O": [
+     "off+lin",
+     "hlc"
+    ]
+   },
+   "source": "SPACE 5: P split forces O off+lin or hlc",
+   "why": "Children inherit the parent's offsets, so a position needs the lineage or a timestamp."
+  },
+  {
+   "id": "X-2pc-S",
+   "if": {
+    "X": [
+     "2pc"
+    ]
+   },
+   "then": {
+    "S": [
+     "lsm"
+    ]
+   },
+   "source": "SPACE 5: X 2pc forces a multi-version S (lsm)",
+   "why": "Readers need a snapshot timestamp, so the store must keep several versions."
+  },
+  {
+   "id": "X-2pc-time",
+   "if": {
+    "X": [
+     "2pc"
+    ],
+    "O": [
+     "lamp",
+     "off",
+     "off+lin",
+     "slot"
+    ]
+   },
+   "then": {
+    "T": [
+     "tso"
+    ]
+   },
+   "source": "SPACE 5: X 2pc forces O hlc or T tso",
+   "why": "Readers need a snapshot timestamp: hybrid-logical-clock positions or a timestamp oracle."
+  },
+  {
+   "id": "Q-mix-Z",
+   "if": {
+    "Q": [
+     "mix"
+    ],
+    "R": [
+     "raft",
+     "rlog",
+     "isr",
+     "slog"
+    ]
+   },
+   "then": {
+    "Z": [
+     "rejoin",
+     "par"
+    ]
+   },
+   "source": "SPACE 5: Q maj-m needs rejoin-as-new; AMENDMENTS 2 Q (mix holds maj-m)",
+   "why": "Under the memory rung a disk may lack what it acknowledged, so a replica that stopped uncleanly must come back as new. Z crash has no such rule. Z par keeps the incarnation (disk-incarnation). V4's mix is its own ladder (R lww), so it is not named."
+  },
+  {
+   "id": "V-wit-S",
+   "if": {
+    "V": [
+     "+lrn +wit"
+    ]
+   },
+   "then": {
+    "S": [
+     "jrnl +tier",
+     "jrnl +tier(store)",
+     "walg +tier",
+     "tier + obj",
+     "obj"
+    ]
+   },
+   "source": "SPACE 5: V +wit needs an object store to repair (S +tier)",
+   "why": "A log replica cannot build a full replica from its log alone."
+  },
+  {
+   "id": "F-ldr-W",
+   "if": {
+    "F": [
+     "ldr",
+     "ldr(app folds)"
+    ]
+   },
+   "then": {
+    "W": [
+     "ridx; any for logs",
+     "lease ridx"
+    ]
+   },
+   "source": "SPACE 5: F ldr removes follower state reads (W any for logs only)",
+   "why": "Followers hold no state, so state reads cannot come from any replica. OBJ's ldr + lazy is not named: its lazy followers fold on read."
+  },
+  {
+   "id": "H-side-U",
+   "if": {
+    "H": [
+     "side"
+    ]
+   },
+   "then": {
+    "U": [
+     "ldr"
+    ]
+   },
+   "source": "SPACE 5: H side forces U ldr",
+   "why": "The app folds only what its host leads, so calls go to the leader's host."
+  },
+  {
+   "id": "H-side-F",
+   "if": {
+    "H": [
+     "side"
+    ]
+   },
+   "then": {
+    "F": [
+     "ldr(app folds)"
+    ]
+   },
+   "source": "SPACE 5: H side forces F ldr in the app, logs in the daemon; SPACE footnote 11",
+   "why": "The daemon keeps the logs; the app's Node process folds for the groups its host leads."
+  },
+  {
+   "id": "N-pool-L",
+   "if": {
+    "N": [
+     "pool"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs+v8"
+    ]
+   },
+   "source": "SPACE 5 and SPACE 2 N pool: pool needs isolates (L rs+v8)",
+   "why": "Many projects share a process, so user code must run in isolates."
+  },
+  {
+   "id": "L-rssrv-U",
+   "if": {
+    "L": [
+     "rs-srv",
+     "rs-srv or go-srv"
+    ]
+   },
+   "then": {
+    "U": [
+     "cli"
+    ]
+   },
+   "source": "SPACE 5: U cli or L rs-srv, no JS on servers; SPACE 2 L rs-srv",
+   "why": "A Rust or Go server runs no JS unless it embeds an engine (rs+v8), so methods cannot run on servers: apps are clients."
+  },
+  {
+   "id": "Q-isr-R",
+   "if": {
+    "Q": [
+     "isr"
+    ]
+   },
+   "then": {
+    "R": [
+     "isr"
+    ]
+   },
+   "source": "SPACE 2 Q isr: needs R isr",
+   "why": "A commit at every member of the in-sync set needs an in-sync set."
+  },
+  {
+   "id": "Q-put-R",
+   "if": {
+    "Q": [
+     "put"
+    ]
+   },
+   "then": {
+    "R": [
+     "obj"
+    ]
+   },
+   "source": "SPACE 2 Q put: needs R obj",
+   "why": "A commit that is a PUT needs the object store as the log."
+  },
+  {
+   "id": "S-obj-R",
+   "if": {
+    "S": [
+     "obj"
+    ]
+   },
+   "then": {
+    "R": [
+     "obj"
+    ]
+   },
+   "source": "SPACE 2 S obj: needs R obj",
+   "why": "The object store only, with a local cache, holds the log only when the object store is the log."
+  },
+  {
+   "id": "D-txn-X",
+   "if": {
+    "D": [
+     "txn"
+    ]
+   },
+   "then": {
+    "X": [
+     "2pc"
+    ]
+   },
+   "source": "SPACE 2 D txn: needs X 2pc",
+   "why": "Transaction ids are dedup under two-phase commit."
+  },
+  {
+   "id": "V-tier-R",
+   "if": {
+    "V": [
+     "tier",
+     "tier +lrn"
+    ]
+   },
+   "then": {
+    "R": [
+     "slog",
+     "obj",
+     "rlog"
+    ]
+   },
+   "source": "SPACE 2 V tier: comes with R slog, obj or rlog",
+   "why": "A separate log tier holds all durability only under a log-first R."
+  },
+  {
+   "id": "I-raftrs-L",
+   "if": {
+    "I": [
+     "raft-rs"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs+napi",
+     "rs+v8",
+     "rs-srv",
+     "rs-srv + ts",
+     "rs-srv or go-srv"
+    ]
+   },
+   "source": "SPACE 2 I raft-rs: needs L rs+napi (a Rust L)",
+   "why": "raft-rs is Rust. SPACE names rs+napi; SRV, PD, EMB-V8 and SIDE run it natively in a Rust server, so any Rust L holds."
+  },
+  {
+   "id": "I-port-L",
+   "if": {
+    "I": [
+     "port",
+     "port(meta)"
+    ]
+   },
+   "then": {
+    "L": [
+     "ts",
+     "ts→rs"
+    ]
+   },
+   "source": "SPACE 2 I port: port etcd's raft to TS; raft-rs later",
+   "why": "The port is a TypeScript Raft core; a row whose core is Rust from day one (rs+napi, a Rust server) cannot run it."
+  },
+  {
+   "id": "G-pslot-P",
+   "if": {
+    "G": [
+     "pslot"
+    ]
+   },
+   "then": {
+    "P": [
+     "slot",
+     "slot+rule"
+    ]
+   },
+   "source": "SPACE 2 G pslot: a group holds (resource, slot set) pairs; '0 beyond P slot'",
+   "why": "Project groups are made of slot sets, so the row needs slots."
+  },
+  {
+   "id": "G-lane-P",
+   "if": {
+    "G": [
+     "lane"
+    ]
+   },
+   "then": {
+    "P": [
+     "fixN(lanes)"
+    ]
+   },
+   "source": "SPACE 2 G lane; SPACE 4.1 LANE (P fixN (lanes))",
+   "why": "A fixed number of logs per project that every resource hashes into: the lanes are the mapping."
+  },
+  {
+   "id": "N-tier-V",
+   "if": {
+    "N": [
+     "tier"
+    ]
+   },
+   "then": {
+    "V": [
+     "+lrn +wit",
+     "tier",
+     "tier +lrn",
+     "tier +lrn(servers fold)"
+    ]
+   },
+   "source": "AMENDMENTS 2 N: 'with V +lrn and H emb there is no log tier to pool, so N follows V'; SPACE 4.1: tier where the row has log replicas",
+   "why": "Only the log tier is pooled, so the row needs log replicas or a log tier to pool."
+  },
+  {
+   "id": "V-logmembers-H",
+   "if": {
+    "V": [
+     "+lrn +wit",
+     "tier",
+     "tier +lrn",
+     "tier +lrn(servers fold)"
+    ]
+   },
+   "then": {
+    "H": [
+     "both",
+     "srv",
+     "side"
+    ]
+   },
+   "source": "AMENDMENTS 2 H: 'both is emb plus log members; it is needed only with V +wit or N tier'",
+   "why": "Log replicas and log tiers are processes of their own; fero inside the app's process alone (H emb) has none."
+  },
+  {
+   "id": "P-slot-mover",
+   "if": {
+    "P": [
+     "slot"
+    ]
+   },
+   "then": {
+    "C": [
+     "cent",
+     "cent(manifest CAS)",
+     "cent(writers)",
+     "cent-co",
+     "self+mv",
+     "self+p"
+    ]
+   },
+   "source": "AMENDMENTS 2 P: who decides the moves under C self is undecided, in two forms (the loop of self+mv, or each leader's rule of P slot + rule); A-18: in cent and cent-co rows the mover is the controller; AMENDMENTS 4 footnotes 14, 15",
+   "why": "Plain slots under plain self have no mover: nobody runs A-18's policy. self+p is allowed: its planner sends move hints that take the move lease like any mover."
+  },
+  {
+   "id": "C-selfmv-P",
+   "if": {
+    "C": [
+     "self+mv"
+    ]
+   },
+   "then": {
+    "P": [
+     "slot",
+     "slot+rule"
+    ]
+   },
+   "source": "AMENDMENTS 4 footnotes 14 and 15; axes.json tag note for C self+mv",
+   "why": "self+mv is self plus one loop on #meta's leader that only proposes slot moves; with no slots the loop has nothing to move."
+  },
+  {
+   "id": "C-meta-loop-I",
+   "if": {
+    "C": [
+     "cent-co",
+     "self+mv"
+    ]
+   },
+   "then": {
+    "I": [
+     "port",
+     "port(meta)",
+     "raft-rs",
+     "raft-rs or etcd raft"
+    ]
+   },
+   "source": "SPACE 2 C cent-co: a loop run by #meta's leader; AMENDMENTS 4 (self+mv's loop on #meta's leader)",
+   "why": "The loop runs on the leader of the metadata Raft group, so the row needs some Raft group (I not '-')."
+  },
+  {
+   "id": "C-writers-R",
+   "if": {
+    "C": [
+     "cent(writers)"
+    ]
+   },
+   "then": {
+    "R": [
+     "slog"
+    ]
+   },
+   "source": "SPACE footnote 5 (SLOG)",
+   "why": "The writer changes its log nodes and the controller changes writers: loglet writers exist only under slog."
+  },
+  {
+   "id": "C-manifest-R",
+   "if": {
+    "C": [
+     "cent(manifest CAS)"
+    ]
+   },
+   "then": {
+    "R": [
+     "obj"
+    ]
+   },
+   "source": "SPACE footnote 7 (OBJ)",
+   "why": "CAS on the object store's manifest: the manifest is the object log's."
+  },
+  {
+   "id": "Q-lognodes-R",
+   "if": {
+    "Q": [
+     "maj-d(log nodes)"
+    ]
+   },
+   "then": {
+    "R": [
+     "slog"
+    ]
+   },
+   "source": "SPACE footnote 6 (SLOG)",
+   "why": "A write quorum of the log nodes: log nodes exist only under slog."
+  },
+  {
+   "id": "I-meta-R",
+   "if": {
+    "I": [
+     "port(meta)"
+    ]
+   },
+   "then": {
+    "R": [
+     "isr",
+     "slog",
+     "obj"
+    ]
+   },
+   "source": "SPACE footnote 4 (ISR, SLOG)",
+   "why": "Raft for the metadata group only: the data groups do not run Raft, and the row has a metadata group."
+  },
+  {
+   "id": "V-standby-F",
+   "if": {
+    "V": [
+     "+lrn(standby)"
+    ]
+   },
+   "then": {
+    "F": [
+     "ldr",
+     "ldr + lazy",
+     "ldr(app folds)"
+    ]
+   },
+   "source": "SPACE footnote 3 (LEAN); AMENDMENTS A-26",
+   "why": "One warm standby that folds is a choice only where the other followers do not fold."
+  },
+  {
+   "id": "V-serversfold-R",
+   "if": {
+    "V": [
+     "tier +lrn(servers fold)"
+    ]
+   },
+   "then": {
+    "R": [
+     "rlog"
+    ]
+   },
+   "source": "SPACE footnote 9 (RLOG)",
+   "why": "Log members vote, servers are full learners, the writer holds a writer epoch: that is rlog."
+  },
+  {
+   "id": "F-servers-R",
+   "if": {
+    "F": [
+     "all(servers)"
+    ]
+   },
+   "then": {
+    "R": [
+     "rlog"
+    ]
+   },
+   "source": "SPACE footnote 9 (RLOG)",
+   "why": "Servers fold and log members do not: the split of roles is rlog's."
+  },
+  {
+   "id": "F-isolates-L",
+   "if": {
+    "F": [
+     "all(isolates)"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs+v8"
+    ]
+   },
+   "source": "SPACE footnote 10 (EMB-V8)",
+   "why": "data folds inside V8 isolates in the server, which only rs+v8 embeds."
+  },
+  {
+   "id": "F-appfolds-H",
+   "if": {
+    "F": [
+     "ldr(app folds)"
+    ]
+   },
+   "then": {
+    "H": [
+     "side"
+    ]
+   },
+   "source": "SPACE footnote 11 (SIDE)",
+   "why": "The app's Node process folds for the groups its host leads: that app sits beside a daemon."
+  },
+  {
+   "id": "Y-daemon-H",
+   "if": {
+    "Y": [
+     "fwd(local daemon)"
+    ]
+   },
+   "then": {
+    "H": [
+     "side"
+    ]
+   },
+   "source": "SPACE 4.1 SIDE: fwd (to the local daemon)",
+   "why": "Writes go to the local daemon, which only H side has."
+  },
+  {
+   "id": "L-side-H",
+   "if": {
+    "L": [
+     "rs-srv + ts"
+    ]
+   },
+   "then": {
+    "H": [
+     "side"
+    ]
+   },
+   "source": "SPACE 4.1 SIDE; SPACE 2 H side",
+   "why": "A native daemon plus the app's TypeScript is the side split."
+  },
+  {
+   "id": "H-side-L",
+   "if": {
+    "H": [
+     "side"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs-srv + ts"
+    ]
+   },
+   "source": "SPACE 2 H side: a native daemon per host; the app's Node process runs rules, methods and data's fold",
+   "why": "The daemon is native and the app is TypeScript."
+  },
+  {
+   "id": "K-srv-L",
+   "if": {
+    "K": [
+     "lib(srv)"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs-srv",
+     "rs-srv or go-srv"
+    ]
+   },
+   "source": "SPACE footnote 2 (SRV)",
+   "why": "The server folds plain rows in Rust and data's views run on clients: the library lives in a native server."
+  },
+  {
+   "id": "F-srv-L",
+   "if": {
+    "F": [
+     "all(srv)"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs-srv",
+     "rs-srv or go-srv"
+    ]
+   },
+   "source": "SPACE footnote 2 (SRV)",
+   "why": "The server folds plain rows in Rust; data's views run on clients and relays."
+  },
+  {
+   "id": "I-etcd-L",
+   "if": {
+    "I": [
+     "raft-rs or etcd raft"
+    ]
+   },
+   "then": {
+    "L": [
+     "rs-srv or go-srv"
+    ]
+   },
+   "source": "SPACE footnote 8 (SRV)",
+   "why": "Two variants of one row: Rust with raft-rs, or Go with etcd's raft run natively."
+  },
+  {
+   "id": "L-gosrv-I",
+   "if": {
+    "L": [
+     "rs-srv or go-srv"
+    ]
+   },
+   "then": {
+    "I": [
+     "raft-rs or etcd raft"
+    ]
+   },
+   "source": "SPACE footnote 8 (SRV)",
+   "why": "Two variants of one row: the Go variant runs etcd's raft natively, the Rust one raft-rs."
+  },
+  {
+   "id": "P-lanes-G",
+   "if": {
+    "P": [
+     "fixN(lanes)"
+    ]
+   },
+   "then": {
+    "G": [
+     "lane"
+    ]
+   },
+   "source": "SPACE 4.1 LANE: fixN (lanes)",
+   "why": "N fixed lanes per project is the lane option's own mapping."
+  },
+  {
+   "id": "S-tierobj-V",
+   "if": {
+    "S": [
+     "tier + obj"
+    ]
+   },
+   "then": {
+    "V": [
+     "tier",
+     "tier +lrn",
+     "tier +lrn(servers fold)"
+    ]
+   },
+   "source": "SPACE 4.1 SLOG (S tier + obj); SPACE 2 V tier",
+   "why": "The log tier holds the log and the object store the rest, so the row needs a separate log tier."
+  },
+  {
+   "id": "L-native-H",
+   "if": {
+    "L": [
+     "rs-srv",
+     "rs-srv or go-srv",
+     "rs+v8"
+    ]
+   },
+   "then": {
+    "H": [
+     "srv",
+     "both"
+    ]
+   },
+   "source": "SPACE 2 L rs-srv (a Rust server, a TS client) and rs+v8 (a Rust server that embeds V8); SPACE 2 H emb, side",
+   "why": "A native server binary cannot run inside the app's Node process (emb), and side's native part is a daemon beside the app (L rs-srv + ts)."
+  },
+  {
+   "id": "U-cli-H",
+   "if": {
+    "U": [
+     "cli"
+    ]
+   },
+   "then": {
+    "H": [
+     "srv"
+    ]
+   },
+   "source": "SPACE 2 U cli (no user code on servers; apps are clients) and H srv (apps are clients)",
+   "why": "Under emb, both or side the app's own process runs fero and its code, so apps are not clients."
+  },
+  {
+   "id": "L-tsclient-R",
+   "if": {
+    "L": [
+     "ts client"
+    ]
+   },
+   "then": {
+    "R": [
+     "outside"
+    ]
+   },
+   "source": "SPACE 4.1 BUY (L ts client) and footnote 12",
+   "why": "fero as a TS client only exists on top of an outside log; with a log of fero's own there is a kernel to build. The search leaves R outside out, so this keeps BUY's L tag out of it too."
+  },
+  {
+   "id": "R-obj-Q",
+   "if": {
+    "R": [
+     "obj"
+    ]
+   },
+   "then": {
+    "Q": [
+     "put"
+    ]
+   },
+   "source": "SPACE 2 R obj: 'a commit is a PUT'",
+   "why": "Q says what a commit means; under R obj it is the PUT."
+  },
+  {
+   "id": "R-obj-S",
+   "if": {
+    "R": [
+     "obj"
+    ]
+   },
+   "then": {
+    "S": [
+     "obj"
+    ]
+   },
+   "source": "SPACE 2 R obj: 'the object store is the durable layer'",
+   "why": "The store holds the log; servers keep only a cache (S obj)."
+  }
+ ]
+}

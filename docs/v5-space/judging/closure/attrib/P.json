@@ -1,0 +1,2330 @@
+{
+ "group": "P",
+ "by": "an attribution agent, from judging/P.settled.json (the why and why2 of each cell). Three families recur: PD's (K kern, X 2pc, T tso, S lsm, O hlc, as its judges itemize TiKV's shape), ISR's (R isr, K hyb, D pid) and OBJ's (R obj, Q put, and W lease where its judge says it was not tested)",
+ "parts": [
+  {
+   "req": "P-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "fails",
+     "basis": "OBJ: a persisted commit is one conditional PUT to the object store (R obj, Q put). A real store's PUT p99 is about 30 to 80 ms on S3 Standard and at or above 7.3 ms on Express One Zone (cited in E-28), against C + 5 ms = 5.7 ms. E-28's own threshold puts OBJ out at persisted"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "fails",
+     "basis": "OBJ: a persisted commit is one conditional PUT to the object store (R obj, Q put). A real store's PUT p99 is about 30 to 80 ms on S3 Standard and at or above 7.3 ms on Express One Zone (cited in E-28), against C + 5 ms = 5.7 ms. E-28's own threshold puts OBJ out at persisted"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: any member takes a write and cells merge by last-writer-wins on Lamport stamps (R lww, O lamp: no total order per partition), so two copies apply two writes in opposite orders and no one committed log has both as folds of its prefixes. Getting one needs another row's R and O options"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: any member takes a write and cells merge by last-writer-wins on Lamport stamps (R lww, O lamp: no total order per partition), so two copies apply two writes in opposite orders and no one committed log has both as folds of its prefixes. Getting one needs another row's R and O options"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-22: 600 of 600 partitions linearizable and every replica equal to the fold of the committed log, but the write p99 bar is not shown on a real kernel (E-02's TS pipeline, 4.3 ms against 5.7 ms, does no protocol work); the native bar (C + 0.5 ms) cannot be settled on this box's one disk; PD's, ISR's and SLOG's shapes were never run; BUY cannot run a seeded sweep. Open for all 18"
+   },
+   "why": "Only OBJ and V4 differ; their judges name R obj and Q put (the PUT commit), and R lww and O lamp (no one order)."
+  },
+  {
+   "req": "P-02",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-02 needs all copies to agree which rows exist at each log position and expiry by writer time. v4 has no time rule (T empty), no log position per partition (O lamp) and no one writer to judge (R lww); an expiry is each member's own guess. 'The cure is one writer and writer time, which are other rows' R and T options'"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-02 needs all copies to agree which rows exist at each log position and expiry by writer time. v4 has no time rule (T empty), no log position per partition (O lamp) and no one writer to judge (R lww); an expiry is each member's own guess. 'The cure is one writer and writer time, which are other rows' R and T options'"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-02 needs all copies to agree which rows exist at each log position and expiry by writer time. v4 has no time rule (T empty), no log position per partition (O lamp) and no one writer to judge (R lww); an expiry is each member's own guess. 'The cure is one writer and writer time, which are other rows' R and T options'"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: JetStream 2.10 expires by stream age, not per row, with no record for a follower to fold; per-row ttl and touch need an expirer nobody built. Not tried in E-44"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "depends_on": "other",
+    "alt": "fails",
+    "basis": "Writer time as the median (A-23) expired no row early and copies agreed at each position (E-21, 30 seeds a family; E-22, 100 seeds in 3 modes). Not shown: the O(expired) tick pin at 1e6 rows. The bound is read as writer time while a writer exists; read to the letter, a failover near the ttl made expiry 2,036 ms late, in any one-writer design (the alt). PD's T tso was not modelled by E-21 and its cell is the same"
+   },
+   "why": "V4's judge names T, O and R; BUY's names JetStream (R outside). Every other row takes the same open cell with the same 'other' reading."
+  },
+  {
+   "req": "P-03",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: E-31's model takes as given one committed log per partition; for this row that promise is the in-sync set and its controller (Kafka's shape), never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: the promise E-31 takes as given rests on the writer change by seal and metadata CAS, never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the promise E-31 takes as given rests on the writer lease by CAS on the manifest, never modelled here"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge says its W lease was not tested; PD's judge says it has lease or read-index reads only (no W any), so its follow path has no model here"
+    },
+    {
+     "when": {
+      "F": [
+       "ldr + lazy"
+      ]
+     },
+     "v": "open",
+     "basis": "F lazy: OBJ's judge says its F lazy was not tested"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: no cursor; it syncs by digests and Lamport stamps (O lamp, R lww), so P-03's cursor property has no form to check"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: no cursor; it syncs by digests and Lamport stamps (O lamp, R lww), so P-03's cursor property has no form to check"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: positions are timestamps (O hlc), which E-31 did not model"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family ('semantics in the kernel on TiKV's shape ... T tso, O hlc') was never built or modelled; E-22's prototype is a Raft kernel with K lib"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family ('semantics in the kernel on TiKV's shape ... T tso, O hlc') was never built or modelled; E-22's prototype is a Raft kernel with K lib"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: following part of a resource with shortfall and a one-hop miss was not tried on JetStream (E-44 ran 4 of 22 patterns)"
+    },
+    {
+     "when": {
+      "O": [
+       "slot"
+      ]
+     },
+     "v": "met",
+     "basis": "E-31 model-checked subscribe with A-06's END and per-slot cursors on ten bounds (up to 7.6 million states): a snapshot then deltas, no gap, no overlap across a leader crash, a reload, a slot move and a relay. E-22's near-cache check (one-hop miss, shortfall, the memory bound) passed 100 of 100 seeds in 3 modes"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "met",
+     "basis": "CELL: cells move whole, so group offsets keep their meaning (E-31's off option holds with no move); at a re-key the old cursor is refused and the reader restarts from a snapshot (E-17c, 6 rules), which for a state follower is a snapshot then deltas with nothing missed"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN",
+       "fixN(lanes)"
+      ]
+     },
+     "v": "met",
+     "basis": "LANE: no partition moves between lanes, and E-31's off option holds every property on every bound without a move. Fixed partitions (fixN) never move either"
+    },
+    {
+     "when": {
+      "O": [
+       "off+lin"
+      ],
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "met",
+     "basis": "SPLIT: offsets with lineage; E-17b and E-17c model a reader across a split and a merge (2 to 3 lineage rules), and E-31's protocol holds on the bounds without a move"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no judged row: group offsets with a P that moves partitions are not shown, and E-31 breaks cursors made of group offsets at the first move in 5 steps (the reason CELL's and LANE's judges give for needing no move)"
+   },
+   "why": "Met rests on E-31's model of the follow path, which the judges tie to the O option and, for group offsets, to a P that never moves a partition (or re-keys and restarts the reader, or keeps lineage). The open rows are named by their R (isr, slog, obj, lww, outside), by PD's timestamps and family, and by OBJ's untested W lease and F lazy."
+  },
+  {
+   "req": "P-04",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: the fill must lose to a write that lands during the load; under LWW the later stamp wins and the fill is stamped later, unless one writer judges a condition, which V4 lacks. Not designed or measured"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: not tried in E-44; a publish-if-empty could elect one loader, but nobody built it"
+    },
+    {
+     "when": {
+      "U": [
+       "cli"
+      ]
+     },
+     "v": "open",
+     "basis": "U cli (SRV, PD): the servers run no user code, so load(key) must run in an app client behind a claim; one load per key across many clients was not built (E-22 ran load at the key's writer)"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-22: six readers that miss one key at once make one load, run at the key's writer and filled with if: absent, and a write during the load keeps its value, in 100 of 100 seeds in 3 modes with a leader change and a slot move; the number of readers does not enter the mechanism"
+   },
+   "why": "SRV's judge names U cli; the other open rows are named by family. V4 and BUY are open, not failed."
+  },
+  {
+   "req": "P-05",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 2.2,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3, P-05's latency clause). Restated it still fails: OBJ's delivery waits for a commit that is a PUT (R obj, Q put), p99 2.67 ms on local MinIO and at or above 7.3 ms on a real store (E-28), against C + one hop of about 0.83 ms; the gap counts the PUT's 2.67 ms"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 2.2,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3, P-05's latency clause). Restated it still fails: OBJ's delivery waits for a commit that is a PUT (R obj, Q put), p99 2.67 ms on local MinIO and at or above 7.3 ms on a real store (E-28), against C + one hop of about 0.83 ms; the gap counts the PUT's 2.67 ms"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.91,
+     "basis": "As worded it fails like every row. Restated, v4's own reasons stay: its fan-out measured about 9,000 deliveries a second against the 100,000 pin (the gap counts that), and it has no one order per room (O lamp, R lww), the structure both judges fail it for on P-07"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "fails",
+     "gap": 0.91,
+     "basis": "As worded it fails like every row. Restated, v4's own reasons stay: its fan-out measured about 9,000 deliveries a second against the 100,000 pin (the gap counts that), and it has no one order per room (O lamp, R lww), the structure both judges fail it for on P-07"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: CELL: a re-key refuses old cursors (E-17), so a reconnect within history across a re-key is not shown to miss nothing"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: SLOG: the reconnect cursor across a failover rests on R slog's writer change, never modelled here"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: BUY: rooms on JetStream were not tried in E-44"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "open",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+    },
+    {
+     "when": {
+      "O": [
+       "slot"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "met",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. Per-slot cursors (E-31)"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN",
+       "fixN(lanes)"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "met",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. LANE: nothing moves between lanes, so group offsets keep the cursor (E-31's off option holds without a move)"
+    },
+    {
+     "when": {
+      "O": [
+       "off+lin"
+      ],
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "fails",
+     "depends_on": "restated",
+     "alt": "met",
+     "gap": 0.45,
+     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. SPLIT: the cursor crosses a split by lineage (E-17c's model)"
+    }
+   ],
+   "else": {
+    "v": "fails",
+    "depends_on": "restated",
+    "alt": "open",
+    "gap": 0.45,
+    "basis": "As worded it fails like every row (AMENDMENTS 1.3). Restated: no judged row: group offsets with a P that moves partitions are not shown, and E-31 breaks cursors made of group offsets at the first move in 5 steps (the reason CELL's and LANE's judges give for needing no move)"
+   },
+   "why": "Every row fails as worded with the relay's 0.45 gap. The restated alt follows the reconnect cursor (O, and P for group offsets, as on P-03), OBJ's PUT commit (R obj, Q put, gap 2.2), V4's lack of one order (R lww, O lamp, gap 0.91), CELL's re-key (P fixN+rekey), and the families never run."
+  },
+  {
+   "req": "P-06",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: any member takes a publish and records merge by Lamport stamp (R lww, O lamp: no total order per partition), so two subscribers on two members can get two publishes to one subject in opposite orders"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: any member takes a publish and records merge by Lamport stamp (R lww, O lamp: no total order per partition), so two subscribers on two members can get two publishes to one subject in opposite orders"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY: its none rung is core NATS itself under fero's client; P-06 says the rung meets PERF-03, and a layer on NATS can at best equal NATS (p99 0.27 ms, E-09b), so it cannot win: 'it cannot beat what it is built on' (SPACE 4.2)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Order and delivery held on both rungs in E-22 (none lost 0 of 900), but no fero kernel has run nats bench against the none rung, core NATS sits only 1.9 times under E-02's socket-free TS ceiling, and the none rung's failover rule was never modelled (K-10). PD's, ISR's, SLOG's and OBJ's shapes were never run either; their cells are the same"
+   },
+   "why": "Only V4 (no one order: R lww, O lamp) and BUY (the none rung is NATS itself: R outside) differ."
+  },
+  {
+   "req": "P-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4 keeps a log per origin and orders cells by Lamport stamps (R lww, O lamp: 'no total order per partition'), so there is no position a reader can replay from that means the same on every member"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4 keeps a log per origin and orders cells by Lamport stamps (R lww, O lamp: 'no total order per partition'), so there is no position a reader can replay from that means the same on every member"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "fails",
+     "basis": "CELL: positions are group offsets (O off) and it grows by a re-key; an old generation's cursor is refused and the reader restarts from a snapshot (E-17c), and offsets kept without the refusal give a false expired in 5 steps (E-31). So a reader cannot go on from a kept position after the resource grows. 'The form that keeps positions (rekey-carry) puts a sequence in each record, which is another O option'"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "slot",
+       "slot+rule",
+       "split",
+       "split+merge",
+       "ring"
+      ]
+     },
+     "v": "fails",
+     "basis": "no judged row: CELL's judge, step 2: 'a raw group offset breaks at the first move in 5 steps (E-31)'; LANE's judge: 'a later range move would need lineage (E-17b)'. A position then changes meaning across a move"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: a JetStream stream keeps limits by age, size and count and a sequence that survives failover, but E-44 did not try P-07; expired with the earliest kept was not built"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-31 holds the log-reader property (every committed record once, in order) on ten bounds, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay; E-22's stream check resumed from saved cursors and got expired with a readable earliest. LANE: no partition moves, so a lane offset keeps its meaning. SPLIT: E-17b and E-17c model a reader across a split and a merge with 2 to 3 lineage rules. P-07 sets no speed bar: Kafka and Redpanda runs are PERF-05 and PERF-06"
+   },
+   "why": "The fails follow O (one order, positions that keep their meaning) and, for group offsets, P (a move or re-key). The open rows are named by family; ISR's judge notes fixN offsets never move but the in-sync-set commit rule was not modelled."
+  },
+  {
+   "req": "P-08",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: one owner per partition per generation and a fenced offset are conditions one writer must judge; under R lww any replica accepts a write on its own state (SPACE 5: lww forbids conditions), so two members can own one partition and a zombie's commit is not refused"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Safety holds on the prototype (nothing skipped, no zombie commit, E-22; exactly once past the horizon with A-05's mark, E-30), but 'a crash hands its partitions on within one lease plus one commit' is neither measured nor held by construction. CELL and SPLIT add that the mark's carry across a re-key or split was not modelled; the families never run and BUY are open too"
+   },
+   "why": "Only V4 differs; its judge names R lww."
+  },
+  {
+   "req": "P-09",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: a take is a claim, at most one live lease per message judged by one writer; under R lww two workers can each take the same message through two replicas and both are told ok"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: 'at most one live lease' needs claim judged by one clock; v4 has no writer time (T is empty), so two workers on two members can hold one message at once"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: on JetStream 294 jobs acked once, 6 dead-lettered, never two live leases (E-44), but the dead-letter move needs a scan, FIFO needs a consumer per partition, and paused workers were not run"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, dead-letter after 5 deliveries, never two live leases, FIFO first deliveries, an empty take appends nothing (real Knossos agrees, E-22b). A re-key (E-17c) and a split (E-17b) carry the dedup outcomes; P-09 names no move"
+   },
+   "why": "V4's judges name R lww and T (no writer time); the open rows are named by family."
+  },
+  {
+   "req": "P-10",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: at most one holder per lease is a condition one writer must judge; under R lww two replicas can each grant the lock, and a stale token is not refused everywhere"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: tokens are Lamport stamps (O lamp) with no one order per lock"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY: on JetStream the judge is fero's client, which compares the token in the last message of one subject; a paused holder's write to another row under an older token passes and is stored after the newer one (E-44 gaps 4 and 6). E-44 lists 'fencing that every write passes through' as needing a kernel fero owns, so the cure is another row's writer"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-22's lock check (holder paused 15 s, clock skewed 3 s, a #locks failover): both fencing checkers clean in every seed; the fence refused every stale write under every clock rule (E-21); the highest token travels in a move, a re-key and a split (E-17, E-17b, E-17c); a restore starts above the store's mark (E-33). Acquire is one conditional write, so one commit"
+   },
+   "why": "V4's judges name R lww and O lamp; BUY's names the client as judge (R outside); the open rows are named by family."
+  },
+  {
+   "req": "P-11",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: a bounded incr must be judged against every earlier incr by one writer; under R lww two incrs that each fit can cross the bound together, and per-cell LWW keeps one of two concurrent values, so an acknowledged incr is lost"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY: measured on JetStream, an incr retried after one other write to the row was counted again (3 where 2 was right) and a retry past the dedup window lands twice (E-44 gap 2); the judge is the client, about 4 ms an incr against 3 µs"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Exactly once and the bounds hold in E-22's simulation and in E-20's dedup model (sess 13 rules, win 17), but the op cost at the writer (3 µs TS, 0.5 µs native) was never measured on any L2, and memtier INCR has only driven a simulator (PERF-02). Open for all 18"
+   },
+   "why": "Only V4 (R lww) and BUY (R outside) differ."
+  },
+  {
+   "req": "P-12",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "Merged views equal the query only with data's merge contract (A-10), which is not landed; today group costs O(rows per bucket), 2,574 µs at 1e6 rows against 1 µs (E-05, E-23). 'Every row runs the same data, so no row differs': open for all 20"
+   }
+  },
+  {
+   "req": "P-13",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: whether a session lapsed is a condition on its renewals judged by one clock; v4 has no one writer (R lww), so a live session's rows can be removed or a removed row can come back"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: no time rule (T is empty); 'the cure is another row's R and T options'"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: not tried; JetStream 2.10 expires by stream, not by session, so presence needs a reaper nobody built"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "depends_on": "other",
+    "alt": "fails",
+    "basis": "E-22 after A-04 (a session-bound write waits for its session's record): a killed client's rows went on every copy within 9.8 s of a 10 s lease, a client paused 5 s kept its rows, 100 seeds in 3 modes; leases by median writer time pass E-21. Read to the letter, a #sessions failover near the lapse gave 12.4 s (the alt)"
+   },
+   "why": "V4's judge names R lww and T; the open rows are named by family and keep the same 'other' alt as the met rows."
+  },
+  {
+   "req": "P-14",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: the rule must be judged by one writer per partition; under R lww two sells of the last item through two servers both pass, and v4 measured exactly that (REQUIREMENTS P-14)"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "BUY: JetStream's only condition is a subject's last sequence, one row; a rule over a partition of several rows can only check the whole stream's last sequence, which any other write breaks (E-44 gap 4); the judge is the client, not the one writer"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "With A-04 all 183,159 partition histories were linearizable in Porcupine and Knossos agrees (E-22b); two sells of the last item gave one ok in all 300 races under leader changes, slot moves and the shuffle, wherever the calls ran (E-22); the ported Raft was linearizable in 26 of 26 Maelstrom runs (E-46)"
+   },
+   "why": "V4 (R lww) and BUY (R outside) fail by their judges' steps; the open rows are named by family."
+  },
+  {
+   "req": "P-15",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "X": [
+       "none"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: X none, no unit across partitions; P-15 asks to change several partitions as one unit"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: a saga needs fenced locks and conditions judged by one writer; last-writer-wins has no such judge, so a paused holder's late step can land after its unit was undone (E-24's 12-step case)"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "met",
+     "basis": "PD: X 2pc, a unit is one Percolator transaction; it commits whole or rolls back, and a later reader resolves a dead or paused holder's intents (Percolator, TiKV in production; cited, not run here)"
+    },
+    {
+     "when": {
+      "X": [
+       "ktxn"
+      ]
+     },
+     "v": "met",
+     "basis": "ISR: X ktxn, Kafka's transactions (KIP-98): a coordinator ends every unit with commit or abort markers, and a paused producer is fenced by its epoch (cited, not run here)"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: the saga library and A-24 are the same, but they rest on fenced locks judged by one writer, and R slog's writer change was never modelled or run"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the saga rests on fenced locks judged by one writer, and R obj's writer lease by CAS (a commit is a PUT) was never modelled"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the saga rests on fenced locks judged by one writer, and R obj's writer lease by CAS (a commit is a PUT) was never modelled"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: A-24 in fero's L5 library, but on JetStream the fence is checked by the client per row (E-44 gap 6); E-24's model assumes a writer that refuses a lower token"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "no judged row: a saga on this family. SLOG's and OBJ's judges: the saga 'rests on fenced locks judged by one writer'; for this family that writer promise is not shown (its P-10 cell is open). The judged ISR and PD rows meet P-15 by X ktxn and X 2pc instead"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row"
+   },
+   "why": "The cell follows X (none fails; 2pc, ktxn and saga meet) and, for a saga, the R whose one-writer fence was not modelled (slog, obj, outside), with V4's R lww as its judge's second reason."
+  },
+  {
+   "req": "P-15",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "met",
+     "basis": "PD: X 2pc over multi-version state; a reader at one timestamp sees all of a committed unit or none (Percolator's snapshot reads, TiKV in production; cited). AMENDMENTS calls it the published route to this SHOULD"
+    },
+    {
+     "when": {
+      "X": [
+       "ktxn"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: X ktxn is Kafka's read_committed, which the requirement names, but commit markers land partition by partition, so a reader of two partitions may see one side first (reasoned), and Elle's fractured-read check was not run on it"
+    }
+   ],
+   "else": {
+    "v": "not",
+    "basis": "X saga shows half a unit by design: Elle finds fractured reads in 66 to 77 of 100 saga histories even with A-24 (E-22, E-22b). X none (V4) has no unit at all. RAMP would give it for plain sets only, and no row holds X ramp"
+   },
+   "why": "Every judge's reason is the X option alone."
+  },
+  {
+   "req": "P-16",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-16 asks to keep every fact and rebuild byte for byte. v4 keeps one log per origin and compacts it ('loser history vanishes, by construction') with no history: 'all', and there is no one order to replay what is left (O lamp); keeping every fact in one order needs another row's R and O options"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-16 asks to keep every fact and rebuild byte for byte. v4 keeps one log per origin and compacts it ('loser history vanishes, by construction') with no history: 'all', and there is no one order to replay what is left (O lamp); keeping every fact in one order needs another row's R and O options"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-22's rebuild check passed and history: 'all' kept every record, but byte for byte fails today for some views: a sum depends on record order (E-43) and top-k breaks ties by arrival (E-23). A-10's contract fixes both but is not landed in data. Every row runs the same data"
+   },
+   "why": "Only V4 differs; its judge names R and O."
+  },
+  {
+   "req": "P-17",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: exactly once needs A's log in one order and outputs deduped at B's one writer; v4 has neither a position in A (O lamp) nor a writer-side judge (R lww), its window dedup applies an output twice after a restart past the horizon (E-30), and it takes no A-05 mark"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: exactly once needs A's log in one order and outputs deduped at B's one writer; v4 has neither a position in A (O lamp) nor a writer-side judge (R lww), its window dedup applies an output twice after a restart past the horizon (E-30), and it takes no A-05 mark"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: not tried; a dedup window alone fails past its horizon on JetStream (E-44 gap 2), and nobody built the mark as a check-and-write on the output rows"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "open",
+     "basis": "CELL: A-05's mark is kept per output slot and travels when the slot moves; CELL has no slots, a re-key re-hashes keys, and a mark kept per group loses an output when keys move (E-30, 12 steps); the carry across a re-key was not modelled, and a re-key of A refuses the reader's cursor (E-17c)"
+    },
+    {
+     "when": {
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "open",
+     "basis": "SPLIT: the carry of A-05's mark across a split was not modelled (A-05 says so); a mark kept per group loses an output when keys move (E-30, 12 steps)"
+    },
+    {
+     "when": {
+      "P": [
+       "slot",
+       "slot+rule"
+      ]
+     },
+     "v": "met",
+     "basis": "E-30 model-checked A-05's mark (per consumer, source slot and output slot, written in the output's own entry, carried when the output slot moves): 5 rules, each A record lands in B once even past the dedup horizon and across a B slot move; E-22's derive check gave exact totals with a member killed mid-batch"
+    },
+    {
+     "when": {
+      "P": [
+       "fixN",
+       "fixN(lanes)"
+      ]
+     },
+     "v": "met",
+     "basis": "LANE: nothing moves between lanes, and a mark kept per output group holds on every bound of E-30 without a move ('it loses an output only when a slot moves'). Fixed partitions never move either"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no judged row: A-05's mark was modelled with slot moves only (AMENDMENTS A-05), and a mark kept per group loses an output when keys move (E-30, 12 steps)"
+   },
+   "why": "Met rests on A-05's mark, which the judges tie to the P option: carried on a slot move, safe with no move, not modelled across a re-key or a split. V4 fails by R and O; the open rows are named by family."
+  },
+  {
+   "req": "P-18",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "TEST-05 and TEST-07 hold on prototypes (E-22, E-06), but TEST-06 is open for every row: the fork was not built, its storage cost was not measured, and a fork that runs costs O(rows). Open for all 20"
+   }
+  },
+  {
+   "req": "P-19",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR: E-31's model takes as given one committed log per partition; for this row that promise is the in-sync set and its controller (Kafka's shape), never modelled or run here. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "SLOG: the promise E-31 takes as given rests on the writer change by seal and metadata CAS, never modelled or run here. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ: the promise E-31 takes as given rests on the writer lease by CAS on the manifest, never modelled here. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "OBJ, Q put: the cold client's first committed write waits for a PUT (p99 2.67 ms on local MinIO, at or above 7.3 ms on a real store, E-28) where the bar counts C; read as time the bar does not hold. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge says its W lease was not tested; PD's judge says it has lease or read-index reads only (no W any), so its follow path has no model here. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "F": [
+       "ldr + lazy"
+      ]
+     },
+     "v": "open",
+     "basis": "F lazy: OBJ's judge says its F lazy was not tested. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: no cursor; it syncs by digests and Lamport stamps (O lamp, R lww), so P-03's cursor property has no form to check. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "open",
+     "basis": "V4: no cursor; it syncs by digests and Lamport stamps (O lamp, R lww), so P-03's cursor property has no form to check. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD: positions are timestamps (O hlc), which E-31 did not model. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family ('semantics in the kernel on TiKV's shape ... T tso, O hlc') was never built or modelled; E-22's prototype is a Raft kernel with K lib. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family ('semantics in the kernel on TiKV's shape ... T tso, O hlc') was never built or modelled; E-22's prototype is a Raft kernel with K lib. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: following part of a resource with shortfall and a one-hop miss was not tried on JetStream (E-44 ran 4 of 22 patterns). P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "slot"
+      ]
+     },
+     "v": "met",
+     "basis": "E-31 model-checked subscribe with A-06's END and per-slot cursors on ten bounds (up to 7.6 million states): a snapshot then deltas, no gap, no overlap across a leader crash, a reload, a slot move and a relay. E-22's near-cache check (one-hop miss, shortfall, the memory bound) passed 100 of 100 seeds in 3 modes. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN+rekey"
+      ]
+     },
+     "v": "met",
+     "basis": "CELL: cells move whole, so group offsets keep their meaning (E-31's off option holds with no move); at a re-key the old cursor is refused and the reader restarts from a snapshot (E-17c, 6 rules), which for a state follower is a snapshot then deltas with nothing missed. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "off"
+      ],
+      "P": [
+       "fixN",
+       "fixN(lanes)"
+      ]
+     },
+     "v": "met",
+     "basis": "LANE: no partition moves between lanes, and E-31's off option holds every property on every bound without a move. Fixed partitions (fixN) never move either. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    },
+    {
+     "when": {
+      "O": [
+       "off+lin"
+      ],
+      "P": [
+       "split",
+       "split+merge"
+      ]
+     },
+     "v": "met",
+     "basis": "SPLIT: offsets with lineage; E-17b and E-17c model a reader across a split and a merge (2 to 3 lineage rules), and E-31's protocol holds on the bounds without a move. P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "no judged row: group offsets with a P that moves partitions are not shown, and E-31 breaks cursors made of group offsets at the first move in 5 steps (the reason CELL's and LANE's judges give for needing no move). P-19 carries P-03's promises over the same client, so the row's P-03 cell decides"
+   },
+   "why": "Every judge reads P-19 as E-40's TS client (27.9 KB gzip, 13 to 17 ms cold) plus P-03's promises over it, so the rules are P-03's. SRV's U cli does not enter: it is met here."
+  },
+  {
+   "req": "P-20",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-20's MUST rests on P-16's rebuild from history: 'all'; v4 compacts every entry that is not its cell's winner and has no shape version, and with no log position per partition (O lamp) two members can fold one record under two versions during a roll. 'The MUST fails with P-16'"
+    },
+    {
+     "when": {
+      "O": [
+       "lamp"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: P-20's MUST rests on P-16's rebuild from history: 'all'; v4 compacts every entry that is not its cell's winner and has no shape version, and with no log position per partition (O lamp) two members can fold one record under two versions during a roll. 'The MUST fails with P-16'"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "Upcasters held in E-22 over three versions with the migrating server killed, but it stays open with P-16 (byte for byte waits on data's contract, A-10), and an old tape replayed on new code was not run"
+   },
+   "why": "Only V4 differs; its judge ties it to P-16 (R and O)."
+  },
+  {
+   "req": "P-20",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "not",
+     "basis": "V4: no shape versions, no upcasters and no exactly-once job; a schema judged at one writer needs a writer, which last-writer-wins lacks"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "not",
+     "basis": "BUY: the writer is nats-server, which runs no fero code and cannot check a schema; fero's client would check it and any other client gets past (E-44, gap 6)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-22's prototype has typed rows, a schema refused at the writer and a re-runnable migration, but 'paced so P-01's p99 holds during a roll' cannot be shown in a simulation with no real clock. SRV (U cli), CELL and SPLIT (the mark's carry) and the families never run are open for more reasons"
+   },
+   "why": "Only V4 (R lww) and BUY (R outside) are not met for want of a writer; every other row is open."
+  },
+  {
+   "req": "P-21",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "The semantics hold in E-22 (383 answers, 17 timeouts of 400, never two answers), but an ask is three persisted commits, 6.0 ms against two hops; a service on the none rung was not built. Open for all 20"
+   }
+  },
+  {
+   "req": "P-22",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: 'takeable within one tick by the writer's clock' needs writer time and claim at one writer; v4 has neither (R lww, T empty), so a replica whose clock runs ahead hands a delayed message out early, and two members can hand out one"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "fails",
+     "basis": "V4: 'takeable within one tick by the writer's clock' needs writer time and claim at one writer; v4 has neither (R lww, T empty), so a replica whose clock runs ahead hands a delayed message out early, and two members can hand out one"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "E-22: a delayed message never taken early by writer time with the clock skewed 200 ms, a waiting take appends nothing. Not shown: delay counts from the adder's clock (E-22 D5), and the wake pin of C + one hop on a real kernel"
+   },
+   "why": "Only V4 differs; its judge names R lww and T."
+  },
+  {
+   "req": "P-22",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "not",
+     "basis": "V4: a take is not safe on V4 (P-09: R lww and no writer time), so priorities have nothing to stand on; v4 has no claim and no queue"
+    },
+    {
+     "when": {
+      "T": [
+       "—"
+      ]
+     },
+     "v": "not",
+     "basis": "V4: a take is not safe on V4 (P-09: R lww and no writer time), so priorities have nothing to stand on; v4 has no claim and no queue"
+    },
+    {
+     "when": {
+      "R": [
+       "isr"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "K": [
+       "hyb"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "D": [
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table"
+    },
+    {
+     "when": {
+      "R": [
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "R slog: the library is the same (K lib) but rests on the one-writer promise, and R slog's writer change (seal and metadata CAS, 3 to 4 novel mechanisms in SPACE) was never modelled or run here"
+    },
+    {
+     "when": {
+      "R": [
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "put"
+      ]
+     },
+     "v": "open",
+     "basis": "R obj, Q put: 'the object-store log (a commit is a PUT, the writer holds a lease by CAS)' was never modelled or run here, so the one-writer promise is not shown"
+    },
+    {
+     "when": {
+      "W": [
+       "lease any",
+       "lease ridx"
+      ]
+     },
+     "v": "open",
+     "basis": "W lease: OBJ's judge adds 'W lease was not tested' (PD's lease ridx reads are untested too)"
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "T": [
+       "tso"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "S": [
+       "lsm"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "O": [
+       "hlc"
+      ]
+     },
+     "v": "open",
+     "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "open",
+     "basis": "BUY: not tried; JetStream has no priority inside a stream, so it would take a subject or consumer per level"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-22's queue keeps one sub-partition per priority level inside a partition and takes the levels in order; the priority-0 message came first in 100 of 100 seeds in 3 modes under faults and the shuffle. A first version, not tuned or timed"
+   },
+   "why": "V4 rests on its P-09 cell (R lww, T); the open rows are named by family."
+  }
+ ]
+}
