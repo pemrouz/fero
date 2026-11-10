@@ -1,9 +1,9 @@
-# ramp: every option on every bound, 2026-11-09T19:04:05Z, Python 3.13.17, 4 vCPU, load 6.13 4.10 3.44
-ramp two: 3,344 states, 0.3s: all hold
+# ramp: every option on every bound, 2026-11-10T01:08:41Z, Python 3.13.17, 4 vCPU, load 3.20 3.33 2.16
+ramp two: 3,344 states, 0.1s: all hold
     L: 3,344 judged states, 0 cannot reach the goal
     V: 3,344 judged states, 0 cannot reach the goal
     W: 3,344 judged states, 0 cannot reach the goal
-ramp fol: 5,114 states, 0.5s: all hold
+ramp fol: 5,114 states, 0.3s: all hold
     L: 5,114 judged states, 0 cannot reach the goal
     V: 5,114 judged states, 0 cannot reach the goal
     W: 5,114 judged states, 0 cannot reach the goal
@@ -15,15 +15,15 @@ ramp move: 1,008 states, 0.0s: all hold
     L: 1,008 judged states, 0 cannot reach the goal
     V: 1,008 judged states, 0 cannot reach the goal
     W: 1,008 judged states, 0 cannot reach the goal
-ramp fol-move: 294,450 states, 44.1s: all hold
+ramp fol-move: 294,450 states, 27.5s: all hold
     L: 294,450 judged states, 0 cannot reach the goal
     V: 294,450 judged states, 0 cannot reach the goal
     W: 294,450 judged states, 0 cannot reach the goal
-ramp gc-move: 20,730 states, 2.0s: all hold
+ramp gc-move: 20,730 states, 1.2s: all hold
     L: 20,730 judged states, 0 cannot reach the goal
     V: 20,730 judged states, 0 cannot reach the goal
     W: 20,730 judged states, 0 cannot reach the goal
-noserve two: 3,072 states, 0.2s: L (4 steps), V (9 steps)
+noserve two: 3,072 states, 0.1s: L (4 steps), V (9 steps)
     L: 3,072 judged states, 124 cannot reach the goal
     V: 3,072 judged states, 46 cannot reach the goal
     W: 3,072 judged states, 0 cannot reach the goal
@@ -42,7 +42,7 @@ noserve two: 3,072 states, 0.2s: L (4 steps), V (9 steps)
      7. plan ()
      8. r2 (('r', 'ldr'), ('x', 'q'))
      9. finish ()
-noserve fol: 4,715 states, 0.3s: L (5 steps), V (9 steps)
+noserve fol: 4,715 states, 0.2s: L (5 steps), V (9 steps)
     L: 4,715 judged states, 103 cannot reach the goal
     V: 4,715 judged states, 55 cannot reach the goal
     W: 4,715 judged states, 0 cannot reach the goal
@@ -80,7 +80,7 @@ noserve move: 1,008 states, 0.0s: V (9 steps)
      7. plan ()
      8. r2 (('r', 'ldr'), ('x', 'p'))
      9. finish ()
-noserve fol-move: 263,520 states, 39.6s: L (4 steps), V (9 steps)
+noserve fol-move: 263,520 states, 21.0s: L (4 steps), V (9 steps)
     L: 263,520 judged states, 7,356 cannot reach the goal
     V: 263,520 judged states, 3,354 cannot reach the goal
     W: 263,520 judged states, 0 cannot reach the goal
@@ -99,7 +99,7 @@ noserve fol-move: 263,520 states, 39.6s: L (4 steps), V (9 steps)
      7. plan ()
      8. r2 (('r', 'ldr'), ('x', 'q'))
      9. finish ()
-noserve gc-move: 20,002 states, 2.4s: V (9 steps)
+noserve gc-move: 20,002 states, 1.3s: V (9 steps)
     L: 20,002 judged states, 0 cannot reach the goal
     V: 20,002 judged states, 72 cannot reach the goal
     W: 20,002 judged states, 0 cannot reach the goal
@@ -113,5 +113,20 @@ noserve gc-move: 20,002 states, 2.4s: V (9 steps)
      7. plan ()
      8. r2 (('r', 'ldr'), ('x', 'p'))
      9. finish ()
-# ramp: gc-fol, which does not finish, on the chosen option (a partial check), 2026-11-09T19:37:24Z, Python 3.13.17, 4 vCPU, load 5.74 3.14 2.77
-ramp gc-fol: 3,000,002 states, 169.5s: all hold (STOPPED AT THE STATE LIMIT)
+# ramp: gc-fol, which does not finish, on the chosen option (a partial check), 2026-11-10T01:09:34Z, Python 3.13.17, 4 vCPU, load 3.15 3.29 2.21
+ramp gc-fol: 3,000,002 states, 183.4s: all hold (STOPPED AT THE STATE LIMIT)
+# ramp: garbage collection without each of its two guards (gc.committed: holds; gc.older: breaks KEEP), 2026-11-10T01:23:46Z, Python 3.13.17, 4 vCPU, load 4.01 3.43 2.93
+ramp gc: 1,146 states, 0.1s: all hold
+    L: 1,146 judged states, 0 cannot reach the goal
+    V: 1,146 judged states, 0 cannot reach the goal
+    W: 1,146 judged states, 0 cannot reach the goal
+ramp gc-move: 35,672 states, 3.2s: all hold
+    L: 35,672 judged states, 0 cannot reach the goal
+    V: 35,672 judged states, 0 cannot reach the goal
+    W: 35,672 judged states, 0 cannot reach the goal
+ramp gc: 60 states, 0.0s: KEEP (4 steps) (STOPPED AT THE STATE LIMIT)
+  KEEP: shortest trace, 4 steps
+     1. prepare (('t', 1), ('x', 'p'))
+     2. prepare (('t', 1), ('x', 'q'))
+     3. commit (('t', 1), ('x', 'p'))
+     4. gc (('t', 1), ('x', 'p'))

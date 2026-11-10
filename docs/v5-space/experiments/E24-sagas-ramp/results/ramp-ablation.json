@@ -1,0 +1,2108 @@
+{
+ "bounds": [
+  "two",
+  "fol",
+  "gc",
+  "move"
+ ],
+ "verify": [
+  "fol-move",
+  "gc-move"
+ ],
+ "pinned": [
+  "move.fresh",
+  "finish.ghost"
+ ],
+ "base": {
+  "two": {
+   "states": 3344,
+   "secs": 0.15,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3344,
+    9892,
+    8506098927768461235
+   ],
+   "judged": {
+    "L": [
+     3344,
+     0
+    ],
+    "V": [
+     3344,
+     0
+    ],
+    "W": [
+     3344,
+     0
+    ]
+   }
+  },
+  "fol": {
+   "states": 5114,
+   "secs": 0.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5114,
+    17149,
+    13403366136410440119
+   ],
+   "judged": {
+    "L": [
+     5114,
+     0
+    ],
+    "V": [
+     5114,
+     0
+    ],
+    "W": [
+     5114,
+     0
+    ]
+   }
+  },
+  "gc": {
+   "states": 845,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    845,
+    2390,
+    11908368016826568795
+   ],
+   "judged": {
+    "L": [
+     845,
+     0
+    ],
+    "V": [
+     845,
+     0
+    ],
+    "W": [
+     845,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 1008,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1008,
+    3090,
+    15714981882177069284
+   ],
+   "judged": {
+    "L": [
+     1008,
+     0
+    ],
+    "V": [
+     1008,
+     0
+    ],
+    "W": [
+     1008,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "prepare.once",
+   "dropped"
+  ],
+  [
+   "commit.once",
+   "dropped"
+  ],
+  [
+   "commit.com",
+   "dropped"
+  ],
+  [
+   "commit.ack",
+   "dropped"
+  ],
+  [
+   "commitold.once",
+   "dropped"
+  ],
+  [
+   "commitold.allprep",
+   "dropped"
+  ],
+  [
+   "commitold.com",
+   "dropped"
+  ],
+  [
+   "commitold.ack",
+   "dropped"
+  ],
+  [
+   "r1.stage",
+   "dropped"
+  ],
+  [
+   "r1.unread",
+   "kept: with the others dropped it breaks R2 on two in 8 steps"
+  ],
+  [
+   "plan.stage",
+   "dropped"
+  ],
+  [
+   "r2.needs",
+   "dropped"
+  ],
+  [
+   "r2.found",
+   "dropped"
+  ],
+  [
+   "r2.commit",
+   "dropped"
+  ],
+  [
+   "restart.needs",
+   "dropped"
+  ],
+  [
+   "gc.committed",
+   "dropped"
+  ],
+  [
+   "gc.drop",
+   "dropped"
+  ],
+  [
+   "move.com",
+   "dropped"
+  ],
+  [
+   "commitold.older",
+   "dropped in the final pass"
+  ],
+  [
+   "restart.stage",
+   "dropped in the final pass"
+  ],
+  [
+   "restart.reset",
+   "dropped in the final pass"
+  ],
+  [
+   "gc.older",
+   "dropped in the final pass"
+  ],
+  [
+   "move.committed",
+   "dropped in the final pass"
+  ],
+  [
+   "restart.gone",
+   "dropped in the final pass"
+  ]
+ ],
+ "removed": [
+  "prepare.once",
+  "commit.once",
+  "commit.com",
+  "commit.ack",
+  "commitold.once",
+  "commitold.allprep",
+  "commitold.com",
+  "commitold.ack",
+  "r1.stage",
+  "plan.stage",
+  "r2.needs",
+  "r2.found",
+  "r2.commit",
+  "restart.needs",
+  "gc.committed",
+  "gc.drop",
+  "move.com",
+  "commitold.older",
+  "restart.stage",
+  "restart.reset",
+  "gc.older",
+  "move.committed",
+  "restart.gone"
+ ],
+ "put_back": [],
+ "minimal": {
+  "two": {
+   "states": 2565,
+   "secs": 0.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2565,
+    7638,
+    2673271991868482241
+   ],
+   "judged": {
+    "L": [
+     2565,
+     0
+    ],
+    "V": [
+     2565,
+     0
+    ],
+    "W": [
+     2565,
+     0
+    ]
+   }
+  },
+  "fol": {
+   "states": 5187,
+   "secs": 0.32,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5187,
+    17869,
+    18437669216379813628
+   ],
+   "judged": {
+    "L": [
+     5187,
+     0
+    ],
+    "V": [
+     5187,
+     0
+    ],
+    "W": [
+     5187,
+     0
+    ]
+   }
+  },
+  "gc": {
+   "states": 419,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    419,
+    1240,
+    13764659982237001051
+   ],
+   "judged": {
+    "L": [
+     419,
+     0
+    ],
+    "V": [
+     419,
+     0
+    ],
+    "W": [
+     419,
+     0
+    ]
+   }
+  },
+  "move": {
+   "states": 1074,
+   "secs": 0.06,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1074,
+    3373,
+    17870437505960768650
+   ],
+   "judged": {
+    "L": [
+     1074,
+     0
+    ],
+    "V": [
+     1074,
+     0
+    ],
+    "W": [
+     1074,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "fol-move": {
+   "states": 184512,
+   "secs": 18.16,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    184512,
+    893012,
+    5673034297578590755
+   ],
+   "judged": {
+    "L": [
+     184512,
+     0
+    ],
+    "V": [
+     184512,
+     0
+    ],
+    "W": [
+     184512,
+     0
+    ]
+   }
+  },
+  "gc-move": {
+   "states": 9752,
+   "secs": 0.78,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    9752,
+    40384,
+    5360747197748034033
+   ],
+   "judged": {
+    "L": [
+     9752,
+     0
+    ],
+    "V": [
+     9752,
+     0
+    ],
+    "W": [
+     9752,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "prepare.once",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "prepare.vers",
+   "kind": "update",
+   "role": "write",
+   "note": "the version is kept, with its unit id and siblings, invisible to round 1",
+   "cmp": null,
+   "alone": [
+    "two",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "id": "prepare.ack",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "commit.once",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commit.allprep",
+   "kind": "guard",
+   "role": "write",
+   "note": "RAMP: commit markers only after every prepare is acked",
+   "cmp": null,
+   "alone": [
+    "two",
+    "KEEP",
+    1,
+    [
+     "KEEP"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "KEEP",
+    1,
+    [
+     "KEEP"
+    ]
+   ],
+   "final_trace": [
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "id": "commit.newer",
+   "kind": "guard",
+   "role": "write",
+   "note": "lastCommit only rises (max)",
+   "cmp": ">",
+   "alone": [
+    "two",
+    "L",
+    7,
+    [
+     "L",
+     "V",
+     "W"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    12,
+    [
+     "L",
+     "V"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "commit.com",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commit.last",
+   "kind": "update",
+   "role": "write",
+   "note": "the new version becomes the one round 1 returns",
+   "cmp": null,
+   "alone": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "commit.ack",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commitold.once",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commitold.allprep",
+   "kind": "guard",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commitold.older",
+   "kind": "guard",
+   "role": "write",
+   "note": "a marker older than lastCommit leaves lastCommit alone",
+   "cmp": "<=",
+   "alone": [
+    "two",
+    "W",
+    4,
+    [
+     "W"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commitold.com",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "commitold.ack",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "r1.stage",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "r1.unread",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "R2",
+    8,
+    [
+     "R2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ]
+   ]
+  },
+  {
+   "id": "r1.mono",
+   "kind": "guard",
+   "role": "mono",
+   "note": "fero's read rule: a server answers only once its fold reached what this process saw there",
+   "cmp": ">=",
+   "alone": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'fol'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "r1.get",
+   "kind": "update",
+   "role": "read",
+   "note": "round 1: the lastCommit version, with its siblings",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "plan.stage",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "plan.all",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "plan.plan",
+   "kind": "update",
+   "role": "seq",
+   "note": "round 2 is planned from round 1",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "r2.stage",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "R2",
+    1,
+    [
+     "R2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "id": "r2.needs",
+   "kind": "guard",
+   "role": "read",
+   "note": "a sibling names a newer unit here than round 1 returned",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "r2.found",
+   "kind": "guard",
+   "role": "read",
+   "note": "the replica holds that version (else it answers retry)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "r2.get",
+   "kind": "update",
+   "role": "read",
+   "note": "round 2: the exact version, by unit id",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L",
+    4,
+    [
+     "L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    4,
+    [
+     "L"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ]
+   ]
+  },
+  {
+   "id": "r2.commit",
+   "kind": "update",
+   "role": "repair",
+   "note": "a pending version fetched by id is committed at the writer (a sibling is)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "r2.last",
+   "kind": "update",
+   "role": "repair",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L",
+    4,
+    [
+     "L",
+     "V"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    4,
+    [
+     "L",
+     "V"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "crash",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "restart.stage",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "restart.needs",
+   "kind": "guard",
+   "role": "read",
+   "note": "",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "restart.gone",
+   "kind": "guard",
+   "role": "read",
+   "note": "the writer no longer holds it (collected): read again",
+   "cmp": null,
+   "alone": [
+    "two",
+    "LIMIT",
+    3000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "restart.reset",
+   "kind": "update",
+   "role": "read",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "gc",
+    "L",
+    10,
+    [
+     "L"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "finish.stage",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "finish.complete",
+   "kind": "guard",
+   "role": "read",
+   "note": "no sibling names a newer unit than the reader holds",
+   "cmp": null,
+   "alone": [
+    "two",
+    "RA",
+    7,
+    [
+     "RA"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "RA",
+    7,
+    [
+     "RA"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "finish.next",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "finish.seen",
+   "kind": "update",
+   "role": "mono",
+   "note": "the process remembers the highest version it saw",
+   "cmp": null,
+   "alone": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'fol'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "finish.ghost",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "gc.older",
+   "kind": "guard",
+   "role": "gc",
+   "note": "keep the lastCommit version",
+   "cmp": "<",
+   "alone": [
+    "gc",
+    "KEEP",
+    4,
+    [
+     "KEEP"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gc.committed",
+   "kind": "guard",
+   "role": "gc",
+   "note": "keep a pending version until its commit marker",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gc.drop",
+   "kind": "update",
+   "role": "gc",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "move.fresh",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "move.pending",
+   "kind": "update",
+   "role": "carry",
+   "note": "the move carries pending versions",
+   "cmp": null,
+   "alone": [
+    "move",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "move",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "move.committed",
+   "kind": "update",
+   "role": "carry",
+   "note": "... committed versions",
+   "cmp": null,
+   "alone": [
+    "move",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "move.com",
+   "kind": "update",
+   "role": "carry",
+   "note": "... the commit markers",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "move.last",
+   "kind": "update",
+   "role": "carry",
+   "note": "... lastCommit",
+   "cmp": null,
+   "alone": [
+    "move",
+    "W",
+    3,
+    [
+     "V",
+     "W"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "move",
+    "V",
+    8,
+    [
+     "V"
+    ]
+   ],
+   "final_trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "move",
+     "()"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "prepare.vers",
+   "caught": [
+    "two",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "prepare.ack",
+   "caught": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "commit.allprep",
+   "caught": [
+    "two",
+    "KEEP",
+    1,
+    [
+     "KEEP"
+    ]
+   ],
+   "trace": [
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "commit.newer",
+   "caught": [
+    "two",
+    "L",
+    12,
+    [
+     "L",
+     "V"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "commit.last",
+   "caught": [
+    "two",
+    "W",
+    0,
+    [
+     "W"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "r1.unread",
+   "caught": [
+    "two",
+    "R2",
+    8,
+    [
+     "R2"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "r1.mono",
+   "caught": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'fol'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "r1.get",
+   "caught": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "plan.all",
+   "caught": [
+    "two",
+    "ERR",
+    2,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "plan.plan",
+   "caught": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "r2.stage",
+   "caught": [
+    "two",
+    "R2",
+    1,
+    [
+     "R2"
+    ]
+   ],
+   "trace": [
+    [
+     "r2",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "r2.get",
+   "caught": [
+    "two",
+    "L",
+    4,
+    [
+     "L"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "r2.last",
+   "caught": [
+    "two",
+    "L",
+    4,
+    [
+     "L",
+     "V"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'p'))"
+    ],
+    [
+     "crash",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "finish.stage",
+   "caught": [
+    "two",
+    "ERR",
+    1,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "finish.complete",
+   "caught": [
+    "two",
+    "RA",
+    7,
+    [
+     "RA"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "prepare",
+     "(('t', 1), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 1), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "finish.next",
+   "caught": [
+    "two",
+    "L",
+    0,
+    [
+     "L"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "finish.seen",
+   "caught": [
+    "fol",
+    "MONO",
+    10,
+    [
+     "MONO"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'fol'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "move.pending",
+   "caught": [
+    "move",
+    "KEEP",
+    3,
+    [
+     "KEEP"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "move",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "move.last",
+   "caught": [
+    "move",
+    "V",
+    8,
+    [
+     "V"
+    ]
+   ],
+   "trace": [
+    [
+     "prepare",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "commit",
+     "(('t', 2), ('x', 'q'))"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'p'))"
+    ],
+    [
+     "r1",
+     "(('r', 'ldr'), ('x', 'q'))"
+    ],
+    [
+     "plan",
+     "()"
+    ],
+    [
+     "finish",
+     "()"
+    ],
+    [
+     "move",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "commit.newer",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "flip",
+   "rule": "r1.mono",
+   "caught": [
+    "two",
+    "L",
+    1,
+    [
+     "L"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "prepare: vers <-> ack",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "r2: get <-> last",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "finish: next <-> seen",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "move: pending <-> last",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "ramp",
+ "secs": 550
+}

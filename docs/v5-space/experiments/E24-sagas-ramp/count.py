@@ -27,21 +27,25 @@ SAGA = [
      'Kafka KIP-98: InitProducerId bumps the epoch; markers go to every partition of the open transaction'),
     ('fail.raise', 'a refusal raises the fence (kernel)', 'NOVEL: no cited system commits a record for a refused write'),
     ('.holds0', 'fenced writes to the intent row', 'Chubby sequencer checked by the resource (here #sagas in M)'),
-    ('.holdsN', 'fenced writes to the intent row', 'Chubby'),
+    ('.holdsN', 'fenced writes to the intent row', 'Chubby sequencer checked by the resource (here #sagas in M)'),
     ('.noother', 'locks owned by the unit; resolve an unfinished unit first',
      'Percolator (Peng and Dabek, OSDI 2010): a transaction that meets a dead one\'s lock rolls it forward or back first'),
     ('other.', 'locks owned by the unit; resolve an unfinished unit first', 'Percolator'),
-    ('backoff.', 'locks owned by the unit; resolve an unfinished unit first', 'Percolator (wait for the lock\'s owner)'),
+    ('backoff.', 'locks owned by the unit; resolve an unfinished unit first', 'Percolator'),
     ('retry.', 'locks owned by the unit; resolve an unfinished unit first', 'Percolator'),
+    # counted strictly: new to sagas. If the judges accept Kafka's end markers as "the
+    # same state and the same rules in the same role" (DEV-10 b), this line is published
+    # and the saga's novel count is 0.
     ('decide.pc', 'the ender writes every partition (undo every step)',
-     'Kafka KIP-98: abort markers go to every partition registered in the transaction, fencing a zombie there'),
+     'NOVEL (strict count): no published saga undoes steps that never ran. Nearest precedent: Kafka KIP-98 '
+     '(end markers go to every partition of the transaction) with KIP-890 (the epoch rises at every end)'),
     ('', 'saga log: intent row, forward and backward recovery, program order',
      'Garcia-Molina and Salem, SIGMOD 1987 (the saga log; backward recovery by compensation; forward recovery)'),
 ]
 
 RAMP = [
     ('r1.mono', 'monotonic reads (fero\'s read rule, API.md "Reads")', 'existing fero rule, not RAMP\'s'),
-    ('finish.seen', 'monotonic reads (fero\'s read rule)', 'existing fero rule'),
+    ('finish.seen', 'monotonic reads (fero\'s read rule, API.md "Reads")', 'existing fero rule, not RAMP\'s'),
     ('r2.commit', 'commit on fetch', 'NOVEL here: RAMP leaves a failed client\'s commits to recovery'),
     ('r2.last', 'commit on fetch', 'NOVEL here'),
     ('gc.', 'version garbage collection', 'RAMP (Bailis et al., SIGMOD 2014), versions kept for in-flight reads'),
@@ -61,23 +65,30 @@ def classify(rid, table):
 
 def main():
     o = json.load(open(sys.argv[1]))
-    table = RAMP if 'ramp' in sys.argv[1] else SAGA
+    table = RAMP if o.get('option') in ('ramp', 'noserve') else SAGA
     kept = [r for r in o.get('rules', []) if r['kept'] and not r.get('pinned')]
     mechs = {}
+    prec = {}
     for r in kept:
         m, p = classify(r['id'], table)
-        mechs.setdefault((m, p), []).append(r['id'])
+        mechs.setdefault(m, []).append(r['id'])
+        prec.setdefault(m, p)          # the first (fullest) precedent line of the mechanism
+    und = [r['id'] for r in kept if r.get('final') and r['final'][1] == 'LIMIT']
     print(f'## {o.get("option")}: {len(kept)} rules kept, by mechanism\n')
+    if und:
+        print(f'Kept without a counterexample (their removal stops at the state limit): ' +
+              ', '.join(f'`{i}`' for i in und) + f'. Needed with a counterexample: {len(kept) - len(und)}.\n')
     print('| mechanism | rules kept | precedent |')
     print('|---|---|---|')
     novel_rules = 0
     novel_mechs = 0
-    for (m, p), ids in mechs.items():
+    for m, ids in mechs.items():
+        p = prec[m]
         print(f'| {m} | {len(ids)}: ' + ', '.join(f'`{i}`' for i in ids) + f' | {p} |')
         if p.startswith('NOVEL'):
             novel_rules += len(ids)
             novel_mechs += 1
-    print(f'\nNovel by this count: {novel_mechs} mechanisms, {novel_rules} rules.')
+    print(f'\nNovel by this count: {novel_mechs} mechanisms, {novel_rules} rules.\n')
 
 
 if __name__ == '__main__':

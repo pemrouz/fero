@@ -2,15 +2,19 @@
 # E-24: sagas with fenced locks (P-15's MUST) and RAMP-Fast (its SHOULD).
 # Two exhaustive models on E-16's engine (E-17's rule language, unchanged), and
 # real Elle 0.2.8 on simulated histories.
-#   ./run.sh check    every option of both models on every bound (traces of what breaks),
-#                     and RAMP's gc-fol, which does not finish, once, on the chosen option
-#   ./run.sh ablate   DEV-10: ablation and mutants of the chosen options (saga fullundo, ramp)
+#   ./run.sh check    every option of both models on every bound (traces of what breaks);
+#                     RAMP's gc-fol, which does not finish, once, on the chosen option; RAMP's
+#                     garbage collection without each of its guards; the saga's three lock
+#                     guards with tokens capped (steal_check.py)
+#   ./run.sh ablate   DEV-10: ablation and mutants of the chosen options (saga fullundo, ramp);
+#                     then resolve24.py settles the saga's swap mutants by state digest
 #   ./run.sh elle     elle/sim.py writes 6 x 100 histories; real Elle checks them;
 #                     then 4 x 1,000 more histories for the direct count of fractured reads
-#   ./run.sh report   results/summary.md from the ablation files
+#   ./run.sh report   results/summary.md and results/count.md from the ablation files
 #   ./run.sh          all four, in order
 # Every model and JVM step runs under $SP/bin/heavy, one hold per step, each under 25 minutes.
-# An ablation resumes from its .cache file, so it runs as several holds until it ends.
+# An ablation resumes from its .cache file, so it runs as several holds until it ends
+# (the saga's takes about 3.5 CPU hours, RAMP's 10 minutes).
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SP="${SP:-/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad}"
@@ -28,7 +32,7 @@ hdr() { echo "# $1, $(date -u +%FT%TZ), $(python3 --version), $(nproc) vCPU, loa
 ablate() {
   n=0
   until [ -f "$3" ]; do
-    n=$((n + 1)); [ $n -le 10 ] || { echo "ablation $2 did not end in 10 holds" >&2; exit 1; }
+    n=$((n + 1)); [ $n -le 20 ] || { echo "ablation $2 did not end in 20 holds" >&2; exit 1; }
     $HEAVY timeout 1500 python3 $CLI "$1" "$2" --ablate "$3" --limit 3000000 || true
   done
 }
@@ -36,13 +40,18 @@ ablate() {
 if want check; then
   hdr 'saga: every option on every bound' > $R/design-saga.txt
   $HEAVY timeout 1500 sh -c "for o in draft owned bump fullundo raise; do python3 $CLI models/saga.py \$o --limit 3000000; done" >> $R/design-saga.txt 2>&1
+  hdr 'saga fullundo: safety with tokens capped at 4 and one lock guard dropped (steal_check.py)' > $R/steal-check.txt
+  $HEAVY timeout 1500 python3 steal_check.py --cap 4 --secs 280 >> $R/steal-check.txt 2>&1
   hdr 'ramp: every option on every bound' > $R/design-ramp.txt
   $HEAVY timeout 1500 sh -c "for o in ramp noserve; do python3 $CLI models/ramp.py \$o --limit 3000000; done" >> $R/design-ramp.txt 2>&1
   hdr 'ramp: gc-fol, which does not finish, on the chosen option (a partial check)' >> $R/design-ramp.txt
   $HEAVY timeout 1500 python3 $CLI models/ramp.py ramp --bound gc-fol --limit 3000000 >> $R/design-ramp.txt 2>&1
+  hdr "ramp: garbage collection without each of its two guards (gc.committed: holds; gc.older: breaks KEEP)" >> $R/design-ramp.txt
+  $HEAVY timeout 600 sh -c "python3 $CLI models/ramp.py ramp --drop gc.committed --bound gc --bound gc-move --limit 3000000; python3 $CLI models/ramp.py ramp --drop gc.older --bound gc --limit 3000000" >> $R/design-ramp.txt 2>&1
 fi
 if want ablate; then
   ablate models/saga.py fullundo $R/saga-fullundo-ablation.json
+  python3 resolve24.py models/saga.py $R/saga-fullundo-ablation.json
   ablate models/ramp.py ramp $R/ramp-ablation.json
 fi
 if want elle; then
@@ -57,4 +66,6 @@ if want elle; then
 fi
 if want report; then
   python3 $REPORT $R/saga-fullundo-ablation.json $R/ramp-ablation.json > $R/summary.md
+  # the kept rules by mechanism, each with its precedent (DEV-10 a, b): this agent's count
+  { python3 count.py $R/saga-fullundo-ablation.json; python3 count.py $R/ramp-ablation.json; } > $R/count.md
 fi
