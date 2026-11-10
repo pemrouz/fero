@@ -1,0 +1,8 @@
+4479a92 SCHEDULE_VERSION 1 2026-08-01 feat(v4/contract): W4 — the SCHEDULE contract is executable
+6b615e2 SCHEDULE_VERSION 2 2026-08-01 feat(v4/kernel,seam): W3 — the deep-path law (SCHEDULE clause 10, VERSION 2)
+b831319 SCHEDULE_VERSION 2 2026-08-01 feat(v4/api): W9 — each()/rowCount() on the handle + the frozen safe snapshot
+46df5f9 SCHEDULE_VERSION 3 2026-08-01 docs+feat(v4/contract): W15 + W16 + W6 — the value-domain law, the housekeeping decisions
+ff85e6c SCHEDULE_VERSION 3 2026-08-03 docs(v4/contract): SCHEDULE.md catches up to VERSION 3 — header, CI claim, clause 6
+dc65b8f SCHEDULE_VERSION 4 2026-08-03 fix(v4/kernel,api,seam): mid-batch attach observes the batch boundary — SCHEDULE_VERSION 4
+2b8b780 SCHEDULE_VERSION 4 2026-08-03 perf(v4): self-contained gates — the v2 referents retire ahead of the root promotion
+63fea66 SCHEDULE_VERSION 4 2026-09-22 docs: install instructions for npm; the site says `npm i data`

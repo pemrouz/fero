@@ -1,0 +1,257 @@
+[
+ {
+  "situation": "remove deep; under object; leaf own number || 4479a92: refused | 6b615e2: taken",
+  "roots": 1840,
+  "example": {
+   "index": 20,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k9417\",\"n\"]}",
+   "before": "{\"n\":n40837800.0,\"s\":\"42\",\"tags\":[\"a\\u0000b\",F]}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n40837800.0,\"s\":\"42\",\"tags\":[\"a\\u0000b\",F]}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"s\":\"42\",\"tags\":[\"a\\u0000b\",F]}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own number || 4479a92: refused | 6b615e2: taken",
+  "roots": 303,
+  "example": {
+   "index": 40,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k11055\",\"meta\",\"meta\"]}",
+   "before": "{\"n\":n40856000.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"1\":{\"c\":n408e5800.0,\"b\":F,\"tags\":n405cc000.0,\"x.y\":{\"2\":\"hello world\",\"c\":n40858800.0}},\"2\":nNaN,\"meta\":n4085b000.0,\"b\":{\"0\":n4057c000.0}}}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n40856000.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"1\":{\"c\":n408e5800.0,\"b\":F,\"tags\":n405cc000.0,\"x.y\":{\"2\":\"hello world\",\"c\":n40858800.0}},\"2\":nNaN,\"meta\":n4085b000.0,\"b\":{\"0\":n4057c000.0}}}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n40856000.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"1\":{\"c\":n408e5800.0,\"b\":F,\"tags\":n405cc000.0,\"x.y\":{\"2\":\"hello world\",\"c\":n40858800.0}},\"2\":nNaN,\"b\":{\"0\":n4057c000.0}}}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own object || 4479a92: refused | 6b615e2: taken",
+  "roots": 255,
+  "example": {
+   "index": 159,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k3531\",\"n\"]}",
+   "before": "{\"n\":{\"10\":F,\"meta\":N,\"c\":n405aa800.0,\"tags\":n433fffff.ffffffff},\"s\":\"é\",\"tags\":[n403f0000.0,N,\"0\",n405f3800.0],\"meta\":{\"1\":T,\"2\":n40798000.0,\"10\":nc0555800.0,\"c\":\"hello world\"}}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":{\"10\":F,\"meta\":N,\"c\":n405aa800.0,\"tags\":n433fffff.ffffffff},\"s\":\"é\",\"tags\":[n403f0000.0,N,\"0\",n405f3800.0],\"meta\":{\"1\":T,\"2\":n40798000.0,\"10\":nc0555800.0,\"c\":\"hello world\"}}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"s\":\"é\",\"tags\":[n403f0000.0,N,\"0\",n405f3800.0],\"meta\":{\"1\":T,\"2\":n40798000.0,\"10\":nc0555800.0,\"c\":\"hello world\"}}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own string || 4479a92: refused | 6b615e2: taken",
+  "roots": 172,
+  "example": {
+   "index": 616,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k17779\",\"meta\",\"0\"]}",
+   "before": "{\"n\":N,\"s\":F,\"meta\":{\"0\":\"a\\u0000b\"},\"a\":N,\"b\":U}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":N,\"s\":F,\"meta\":{\"0\":\"a\\u0000b\"},\"a\":N,\"b\":U}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":N,\"s\":F,\"meta\":{},\"a\":N,\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own object || 4479a92: refused | 6b615e2: taken",
+  "roots": 133,
+  "example": {
+   "index": 243,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k13279\",\"meta\",\"tags\"]}",
+   "before": "{\"n\":n4079b000.0,\"s\":\"42\",\"tags\":[n407f8000.0,n40694000.0,n408d9000.0,{\"1\":N,\"meta\":\"é\"}],\"meta\":{\"0\":n4088b800.0,\"1\":{},\"meta\":\"0\",\"tags\":{\"s\":n4076f000.0},\"b\":{\"1\":\"é\",\"meta\":n40652000.0,\"s\":n4076d000.0}},\"x.y\":\"a\\u0000b\",\"b\":T}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n4079b000.0,\"s\":\"42\",\"tags\":[n407f8000.0,n40694000.0,n408d9000.0,{\"1\":N,\"meta\":\"é\"}],\"meta\":{\"0\":n4088b800.0,\"1\":{},\"meta\":\"0\",\"tags\":{\"s\":n4076f000.0},\"b\":{\"1\":\"é\",\"meta\":n40652000.0,\"s\":n4076d000.0}},\"x.y\":\"a\\u0000b\",\"b\":T}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n4079b000.0,\"s\":\"42\",\"tags\":[n407f8000.0,n40694000.0,n408d9000.0,{\"1\":N,\"meta\":\"é\"}],\"meta\":{\"0\":n4088b800.0,\"1\":{},\"meta\":\"0\",\"b\":{\"1\":\"é\",\"meta\":n40652000.0,\"s\":n4076d000.0}},\"x.y\":\"a\\u0000b\",\"b\":T}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own array || 4479a92: refused | 6b615e2: taken",
+  "roots": 65,
+  "example": {
+   "index": 1189,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k10912\",\"0\"]}",
+   "before": "{\"0\":[],\"n\":n40746000.0,\"s\":\"😀 ok\",\"tags\":[{\"s\":n40442000.0},\"a\\u0000b\",{\"10\":nc0646c00.0,\"c\":n80000000.0},T],\"a\":N}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"0\":[],\"n\":n40746000.0,\"s\":\"😀 ok\",\"tags\":[{\"s\":n40442000.0},\"a\\u0000b\",{\"10\":nc0646c00.0,\"c\":n80000000.0},T],\"a\":N}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n40746000.0,\"s\":\"😀 ok\",\"tags\":[{\"s\":n40442000.0},\"a\\u0000b\",{\"10\":nc0646c00.0,\"c\":n80000000.0},T],\"a\":N}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own string || 4479a92: refused | 6b615e2: taken",
+  "roots": 51,
+  "example": {
+   "index": 293,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k15783\",\"n\"]}",
+   "before": "{\"1\":n404c0000.0,\"n\":\"😀 ok\",\"s\":\"日本語\"}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"1\":n404c0000.0,\"n\":\"😀 ok\",\"s\":\"日本語\"}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"1\":n404c0000.0,\"s\":\"日本語\"}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own boolean || 4479a92: refused | 6b615e2: taken",
+  "roots": 51,
+  "example": {
+   "index": 1523,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k4683\",\"meta\",\"n\"]}",
+   "before": "{\"n\":n4082e800.0,\"s\":\"true\",\"tags\":[n406b8000.0,{\"1\":\"😀 ok\",\"10\":\"\"},T],\"meta\":{\"1\":{},\"10\":\"hello world\",\"n\":T},\"a\":N,\"b\":U}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n4082e800.0,\"s\":\"true\",\"tags\":[n406b8000.0,{\"1\":\"😀 ok\",\"10\":\"\"},T],\"meta\":{\"1\":{},\"10\":\"hello world\",\"n\":T},\"a\":N,\"b\":U}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n4082e800.0,\"s\":\"true\",\"tags\":[n406b8000.0,{\"1\":\"😀 ok\",\"10\":\"\"},T],\"meta\":{\"1\":{},\"10\":\"hello world\"},\"a\":N,\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own array || 4479a92: refused | 6b615e2: taken",
+  "roots": 50,
+  "example": {
+   "index": 90,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k16498\",\"meta\",\"meta\"]}",
+   "before": "{\"n\":n408ac000.0,\"s\":\"é\",\"meta\":{\"meta\":[],\"tags\":n403d0000.0,\"a\":n407f0000.0}}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n408ac000.0,\"s\":\"é\",\"meta\":{\"meta\":[],\"tags\":n403d0000.0,\"a\":n407f0000.0}}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n408ac000.0,\"s\":\"é\",\"meta\":{\"tags\":n403d0000.0,\"a\":n407f0000.0}}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own null || 4479a92: refused | 6b615e2: taken",
+  "roots": 29,
+  "example": {
+   "index": 84,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k17987\",\"meta\",\"a\"]}",
+   "before": "{\"n\":n40898000.0,\"s\":\"null\",\"meta\":{\"a\":N},\"tags\":n40360000.0}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n40898000.0,\"s\":\"null\",\"meta\":{\"a\":N},\"tags\":n40360000.0}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n40898000.0,\"s\":\"null\",\"meta\":{},\"tags\":n40360000.0}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > object; leaf own bytes || 4479a92: refused | 6b615e2: taken",
+  "roots": 18,
+  "example": {
+   "index": 10085,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k17076\",\"meta\",\"é\"]}",
+   "before": "{\"n\":n40842000.0,\"s\":\"hello world\",\"tags\":[\"42\"],\"meta\":{\"é\":b4e},\"a\":N}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n40842000.0,\"s\":\"hello world\",\"tags\":[\"42\"],\"meta\":{\"é\":b4e},\"a\":N}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n40842000.0,\"s\":\"hello world\",\"tags\":[\"42\"],\"meta\":{},\"a\":N}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own boolean || 4479a92: refused | 6b615e2: taken",
+  "roots": 17,
+  "example": {
+   "index": 3015,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k3734\",\"n\"]}",
+   "before": "{\"n\":F,\"s\":\"0\",\"tags\":[n40882000.0,n407ee000.0,U]}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":F,\"s\":\"0\",\"tags\":[n40882000.0,n407ee000.0,U]}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"s\":\"0\",\"tags\":[n40882000.0,n407ee000.0,U]}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own null || 4479a92: refused | 6b615e2: taken",
+  "roots": 8,
+  "example": {
+   "index": 7520,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k9273\",\"n\"]}",
+   "before": "{\"n\":N,\"s\":{\"0\":\"\\ud83d\",\"1\":\"\\ude00\",\"2\":\" \",\"3\":\"o\",\"4\":\"k\",\"meta\":\"str\"},\"meta\":{}}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":N,\"s\":{\"0\":\"\\ud83d\",\"1\":\"\\ude00\",\"2\":\" \",\"3\":\"o\",\"4\":\"k\",\"meta\":\"str\"},\"meta\":{}}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"0\":\"\\ud83d\",\"1\":\"\\ude00\",\"2\":\" \",\"3\":\"o\",\"4\":\"k\",\"meta\":\"str\"},\"meta\":{}}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object; leaf own bytes || 4479a92: refused | 6b615e2: taken",
+  "roots": 6,
+  "example": {
+   "index": 4145,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k2016\",\"1\"]}",
+   "before": "{\"1\":b050683,\"n\":n40757000.0,\"s\":\"é\",\"b\":U}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"1\":b050683,\"n\":n40757000.0,\"s\":\"é\",\"b\":U}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n40757000.0,\"s\":\"é\",\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "remove deep; under object > bytes; leaf none || 4479a92: refused | 6b615e2: taken",
+  "roots": 2,
+  "example": {
+   "index": 45822,
+   "record": "{\"type\":n40000000.0,\"key\":[\"k829\",\"tags\",\"0\"]}",
+   "before": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":bc81c362e66,\"a\":{\"s\":n3e7ad7f2.9abcaf48}}",
+   "4479a92": {
+    "outcome": "threw: data: ingest() nested-field removal is not supported (v# deep delete) — write undefined/null instead",
+    "after": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":bc81c362e66,\"a\":{\"s\":n3e7ad7f2.9abcaf48}}"
+   },
+   "6b615e2": {
+    "outcome": "applied",
+    "after": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":{\"1\":n403c0000.0,\"2\":n404b0000.0,\"3\":n40470000.0,\"4\":n40598000.0},\"a\":{\"s\":n3e7ad7f2.9abcaf48}}"
+   }
+  }
+ }
+]

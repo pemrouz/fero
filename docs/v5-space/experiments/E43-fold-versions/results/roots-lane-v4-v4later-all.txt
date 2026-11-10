@@ -1,0 +1,8 @@
+# every root of the pair lane-v4-v4later (dc65b8f against 2b8b780, both SCHEDULE_VERSION 4), by what the record met
+15815 roots; 15812 of them have a string on the path of the write
+ 13713  update deep; under object > string; leaf none || dc65b8f: taken | 2b8b780: taken
+  1165  update deep; under object > array > string; leaf none || dc65b8f: taken | 2b8b780: taken
+   694  update deep; under object > object > string; leaf none || dc65b8f: taken | 2b8b780: taken
+   240  update deep; under object > string > absent; leaf none || dc65b8f: taken | 2b8b780: taken
+     2  (rows already apart) update deep; under object > object; leaf absent || dc65b8f: taken | 2b8b780: taken
+     1  (rows already apart) update deep; under object > object > absent; leaf none || dc65b8f: taken | 2b8b780: taken

@@ -1,0 +1,14 @@
+# grep of data at 63fea66 (kernel, ops, api, seam; tests left out) for calls whose result can differ between JavaScript engines or builds
+# pattern: localeCompare | Intl. | toLocale | .sort( | Math.(sin|cos|tan|pow|exp|log|sqrt|cbrt|hypot|atan|random) | ** | Date | performance.now | normalize( | toUpperCase | toLowerCase
+kernel/runtime.ts:239:      const t0 = measure ? performance.now() : 0
+kernel/runtime.ts:242:      if (stats) stats.push({ id: s.id, deltas: countDeltas(batch), ms: performance.now() - t0 })
+kernel/runtime.ts:258:    agenda.sort(byHeight)
+kernel/runtime.ts:263:      const t0 = measure ? performance.now() : 0
+kernel/runtime.ts:267:      if (stats) stats.push({ id: n.id, deltas: countDeltas(out), ms: performance.now() - t0 })
+ops/quantile.ts:81:    vals.sort((a, b) => a - b)
+ops/between.ts:407:    entries.sort((a, b) => ((a[0] as any) < (b[0] as any) ? -1 : (a[0] as any) > (b[0] as any) ? 1 : 0))
+ops/bucket.ts:153:        sk.sorted = [...sk.bySk.keys()].sort(cmpKeys)
+ops/bucket.ts:233:    keys.sort(cmpKeys)
+ops/ordered.ts:87:    this.keys = keys.slice().sort(this.cmp)
+ops/ordered.ts:132:      if (inserts.length > 1) inserts.sort(this.cmp)
+ops/ordered.ts:267:    const keys = [...snap.keys()].sort((a, b) => {
