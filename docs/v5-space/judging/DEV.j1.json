@@ -1,0 +1,873 @@
+{
+ "group": "DEV",
+ "judge": "j1",
+ "cells": [
+  {
+   "req": "DEV-01",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-16",
+     "E-26",
+     "E-30",
+     "E-33",
+     "E-36",
+     "E-38",
+     "E-39"
+    ],
+    "why": "The settled count of novel mechanisms, made by two blind counters and a referee (judging/mechanisms.json 'counts', 'settled'; MECHANISMS.md section 2), is below v4's 13 in every row: DRAFT 6; CELL, SPLIT and SLOG 5; MIN, RUST, SRV, LEAN, LANE, MIN-TS, RLOG, EMB-V8 and SIDE 4; MIN-P and COMP 3; ISR and OBJ 2; PD and BUY 0. The higher of the two counters' counts is at most 8 in these rows, and the open items that could add one each (a new election rule if F-17 is not restated, Z `par`) still leave every row far below 13."
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [],
+     "why": "V4's own settled count is 8 (counter a 8, counter b 11): the referee found two of REQUIREMENTS' thirteen names are not v4's and placed precedents for five more (MECHANISMS.md 4.1). Judged by the same rule as every row, 8 is below the bar of 13 the user wrote."
+    }
+   }
+  },
+  {
+   "req": "DEV-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-32",
+     "E-16",
+     "E-17",
+     "E-17b"
+    ],
+    "why": "E-32 placed every pair the code finds (judging/pairs.json): some sit in an exhaustive model (E-14c, E-15, E-16, E-17, E-20, E-30, E-31 and E-32's composed crossing), some are argued independent, and every row still has open pairs (8 in BUY, 50 to 107 elsewhere) after the second agent's check. No model of these pairs found a counterexample and no argument shows one, so by rule 1 the MUST is open, not failed.",
+    "closes": "E-32's closers (pairs.md sections 7 and 9): K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME, and each row's own model where its replication was never modelled"
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of DRAFT's 309 pairs, 73 sit in an exhaustive model, 29 in a simulation only, 100 are argued independent and 107 are open (E-32 pairs.md section 4, after the second agent's check). Its log replicas, planner hints, the leader's own slow-leader rule and the `memory` rung were never modelled, and `win`'s floor was not in E-32 (b); no model found a counterexample, so the MUST is open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "MIN": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of MIN's 253 pairs, 74 sit in an exhaustive model, 29 in a simulation only, 90 are argued independent and 60 are open (E-32 pairs.md section 4, after the second agent's check). The open ones include PreVote and CheckQuorum against a voter change (PREVOTE), a fork against the log drop (FORKPIN), writer time on an inherited uncommitted tail (WTAIL), a restore against tier names (RESTORENAME), quiet groups (K-22) and the never-modelled dir lease; no model found a counterexample, so rule 1 makes this open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "RUST": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of RUST's 253 pairs, 74 sit in an exhaustive model, 29 in a simulation only, 90 are argued independent and 60 are open (E-32 pairs.md section 4, after the second agent's check). The open ones include PreVote and CheckQuorum against a voter change (PREVOTE), a fork against the log drop (FORKPIN), writer time on an inherited uncommitted tail (WTAIL), a restore against tier names (RESTORENAME), quiet groups (K-22) and the never-modelled dir lease; no model found a counterexample, so rule 1 makes this open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of SRV's 267 pairs, 74 sit in an exhaustive model, 29 in a simulation only, 103 are argued independent and 61 are open (E-32 pairs.md section 4, after the second agent's check). The open ones include PreVote and CheckQuorum against a voter change (PREVOTE), a fork against the log drop (FORKPIN), writer time on an inherited uncommitted tail (WTAIL), a restore against tier names (RESTORENAME), quiet groups (K-22) and the never-modelled dir lease; no model found a counterexample, so rule 1 makes this open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "LEAN": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of LEAN's 255 pairs, 69 sit in an exhaustive model, 27 in a simulation only, 93 are argued independent and 66 are open (E-32 pairs.md section 4, after the second agent's check). As MIN's, and F `ldr` with its warm standby was never modelled; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of CELL's 262 pairs, 57 sit in an exhaustive model, 25 in a simulation only, 87 are argued independent and 93 are open (E-32 pairs.md section 4, after the second agent's check). Its log replicas, the `memory` rung, the leader's own slow-leader rule and the re-key against a restore are in no model; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of LANE's 232 pairs, 51 sit in an exhaustive model, 25 in a simulation only, 71 are argued independent and 85 are open (E-32 pairs.md section 4, after the second agent's check). Its log replicas, planner hints and the leader's own slow-leader rule are in no model; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of SPLIT's 278 pairs, 59 sit in an exhaustive model, 25 in a simulation only, 88 are argued independent and 106 are open (E-32 pairs.md section 4, after the second agent's check). Its log replicas, planner hints, the `memory` rung and the leader's own slow-leader rule are in no model; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of PD's 209 pairs, 44 sit in an exhaustive model, 21 in a simulation only, 78 are argued independent and 66 are open (E-32 pairs.md section 4, after the second agent's check). Its own two-phase commit, timestamp oracle, MVCC and LSM store meet the rest in no model; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of ISR's 214 pairs, 16 sit in an exhaustive model, 20 in a simulation only, 96 are argued independent and 82 are open (E-32 pairs.md section 4, after the second agent's check). ISR's own replication (in-sync set, leader epochs, eligible leaders, controller records) is in no model, and the second agent broke META1 for its #meta records (+27 open); no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of SLOG's 272 pairs, 38 sit in an exhaustive model, 24 in a simulation only, 123 are argued independent and 87 are open (E-32 pairs.md section 4, after the second agent's check). Loglets, their seal and chain and the writer's epoch are in no model, and the second agent broke META1 for its #meta records (+24 open); no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of OBJ's 144 pairs, 24 sit in an exhaustive model, 11 in a simulation only, 54 are argued independent and 55 are open (E-32 pairs.md section 4, after the second agent's check). The object-store log, its manifest CAS and the writer lease are in no model; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of V4's 52 pairs, 0 sit in an exhaustive model, 0 in a simulation only, 2 are argued independent and 50 are open (E-32 pairs.md section 4, after the second agent's check). No v4 mechanism is in any model of this study; v4's open bugs at crossings (REQUIREMENTS section 5) are not a model counterexample, so by rule 1 this is open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "MIN-P": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of MIN-P's 252 pairs, 76 sit in an exhaustive model, 29 in a simulation only, 86 are argued independent and 61 are open (E-32 pairs.md section 4, after the second agent's check). As MIN's, plus K-05: an alter of `copies` or durability against the slot table (the second agent broke ONCE there); no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "MIN-TS": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of MIN-TS's 253 pairs, 74 sit in an exhaustive model, 29 in a simulation only, 90 are argued independent and 60 are open (E-32 pairs.md section 4, after the second agent's check). The open ones include PreVote and CheckQuorum against a voter change (PREVOTE), a fork against the log drop (FORKPIN), writer time on an inherited uncommitted tail (WTAIL), a restore against tier names (RESTORENAME), quiet groups (K-22) and the never-modelled dir lease; no model found a counterexample, so rule 1 makes this open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of RLOG's 268 pairs, 80 sit in an exhaustive model, 29 in a simulation only, 99 are argued independent and 60 are open (E-32 pairs.md section 4, after the second agent's check). As MIN's open pairs; its writer epoch is inside E-16's model. No counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of EMB-V8's 269 pairs, 74 sit in an exhaustive model, 29 in a simulation only, 105 are argued independent and 61 are open (E-32 pairs.md section 4, after the second agent's check). The open ones include PreVote and CheckQuorum against a voter change (PREVOTE), a fork against the log drop (FORKPIN), writer time on an inherited uncommitted tail (WTAIL), a restore against tier names (RESTORENAME), quiet groups (K-22) and the never-modelled dir lease; no model found a counterexample, so rule 1 makes this open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of SIDE's 277 pairs, 69 sit in an exhaustive model, 27 in a simulation only, 112 are argued independent and 69 are open (E-32 pairs.md section 4, after the second agent's check). As MIN's, and F `ldr` and the side seam were never modelled; no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of BUY's 12 pairs, 0 sit in an exhaustive model, 0 in a simulation only, 4 are argued independent and 8 are open (E-32 pairs.md section 4, after the second agent's check). JetStream's own log meets fero's libraries in no model here, and its fencing is by convention (E-44); no counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME), and a model of the row's own replication"
+    },
+    "COMP": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-32"
+     ],
+     "why": "Of COMP's 283 pairs, 76 sit in an exhaustive model, 29 in a simulation only, 91 are argued independent and 87 are open (E-32 pairs.md section 4, after the second agent's check). The `memory` rung (K-09), the leader's own slow-leader rule (K-17), the hint path (K-08) and the move loop beside leader healing (K-07) are in no model; K-01 holds in E-32 (b) at one member fault. No counterexample, so open.",
+     "closes": "E-32's closers for this row's open pairs (pairs.md sections 7 and 9: K-01 to K-28, FORKPIN, WTAIL, SRCMOVE, PREVOTE, RESTORENAME)"
+    }
+   }
+  },
+  {
+   "req": "DEV-02",
+   "part": "S",
+   "default": {
+    "v": "not",
+    "basis": "measured",
+    "ev": [
+     "E-32"
+    ],
+    "why": "DEV-02's count, built by code from each mechanism's reads and writes (judging/pairs.json, E-32 (a), checked current by the second agent), is far above 10 in every row: BUY 12, V4 52, OBJ 144, PD 209, ISR 214, LANE 232, MIN-P 252, MIN, RUST and MIN-TS 253, LEAN 255, CELL 262, SRV 267, RLOG 268, EMB-V8 269, SLOG 272, SIDE 277, SPLIT 278, COMP 283, DRAFT 309."
+   },
+   "except": {}
+  },
+  {
+   "req": "DEV-03",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-15",
+     "E-16",
+     "E-17c",
+     "E-20",
+     "E-30",
+     "E-31",
+     "E-32",
+     "E-33",
+     "E-37"
+    ],
+    "why": "Models cover membership on commit (E-14c, TLC on etcd's spec: 12 of 13 non-equivalent mutants, 92 %, judged on bounds run within 1 h), the controller's healing (E-16: 18 rules, 12 of 21 mutants caught, 9 undecided), the slot move (E-17c's smallest model, crash-only, catches every non-equivalent mutant in seconds; E-15's TLA+ with unclean recovery catches 39 % of DEV-10's mutants, largest bound 23 min), sessions (E-20: 14 of 16), marks (E-30: 6 of 6), subscribe (E-31: 31 of 32, 15 min), genesis and restore (E-33: all caught), rejoin (E-37) and their crossing (E-32: 70 %, each bound under 1 h). But E-15's and E-32's rates are under 85 %, `cent-co`'s 9 mutants are undecided, and no model holds PreVote and CheckQuorum with a voter change, quiet groups on link pings, the dir lease or the slow-leader rule, so the MUST is open.",
+    "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); `cent-co`'s undecided mutants decided by TLC (G-09)"
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-10",
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN, and A-01's 16 membership rules were checked on etcd's spec only: for raft-rs, which lacks StepDownOnRemoval (E-10), they are reasoned, so this row's own core is in no membership model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); E-14c's checks run against raft-rs's rules"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-10",
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN, and A-01's 16 membership rules were checked on etcd's spec only: for raft-rs, which lacks StepDownOnRemoval (E-10), they are reasoned, so this row's own core is in no membership model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); E-14c's checks run against raft-rs's rules"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-10",
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN, and A-01's 16 membership rules were checked on etcd's spec only: for raft-rs, which lacks StepDownOnRemoval (E-10), they are reasoned, so this row's own core is in no membership model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); E-14c's checks run against raft-rs's rules"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-10",
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN; its Go variant runs etcd's raft, which E-14c covers, but its Rust variant runs raft-rs, for which A-01's membership rules are only reasoned (E-10).",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); E-14c's checks run against raft-rs's rules for the Rust variant"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN, plus the writer handover (E-16: 9 rules, 9 of 9 non-equivalent mutants); the slot move's and the crossing's mutant rates (39 % and 70 %) and the rules no model holds (PreVote and CheckQuorum with voter changes, quiet groups, the dir lease, the slow-leader rule) leave it open.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07)"
+    },
+    "MIN-P": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17b",
+      "E-17c",
+      "E-32"
+     ],
+     "why": "As MIN: `pslot` moves need the same 28 rules as `slot` (E-17c, every non-equivalent mutant caught), but its about 2 placement rules (equal settings per group) are reasoned, not modelled, and the gaps of MIN's family (E-15 at 39 %, E-32 at 70 %, `cent-co`'s 9 undecided mutants, PreVote and CheckQuorum with voter changes, quiet groups, the dir lease, the slow-leader rule) remain.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); a model of `pslot`'s placement rules (K-04, K-05)"
+    },
+    "COMP": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17c",
+      "E-20",
+      "E-30",
+      "E-31",
+      "E-32",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Healing by leaders is in E-16 (14 rules, 16 of 17 mutants, 94 %), and membership, the slot move, sessions, marks, subscribe, genesis, restore and rejoin are modelled as for MIN, with their crossing in E-32 (70 % of mutants, under 85 %). The `memory` rung (K-09), the move loop beside leader healing (K-07), the hint path (K-08), PreVote and CheckQuorum with voter changes and quiet groups are in no model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); models of K-07, K-08 and K-09"
+    },
+    "DRAFT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-15",
+      "E-16",
+      "E-17",
+      "E-20",
+      "E-32"
+     ],
+     "why": "Healing by leaders (E-16: 16 of 17 mutants), membership (E-14c: 92 %), the slot move (E-17c; E-15 at 39 %) and `win` (E-20: 22 of 25) are modelled, but log replicas (`+wit`), planner hints, the `memory` rung and a few give-up rules of the two-decider move (E-17 part 1, undecided) are in no model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); models of log replicas, planner hints and the `memory` rung"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-16",
+      "E-17",
+      "E-20"
+     ],
+     "why": "Healing by leaders (E-16: 94 %), membership (E-14c: 92 %), the re-key (E-17: 98 % of non-equivalent mutants) and sessions (E-20) are modelled, but log replicas, the `memory` rung, PreVote and CheckQuorum with voter changes and quiet groups are in no model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); models of log replicas and the `memory` rung"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-16",
+      "E-17b",
+      "E-20"
+     ],
+     "why": "Healing by leaders (E-16: 94 %), membership (E-14c) and lanes with range moves (E-17b: every non-equivalent mutant caught) are modelled, but log replicas, planner hints, PreVote and CheckQuorum with voter changes and quiet groups are in no model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); models of log replicas and planner hints"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-16",
+      "E-17b",
+      "E-17c",
+      "E-20"
+     ],
+     "why": "Healing by leaders (E-16: 94 %), membership (E-14c) and split + merge (E-17b: 33 rules, every non-equivalent mutant caught) are modelled, but log replicas, planner hints, the `memory` rung, PreVote and CheckQuorum with voter changes and quiet groups are in no model.",
+     "closes": "a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07); models of log replicas, planner hints and the `memory` rung"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-10",
+      "E-16",
+      "E-17b",
+      "E-37"
+     ],
+     "why": "Split + merge is modelled (E-17b: every non-equivalent mutant caught), but PD's controller rules are only reasoned from E-16 (A-20), A-01's membership rules are only reasoned for its raft-rs core (E-10), and PreVote, CheckQuorum, quiet groups and the timestamp oracle are in no model.",
+     "closes": "models of PD's controller, its raft-rs membership rules and its storage-fault rules, plus a phase-1 model of each uncovered rule (PreVote and CheckQuorum with voter changes, quiet groups with failure detection, the dir lease, the slow-leader rule), and the slot move's smallest model with unclean recovery in TLA+ re-run for DEV-10 mutants (G-07)"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-20"
+     ],
+     "why": "Only #meta's Raft (E-14c) and `pid` (E-20: 22 of 23 mutants) are modelled; the in-sync set, high watermark, leader epochs, eligible leaders and the controller that changes them, the core of ISR's replication, are in no model.",
+     "closes": "a model of ISR's own replication and controller (none in this study)"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-14c",
+      "E-15",
+      "E-17c",
+      "E-20"
+     ],
+     "why": "Only #meta's Raft (E-14c), the slot move (E-17c; E-15 at 39 %) and `win` (E-20) are modelled; loglets, their seal and chain and the writer's epoch, the core of SLOG's replication, are in no model.",
+     "closes": "a model of SLOG's loglets, seal, chain and writer epoch (none in this study)"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-17c",
+      "E-20",
+      "E-33"
+     ],
+     "why": "The slot move, sessions and the restore are modelled, but the object-store log, the manifest CAS and the writer lease, the core of OBJ's replication, are in no model.",
+     "closes": "a model of OBJ's manifest CAS and writer lease (none in this study)"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "None of v4's replication mechanisms (LWW cells, digests, ballot views, floors, sheds, latches and the rest) is in TLA+ or an exhaustive model in this study; v4's own simulator runs seeded schedules, which DEV-03 does not count.",
+     "closes": "an exhaustive model of v4's replication and membership (none in this study)"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "BUY's replication is JetStream's Raft inside nats-server; no model in this study holds its rules, and fero's fencing on it is by convention (E-44).",
+     "closes": "an exhaustive model of JetStream's replication rules as fero relies on them"
+    }
+   }
+  },
+  {
+   "req": "DEV-04",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-10",
+     "E-46"
+    ],
+    "why": "The row's Raft core is a faithful TypeScript port of etcd's raft (I `port`): it passes 41 of 41 of etcd's datadriven files and 4,000 of 4,000 fuzz scripts byte for byte (E-10) and was linearizable in 26 of 26 Maelstrom runs (E-46). etcd's raft is about 4,100 lines, so the ported share and fero's own share of the layer (about 5,500 lines, E-44's estimate) can be reported."
+   },
+   "except": {
+    "RUST": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-10",
+      "E-04"
+     ],
+     "why": "It reuses raft-rs, a production library DEV-04 names (TiKV's core); E-10 finds it a drifted fork without etcd's test oracle, StepDownOnRemoval or etcd's async-write contract, which fero adds as its own share, and E-04 ran it as WASM."
+    },
+    "EMB-V8": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-10",
+      "E-04"
+     ],
+     "why": "It reuses raft-rs, a production library DEV-04 names (TiKV's core); E-10 finds it a drifted fork without etcd's test oracle, StepDownOnRemoval or etcd's async-write contract, which fero adds as its own share."
+    },
+    "SIDE": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-10",
+      "E-04"
+     ],
+     "why": "It reuses raft-rs, a production library DEV-04 names (TiKV's core); E-10 finds it a drifted fork without etcd's test oracle, StepDownOnRemoval or etcd's async-write contract, which fero adds as its own share."
+    },
+    "PD": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-10"
+     ],
+     "why": "It reuses raft-rs, a production library DEV-04 names and the core of TiKV, the system PD copies; E-10's gaps (no etcd oracle, no StepDownOnRemoval) become fero's own share."
+    },
+    "SRV": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-10",
+      "E-11"
+     ],
+     "why": "Its Go variant runs etcd's raft natively and its Rust variant reuses raft-rs; both are production libraries DEV-04 names (E-10, E-11 ran both)."
+    },
+    "ISR": {
+     "v": "not",
+     "basis": "construction",
+     "ev": [],
+     "why": "Only #meta's group runs the ported Raft (SPACE 4.1, footnote 4). The data path's replication, a leader with an in-sync set, high watermark and leader epochs under a controller, is fero's own code written from Kafka's KIPs, so the core of the replication layer is not reused or ported from a library."
+    },
+    "SLOG": {
+     "v": "not",
+     "basis": "construction",
+     "ev": [],
+     "why": "Only #meta's group runs the ported Raft (SPACE 4.1, footnote 4). Loglets, their write quorum, seal and chain are fero's own code written from the Corfu and Delos papers, so the core of the replication layer is not reused or ported from a library."
+    },
+    "OBJ": {
+     "v": "not",
+     "basis": "construction",
+     "ev": [],
+     "why": "OBJ has no consensus library (axis I is empty for it): commit is a PUT and the writer lease is fero's own CAS protocol on the store's manifest, so no core is reused or ported from etcd raft, raft-rs or openraft."
+    },
+    "V4": {
+     "v": "not",
+     "basis": "construction",
+     "ev": [],
+     "why": "v4 replicates by its own leaderless LWW cells, digests and ballot views; no part of its replication is reused or ported from a consensus library."
+    },
+    "BUY": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-44"
+     ],
+     "why": "The whole log, Raft included, is NATS JetStream's, reused as it ships; fero's share of that layer is 0 lines (E-44: all 164 fero lines sit above the log)."
+    }
+   }
+  },
+  {
+   "req": "DEV-05",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "reasoned",
+    "ev": [
+     "E-44",
+     "E-45",
+     "E-22"
+    ],
+    "why": "E-44 estimates fero-owned lines from DEV-05's own figures plus E-22's 2,517 lines above L1: about 8,000 for every Raft-per-group row (this row among them), against about 13,500 for SLOG, RLOG and SPLIT, and E-45's four gateways add about 1,300 to every row. No contender is estimated smaller than 8,000, so this row is within 2 times of any row that could pass every MUST, and E-44 writes the reason for the multiple over BUY."
+   },
+   "except": {
+    "SLOG": {
+     "v": "met",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-45"
+     ],
+     "why": "E-44 estimates about 13,500 fero-owned lines for the log-first and split rows, 1.7 times the Raft rows' 8,000, so inside 2 times (E-45's gateways add the same 1,300 to both); E-04 lets a `ts→rs` row retire its TS kernel, so two kernels need not count at once."
+    },
+    "RLOG": {
+     "v": "met",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-45"
+     ],
+     "why": "E-44 estimates about 13,500 fero-owned lines for the log-first and split rows, 1.7 times the Raft rows' 8,000, so inside 2 times (E-45's gateways add the same 1,300 to both); E-04 lets a `ts→rs` row retire its TS kernel, so two kernels need not count at once."
+    },
+    "SPLIT": {
+     "v": "met",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-45"
+     ],
+     "why": "E-44 estimates about 13,500 fero-owned lines for the log-first and split rows, 1.7 times the Raft rows' 8,000, so inside 2 times (E-45's gateways add the same 1,300 to both); E-04 lets a `ts→rs` row retire its TS kernel, so two kernels need not count at once."
+    },
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "v4's kernel, api and shell are 9,100 lines (REQUIREMENTS section 5, E-44), 1.1 times the Raft rows' estimate of 8,000."
+    },
+    "BUY": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-44",
+      "E-45"
+     ],
+     "why": "BUY is 164 fero-owned lines (E-44), about 1,500 with E-45's gateways: the floor of every row."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "No estimate of PD's fero-owned lines exists (E-44's table leaves it out), and its kernel semantics, two-phase commit, timestamp oracle and MVCC are much more than a Raft row's, so whether it is within 2 times of the smallest MUST-passing row is not known.",
+     "closes": "an estimate of PD's fero-owned lines per layer"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "No estimate of ISR's fero-owned lines exists (E-44's table leaves it out): its in-sync replication, controller, `pid` and Kafka-style transactions were never sized.",
+     "closes": "an estimate of ISR's fero-owned lines per layer"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "No estimate of OBJ's fero-owned lines exists (E-44's table leaves it out): its object-store log, manifest CAS and writer lease were never sized.",
+     "closes": "an estimate of OBJ's fero-owned lines per layer"
+    }
+   }
+  },
+  {
+   "req": "DEV-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22",
+     "E-04"
+    ],
+    "why": "No row has its layer interfaces, invariant lists, per-layer suites or CI yet. E-22's prototype ran 200 chaos seeds in 0.65 s and E-04's WASM kernel in 0.1 to 0.4 s, so suites under 30 s look reachable, but nothing in the evidence shows this row's suites meet or miss the bar.",
+    "closes": "phase 1: LAYERS.md's interfaces and invariant lists, a timed suite per layer under 30 s, and a CI config in which fero and data pin each other's commit"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 runs its whole battery in CI (.github/workflows/test.yml), but CI checks out data's HEAD rather than a pinned commit, and there is no per-layer suite with a recorded time under 30 s; both can be added, so nothing shows a failure.",
+     "closes": "pin data's commit in v4's CI and time a suite per layer"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "BUY's L1 is JetStream, so its layer suite must start nats-server, and E-44's leader-kill checks wait 5.2 to 7.2 s per failover; nothing shows such a suite cannot stay under 30 s.",
+     "closes": "phase 1: a timed suite per layer, JetStream's included, and the CI config"
+    }
+   }
+  },
+  {
+   "req": "DEV-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-04",
+     "E-10",
+     "E-42",
+     "E-46"
+    ],
+    "why": "The row's kernel is a step function by design (etcd's raft and its port are pure state machines, E-10), a TS and a Rust twin stayed byte-identical over 1,000 seeds (E-04), and 18 of 18 recorded runs replayed byte for byte (E-42). But the row's own kernel is not built, and no sim trace has been replayed through a spec yet (etcd's 2024 trace-validation hooks port in under half an hour, E-10).",
+    "closes": "phase 1: the determinism canary on the row's real kernel, and trace validation of sim traces against etcdraft.tla and the slot-move spec"
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-04",
+      "E-10"
+     ],
+     "why": "raft-rs is a step function and ran deterministically as WASM in the sim (E-04: 200 chaos seeds in 384 ms), but raft-rs lacks etcd's trace-validation hooks (E-10), so replaying traces through a spec is still to build.",
+     "closes": "phase 1: the determinism canary, and trace validation hooks for raft-rs against a spec"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-04",
+      "E-10",
+      "E-03"
+     ],
+     "why": "raft-rs runs deterministically as WASM in the sim (E-04), and `data` folds inside deno_core at 0.80 times Node (E-03); but raft-rs lacks etcd's trace-validation hooks (E-10), so replaying traces through a spec is still to build.",
+     "closes": "phase 1: the determinism canary, and trace validation hooks for raft-rs against a spec"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-04",
+      "E-10"
+     ],
+     "why": "raft-rs runs deterministically as WASM in the sim (E-04), and the shared-memory ring between daemon and app is an input that can be recorded; but raft-rs lacks etcd's trace-validation hooks (E-10).",
+     "closes": "phase 1: the determinism canary across the ring, and trace validation hooks for raft-rs against a spec"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's kernel has no I/O and its sim replays the same kernel bytes on seeded schedules (CLAUDE.md), but v4 has no spec to replay traces through, and E-42 lists it as having no recordable kernel without saying why.",
+     "closes": "a spec of v4's replication and trace validation against it"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "(1) BUY's replication layer is NATS JetStream (SPACE 4.1, R `outside`). (2) JetStream replicates inside nats-server, a Go process with its own threads, timers, sockets and disk, and fero owns no step function for it (E-44: no kernel of its own). (3) So fero's sim cannot feed that layer events and take its effects out, and one seed cannot give a byte-identical trace of it; SPACE 4.2 and E-44 count TEST-10 failed by construction for the same reason ('the sim cannot run their bytes'). (4) Making the layer pure means replacing JetStream with fero's own kernel, which is another row's R option.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "DEV-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Bug flow is a rule for the build: whether every bug arrives as a failing seed or test tagged with its layer and invariant, and whether work stops when open bugs rise, can only be seen in STATUS's weekly counts once building starts. Nothing in this row's design stops it, and a deterministic sim (DEV-07) lets bugs arrive as seeds.",
+    "closes": "the build phases: STATUS's weekly bug counts from phase 1"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's own record shows open bugs going 15, 29, 40 and 34 across October, at mechanism crossings (REQUIREMENTS section 5; STATUS), and v5 is the re-plan that the rule calls for; that is history, and nothing makes the rule impossible to keep on v4.",
+     "closes": "STATUS's weekly bug counts, tagged by layer and invariant"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A bug inside JetStream can arrive only as a failing test against nats-server, not as a seed, since the sim cannot run it (E-44); DEV-08 allows a test, so nothing shows a failure.",
+     "closes": "the build phases: STATUS's weekly bug counts"
+    }
+   }
+  },
+  {
+   "req": "DEV-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-19",
+     "E-31",
+     "E-18",
+     "E-29",
+     "E-42",
+     "E-45",
+     "E-13",
+     "E-36"
+    ],
+    "why": "The shapes are known, and nothing in this row forces a later phase to change them: positions and delta-coded cursors survive moves with no translation (E-19, E-31), and the record header and API take their phase-1 rules from E-29, E-42, A-16 and E-45's five API changes. They are not fixed yet, and some still need a decision before phase 1 (4,096 or 1,024 slots, G-06; the move's window, A-17 (3), E-13).",
+    "closes": "phase 1 fixes positions, cursors, the record header and the layer interfaces; each later phase's interface diff is then checked to be additive"
+   },
+   "except": {
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-17b",
+      "E-31"
+     ],
+     "why": "As counted (judging/mechanisms.json, `lanes`), the LANE row holds no range move, so its per-lane offsets (O `off`) need not change. But its source plans key-range moves later with 'per-lane offset; lineage in phase 5' (V5-UNITS), and E-17b shows such a move needs a per-range epoch and END(N) lineage bases in every cursor (E-31: offset cursors break at the first move, 5 steps); if LANE takes that step, a later phase changes the cursor's shape and DEV-09 fails unless O `off+lin`, another option, is fixed now.",
+     "closes": "the decision whether LANE ever moves key ranges; if it does, this fails as it stands (a later shape change), if not, phase 1 fixes per-lane offsets"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31",
+      "E-17"
+     ],
+     "why": "CELL's positions are per-group offsets that a re-key refuses with `unknown-log` rather than translates (V5-UNITS; SPACE R1.F16.K), so their shape can be fixed in phase 1 and need not change; E-31 marks it down because the meaning is cut at a re-key, which is P-07's question.",
+     "closes": "phase 1 fixes positions, cursors, the record header and the layer interfaces; each later phase's interface diff is then checked to be additive"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-17b",
+      "E-31"
+     ],
+     "why": "SPLIT holds O `off+lin`, so lineage is in its positions from phase 1; the generation a later merge needs (E-17b) can sit in the group's incarnation from the start, so no later shape change is forced.",
+     "closes": "phase 1 fixes positions with lineage and a group generation; each later phase's interface diff is then checked to be additive"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-45"
+     ],
+     "why": "Positions and the record header are JetStream's stream sequences and headers, fixed by the vendor; fero's own interfaces sit above them and take E-45's five API changes in phase 1.",
+     "closes": "phase 1 fixes fero's layer interfaces over JetStream; each later phase's diff is checked to be additive"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4's shapes exist already (its records and Lamport stamps); built on, it would take A-09's format rules and A-10's API changes, but V4 as it stands has no next phase that the evidence shows changing them.",
+     "closes": "a phase plan for V4 with its interface diffs"
+    }
+   }
+  },
+  {
+   "req": "DEV-10",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-14b",
+     "E-15",
+     "E-17c",
+     "E-31",
+     "E-32"
+    ],
+    "why": "This row was counted as DEV-10 says: two counters judged every unit blind (judging/mechanisms.a.json and .b.json), every difference was listed and settled in writing by a referee before judging (MECHANISMS.md section 4), and the tool counts novel mechanisms and pairs from the settled file. Every rule count the study uses is by ablation, with mutants made by script (E-14b, E-15, E-17c, E-31, E-32)."
+   },
+   "except": {}
+  }
+ ]
+}
