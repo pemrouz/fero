@@ -52,6 +52,9 @@ if [ "$STEP" = all ] || [ "$STEP" = ablate ]; then
   # trying the small bounds first (a no-op when none did)
   ablate win-smart; ablate sess-smart --limit 2500000; ablate pid-smart; ablate keys-smart
   "$HEAVY" timeout 1500 python3 resolve20.py results/sess-smart-ablation.json --small-only swap >> results/sess-smart-ablation.log 2>&1
+  # the one swap the small bounds do not catch (open: outs <-> floor), on `lost` at 2.5 million
+  # (about 4 minutes on a quiet box): equivalent by state digest
+  "$HEAVY" timeout 1700 python3 resolve20.py results/sess-smart-ablation.json >> results/sess-smart-ablation.log 2>&1
   # win, pid and keys under fwd: from the smart option's smallest model (what the relay adds)
   for d in win pid keys; do ablate "$d-fwd" --from "results/$d-smart-ablation.json"; done
   # sess under fwd: from sess-smart's smallest model, `lost` would need well

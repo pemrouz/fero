@@ -2250,16 +2250,9 @@
    "rule": "open: outs <-> floor",
    "resolved_by": "resolve20.py: bounds in the order restart,move,expire,exprst,mvexp,lost, limit 2500000",
    "caught": null,
-   "undecided": [
-    "lost",
-    "NOT RUN",
-    0,
-    [
-     "not caught on restart,move,expire,exprst,mvexp; lost not run"
-    ]
-   ]
+   "equivalent": true
   }
  ],
  "secs": 377,
- "resolve_secs": 0
+ "resolve_secs": 208
 }
