@@ -30,7 +30,7 @@ GROUPS = {'P': ['P'], 'PERF-DATA': ['PERF', 'DATA'], 'SC': ['SC'], 'F': ['F'], '
 VM, VS = ('met', 'open', 'fails'), ('met', 'not', 'open')
 PROOFS = ('counterexample', 'ceiling', 'structural')
 BASES = ('measured', 'model', 'cited', 'reasoned', 'construction')
-CHOICES = ('F_w', 'N_res', 'PERF-01 losses', 'region scope', 'shared tier', 'fsync figure', 'F-06 reading', 'other')
+CHOICES = ('restated', 'F_w', 'N_res', 'PERF-01 losses', 'region scope', 'shared tier', 'fsync figure', 'F-06 reading', 'other')
 
 def load(p):
     with open(p) as f:
@@ -126,6 +126,10 @@ def expand(d):
             cells[(c['req'], c['part'], row)] = (c.get('except') or {}).get(row, c['default'])
     return cells
 
+def restated(v):
+    """The verdict if the requirement is restated as AMENDMENTS 1.3 asks (else the verdict as worded)."""
+    return v.get('alt') if v.get('depends_on') == 'restated' else v.get('v')
+
 def decisive(part, a, b):
     """A disagreement that can change the ranking: out or not (MUST), counted or not (SHOULD)."""
     return (a == 'fails') != (b == 'fails') if part == 'M' else (a == 'met') != (b == 'met')
@@ -136,9 +140,9 @@ def diff(group):
     rows, same, dec = [], 0, 0
     for k in ca:
         va, vb = ca[k], cb[k]
-        if va['v'] == vb['v']:
+        if va['v'] == vb['v'] and restated(va) == restated(vb):
             same += 1; continue
-        d = decisive(k[1], va['v'], vb['v'])
+        d = decisive(k[1], va['v'], vb['v']) or decisive(k[1], restated(va), restated(vb))
         dec += d
         rows.append({'req': k[0], 'part': k[1], 'row': k[2], 'decisive': d, 'j1': va, 'j2': vb})
     n = len(ca)
@@ -147,7 +151,8 @@ def diff(group):
            '%d cells. Same verdict: %d (%.1f%%). Decisive differences (out or not; counted or not): %d. Minor (met against open; not against open): %d.'
            % (n, same, 100.0 * same / n, dec, n - same - dec), '',
            '| Requirement | Row | Kind | Judge 1 | Judge 2 |', '|---|---|---|---|---|']
-    cut = lambda v: ('**%s**%s: %s' % (v['v'], ' (%s)' % v['proof'] if v.get('proof') else '', v['why'])).replace('|', '/').replace('\n', ' ')
+    cut = lambda v: ('**%s**%s%s: %s' % (v['v'], ' (%s)' % v['proof'] if v.get('proof') else '',
+                     '; if %s: **%s**' % (v['depends_on'], v.get('alt')) if v.get('depends_on') else '', v['why'])).replace('|', '/').replace('\n', ' ')
     for r in sorted(rows, key=lambda r: (not r['decisive'], r['req'], r['row'])):
         out.append('| %s %s | %s | %s | %s | %s |' % (r['req'], r['part'], r['row'], 'decisive' if r['decisive'] else 'minor', cut(r['j1']), cut(r['j2'])))
     open('%s/%s.diff.md' % (J, group), 'w').write('\n'.join(out) + '\n')
@@ -161,13 +166,16 @@ def settle(group):
     errs, cells = [], []
     for k in ca:
         va, vb = ca[k], cb[k]
-        if va['v'] == vb['v'] and k in rul and not rul[k].get('overrules'):
+        agree = va['v'] == vb['v'] and restated(va) == restated(vb)
+        if agree and k in rul and not rul[k].get('overrules'):
             errs.append('%s %s %s: the judges agree; a ruling here needs "overrules": true and a source' % k); continue
-        if va['v'] == vb['v'] and k not in rul:
+        if agree and k not in rul:
             v = dict(va); v['why2'] = vb['why']; by = 'both'
+            if 'depends_on' not in v and vb.get('depends_on'):
+                v['depends_on'], v['alt'] = vb['depends_on'], vb.get('alt')
             if va['v'] == 'fails' and va.get('proof') != vb.get('proof'):
                 v['proof2'] = vb.get('proof')
-        elif va['v'] == vb['v']:
+        elif agree:
             v = {x: y for x, y in rul[k].items() if x not in ('req', 'part', 'row', 'overrules')}
             check_verdict(v, k[1], '%s %s %s ruling' % k, errs); by = 'referee, against both judges'
         else:
@@ -175,7 +183,7 @@ def settle(group):
                 errs.append('%s %s %s: the judges differ and there is no ruling' % k); continue
             v = {x: y for x, y in rul[k].items() if x not in ('req', 'part', 'row')}
             check_verdict(v, k[1], '%s %s %s ruling' % k, errs); by = 'referee'
-        cells.append({'req': k[0], 'part': k[1], 'row': k[2], 'by': by, 'j1': va['v'], 'j2': vb['v'], **v})
+        cells.append({'req': k[0], 'part': k[1], 'row': k[2], 'by': by, 'j1': va['v'], 'j2': vb['v'], 'j1r': restated(va), 'j2r': restated(vb), **v})
     for k in rul:
         if k not in ca:
             errs.append('%s %s %s: a ruling for a cell that does not exist' % k)
@@ -260,12 +268,25 @@ def pairs():
 
 # ---- the verdict: REQUIREMENTS, judging rules 1 to 3, as arithmetic ----
 
+def view(cells, scenario):
+    """The cells as worded, or with each clause restated as AMENDMENTS 1.3 asks (the "alt" of a "restated" cell)."""
+    if scenario != 'restated':
+        return cells
+    out = []
+    for c in cells:
+        c = dict(c)
+        if c.get('depends_on') == 'restated':
+            c['v'] = c['alt']
+        c['j1'], c['j2'] = c.get('j1r', c['j1']), c.get('j2r', c['j2'])
+        out.append(c)
+    return out
+
 def tally(cells, dev01, pairs, opt=None):
     opt = opt or {}
     t = {r: {'fails': [], 'open': 0, 'met': 0, 's_met': [], 's_not': [], 's_open': [], 'gap': 0.0} for r in ROWS}
     for c in cells:
-        r, v = c['row'], c[opt.get('use', 'v')] if opt.get('use') else c['v']
-        if opt.get('choice') and c.get('depends_on') == opt['choice']:
+        r, v = c['row'], c[opt['use']] if opt.get('use') else c['v']
+        if opt.get('choice') and c.get('depends_on') == opt['choice'] and not opt.get('use'):
             v = c['alt']
         if (c['req'], c['part']) in opt.get('drop', ()):
             continue
@@ -299,8 +320,10 @@ def beats(a, b, t, shoulds_first=False):
 def rank(t, shoulds_first=False):
     inn = [r for r in ROWS if not t[r]['fails']]
     if not inn:  # rule 2: every row fails a MUST
-        order = sorted(ROWS, key=lambda r: (len(t[r]['fails']), t[r]['gap']))
-        return {'all_out': True, 'order': order, 'winner': order[0], 'in': [], 'wins': {}}
+        order = sorted(ROWS, key=lambda r: (len(set(t[r]['fails'])), t[r]['gap']))
+        best = len(set(t[order[0]]['fails']))
+        return {'all_out': True, 'order': order, 'winner': order[0], 'in': [], 'wins': {}, 'losses': {}, 'unbeaten': [],
+                'tied_first': [r for r in order if len(set(t[r]['fails'])) == best], 'clear': False}
     wins = {r: sum(beats(r, o, t, shoulds_first) > 0 for o in inn if o != r) for r in inn}
     losses = {r: sum(beats(r, o, t, shoulds_first) < 0 for o in inn if o != r) for r in inn}
     order = sorted(inn, key=lambda r: (-wins[r], losses[r], t[r]['dev01'] if t[r]['dev01'] is not None else 99, -len(t[r]['s_met'])))
@@ -308,24 +331,12 @@ def rank(t, shoulds_first=False):
     return {'all_out': False, 'in': inn, 'order': order, 'wins': wins, 'losses': losses, 'unbeaten': unbeaten,
             'winner': order[0], 'clear': len(unbeaten) == 1 and wins[unbeaten[0]] == len(inn) - 1}
 
-def verdict():
-    cells, agree = [], {}
-    for g in GROUPS:
-        p = '%s/%s.settled.json' % (J, g)
-        if not os.path.exists(p):
-            print('missing', p); sys.exit(1)
-        s = load(p)
-        cells += s['cells']
-        agree[g] = {k: s[k] for k in ('cells_total', 'same', 'decisive', 'minor')}
-    mech = load(J + '/mechanisms.json') if os.path.exists(J + '/mechanisms.json') else {}
-    dev01 = (mech.get('counts') or {}).get('settled', {})
-    pairs = load(J + '/pairs.json').get('pairs', {}) if os.path.exists(J + '/pairs.json') else {}
+def outcome(cells, dev01, pairs, mech):
     t = tally(cells, dev01, pairs)
     base = rank(t)
     sens = []
     def case(name, opt=None, d01=None, sf=False, sweep=''):
-        tt = tally(cells, d01 if d01 is not None else dev01, pairs, opt)
-        r = rank(tt, sf)
+        r = rank(tally(cells, d01 if d01 is not None else dev01, pairs, opt), sf)
         sens.append({'case': name, 'sweep': sweep, 'winner': r['winner'], 'in': r['in'], 'top3': r['order'][:3], 'same_as_base': r['winner'] == base['winner']})
     case('judge 1 alone, before the referee', {'use': 'j1'})
     case('judge 2 alone, before the referee', {'use': 'j2'})
@@ -336,10 +347,10 @@ def verdict():
         if (mech.get('counts') or {}).get(who):
             case('novel mechanisms as counter %s counted them' % who, None, mech['counts'][who])
     for ch in CHOICES:
-        if any(c.get('depends_on') == ch for c in cells):
+        if ch != 'restated' and any(c.get('depends_on') == ch for c in cells):
             case('the user chooses the other way on: ' + ch, {'choice': ch})
     for req, part in sorted({(c['req'], c['part']) for c in cells if c['part'] == 'S'}):
-        case('without the SHOULD %s' % req, {'drop': {(req, part)}}, sweep='one SHOULD left out, each of the 16 in turn')
+        case('without the SHOULD %s' % req, {'drop': {(req, part)}}, sweep='one SHOULD left out, each in turn')
     for r in ROWS:
         if dev01.get(r) is not None:
             for d in (-2, 2):
@@ -347,37 +358,38 @@ def verdict():
                 case('%s with %+d novel mechanisms' % (r, d), None, dd, sweep='one row given 2 more or 2 fewer novel mechanisms, each row in turn')
     back = []
     for r in ROWS:
-        if t[r]['fails'] and len(set(t[r]['fails'])) <= 2:
+        f = sorted(set(t[r]['fails']))
+        if f and len(f) <= 2 and not base['all_out']:
             tt = json.loads(json.dumps(t)); tt[r]['fails'] = []
             rr = rank(tt)
-            back.append({'row': r, 'if_these_musts_were_waived': sorted(set(t[r]['fails'])), 'it_would_place': rr['order'].index(r) + 1, 'winner_then': rr['winner']})
-    dump(J + '/outcome.json', {'agreement': agree, 'tally': t, 'rank': base, 'sensitivity': sens, 'waivers': back})
-    tot = {k: sum(a[k] for a in agree.values()) for k in ('cells_total', 'same', 'decisive', 'minor')}
-    o = ['# The outcome, as arithmetic', '',
-         'Built by `python3 tools/judging.py verdict` from the settled judging files in this folder. Nothing here is written by hand: it applies [REQUIREMENTS.md](../REQUIREMENTS.md)\'s judging rule to the cells. [VERDICT.md](../VERDICT.md) explains it.', '',
-         '## 1. How far the two judges agreed', '',
-         '| Group | Cells | Same verdict | Decisive differences | Minor differences |', '|---|---|---|---|---|']
-    for g, a in agree.items():
-        o.append('| %s | %d | %d (%.1f%%) | %d | %d |' % (g, a['cells_total'], a['same'], 100.0 * a['same'] / a['cells_total'], a['decisive'], a['minor']))
-    o.append('| **All** | %d | %d (%.1f%%) | %d | %d |' % (tot['cells_total'], tot['same'], 100.0 * tot['same'] / tot['cells_total'], tot['decisive'], tot['minor']))
-    o += ['', 'A decisive difference is one that could change the ranking: a MUST that one judge failed and the other did not, or a SHOULD that one counted as met and the other did not. A referee settled every difference in writing.', '',
-          '## 2. Each row', '',
+            back.append({'row': r, 'if_these_musts_were_waived': f, 'it_would_place': rr['order'].index(r) + 1, 'winner_then': rr['winner']})
+    return {'tally': t, 'rank': base, 'sensitivity': sens, 'waivers': back}
+
+def write_outcome(o, res, head):
+    t, base, sens, back = res['tally'], res['rank'], res['sensitivity'], res['waivers']
+    o += ['', '### %s.1 Each row' % head, '',
           '| Row | MUSTs failed by design | MUSTs open | MUSTs met | Novel mechanisms (DEV-01) | SHOULDs met | SHOULDs not met | SHOULDs open | Interacting pairs (DEV-02) |', '|---|---|---|---|---|---|---|---|---|']
     for r in ROWS:
         x = t[r]
         o.append('| %s | %s | %d | %d | %s | %d | %d | %d | %s |' % (r, ', '.join(sorted(set(x['fails']))) or 'none', x['open'], x['met'],
                  '?' if x['dev01'] is None else x['dev01'], len(x['s_met']), len(x['s_not']), len(x['s_open']), '?' if x['pairs'] is None else x['pairs']))
-    o += ['', '## 3. The ranking', '']
+    o += ['', '### %s.2 The ranking' % head, '']
     if base['all_out']:
-        o.append('Every row fails at least one MUST, so rule 2 applies: fewest MUSTs failed first. Order: ' + ', '.join(base['order']) + '.')
+        o.append('Every row fails at least one MUST, so rule 2 applies: fewest MUSTs failed first, then the smaller sum of gap over bar. '
+                 + ('First: **%s**.' % base['winner'] if len(base['tied_first']) == 1 else 'Level on the count of MUSTs failed: %s.' % ', '.join(base['tied_first'])))
+        o += ['', '| Place | Row | MUSTs failed | Sum of gap over bar |', '|---|---|---|---|']
+        for i, r in enumerate(base['order']):
+            o.append('| %d | %s | %d | %.2f |' % (i + 1, r, len(set(t[r]['fails'])), t[r]['gap']))
     else:
         o.append('Rows still in (no MUST failed by design): ' + ', '.join(base['in']) + '.')
         o.append('')
-        o.append('Rule 3 is applied to every pair of rows still in. ' + ('**%s beats every other row.**' % base['winner'] if base['clear'] else 'No single row beats every other; unbeaten rows: %s. The order below is by pairs won.' % ', '.join(base['unbeaten'])))
-        o += ['', '| Place | Row | Pairs won | Pairs lost | Novel mechanisms | SHOULDs met |', '|---|---|---|---|---|---|']
+        o.append('Rule 3 is applied to every pair of rows still in. ' + ('**%s beats every other row.**' % base['winner'] if base['clear']
+                 else 'No single row beats every other. Rows that lose to none: %s. The order below is by pairs won.' % (', '.join(base['unbeaten']) or 'none')))
+        o += ['', '| Place | Row | Pairs won | Pairs lost | Novel mechanisms | SHOULDs met | Interacting pairs |', '|---|---|---|---|---|---|---|']
         for i, r in enumerate(base['order']):
-            o.append('| %d | %s | %d | %d | %s | %d |' % (i + 1, r, base['wins'][r], base['losses'][r], '?' if t[r]['dev01'] is None else t[r]['dev01'], len(t[r]['s_met'])))
-    o += ['', '## 4. What flips the winner', '', 'Each line changes one thing and runs the rule again.', '', '| Change | Winner | Top three | Same winner? |', '|---|---|---|---|']
+            o.append('| %d | %s | %d | %d | %s | %d | %s |' % (i + 1, r, base['wins'][r], base['losses'][r], '?' if t[r]['dev01'] is None else t[r]['dev01'],
+                     len(t[r]['s_met']), '?' if t[r]['pairs'] is None else t[r]['pairs']))
+    o += ['', '### %s.3 What flips the winner' % head, '', 'Each line changes one thing and runs the rule again.', '', '| Change | Winner | Top three | Same winner? |', '|---|---|---|---|']
     for s in sens:
         if not s['sweep'] or not s['same_as_base']:
             o.append('| %s | %s | %s | %s |' % (s['case'], s['winner'], ', '.join(s['top3']), 'yes' if s['same_as_base'] else '**no**'))
@@ -386,11 +398,51 @@ def verdict():
         o.append('| %s | %s | | %d of %d keep the winner%s |' % (sw, base['winner'], sum(s['same_as_base'] for s in grp), len(grp),
                  '' if all(s['same_as_base'] for s in grp) else '; the ones that do not are listed above'))
     if back:
-        o += ['', '## 5. Rows that one or two MUSTs put out', '', '| Row | Out on | If those were waived it would place | Winner then |', '|---|---|---|---|']
+        o += ['', '### %s.4 Rows that one or two MUSTs put out' % head, '', '| Row | Out on | If those were waived it would place | Winner then |', '|---|---|---|---|']
         for b in back:
             o.append('| %s | %s | %d | %s |' % (b['row'], ', '.join(b['if_these_musts_were_waived']), b['it_would_place'], b['winner_then']))
+
+def verdict():
+    cells, agree = [], {}
+    for g in GROUPS:
+        p = '%s/%s.settled.json' % (J, g)
+        if not os.path.exists(p):
+            print('missing', p); sys.exit(1)
+        s = load(p)
+        cells += s['cells']
+        agree[g] = {k: s[k] for k in ('cells_total', 'same', 'decisive', 'minor')}
+        agree[g]['referee_against_both'] = sum(c['by'].startswith('referee,') for c in s['cells'])
+    mech = load(J + '/mechanisms.json') if os.path.exists(J + '/mechanisms.json') else {}
+    dev01 = (mech.get('counts') or {}).get('settled', {})
+    pairs = load(J + '/pairs.json').get('pairs', {}) if os.path.exists(J + '/pairs.json') else {}
+    has_restated = any(c.get('depends_on') == 'restated' for c in cells)
+    worded = outcome(cells, dev01, pairs, mech)
+    rest = outcome(view(cells, 'restated'), dev01, pairs, mech) if has_restated else None
+    dump(J + '/outcome.json', {'agreement': agree, 'as_worded': worded, 'restated': rest})
+    tot = {k: sum(a[k] for a in agree.values()) for k in ('cells_total', 'same', 'decisive', 'minor', 'referee_against_both')}
+    o = ['# The outcome, as arithmetic', '',
+         'Built by `python3 tools/judging.py verdict` from the settled judging files in this folder. Nothing here is written by hand: it applies the judging rule of [REQUIREMENTS.md](../REQUIREMENTS.md) to the cells. [VERDICT.md](../VERDICT.md) explains it.', '',
+         '## 1. How far the two judges agreed', '',
+         '| Group | Cells | Same verdict | Decisive differences | Minor differences | Referee against both |', '|---|---|---|---|---|---|']
+    for g, a in agree.items():
+        o.append('| %s | %d | %d (%.1f%%) | %d | %d | %d |' % (g, a['cells_total'], a['same'], 100.0 * a['same'] / a['cells_total'], a['decisive'], a['minor'], a['referee_against_both']))
+    o.append('| **All** | %d | %d (%.1f%%) | %d | %d | %d |' % (tot['cells_total'], tot['same'], 100.0 * tot['same'] / tot['cells_total'], tot['decisive'], tot['minor'], tot['referee_against_both']))
+    o += ['', 'A cell is one requirement part for one row. A decisive difference could change the ranking: a MUST that one judge failed and the other did not, or a SHOULD that one counted as met and the other did not. A referee ruled on every difference in writing.']
+    if has_restated:
+        n = sum(c.get('depends_on') == 'restated' for c in cells)
+        o += ['', 'Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists requirement clauses that the evidence shows no row can meet as worded, and what each experiment asks instead. %d cells carry two verdicts for that reason: one as the requirement is worded, one as restated. Part A uses the first, part B the second.' % n,
+              '', '## A. As the requirements are worded today']
+        write_outcome(o, worded, 'A')
+        o += ['', '## B. With the clauses of AMENDMENTS 1.3 restated as the evidence asks']
+        write_outcome(o, rest, 'B')
+    else:
+        o += ['', '## A. The outcome']
+        write_outcome(o, worded, 'A')
     open(J + '/OUTCOME.md', 'w').write('\n'.join(o) + '\n')
-    print('winner:', base['winner'], '| in:', base['in'], '| flips:', [s['case'] for s in sens if not s['same_as_base']][:12])
+    for name, res in (('as worded', worded), ('restated', rest)):
+        if res:
+            b = res['rank']
+            print('%s: winner %s | all out: %s | in: %s | flips: %s' % (name, b['winner'], b['all_out'], b['in'], [x['case'] for x in res['sensitivity'] if not x['same_as_base']][:10]))
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
