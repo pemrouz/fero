@@ -27,3 +27,6 @@ mutant flip apply.floor: SURVIVED
 mutant swap fence: outs <-> floor: equivalent
 mutant swap open: outs <-> floor: ['lost', 'NOT RUN', 0, ['not caught on restart,move,expire,exprst,mvexp; lost not run']]
 sess-smart: mutants 18, caught 14, equivalent 1, undecided 1; resolve 0 s
+# resume 2026-11-10T00:52:04Z: the one swap left (open: outs <-> floor) on lost at 2.5 million, load 0.29 0.31 0.14
+mutant swap open: outs <-> floor: equivalent
+sess-smart: mutants 18, caught 14, equivalent 2, undecided 0; resolve 208 s
