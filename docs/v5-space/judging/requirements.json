@@ -1,0 +1,1097 @@
+{
+ "rows": [
+  "DRAFT",
+  "MIN",
+  "RUST",
+  "SRV",
+  "LEAN",
+  "CELL",
+  "LANE",
+  "SPLIT",
+  "PD",
+  "ISR",
+  "SLOG",
+  "OBJ",
+  "V4",
+  "MIN-P",
+  "MIN-TS",
+  "RLOG",
+  "EMB-V8",
+  "SIDE",
+  "BUY",
+  "COMP"
+ ],
+ "groups": {
+  "P": [
+   "P"
+  ],
+  "PERF-DATA": [
+   "PERF",
+   "DATA"
+  ],
+  "SC": [
+   "SC"
+  ],
+  "F": [
+   "F"
+  ],
+  "DEV": [
+   "DEV"
+  ],
+  "DEP": [
+   "DEP"
+  ],
+  "TEST-OPS": [
+   "TEST",
+   "OPS"
+  ]
+ },
+ "choices": [
+  "F_w",
+  "N_res",
+  "PERF-01 losses",
+  "region scope",
+  "shared tier",
+  "fsync figure",
+  "F-06 reading",
+  "other"
+ ],
+ "parts": [
+  {
+   "req": "P-01",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Live shared state"
+  },
+  {
+   "req": "P-02",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Cache with expiry, session store"
+  },
+  {
+   "req": "P-03",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Near cache, client data sync"
+  },
+  {
+   "req": "P-04",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Read-through cache"
+  },
+  {
+   "req": "P-05",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "WebSocket fan-out by room"
+  },
+  {
+   "req": "P-06",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Pub/sub"
+  },
+  {
+   "req": "P-07",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Streams and replay"
+  },
+  {
+   "req": "P-08",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Consumer groups"
+  },
+  {
+   "req": "P-09",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Work queue"
+  },
+  {
+   "req": "P-10",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Locks and leader election"
+  },
+  {
+   "req": "P-11",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Counters and rate limits"
+  },
+  {
+   "req": "P-12",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Leaderboards, live aggregates"
+  },
+  {
+   "req": "P-13",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Presence"
+  },
+  {
+   "req": "P-14",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Invariants"
+  },
+  {
+   "req": "P-15",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Transactions across partitions"
+  },
+  {
+   "req": "P-15",
+   "part": "S",
+   "area": "P",
+   "group": "P",
+   "title": "Transactions across partitions"
+  },
+  {
+   "req": "P-16",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Event sourcing, CQRS"
+  },
+  {
+   "req": "P-17",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Derived resources"
+  },
+  {
+   "req": "P-18",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Tapes, forks, replays"
+  },
+  {
+   "req": "P-19",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Clients everywhere"
+  },
+  {
+   "req": "P-20",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Change the shape of rows"
+  },
+  {
+   "req": "P-20",
+   "part": "S",
+   "area": "P",
+   "group": "P",
+   "title": "Change the shape of rows"
+  },
+  {
+   "req": "P-21",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Request and reply"
+  },
+  {
+   "req": "P-22",
+   "part": "M",
+   "area": "P",
+   "group": "P",
+   "title": "Delayed jobs, waiting takes, priorities"
+  },
+  {
+   "req": "P-22",
+   "part": "S",
+   "area": "P",
+   "group": "P",
+   "title": "Delayed jobs, waiting takes, priorities"
+  },
+  {
+   "req": "PERF-01",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Fair comparison"
+  },
+  {
+   "req": "PERF-02",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Redis 7"
+  },
+  {
+   "req": "PERF-03",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "NATS core"
+  },
+  {
+   "req": "PERF-04",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "NATS JetStream"
+  },
+  {
+   "req": "PERF-05",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Kafka"
+  },
+  {
+   "req": "PERF-06",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Redpanda"
+  },
+  {
+   "req": "PERF-07",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "etcd"
+  },
+  {
+   "req": "PERF-08",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Commit latency"
+  },
+  {
+   "req": "PERF-09",
+   "part": "S",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Write throughput"
+  },
+  {
+   "req": "PERF-10",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Reads and ops"
+  },
+  {
+   "req": "PERF-11",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Fan-out"
+  },
+  {
+   "req": "PERF-12",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Idle cost"
+  },
+  {
+   "req": "PERF-13",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Nothing on a timer grows with data"
+  },
+  {
+   "req": "PERF-14",
+   "part": "M",
+   "area": "PERF",
+   "group": "PERF-DATA",
+   "title": "Never widen"
+  },
+  {
+   "req": "SC-01",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "One process, no setup"
+  },
+  {
+   "req": "SC-02",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Same code at every size"
+  },
+  {
+   "req": "SC-03",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Scale writes up"
+  },
+  {
+   "req": "SC-04",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Scale down"
+  },
+  {
+   "req": "SC-05",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Scale to zero and back"
+  },
+  {
+   "req": "SC-06",
+   "part": "S",
+   "area": "SC",
+   "group": "SC",
+   "title": "State size"
+  },
+  {
+   "req": "SC-07",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Members"
+  },
+  {
+   "req": "SC-08",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Without worry"
+  },
+  {
+   "req": "SC-09",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Limits warn before they bite"
+  },
+  {
+   "req": "SC-10",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Only stated ceilings, each above its floor"
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Hosted, many tenants"
+  },
+  {
+   "req": "SC-12",
+   "part": "S",
+   "area": "SC",
+   "group": "SC",
+   "title": "Clients"
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Many resources"
+  },
+  {
+   "req": "SC-14",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Region scope"
+  },
+  {
+   "req": "SC-15",
+   "part": "M",
+   "area": "SC",
+   "group": "SC",
+   "title": "Sizes and neighbours"
+  },
+  {
+   "req": "F-01",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "No lost acknowledged write"
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Exactly once per attempt"
+  },
+  {
+   "req": "F-03",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "One writer"
+  },
+  {
+   "req": "F-04",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Nothing seen is undone"
+  },
+  {
+   "req": "F-05",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Failover time"
+  },
+  {
+   "req": "F-06",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "No false failovers"
+  },
+  {
+   "req": "F-07",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Restart in any order"
+  },
+  {
+   "req": "F-08",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Deleted rows stay deleted"
+  },
+  {
+   "req": "F-09",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Every loss is said"
+  },
+  {
+   "req": "F-10",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Disks"
+  },
+  {
+   "req": "F-11",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Two machines"
+  },
+  {
+   "req": "F-12",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Majority loss"
+  },
+  {
+   "req": "F-13",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Bounded"
+  },
+  {
+   "req": "F-14",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "User code never stops fero"
+  },
+  {
+   "req": "F-15",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Outside services"
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Returning members"
+  },
+  {
+   "req": "F-17",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Partial partitions"
+  },
+  {
+   "req": "F-18",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Fail-slow"
+  },
+  {
+   "req": "F-19",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Overload and storms"
+  },
+  {
+   "req": "F-20",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Disk full"
+  },
+  {
+   "req": "F-21",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "Divergence is caught"
+  },
+  {
+   "req": "F-22",
+   "part": "M",
+   "area": "F",
+   "group": "F",
+   "title": "One bad entry"
+  },
+  {
+   "req": "F-22",
+   "part": "S",
+   "area": "F",
+   "group": "F",
+   "title": "One bad entry"
+  },
+  {
+   "req": "DEV-01",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Few novel mechanisms"
+  },
+  {
+   "req": "DEV-02",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Few interactions"
+  },
+  {
+   "req": "DEV-02",
+   "part": "S",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Few interactions"
+  },
+  {
+   "req": "DEV-03",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Model before code"
+  },
+  {
+   "req": "DEV-04",
+   "part": "S",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Published core"
+  },
+  {
+   "req": "DEV-05",
+   "part": "S",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Small code"
+  },
+  {
+   "req": "DEV-06",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Layer contracts"
+  },
+  {
+   "req": "DEV-07",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Deterministic"
+  },
+  {
+   "req": "DEV-08",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Bug flow"
+  },
+  {
+   "req": "DEV-09",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Shapes fixed early"
+  },
+  {
+   "req": "DEV-10",
+   "part": "M",
+   "area": "DEV",
+   "group": "DEV",
+   "title": "Counting convention,"
+  },
+  {
+   "req": "DEP-01",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Rolling deploy"
+  },
+  {
+   "req": "DEP-02",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Caught up is a number"
+  },
+  {
+   "req": "DEP-03",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Restart all"
+  },
+  {
+   "req": "DEP-04",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Sleep and wake"
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Seeds once"
+  },
+  {
+   "req": "DEP-06",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Addresses"
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "One public address with TLS"
+  },
+  {
+   "req": "DEP-08",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Clients leave shut servers"
+  },
+  {
+   "req": "DEP-09",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "The supervisor owns secrets"
+  },
+  {
+   "req": "DEP-10",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Contracts before the roll"
+  },
+  {
+   "req": "DEP-10",
+   "part": "S",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Contracts before the roll"
+  },
+  {
+   "req": "DEP-11",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Write gate"
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Group commit"
+  },
+  {
+   "req": "DEP-13",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Small copies"
+  },
+  {
+   "req": "DEP-14",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "More copies, more room"
+  },
+  {
+   "req": "DEP-14",
+   "part": "S",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "More copies, more room"
+  },
+  {
+   "req": "DEP-15",
+   "part": "S",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Two copies survive a crash"
+  },
+  {
+   "req": "DEP-16",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "A lost host loses nothing acknowledged"
+  },
+  {
+   "req": "DEP-17",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "The platform is the planner"
+  },
+  {
+   "req": "DEP-18",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Projects never meet"
+  },
+  {
+   "req": "DEP-19",
+   "part": "S",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Migrate"
+  },
+  {
+   "req": "DEP-20",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "npm"
+  },
+  {
+   "req": "DEP-21",
+   "part": "M",
+   "area": "DEP",
+   "group": "DEP",
+   "title": "Cost is a number"
+  },
+  {
+   "req": "TEST-01",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Solo, in process"
+  },
+  {
+   "req": "TEST-02",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Virtual time and ids"
+  },
+  {
+   "req": "TEST-03",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Input keys"
+  },
+  {
+   "req": "TEST-04",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Worlds"
+  },
+  {
+   "req": "TEST-05",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Tapes"
+  },
+  {
+   "req": "TEST-06",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Forks cost a record"
+  },
+  {
+   "req": "TEST-07",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Rerun on the exact earlier state"
+  },
+  {
+   "req": "TEST-08",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Captures line up"
+  },
+  {
+   "req": "TEST-09",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "App steps in the simulator"
+  },
+  {
+   "req": "TEST-10",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Same kernel bytes"
+  },
+  {
+   "req": "TEST-11",
+   "part": "S",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Perf pin per resource"
+  },
+  {
+   "req": "TEST-12",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "No order that will not last"
+  },
+  {
+   "req": "TEST-13",
+   "part": "M",
+   "area": "TEST",
+   "group": "TEST-OPS",
+   "title": "Outside checkers"
+  },
+  {
+   "req": "DATA-01",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "data is the state engine"
+  },
+  {
+   "req": "DATA-02",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "One seam"
+  },
+  {
+   "req": "DATA-03",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "Records are the wire"
+  },
+  {
+   "req": "DATA-04",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "The SCHEDULE contract"
+  },
+  {
+   "req": "DATA-05",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "Views are data's operators,"
+  },
+  {
+   "req": "DATA-06",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "Faults stay in user land"
+  },
+  {
+   "req": "DATA-07",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "Rows handed out are immutable,"
+  },
+  {
+   "req": "DATA-08",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "data's perf rides along"
+  },
+  {
+   "req": "DATA-09",
+   "part": "M",
+   "area": "DATA",
+   "group": "PERF-DATA",
+   "title": "A native kernel keeps data"
+  },
+  {
+   "req": "OPS-01",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "No numbers to choose"
+  },
+  {
+   "req": "OPS-02",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Health is complete"
+  },
+  {
+   "req": "OPS-03",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Config"
+  },
+  {
+   "req": "OPS-04",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Debugger"
+  },
+  {
+   "req": "OPS-05",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Mixed versions"
+  },
+  {
+   "req": "OPS-06",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Security"
+  },
+  {
+   "req": "OPS-07",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Backup, restore and point in time"
+  },
+  {
+   "req": "OPS-08",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Numbers for machines"
+  },
+  {
+   "req": "OPS-09",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "One owner per dir"
+  },
+  {
+   "req": "OPS-10",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Per-user access"
+  },
+  {
+   "req": "OPS-11",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Debugging in production"
+  },
+  {
+   "req": "OPS-11",
+   "part": "S",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Debugging in production"
+  },
+  {
+   "req": "OPS-12",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Upgrades both ways, and the fold's version"
+  },
+  {
+   "req": "OPS-13",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "Erase"
+  },
+  {
+   "req": "OPS-14",
+   "part": "M",
+   "area": "OPS",
+   "group": "TEST-OPS",
+   "title": "A shared tier keeps projects apart"
+  }
+ ]
+}
