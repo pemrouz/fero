@@ -250,6 +250,16 @@ Folder: [experiments/E31-subscribe](experiments/E31-subscribe/README.md)
 
 Q-31: Yes, after one rule change. As drafted, a follower that reloaded a snapshot tells a `log` reader `expired` while the leader holds every record (model-checked, 7 steps, one fault). With "a replica that lacks the reader's next record answers `END`; only the holding group's leader says `expired`", every property holds on ten bounds, each explored in full (up to 7.6 million states, 15 minutes of CPU in all): a leader crash, a follower's reload, a dropped link, a slot move and a relay, in `state` and `log` modes, every feature at once with one fault, and the move with two; only every feature at once with two faults is partial (no counterexample in 3 million states each). Cursors must be per-slot sequences: group offsets break both modes at the first move (5 steps). The move's carried segment names are a needed rule (a false `expired` in 8 steps without them). DEV-10: 26 rules by ablation, 27 with the segment names; 31 of 32 non-equivalent mutants caught (97%). Moves: every row that serves subscriptions from followers (W `any`: DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8; LEAN and SIDE for logs) keeps P-03, P-05, P-07 and F-04 once DESIGN-V5 4.4 says `END` (a changed answer, no new mechanism); O `slot` rows (DRAFT, MIN and its variants, RUST, SRV, LEAN, SLOG, OBJ) up on P-03, P-07 and DEV-09 (the cursor shape stands, with no translation at a move); O `off` rows down on P-07 and DEV-09 wherever a partition's records go on in another group's log (CELL's re-key; LANE if a lane's range ever moves; SPLIT only through its lineage rule); SC-14's far reads unchanged (a relay with any delay keeps every property; lag is not modelled).
 
+### E-32: E-32: does the design hold where its mechanisms meet?
+
+Folder: [experiments/E32-composition](experiments/E32-composition/README.md)
+
+Q-32 (b): yes at these bounds, within stated limits: one model with a slot move, a leader change, a voter swap in A or B, a log drop behind a snapshot and the carried dedup state, interleaved freely (the design runs keep DESIGN-V5 4.1's guard, so a source never drops its log while a move copies from it; without the guard all 15 full bounds it touches hold too), keeps every property it checks (E-15's 1 to 8 but not 9, E-14's QL, LC and CF, E-16's P2, P3 and P8, E-20's ONCE and REFUSED, E-30's ONCE and DONE, E-17's reader cursor; E-31's protocol and E-15's slot table are not in it) on 28 bounds in full (up to 2,612,006 states, each under an hour) and on the review's two reader bounds with two writes (in full), while 3 bounds are partial and not a pass (`any` and `all` at 2.5 million states, the review's two-crash bound at 3 million, no counterexample), so every bound run in full has one member fault and no election ever meets a voter behind the log; once three rules are written: E-20's floor guards every path that judges a copy, E-17's lock-token refusal included (a write both applied and refused in 6 steps without it, found by composing, no move needed; Raft thesis 6.3); a snapshot keeps the floor, outcomes, mark and highest lock token beside the rows (5 to 20 steps without each); and the move carries the floor and the mark (16 to 19 steps); 20 of the 24 rules added at the crossing are needed, DESIGN-V5 4.1's "no move still copying" is not, and 95 of 136 mutants are caught (70%, under DEV-03's 85%; 85% where dedup meets the move and the log drop); 4 bugs the review planted are all caught, 2 only on the review's bounds. Moves: COMP (and MIN, MIN-P, MIN-TS, RUST, SRV, LEAN, RLOG, EMB-V8, SIDE once they take C `self`) up on DEV-02 (K-01 inside one model at one member fault; K-02 in part: one session's floor, the highest token rather than a fence table, no epoch, no segment names), F-02 and P-08, +20 counted rules on DEV-10 and no new mechanism on DEV-01; DEV-03 up on its model clause, its mutant clause still open for the slot move; DRAFT, LANE, SPLIT, SLOG (`win`) not checked here, and owed the same floor rule by reasoning.
+
+Q-32 (a) and (c): the matrix exists and is built by code (773 distinct pairs after four read-set fixes); every pair is placed (329 distinct pairs are argued independent in at least one row, for a second agent to check), and DEV-02's MUST stays open for every row until E-32 (b) finishes and the open pairs of section 7 get their models. Moves: no row up or down on DEV-02 (M) beyond "open"; every row fails DEV-02 (S); the rows with the most open row-pairs carry unmodelled mechanisms of their own (ISR, SLOG, OBJ, PD and V4 their own replication; DRAFT, CELL, LANE and SPLIT log replicas and, with COMP, the leader-run slow-leader rule).
+
+**Q-32 (c), second agent:** the per-row counts add up and pairs.json is current; 59 of the 773 distinct pairs change class. E-32 (b) finished and holds 14 more pairs; 42 distinct pairs (198 row-pairs) move to open (39 whose argument broke, 3 whose model held only a stand-in), so every row still has open pairs and DEV-02's MUST stays open everywhere. Moves: no row up or down on DEV-02 (M) beyond "open"; ISR and SLOG carry the most new open pairs (27 and 24), from #meta records their data side acts on; every row with forks gains FORKPIN, every row with a tier and a restore mark gains RESTORENAME, and every row with writer time gains WTAIL (ISR, SLOG and OBJ the same question in their own model).
+
 ### E-33: E-33: genesis founds exactly one cluster; a restore keeps tokens and cursors honest
 
 Folder: [experiments/E33-genesis-restore](experiments/E33-genesis-restore/README.md)
@@ -351,7 +361,7 @@ A requirement is listed when an answer line above names it. A requirement that i
 | P-03 | E-19, E-31 |
 | P-05 | E-8, E-19, E-31 |
 | P-07 | E-19, E-31 |
-| P-08 | E-30 |
+| P-08 | E-30, E-32 |
 | P-09 | E-44 |
 | P-10 | E-9e, E-21, E-44 |
 | P-12 | E-5, E-23, E-43 |
@@ -385,7 +395,7 @@ A requirement is listed when an answer line above names it. A requirement that i
 | SC-13 | E-11, E-36 |
 | SC-14 | E-31 |
 | SC-15 | E-35 |
-| F-02 | E-20, E-30, E-44 |
+| F-02 | E-20, E-30, E-32, E-44 |
 | F-04 | E-31 |
 | F-05 | E-1, E-5, E-13, E-38c, E-44 |
 | F-06 | E-7, E-21, E-34 |
@@ -401,14 +411,14 @@ A requirement is listed when an answer line above names it. A requirement that i
 | F-20 | E-29 |
 | F-21 | E-5, E-43 |
 | F-22 | E-37 |
-| DEV-01 | E-9a, E-9b, E-9c, E-9e, E-11, E-15, E-16, E-17, E-17b, E-17c, E-20, E-22, E-24, E-26, E-27, E-30, E-36, E-37, E-38, E-38c, E-39 |
-| DEV-02 | E-16, E-17, E-17b |
-| DEV-03 | E-14, E-14b, E-14c, E-15, E-17, E-17b, E-17c |
+| DEV-01 | E-9a, E-9b, E-9c, E-9e, E-11, E-15, E-16, E-17, E-17b, E-17c, E-20, E-22, E-24, E-26, E-27, E-30, E-32, E-36, E-37, E-38, E-38c, E-39 |
+| DEV-02 | E-16, E-17, E-17b, E-32 |
+| DEV-03 | E-14, E-14b, E-14c, E-15, E-17, E-17b, E-17c, E-32 |
 | DEV-04 | E-10, E-46 |
 | DEV-05 | E-3, E-10, E-44, E-46 |
 | DEV-07 | E-4 |
 | DEV-09 | E-5, E-13, E-17b, E-18, E-19, E-29, E-31, E-35, E-36, E-40, E-42, E-45 |
-| DEV-10 | E-14, E-15, E-20, E-31 |
+| DEV-10 | E-14, E-15, E-20, E-31, E-32 |
 | DEP-01 | E-13, E-21 |
 | DEP-04 | E-26, E-28 |
 | DEP-07 | E-27, E-40 |
