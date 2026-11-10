@@ -1,0 +1,1608 @@
+{
+ "group": "P",
+ "judge": "j2",
+ "cells": [
+  {
+   "req": "P-01",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-02",
+     "E-44"
+    ],
+    "why": "The prototype passes the P-01 check in 100 of 100 seeds in three modes with the fold monitor on (E-22). A TS pipeline holds p99 4.3 ms against the 5.7 ms bar, but with no protocol work, so it is a ceiling (E-02); a held row reads in 81 ns through data (E-44). No kernel of this row has run example 02 on 3 processes, the 1,000-seed sweep or the pins.",
+    "closes": "Phase 1 kernel: example 02 on 3 processes, the 1,000-seed crash sweep with the fold monitor, and the write and read pins."
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02"
+     ],
+     "why": "The checks are as for the other Raft rows (E-22). Its write bar is the native one, C + 0.5 ms = 1.2 ms: E-02's Rust pipeline holds p99 0.67 ms (Go 0.75 ms) with independent disks emulated, but Rust's p99 is 1.6 ms on this box's one shared disk, so the pin is shown neither met nor missed.",
+     "closes": "Phase 1 kernel: example 02 on 3 processes, the 1,000-seed crash sweep with the fold monitor, and the write and read pins. The native pin needs independent disks."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02"
+     ],
+     "why": "The checks are as for the other Raft rows (E-22). Its write bar is the native one, C + 0.5 ms = 1.2 ms: E-02's Rust pipeline holds p99 0.67 ms (Go 0.75 ms) with independent disks emulated, but Rust's p99 is 1.6 ms on this box's one shared disk, so the pin is shown neither met nor missed.",
+     "closes": "Phase 1 kernel: example 02 on 3 processes, the 1,000-seed crash sweep with the fold monitor, and the write and read pins. The native pin needs independent disks."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02"
+     ],
+     "why": "The checks are as for the other Raft rows (E-22). Its write bar is the native one, C + 0.5 ms = 1.2 ms: E-02's Rust pipeline holds p99 0.67 ms (Go 0.75 ms) with independent disks emulated, but Rust's p99 is 1.6 ms on this box's one shared disk, so the pin is shown neither met nor missed.",
+     "closes": "Phase 1 kernel: example 02 on 3 processes, the 1,000-seed crash sweep with the fold monitor, and the write and read pins. The native pin needs independent disks."
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02",
+      "E-03"
+     ],
+     "why": "The checks are as for the other Raft rows (E-22), and a write also crosses the ring to the daemon (15 ns a record in batches, E-03). Its write bar is the native one, C + 0.5 ms = 1.2 ms: E-02's Rust pipeline holds p99 0.67 ms with independent disks emulated but 1.6 ms on this box's one shared disk, so the pin is shown neither met nor missed.",
+     "closes": "Phase 1 kernel: example 02 on 3 processes, the 1,000-seed crash sweep with the fold monitor, and the write and read pins. The native pin needs independent disks."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (order per partition, read your writes, commit before the answer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (order per partition, read your writes, commit before the answer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (order per partition, read your writes, commit before the answer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [
+      "E-28"
+     ],
+     "why": "Step 1: a `persisted` write commits by one conditional PUT to the object store (R `obj`, Q `put`). Step 2: that PUT costs p99 2.67 ms on local MinIO, but about 30 ms typical on S3 Standard and at or above 7.3 ms p99 on Express One Zone (cited in E-28). Step 3: the bar is C + 5 ms = 5.7 ms here, so on any real store the write p99 is over it; E-28's own threshold puts OBJ out at `persisted`.",
+     "proof": "structural"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: in v4 any member writes, and cells merge by last-writer-wins on Lamport stamps (R `lww`; O `lamp` is 'no total order per partition' in SPACE §2). Step 2: so there is no committed log per partition, and two members can apply two writes in different orders. Step 3: P-01 asks for per-partition order, and its test 'every replica's rows equal the fold of the committed log' cannot be stated for v4.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44",
+      "E-09b"
+     ],
+     "why": "On JetStream with fsync on three replicas, 900 writes through a leader kill lost nothing, read-your-writes held 900 of 900 and a held row read in 81 ns (E-44); a single ack takes p99 1.31 ms (E-09b). No seeded sweep can run on nats-server's bytes, and the write pin under load was not timed.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-21",
+     "E-22"
+    ],
+    "why": "Writer time as the median (window 0, A-23) passed every TTL check where at most one clock is wrong: worst 100 ms early and 300 ms late against 250 and 350 ms, and copies agreed at each position (E-21, simulated, 30 seeds a family). E-22's cache check passes with a leader change; a row is then up to 2.0 s late, which E-21 and this verdict read as time with no writer. Not shown on any kernel: the O(expired) tick pin at 1e6 rows, and memtier against Redis (PERF-02).",
+    "closes": "The expiry-tick pin at 1e6 rows, the row-set monitor in the kernel's sim sweep, and PERF-02's memtier runs through the RESP gateway on a real kernel."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "T `tso` was left out of E-21's runs, and TiKV's shape was never modelled or run here. So TTL agreement at each log position is not shown for this row.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (writer time that all copies agree on, expiry as a log record) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (writer time that all copies agree on, expiry as a log record) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (writer time that all copies agree on, expiry as a log record) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: P-02 wants every copy to agree which rows exist at each log position, with expiry inside one tick + `skew.max` of one clock. Step 2: v4 has no writer time (T is empty in SPACE §4) and no log position per partition (O `lamp`); each member would expire by its own clock and merge by last-writer-wins. Step 3: so a `touch` on one member and an expiry on another race, and copies can disagree; fixing it needs another row's T and R options.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream (E-44 ran P-01, P-09, P-10 and P-14 only). JetStream 2.10 expires by stream age, with no record for a follower to fold, so per-row `ttl` and `touch` need an expirer process that nobody built.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-03",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-31",
+     "E-22",
+     "E-19"
+    ],
+    "why": "With the `END` fix (A-06), E-31's model of subscribe holds every property (a snapshot then deltas with no gap and no overlap, a cursor that never goes back, own writes visible) on ten bounds explored in full, up to 7.6 million states: a leader crash, a reload, a dropped link, a slot move and a relay. E-22's near-cache check (a one-hop miss, `shortfall`, the memory bound) passes 100 of 100 seeds in three modes. A client cursor is 22 to 79 B (E-19)."
+   },
+   "except": {
+    "CELL": {
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-17c",
+      "E-31",
+      "E-22"
+     ],
+     "why": "Cells move whole, so group offsets keep their meaning (E-31's `off` option holds on every bound with no move). At a re-key the model refuses a cursor of the old generation and restarts the reader from a snapshot (E-17c, 6 rules): for a state follower that is a snapshot, then deltas, with nothing missed. The near-cache library is E-22's."
+    },
+    "LANE": {
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-31",
+      "E-22"
+     ],
+     "why": "No partition moves between lanes in this row, and E-31's `off` option (group offsets) holds every property on every bound without a move. The near-cache library is E-22's."
+    },
+    "SPLIT": {
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-17c",
+      "E-17b",
+      "E-31",
+      "E-22"
+     ],
+     "why": "Offsets with lineage: E-17b and E-17c model a reader across a split and a merge and hold with 2 to 3 lineage rules, and E-31's protocol holds on the bounds without a move. The two were not run in one model. The near-cache library is E-22's."
+    },
+    "ISR": {
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-31",
+      "E-22"
+     ],
+     "why": "Fixed partitions never move, so offsets keep their meaning, and E-31's `off` option holds every property on every bound without a move; serving from a follower at a position is Kafka's KIP-392, E-31's own precedent. The in-sync-set commit rule itself was not modelled."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "E-31 modelled per-slot sequences and group offsets, served from any ready replica. This row has timestamps (O `hlc`) and lease or read-index reads only (no W `any`), so its follow path has no model here.",
+     "closes": "E-31's model with this row's positions and read paths."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 follows by digests and Lamport stamps, not cursors, so P-03's cursor property has no form to check. DESIGN-V5 §9 measured a client that opened one room's server view holding all 1,000 rows.",
+     "closes": "Nothing is planned: V4 is the reference row and takes no fix."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream (E-44 ran 4 of 22 patterns). A subject filter and a stream sequence could carry a follow set and a cursor, but `shortfall` and the memory bound were not built.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-04",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "On the prototype six readers on three servers and three clients, missing one key at once, made exactly one `load` (it runs at the key's writer and fills with `if: absent`), and a write during the load kept its value. Both held in 100 of 100 seeds in three modes, with a leader change and a slot move inside (E-22, simulated). The number of readers does not enter the mechanism, so 1,000 misses give the same one load (reasoned)."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "As SRV: no user code runs on the servers (U `cli`), so `load` must run in a client behind a claim, and TiKV's shape was never run here.",
+     "closes": "A design and a sim check of read-through with `load` in a client, on a prototype of this row."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer that judges `if: absent` and runs the load once) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer that judges `if: absent` and runs the load once) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer that judges `if: absent` and runs the load once) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "In the design E-22 ran, `load` is user code that runs at the key's writer. SRV's servers run no user code (U `cli`), so the load must run in an app client behind a claim, which nobody designed or ran.",
+     "closes": "A design and a sim check of read-through with `load` in a client, in the phase that builds L4."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no `load`. One load per key across servers needs one place to decide, and 'a write during the load wins' needs a condition or a stamp trick under last-writer-wins; neither was designed.",
+     "closes": "Nothing is planned: V4 is the reference row and takes no fix."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream. A publish-if-empty on a marker subject could elect one loader, and the fill could be a check-and-write, but nobody built it.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-05",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-08",
+     "E-22",
+     "E-31"
+    ],
+    "why": "AMENDMENTS 1.3, line 'P-05's latency clause': C + one hop is about 0.8 ms here, and one relay hop alone took p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait (0.22 to 0.25 s at 10,000), so no row meets the clause as worded. Restated with a coalescing window and about 1,000 sockets a core, the rooms check (E-22), the reconnect model (E-31) and the 100,000 a second pin (0.57 to 1.5 M in Node, E-08) hold on prototypes. The cell then stays open only on `nats bench` fan-out through a gateway on a real kernel (PERF-03).",
+    "proof": "ceiling",
+    "gap": 0.5,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "P-05 restated with a coalescing window per room and a socket count per core; then PERF-03's fan-out run through the NATS gateway on a real kernel and the delivery pin."
+   },
+   "except": {
+    "OBJ": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-28",
+      "E-08"
+     ],
+     "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'; E-08). Its own reason stays under the restated clause: delivery follows a commit that is a PUT, p99 2.67 ms on local MinIO and at or above 7.3 ms on a real store (cited in E-28), against C + one hop of about 0.8 ms plus a few ms of window.",
+     "proof": "ceiling",
+     "gap": 2.3,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-08"
+     ],
+     "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'; E-08). Its own reasons stay under the restated clause: v4 measured about 9,000 deliveries a second against the 100,000 pin (PERF-11's own figure), and its order is per cell (O `lamp`), not per room.",
+     "proof": "ceiling",
+     "gap": 0.91,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-09b",
+      "E-08"
+     ],
+     "why": "AMENDMENTS 1.3 (line 'P-05's latency clause') names every row. Here a room message on JetStream is acked at p99 1.31 ms with fsync on three replicas (E-09b), before any delivery hop, against C + one hop of about 0.8 ms. Restated, it is open: rooms on JetStream were not tried (E-44).",
+     "proof": "ceiling",
+     "gap": 0.64,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-09b",
+     "E-02",
+     "E-08"
+    ],
+    "why": "Both rungs run in the prototype's check, in order and with no duplicate (E-22), and every row counts the `none` rung as one mechanism. But the `none` path's failover rule was never modelled (K-10), `LogReader.gaps` is not built, and no kernel has been driven by `nats bench` or `nats latency`. NATS does p99 0.27 ms and 2.25 M messages a second, only 1.9 times under TS's ceiling with no sockets at all (E-09b).",
+    "closes": "A kernel with the `none` rung driven by `nats bench` and `nats latency` through the NATS gateway (PERF-03), and a model of the `none` path with relays and a failover (K-10)."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (order per subject on the log path, and a `none` path beside it) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (order per subject on the log path, and a `none` path beside it) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (order per subject on the log path, and a `none` path beside it) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (order per subject on the log path, and a `none` path beside it) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: any v4 member writes, and cells merge by Lamport stamp (R `lww`, O `lamp`: no total order per partition). Step 2: so two publishes to one subject from two members have no one order, and two subscribers can get them in different orders. Step 3: P-06 asks for order per subject, which REQUIREMENTS reads as total per partition.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-09b"
+     ],
+     "why": "Step 1: BUY's `none` rung is core NATS itself, under fero's client. Step 2: P-06 says its latency meets PERF-03, and PERF-01 counts a win only when fero is better than NATS by more than the spread (a tie counts only at the measured floor). Step 3: a layer on NATS can at best equal NATS (p99 0.27 ms, E-09b), so it cannot win: SPACE §4.2's 'it cannot beat what it is built on'.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-31",
+     "E-19",
+     "E-22"
+    ],
+    "why": "Per-slot sequences keep a position's meaning across a leader crash, a follower's reload and a slot move in E-31's model (every property on ten bounds; group offsets break in 5 steps), and cost 3.9 B a record (E-19). E-22's stream check (resume from saved cursors, `expired` with `earliest`) passes in every seed. Open: the same monitor on a real kernel, and the Kafka and Redpanda runs through a gateway (PERF-05, PERF-06).",
+    "closes": "The cursor monitor in the kernel's sim sweep with failovers and moves; PERF-05 and PERF-06 through the Kafka gateway on a real kernel."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "Positions here are timestamps (O `hlc`) across splits and merges. E-31 modelled per-slot sequences and group offsets only, and TiKV's shape was never run here.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a committed log per partition and positions that outlive a move) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a committed log per partition and positions that outlive a move) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-31"
+     ],
+     "why": "Fixed partitions never move, so an offset keeps its meaning by construction, and E-31's protocol holds with group offsets on every bound without a move. Open like every row on the Kafka and Redpanda runs, and the in-sync-set commit rule was not modelled here.",
+     "closes": "The cursor monitor in the kernel's sim sweep with failovers and moves; PERF-05 and PERF-06 through the Kafka gateway on a real kernel."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-31",
+      "E-17b"
+     ],
+     "why": "Lane offsets keep their meaning while no lane's range moves, which this row never does (E-31's `off` option holds without a move); a later range move would need an epoch and lineage (E-17b). Open like every row on the Kafka and Redpanda runs through a gateway.",
+     "closes": "The cursor monitor in the kernel's sim sweep with failovers and moves; PERF-05 and PERF-06 through the Kafka gateway on a real kernel."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-17c",
+      "E-31"
+     ],
+     "why": "Offsets with lineage: E-17c models a reader across a split and a merge and holds with 2 to 3 lineage rules, kept for ever, but E-31 did not run its subscribe model with lineage. Open also, like every row, on the Kafka and Redpanda runs through a gateway.",
+     "closes": "E-31's model with lineage across a split; then as the other rows."
+    },
+    "CELL": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-17c",
+      "E-31"
+     ],
+     "why": "Step 1: CELL's positions are group offsets (O `off`), and it grows by a re-key that copies rows into a new generation of groups. Step 2: as written, a cursor of the old generation is refused `unknown-log` and the reader restarts from a snapshot (E-17c's model; SPACE §2 `rekey`: 'cursors break'); kept without the refusal, offsets give a false `expired` in 5 steps (E-31, `off`). Step 3: so a log reader cannot go on from a kept position after the resource grows: it skips records or reads them again, against 'a position never changes meaning across scaling' and 'every record once, in order'.",
+     "proof": "structural"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: a replayable stream needs one order of records per partition and a position in it. Step 2: v4 keeps a log per origin, compacts it, and stamps cells with Lamport clocks (O `lamp`: no total order per partition). Step 3: so there is no position a reader can replay from that means the same on every member.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-09b"
+     ],
+     "why": "Not tried in E-44. A JetStream stream has limits by age, size and count and a sequence that survives failover, so the shape fits. Its speed is JetStream's own: 3,700 messages a second with fsync always (E-09b).",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-30",
+     "E-22"
+    ],
+    "why": "E-22's check passes in every seed: nothing skipped, one invoice per order, and the paused member's commit refused `fenced` in 40 of 40 runs. With the `srchi-slot` mark (A-05) outputs stay exactly once past the dedup horizon (E-30, model-checked; real Elle agrees on all 2,800 histories). Open: 'a crash hands on within one lease plus one commit' was never timed, and the libraries are first versions.",
+    "closes": "The rebalance-time pin on the groups library, in the phase that builds L5."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (fenced offsets judged at one writer, exactly once past the dedup horizon) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (fenced offsets judged at one writer, exactly once past the dedup horizon) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (fenced offsets judged at one writer, exactly once past the dedup horizon) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (fenced offsets judged at one writer, exactly once past the dedup horizon) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30",
+      "E-17c",
+      "E-22"
+     ],
+     "why": "The group library is E-22's, and fences travel across a re-key (E-17c). But A-05's mark is kept per output slot and CELL has no slots, so its carry across a re-key was not modelled, and a re-key of the stream refuses the members' cursors. The rebalance-time pin was never timed.",
+     "closes": "E-30's model with a re-key of the source and of the output; the rebalance-time pin."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30",
+      "E-17c",
+      "E-22"
+     ],
+     "why": "The group library is E-22's, and fences travel across a split (E-17c). But the carry of A-05's mark across a split was not modelled, and the rebalance-time pin was never timed.",
+     "closes": "E-30's model with a split of the output group; the rebalance-time pin."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: one live owner per partition per generation, and offsets a zombie cannot commit, need a condition judged at one writer. Step 2: v4 has none (SPACE §5: `lww` forbids conditions and ops); DESIGN-V5 §9 measured two claims that both committed and were both told `ok`. Step 3: so two members can own one partition, and a paused member's commit is not refused.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream. Cursor rows written by check-and-write could carry a fence, but past the dedup window an attempt lands twice (E-44, gap 2), and nobody built the group library there.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-44"
+    ],
+    "why": "On the prototype every job was removed once, the poison job was dead-lettered after 5 deliveries, no message had two live leases in the log, first deliveries were FIFO and an empty take appended nothing, in every seed with workers killed and paused (E-22). The rule 'a take hands over what it has at once' is added (E-44, A-10). Open: the JetStream work-queue run through a gateway on a real kernel (PERF-04).",
+    "closes": "PERF-04's work-queue row through the NATS gateway on a real kernel; the queue check in the kernel's sim sweep."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` judged at one writer, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` judged at one writer, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` judged at one writer, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` judged at one writer, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: 'at most one live lease' needs `claim`, a condition judged at one writer by one clock. Step 2: v4 has no single judge (R `lww`: no conditions or ops, SPACE §5) and no writer time (T is empty); DESIGN-V5 §9 measured two claims that both committed. Step 3: so two workers on two members can hold one message at once.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "On JetStream 294 jobs were acked once, 6 poison jobs dead-lettered, never two live leases, and an empty take wrote nothing, through a leader kill (E-44). But the dead-letter notice can be missed without a scan, and FIFO per partition needs a consumer per partition; no seeded sim can run there.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-10",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-21",
+     "E-17c",
+     "E-33",
+     "E-09e"
+    ],
+    "why": "The fence refused every stale write under every clock rule (28 to 127 per option, E-21, simulated); E-22's lock check and both fencing checkers are clean with a paused, skewed holder and a `#locks` failover. A move carries the highest token (E-17c), and a restore starts above a high-water mark (A-08, E-33). Open: 'acquire ≤ C', read here as one commit, has no pin, and etcd's lock bench (PERF-07) has only driven a simulator.",
+    "closes": "PERF-07's lease and lock rows through the etcd gateway on a real kernel, the acquire pin, and TEST-13's fencing checker on real-TCP runs."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table at each writer, tokens that rise across failovers and moves, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table at each writer, tokens that rise across failovers and moves, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table at each writer, tokens that rise across failovers and moves, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table at each writer, tokens that rise across failovers and moves, leases by writer time) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: a lock is taken with `if: absent`, and a protected write is refused below the highest token the writer has seen: both are judged at one writer. Step 2: v4 has no such judge (R `lww`: no conditions, SPACE §5); DESIGN-V5 §9 measured two claims both told `ok`. Step 3: so two holders can acquire at once on two members, and a stale token is not refused.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: on JetStream the token check runs in fero's client, per subject; the stream's writer cannot tie a write to a token (E-44, gap 6: a write with no token to a protected row was accepted). Step 2: so a stale holder that writes a row the newer holder never wrote, or that uses another tool, commits after the writer has seen a newer token. Step 3: P-10 asks that such a write is refused; one lock name under two lease lengths was also held twice at once (gap 7).",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-11",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-20"
+    ],
+    "why": "On the prototype the counter equals the acknowledged incrs and a limiter of 5 passes exactly 5 of 12, with 5 % of messages lost and a leader change; the 7 and 1 seeds that fail count appended entries, not committed ones (a check artifact, E-22). Every dedup option holds exactly once in E-20's model. Open: the op-cost pin (3 µs TS, 0.5 µs native) was never measured, and memtier INCR has only driven a simulator (PERF-02).",
+    "closes": "The op-cost pin at the writer, and PERF-02's INCR rows through the RESP gateway on a real kernel."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (ops judged at one writer, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (ops judged at one writer, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (ops judged at one writer, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (ops judged at one writer, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: a bound that is never crossed, and an incr counted once across retries, need one writer that judges each attempt. Step 2: v4 has none (R `lww`: no conditions or ops, SPACE §5); REQUIREMENTS F-02 records that one forwarded write can commit twice, and DESIGN-V5 §9 that two check-then-sets off the owner were both told `ok`. Step 3: so two incrs on two members can pass a bound together, and a retry can count twice.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Measured on JetStream: an `incr` whose answer was lost, retried after one other write to the row, was counted again (the counter read 3 where 2 was right), and a retry after the dedup window lands twice (E-44, gap 2). The attempt id lives only in the row's last message, and the log's writer keeps no attempt table. The op also costs about 4 ms, judged by the client, against 3 µs.",
+     "proof": "counterexample"
+    }
+   }
+  },
+  {
+   "req": "P-12",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-23",
+     "E-05",
+     "E-43"
+    ],
+    "why": "Merged views equal the one-group result only with a merge contract that data does not have yet: with it 0 mismatches in 225.6 million checks; without it top-k and sum differ, even between replicas of one group (E-23). data's `group` costs O(rows per bucket) a commit, 2,574 µs at 1e6 rows against the 1 µs bar (E-05). Both changes are owed by data for every row alike (A-10), so no row is shown to meet the pins.",
+    "closes": "data's merge contract and per-row `group` deltas land (a SCHEDULE_VERSION bump); then data's perf pins and the merged-view test on random runs."
+   },
+   "except": {}
+  },
+  {
+   "req": "P-13",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-21"
+    ],
+    "why": "With 'a bound write waits for its session's record' (A-04), the prototype removed a killed client's rows on every copy within 9.8 s of a 10 s lease and kept the rows of a client paused 5 s, in 100 of 100 seeds in three modes (E-22, simulated). Leases judged by median writer time pass E-21's checks. With a `#sessions` failover near the lapse removal took up to 12.4 s, read here as time with no writer."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (leases by one writer time, removal as a log record at each group) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (leases by one writer time, removal as a log record at each group) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (leases by one writer time, removal as a log record at each group) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (leases by one writer time, removal as a log record at each group) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: 'removed on every copy within the lease plus one tick, and never while the session lives' needs one clock and one judge per partition. Step 2: v4 has no writer time (T is empty) and merges by last-writer-wins. Step 3: so a reaper's remove and a live session's renewal written on two members race, and either a lapsed row stays or a live row goes.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream. Version 2.10 expires by stream, not by session (E-44 lists leases by the writer's clock as a gap), so presence needs a reaper process that nobody built.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-14",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-22b",
+     "E-46",
+     "E-20"
+    ],
+    "why": "With a condition or an op, two sells of the last item never both passed, wherever the calls ran: 0 of 240 races, and 0 of 300 more under forced leader changes, slot moves and the shuffle (E-22, simulated). With 'a refusal waits for the commit it was judged on' (A-04), Porcupine found all 183,159 partition histories linearizable, and real Knossos agrees (E-22b). The ported Raft core was linearizable in 26 of 26 Maelstrom runs (E-46)."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer per partition, linearizable conditions, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer per partition, linearizable conditions, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer per partition, linearizable conditions, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (one writer per partition, linearizable conditions, exactly once per attempt) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: a rule over a partition holds only if every condition is judged at one writer. Step 2: v4 judges where the call lands and merges by last-writer-wins: DESIGN-V5 §9 measured a check-then-set refused on the owner but both told `ok` elsewhere, and two claims both committed (REQUIREMENTS P-14: 'v4 measured: both ok'). Step 3: so two sells of the last item through two servers both pass.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: on JetStream a condition is a check-and-write by the client against one subject's last sequence. Step 2: that judges one row; a partition of several rows can only be checked against the whole stream's last sequence, which any other write breaks (E-44, gap 4, reasoned from the headers). Step 3: so a rule over a partition of several rows cannot be kept, though two sells of one row gave exactly one `ok` in 100 of 100 rounds.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-15",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-24",
+     "E-22",
+     "E-22b"
+    ],
+    "why": "Sagas with fenced locks owned by the unit, plus 'a failed run undoes every step' (A-24), keep all-or-nothing, no G0 and 'every unit ends' on seven bounds explored in full, up to 2.9 million states, with a crash at every step and a paused holder (E-24: 38 rules, 41 of 44 mutants caught). Real Elle finds no G0 in 300 saga histories with the first rule (E-22b)."
+   },
+   "except": {
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-24"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table and one judge at each partition) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-24"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a fence table and one judge at each partition) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "PD": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "2PC with transaction records and intents: a unit commits at its primary record, and any later reader resolves a dead or paused holder's intents forward or back (Percolator; TiKV in production). Cited, not run here."
+    },
+    "ISR": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "Kafka-style transactions: a coordinator's log ends every unit with commit or abort markers on each partition, and a paused producer is fenced by its epoch (KIP-98). Cited, not run here."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-24"
+     ],
+     "why": "Step 1: X is `none` for this row, and a unit that is safe against a paused holder needs fenced steps: a writer that refuses an older token. Step 2: last-writer-wins has no such judge (SPACE §5: `lww` allows at most a saga without fences). Step 3: so nothing stops a paused holder's late step from landing after its unit was undone, the case E-24 needed fences plus a rule to close.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-24"
+     ],
+     "why": "The saga takes A-24 in fero's L5 library, but on JetStream a fence is checked by the client, per row (E-44). E-24's model assumes a writer that refuses a lower token, so it does not cover this row.",
+     "closes": "E-24's bounds run again with a client-side fence per row, then the saga check on a JetStream cluster."
+    }
+   }
+  },
+  {
+   "req": "P-15",
+   "part": "S",
+   "default": {
+    "v": "not",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-22b",
+     "E-24"
+    ],
+    "why": "A saga shows its steps one at a time: Elle finds fractured reads in 66 to 77 of 100 saga histories even with A-24's rules (E-22; real Elle confirms, E-22b). RAMP would give atomic reads for units of plain sets only, and no row holds it (E-24)."
+   },
+   "except": {
+    "PD": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "2PC over multi-version state reads at one timestamp, so a reader sees all of a unit or none of it by construction (Percolator's snapshot reads; TiKV in production). Cited, not run here."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-24"
+     ],
+     "why": "`ktxn` is the route the requirement names (Kafka's `read_committed`), and E-24 prices the SHOULD from it. But no experiment ran it, and commit markers land partition by partition, so a reader of two partitions can see one side first; Elle's fractured-read check has not been run on it."
+    },
+    "V4": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "X is `none`: v4 has no unit across partitions at all, so nothing makes one visible as a whole."
+    }
+   }
+  },
+  {
+   "req": "P-16",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-43",
+     "E-23"
+    ],
+    "why": "On the prototype the rebuilt projection equalled the live one in every seed, and `history: 'all'` kept every record (E-22). But E-43 found a `sum` view that depends on the records, not the rows (0.10000000000000003 live against 0.1 rebuilt), and two data commits under one SCHEDULE_VERSION that fold 578 rows differently. The fix is owed by data for every row alike (A-10: an exactly rounded sum, the fold-version pins) and has not landed.",
+    "closes": "data's contract and the fold-version pins land; then P-16's rebuild test with aggregate views on random runs, and the retention monitor in the kernel's sweep."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-43"
+     ],
+     "why": "Step 1: a byte-for-byte rebuild needs one order of every fact. Step 2: v4 keeps a log per origin, compacts it, and merges cells by Lamport stamp (O `lamp`: no total order per partition), so there is no `history: 'all'` log to replay. Step 3: a projection that depends on order (a float sum, top-k ties: E-43, E-23) can then differ between the live fold and a rebuild.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-17",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-30",
+     "E-22"
+    ],
+    "why": "With the `srchi-slot` mark written in the output's own entry and carried on a slot move (A-05), B equals f(A) on every bound, a restart past the dedup horizon and a B slot move included (E-30: 5 rules, all needed; real Elle agrees on all 2,800 histories). E-22's derive check gives exact totals with a member killed mid-batch, in every seed."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (a mark that commits in the output's own entry at one writer, and travels with the unit that moves) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (a mark that commits in the output's own entry at one writer, and travels with the unit that moves) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a mark that commits in the output's own entry at one writer, and travels with the unit that moves) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a mark that commits in the output's own entry at one writer, and travels with the unit that moves) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "LANE": {
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-30",
+      "E-22"
+     ],
+     "why": "Nothing moves between lanes in this row, and a mark kept per output group holds on every bound of E-30 without a move, a restart past the dedup horizon included (it loses an output only when a slot moves). E-22's derive check gives exact totals with a member killed mid-batch."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30",
+      "E-17c"
+     ],
+     "why": "A-05's mark is kept per output slot and travels when the slot moves. CELL has no slots: a re-key re-hashes keys, and E-30 shows a mark kept per group loses an output when keys move (12 steps), so the carry across a re-key is not modelled. A re-key of A also refuses the reader's cursor (E-17c).",
+     "closes": "E-30's model with a re-key of A and of B."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-30",
+      "E-17c"
+     ],
+     "why": "A-05's mark is kept per output slot and travels when the slot moves. SPLIT has ranges that split, and the carry of the mark across a split was not modelled (A-05 says so); a mark kept per group loses an output when keys move (E-30, 12 steps).",
+     "closes": "E-30's model with a split of the output group and of the source."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: 'each A record affects B exactly once' needs A's log in one order, and outputs deduped at B's one writer. Step 2: v4 has neither a position in A (O `lamp`) nor a writer-side judge (R `lww`); REQUIREMENTS F-02 records that one forwarded write can commit twice. Step 3: so an output that is not idempotent (an `incr`) can apply twice after a crash mid-batch.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream. A dedup window alone fails past its horizon there (E-44, gap 2: a retry lands twice after the window), and nobody built the mark as a check-and-write on the output rows.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-18",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-06",
+     "E-22"
+    ],
+    "why": "TEST-05: the prototype's tape records, finds by match key, replays in order and forgets past its window (E-22; a tape is one partition). TEST-07: a rerun by undo costs 0.03 to 0.05 ms at every size against 10 ms, with one small data change owed (E-06). TEST-06 is open for every row: the fork was not built (E-22), its < 1 KB storage cost was not measured, and a fork that runs costs O(rows), 2.6 s at 1e6 rows (E-06).",
+    "closes": "The fork built on immutable segments and snapshots in the fero test phase: a fork of a 1 GB resource writes < 1 KB, with one cut per group."
+   },
+   "except": {}
+  },
+  {
+   "req": "P-19",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-40",
+     "E-45",
+     "E-31"
+    ],
+    "why": "A prototype client (the door, follow with a cursor, writes that resolve on commit) with all of data is 27.9 KB gzip against 60 KB. It reaches its first committed write over wss in 13 to 17 ms in Chromium, with one TLS handshake plus two round trips by design, and imports in 4 to 22 ms against 50 ms (E-40). A RESP gateway built from the API's verbs ran with 0 errors (E-45); P-03's promises over this wire are E-31's model."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-40"
+     ],
+     "why": "The TS client and its bundle are E-40's, as for every row. But P-19 carries P-03's promises, and P-03 is open for this row: its follow path (timestamps, no reads from any replica) has no model here.",
+     "closes": "As P-03 for this row."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-40"
+     ],
+     "why": "Today a browser cannot join: the bridge joins for it (example 42's README, cited in REQUIREMENTS). The site already runs v4's kernel in a browser, so a WebSocket transport is not ruled out, but P-03's cursors have no form in v4.",
+     "closes": "Nothing is planned: V4 is the reference row and takes no fix."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-40",
+      "E-28"
+     ],
+     "why": "The TS client, its bundle and P-03's promises are as for the other slot rows (E-40, E-31). But the cold client's first committed write waits for a PUT (p99 2.67 ms on local MinIO, at or above 7.3 ms on a real store, cited in E-28) where the bar counts C. Read as a count of legs the bar holds; read as time it does not.",
+     "closes": "A cold-client pin against a real object store."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-40",
+      "E-44"
+     ],
+     "why": "Not tried. nats-server speaks WebSocket, but the bundle would carry a NATS client beside data's 26.6 KB, and nobody measured it or the cold start.",
+     "closes": "A browser check and a bundle count of fero's client over NATS's WebSocket."
+    }
+   }
+  },
+  {
+   "req": "P-20",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-43"
+    ],
+    "why": "On the prototype every replica equals a rebuild through the upcasters after each bump across three versions, old records replay at v3, and held rows are upcast at the bump (E-22). Not built or run: an old tape replayed on new code (exact, or refused `schema-changed`). The byte-for-byte rebuild also rests on data's contract, which has not landed (P-16, E-43).",
+    "closes": "The tape replay across a shape change in the fero test phase, and P-16's rebuild test across the change once data's contract lands."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (a shape version in force from one log position on every copy) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (a shape version in force from one log position on every copy) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a shape version in force from one log position on every copy) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a shape version in force from one log position on every copy) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: the MUST rests on P-16's rebuild from `history: 'all'` and on a version in force from one log position. Step 2: v4 has no total order per partition (O `lamp`) and no kept history, so members can fold one record under different versions. Step 3: so a rebuild on new code cannot be shown equal to the live state.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-20",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "The prototype refuses a bad row at the writer with `schema` and the path. Its `migrate` rewrote each row exactly once across a killed and re-run migration, paced at 500 rows a second, with `progress()`, in 100 of 100 seeds in three modes (E-22, simulated). What the pacing does to P-01's p99 was not timed."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (a schema judged at one writer, and P-17's exactly-once machinery) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a schema judged at one writer, and P-17's exactly-once machinery) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (a schema judged at one writer, and P-17's exactly-once machinery) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The migration job runs in a client and fits. But the runtime schema is user code checked at the writer, and SRV's servers run no user code (U `cli`); a declarative schema for a native server was not designed."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "As SRV: no user code on the servers, so a runtime schema at the writer needs a declarative form that was not designed; TiKV's shape was never run here."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-30"
+     ],
+     "why": "Typed rows and the schema at the writer are E-22's. But the migration is P-17's machinery, and the mark's carry across a re-key was not modelled, so 'exactly once' is not shown for this row."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-30"
+     ],
+     "why": "Typed rows and the schema at the writer are E-22's. But the migration is P-17's machinery, and the mark's carry across a split was not modelled, so 'exactly once' is not shown for this row."
+    },
+    "V4": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no shape versions, no upcasters and no exactly-once job: a schema judged at one writer needs a writer, which last-writer-wins lacks."
+    },
+    "BUY": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "On JetStream the writer is nats-server, which cannot check a schema; fero's client would check it, and any other client gets past, as with fences (E-44, gap 6)."
+    }
+   }
+  },
+  {
+   "req": "P-21",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-45"
+    ],
+    "why": "The prototype's service gives `no-answerer` at once, and each ask one answer or a timeout, never two (383 answers and 17 timeouts of 400, with an answerer killed). But an ask is three persisted commits: 6.0 ms against 2.15 ms for one write, far over two hops (E-22, D7). API.md's `none` default cannot be built on `claim`, so the latency clause needs a service on the `none` rung (or a memory rung) that nobody designed or ran.",
+    "closes": "A request and reply library on the `none` rung, checked in the sim and driven by `nats bench` request/reply through the gateway (PERF-03's setup)."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4's method plane answers a client's call from a server at most once. Queue groups among client answerers, `no-answerer` and the two-hop pin were not shown.",
+     "closes": "Nothing is planned: V4 is the reference row and takes no fix."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-09b"
+     ],
+     "why": "Not tried in E-44. NATS's own request and reply with queue groups gives the shape, but then fero only equals NATS on `nats bench`.",
+     "closes": "The pattern's check on a JetStream cluster; no seeded sim is possible there (TEST-10)."
+    }
+   }
+  },
+  {
+   "req": "P-22",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "On the prototype a delayed message was never claimed before its time by writer time, with the writer's clock skewed 200 ms and a leader change; the cron message came due at 06:00; a waiting take appended nothing (E-22, simulated). Open: the wake came 3.5 ms of virtual time after the enqueue's ack, which is not a pin for 'C + one hop'. And `delay` counts from the adder's clock until the writer stamps it (E-22, D5).",
+    "closes": "The waiting-take wake pin on a real kernel, and a writer-stamped `delay`, in the phase that builds the queue library."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` with `where` by writer time at one writer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` with `where` by writer time at one writer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` with `where` by writer time at one writer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` with `where` by writer time at one writer) are not shown for this row. Only the library above them is the one E-22 ran.",
+     "closes": "A model or a prototype of this row's writer path (one writer, order, exactly once, writer time) under the same checks, then the pins."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: 'takeable within one tick of its time by the writer's clock' and a take with a lease need writer time and `claim` at one writer. Step 2: v4 has neither (T is empty; R `lww` has no conditions, SPACE §5). Step 3: so two members can hand out one delayed message, each by its own clock.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "P-22",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "The prototype's queue keeps one sub-partition per priority level inside a partition and takes the levels in order. Its check gets the priority-0 message first in 100 of 100 seeds in three modes (E-22, simulated). FIFO holds inside each level."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` in partition order at one writer) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "Kafka's shape (a leader and an in-sync set, `pid` dedup) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` in partition order at one writer) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shared log (loglets on log nodes, seal and CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` in partition order at one writer) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The object-store log (a commit is a PUT, the writer holds a lease by CAS) was never modelled or run in this study, so the kernel promises this pattern stands on (`claim` in partition order at one writer) are not shown for this row. Only the library above them is the one E-22 ran."
+    },
+    "V4": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no `claim` and no queue; priorities sit on top of both."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Not tried on JetStream; a subject per level, pulled in order, could do it."
+    }
+   }
+  }
+ ]
+}

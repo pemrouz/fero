@@ -1,0 +1,1298 @@
+[
+ {
+  "req": "P-01",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) In v4 any member takes a write and cells merge by last-writer-wins on Lamport stamps (SPACE section 2: R `lww`; O `lamp`, 'no total order per partition'). (2) So two members that each take a write to another field of one row apply the two in opposite orders: one copy shows {x} then {x, y}, the other {y} then {x, y}, and no one log has both as folds of its prefixes. (3) P-01 asks for per-partition order, which REQUIREMENTS reads as total, and tests that every replica equals the fold of the committed log; v4 has no such log, and getting one needs another row's R and O options. Judge 1's verdict here was the default text about E-22's Raft prototype, which is not v4's mechanism."
+ },
+ {
+  "req": "P-02",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) P-02 asks that all copies agree on which rows exist at each log position, and that a row expires within one tick plus `skew.max` of its ttl. (2) v4 has no time rule (T is empty in SPACE 4.1), no log position per partition (O `lamp`), no `ttl` or `max` in its API, and no one writer to judge a condition (SPACE section 5: `lww` forbids conditions). (3) So an expiry is each member's own guess by its own clock: a remove written on one member and a `touch` on another merge by stamp, not by time, so a touched row can go early or copies can differ. The cure is one writer and writer time, which are other rows' R and T options, so the row fails as it stands. Judge 1 named the same gap ('no test on it') and called it open."
+ },
+ {
+  "req": "P-06",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) Any v4 member takes a publish, each origin keeps its own log, and records merge by Lamport stamp (R `lww`, O `lamp`: no total order per partition). (2) Two publishes to one subject through two members are applied in arrival order on each copy, so two subscribers on two members can get them in opposite orders. (3) P-06 asks for order per subject, which REQUIREMENTS reads as total per partition; both judges already fail V4 on P-07 for this same lack of one order. Judge 1's verdict here was the default text about E-22's Raft prototype."
+ },
+ {
+  "req": "P-13",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) P-13 has two halves: a lapsed session's rows go on every copy within its lease plus one tick, and a live session's rows never go; whether a session has lapsed is a condition on its renewals, by one clock. (2) v4 has no time rule (T is empty in SPACE 4.1) and no one writer to judge a condition (R `lww`; DESIGN-V5 section 9 measured two claims judged on local state that both committed). (3) So a member that has not seen a renewal removes a live session's rows, and the remove stands if its stamp is higher; or renewals win, and a late one brings a removed row back (STATUS's open bug: a write from an evicted member beats a newer remove). One half breaks either way, and the cure is another row's R and T options. Judge 1 named the same gap and called it open."
+ },
+ {
+  "req": "P-16",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) P-16 asks to keep every fact and to rebuild a projection equal to the live one byte for byte. (2) v4 keeps one log per origin and compacts it: an entry that is not its cell's winner is dropped ('loser history vanishes, by construction', kernel/log.ts), and v4 has no `history: 'all'`. (3) So an overwritten fact is gone, and there is no one order to replay what is left (O `lamp`); keeping every fact in one order needs another row's R and O options. Judge 1's verdict here was the default text about E-22's Raft prototype and data's contract."
+ },
+ {
+  "req": "P-20",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 2 was right; I confirm the steps. (1) P-20's MUST rests on P-16's rebuild from `history: 'all'` and on old records passing through upcasters. (2) v4 keeps no full history (compaction drops every entry that is not its cell's winner, kernel/log.ts) and has no shape version or upcaster; with no log position per partition (O `lamp`) two members can also fold one record under two versions during a roll. (3) So there is nothing to rebuild from, and the MUST fails with P-16. Judge 1's verdict here was the default text about E-22's Raft prototype."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "MIN",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "RUST",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "SRV",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "LEAN",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "LANE",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row. In this row nothing moves between lanes, so its group offsets keep the cursor (E-31's `off` option holds without a move)."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row. In this row the cursor crosses a split by lineage (E-17c's model), the footing on which both judges score its P-03 met."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "RLOG",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "SIDE",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "COMP",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.45,
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-22",
+   "E-31"
+  ],
+  "depends_on": "restated",
+  "alt": "met",
+  "closes": "P-05 restated as AMENDMENTS 1.3 asks: a coalescing window per room and about 1,000 sockets a core.",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'): C + one hop is about 0.83 ms here, and E-08's relay alone had p99 1.2 ms in Node and 3.5 ms in Rust at 1,000 subscribers with no added wait; the gap counts 1.2 ms against 0.83 ms. Restated with a window per room and about 1,000 sockets a core, judge 1 was right that it is met: per-room order and rooms-only delivery held in E-22 (100 seeds in 3 modes), the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once and pushes 0.57 to 1.5 M deliveries a second a core. Judge 2 kept it open only for the `nats bench` run, which is PERF-03's own cell and is open there for every row."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "OBJ",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 2.2,
+  "basis": "measured",
+  "ev": [
+   "E-28",
+   "E-08"
+  ],
+  "depends_on": "restated",
+  "alt": "fails",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause'; E-08). Judge 2 was right on the restated clause: a window per room is added to both sides of the bar, and OBJ's delivery still waits for a commit that is a PUT, p99 2.67 ms on local MinIO and at or above 7.3 ms on a real store (cited in E-28), against C = 0.73 ms. That is the reason both judges already fail OBJ on P-01. The gap counts the PUT's 2.67 ms alone against C + one hop, about 0.83 ms."
+ },
+ {
+  "req": "P-05",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.91,
+  "basis": "measured",
+  "ev": [
+   "E-08"
+  ],
+  "depends_on": "restated",
+  "alt": "fails",
+  "why": "As worded it fails like every row (AMENDMENTS 1.3, line 'P-05's latency clause': E-08's relay p99 was 1.2 ms against a bar under 1 ms). Judge 2 was right on the restated clause: v4's own reasons stay. Its fan-out measured about 9,000 deliveries a second against the 100,000 pin in P-05's test (PERF-11's own figure for v4; the gap counts that), and it has no one order per room (O `lamp`), the structure both judges fail it for on P-07."
+ },
+ {
+  "req": "P-03",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-31",
+   "E-22"
+  ],
+  "closes": "A model or a prototype of this row's writer change that gives E-31's world (one committed log, one writer at a time), then E-22's near-cache check on a prototype of this family.",
+  "why": "Judge 1 was right. E-31's model takes as given one committed log per partition that loses at most the uncommitted tail when its writer changes; for this row that promise is the in-sync set and its controller (Kafka's shape), never modelled or run here, and the second half of P-03's test (a client's view equals its server's fold after every heal) ran only on E-22's Raft prototype. Both judges hold this row open on P-04, P-14 and P-17 for the same reason. What judge 2 cites does hold as far as it goes: nothing moves, and group offsets pass E-31's bounds without a move."
+ },
+ {
+  "req": "P-03",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-31",
+   "E-22"
+  ],
+  "closes": "A model or a prototype of this row's writer change that gives E-31's world (one committed log, one writer at a time), then E-22's near-cache check on a prototype of this family.",
+  "why": "Judge 1 was right. E-31's model takes as given one committed log per partition that loses at most the uncommitted tail when its writer changes; for this row that promise is the writer change by seal and metadata CAS (3 to 4 novel mechanisms in SPACE), never modelled or run here, and the second half of P-03's test (a client's view equals its server's fold after every heal) ran only on E-22's Raft prototype. Both judges hold this row open on P-04, P-14 and P-17 for the same reason. Judge 2's own P-07 verdict for this row gives the same reason and is open."
+ },
+ {
+  "req": "P-03",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-31",
+   "E-22"
+  ],
+  "closes": "A model or a prototype of this row's writer change that gives E-31's world (one committed log, one writer at a time), then E-22's near-cache check on a prototype of this family.",
+  "why": "Judge 1 was right. E-31's model takes as given one committed log per partition that loses at most the uncommitted tail when its writer changes; for this row that promise is the writer lease by CAS on the manifest; its W `lease` and F `lazy` were not tested either, never modelled or run here, and the second half of P-03's test (a client's view equals its server's fold after every heal) ran only on E-22's Raft prototype. Both judges hold this row open on P-04, P-14 and P-17 for the same reason. Judge 2's own P-07 verdict for this row gives the same reason and is open."
+ },
+ {
+  "req": "P-19",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-40",
+   "E-31"
+  ],
+  "closes": "P-03 closed for this row, then E-40's client run against it.",
+  "why": "Judge 1 was right. The client is the same in every row (E-40: 27.9 KB gzip against 60 KB, a first committed write in 13 to 17 ms in Chromium). But P-19 asks for P-03's promises over it, and P-03 is open for this row: its writer change was never modelled or run. Judge 2 itself holds PD open on P-19 for that reason."
+ },
+ {
+  "req": "P-19",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-40",
+   "E-31"
+  ],
+  "closes": "P-03 closed for this row, then E-40's client run against it.",
+  "why": "Judge 1 was right. The client is the same in every row (E-40: 27.9 KB gzip against 60 KB, a first committed write in 13 to 17 ms in Chromium). But P-19 asks for P-03's promises over it, and P-03 is open for this row: its writer change was never modelled or run. Judge 2 itself holds PD open on P-19 for that reason."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "MIN",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "RUST",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "SRV",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "LEAN",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "LANE",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-17b",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. No partition moves between lanes in this row, so a lane offset keeps its meaning, and E-31's model holds every property with group offsets on the bounds without a move (a leader crash, a reload, a relay); E-22's stream check passed in 100 seeds in 3 modes. A later range move would need lineage (E-17b: 2 more rules), which this row does not have; the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-17c",
+   "E-17b",
+   "E-31",
+   "E-22",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-17b and E-17c model a reader across a split and a merge: it takes every record once, in order, with 2 to 3 lineage rules (without the merge's base a record is read out of order in 15 steps), and E-31's protocol holds on the bounds without a move. The two were not run in one model, the footing on which both judges score P-03 met for this row; the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "RLOG",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "SIDE",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-07",
+  "part": "M",
+  "row": "COMP",
+  "v": "met",
+  "basis": "model",
+  "ev": [
+   "E-31",
+   "E-22",
+   "E-19",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-31's model holds the log-reader property (every committed record once, in order) on ten bounds explored in full, up to 7.6 million states, across a leader crash, a reload, a slot move and a relay, and E-22's stream check resumed from saved cursors in 100 seeds in 3 modes with a forced leader change and slot move and got `expired` with a readable earliest. P-07's sentence sets no speed bar: the Kafka and Redpanda runs are judged in PERF-05 and PERF-06, open there for every row (E-45's Kafka gateway already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-08",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-30",
+   "E-22b"
+  ],
+  "closes": "The rebalance-time pin on the group library (a waiting member claims a share at the lapse, in one commit), in the phase that builds L5.",
+  "why": "Judge 2 was right. The safety half holds on the prototype: nothing skipped, one output per order and no zombie commit in 100 seeds in 3 modes (E-22), and outputs stay exactly once past the dedup horizon with A-05's mark (E-30, model-checked). But P-08's own sentence says a crash hands its partitions on within one lease plus one commit, and nothing shows it: E-22's check asserts no hand-on time, and its group library looks for free shares on a timer of a third of a lease and takes one in two commits, so the bound is neither measured nor held by construction, as judge 1 took it."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "MIN",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "RUST",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "SRV",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "LEAN",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "CELL",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45",
+   "E-17c"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice. For this row a re-key keeps every acknowledged write and the dedup outcomes (E-17c, model-checked); P-09's sentence names no move."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "LANE",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice. In this row nothing moves between lanes."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45",
+   "E-17b"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice. For this row a split copies nothing and carries the dedup outcomes (E-17b, model-checked); P-09's sentence names no move."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "RLOG",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "SIDE",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-09",
+  "part": "M",
+  "row": "COMP",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-21",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's queue check passed in 100 seeds in 3 modes with a worker killed, a worker paused 40 s and a forced leader change and slot move: each job removed once, the poison job dead-lettered after 5 deliveries, never two live leases in the log, first deliveries in FIFO order, and an empty take appends nothing (600 of 600 partitions linearizable; real Knossos agrees, E-22b). That is every clause of P-09's sentence; the JetStream work-queue run is judged in PERF-04, open there for every row, and counting it here too would count the `persisted` rung's measured loss on PERF-04's default row twice."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "MIN",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "RUST",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "SRV",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "LEAN",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "CELL",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45",
+   "E-17c"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors). For this row a re-key carries the highest lock token (E-17c, model-checked)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "LANE",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors). In this row nothing moves between lanes."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45",
+   "E-17b"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors). For this row a split carries the highest lock token in its `init` entry (E-17b, model-checked)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "RLOG",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "SIDE",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "COMP",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21",
+   "E-17",
+   "E-33",
+   "E-45"
+  ],
+  "why": "Judge 1 was right. E-22's lock check ran a holder paused 15 s with its clock skewed 3 s and a `#locks` failover, and both fencing checkers were clean in every seed of 3 modes (897 of 897 partitions linearizable); the fence refused every stale write under every clock rule (E-21), the highest token travels in a move (E-17, model-checked) and a restore starts above the store's mark (A-08, E-33). 'Acquire ≤ C' holds by construction, since an acquire is one conditional write on the lock's row, so one commit; the etcd lock run is judged in PERF-07, open there for every row (E-45's lock loop already drove the prototype with zero errors)."
+ },
+ {
+  "req": "P-10",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [
+   "E-44",
+   "E-22"
+  ],
+  "why": "Judge 2 was right; I confirm the steps. (1) P-10 asks that a write with an older token than one a writer has seen is refused, and TEST-13's checker reads that per log and per lock (E-22's `fence-log`). (2) On JetStream the judge is fero's client, which compares the token in the last message of one subject, one row; the only wider condition is the whole stream's last sequence, which any other write breaks (E-44, gaps 4 and 6; both judges fail BUY on P-14 for this same limit). (3) So after the new holder writes row A under token 61, the paused holder's write to row B under token 60 passes its check and is stored after the newer token in the same log. E-44 lists 'fencing that every write passes through' as needing a kernel fero owns, so the cure is another row's writer. What E-44 measured still holds: 60 acquires, never two holders, and an older token refused on the same row."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ },
+ {
+  "req": "P-20",
+  "part": "S",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "closes": "A migration across three versions on example 43 under real load, with P-01's write p99 pinned during a roll (after P-01's own pin).",
+  "why": "Judge 1 was right. The prototype refuses a bad row at the writer with `schema`, and its `migrate` rewrote each row exactly once across a killed and re-run migration, with `progress()` and a rate of 500 rows a second, in 100 seeds in 3 modes (E-22, simulated). But the SHOULD also says the migration is paced so P-01's p99 holds during a roll, and its test is a migration under load: no run timed a write's p99 beside a migration (the simulation has no real clock), and P-01's p99 is itself open; judge 2 says the same ('not timed') and holds P-08 and P-22 open for a bar that was never timed."
+ }
+]
