@@ -6,7 +6,10 @@ segment machinery is the same (-checkpoint, -Dtlc2.TLC.stopAfter,
 -recover, the same -fp in every segment).
 
   python3 tools/run14c.py --list
-  python3 tools/run14c.py RUN [RUN ...] [--seg-secs S] [--max-seg K] [--heap 5g] [--redo]
+  python3 tools/run14c.py RUN [RUN ...] [--seg-secs S] [--max-seg K] [--heap 5g] [--redo] [--no-graph]
+
+Flags go after the run names. --no-graph continues a run without dumping
+the state graph (invariants only, about three times faster).
 
 A run with a graph (liveness) dumps TLC's state graph through a FIFO into
 tools/dotfilter.py, which keeps the flags and edges; tools/agef2.py then
@@ -60,8 +63,9 @@ NEW = ['LogInv', 'MoreThanOneLeaderInv', 'ElectionSafetyInv', 'LogMatchingInv',
 RUNS = {}
 
 
-def run(name, scen, dot=True, sym=True, invs=None, patch=None, judge_off=2, **kw):
-    RUNS[name] = dict(scen=scen, kw=kw, dot=dot, sym=sym, invs=invs or NEW, patch=patch, judge_off=judge_off)
+def run(name, scen, dot=True, sym=True, invs=None, patch=None, judge_off=2, module='MCferoc', spec='CSpec', **kw):
+    RUNS[name] = dict(scen=scen, kw=kw, dot=dot, sym=sym, invs=invs or NEW, patch=patch, judge_off=judge_off,
+                      module=module, spec=spec)
 
 
 # E-14b's liveness settings: crashes as the fault (at most one; recovery is
@@ -79,6 +83,45 @@ run('four', 'four', Plan='swap', **T4)
 # three-disk, a lost disk of any member, as before).
 run('four-lc', 'four', Plan='swap', CrashLeaderOnly=True, **T4)
 run('three-disk-lc', 'three+spare', Plan='replace', AllowLoseDisk=True, CrashLeaderOnly=True, **T4)
+# The bound that does finish: the same scenarios with terms up to 3, judged
+# at 2. The only use of MaxTermLimit is a guard on a timeout (BTimeout), so
+# every step of the terms-up-to-3 model is a step of the terms-up-to-4
+# model, and the judged states (highest term 2) are the same set in both.
+# A PASS here is therefore a PASS at terms up to 4 (README, step 3).
+T3 = dict(MaxTermLimit=3, **LIVE)
+run('three-disk-t3', 'three+spare', Plan='replace', AllowLoseDisk=True, judge_off=1, **T3)
+run('four-t3', 'four', Plan='swap', judge_off=1, **T3)
+# Terms up to 2: no new election at all, so this is exactly the judged part
+# of the graph (every state before the first new election, with every step
+# between two such states). It finishes in minutes and gives tools/partial.py
+# the complete set of judged states.
+T2 = dict(MaxTermLimit=2, **LIVE)
+run('three-disk-t2', 'three+spare', Plan='replace', AllowLoseDisk=True, judge_off=0, **T2)
+run('four-t2', 'four', Plan='swap', judge_off=0, **T2)
+# The reduction that finishes at E-14b's bounds (tla/MCferoq.tla): four
+# bounds that apply only above the judged term and only remove steps, so
+# the judged states are the full model's and a PASS is sound (README, step 3).
+Q1 = dict(module='MCferoq', spec='QSpec', ProgressAbove=2, NoConfAfterFault=False, Canon=False,
+          StopAtGoal=False)                              # bound 1: no fault, no recovery
+Q12 = dict(Q1, NoConfAfterFault=True)                    # and bound 2: no new change after a fault
+QF = dict(Q12, Canon=True, StopAtGoal=True)              # and bounds 3 and 4: one order, stop at the goal
+# Bounds 1 and 2 alone are not enough: stopped after one segment each.
+run('three-disk-q', 'three+spare', Plan='replace', AllowLoseDisk=True, **Q12, **T4)
+run('four-q', 'four', Plan='swap', **Q12, **T4)
+# All four bounds: still too big (stopped part-way through a second segment).
+run('three-disk-qf', 'three+spare', Plan='replace', AllowLoseDisk=True, **QF, **T4)
+run('four-qf', 'four', Plan='swap', **QF, **T4)
+# Two more bounds (tla/MCferoz.tla): one candidate that can win, and one
+# fixed schedule for the steps with no choice in them. These finish.
+Z = dict(QF, module='MCferoz', spec='ZSpec')
+run('three-disk-z', 'three+spare', Plan='replace', AllowLoseDisk=True, **Z, **T4)
+run('four-z', 'four', Plan='swap', **Z, **T4)
+# The same two scenarios with the healing-order rule "grow first"
+# (tla/MCferog.tla): the leader takes a voter away only once the newcomer
+# is a voter, so the group never passes through two voters.
+G = dict(Z, module='MCferog', spec='GSpec')
+run('three-disk-g', 'three+spare', Plan='replace', AllowLoseDisk=True, **G, **T4)
+run('four-g', 'four', Plan='swap', **G, **T4)
 
 # --- step 1: the replacements on runs E-14b finished or stopped (cost of
 # the history variable; the old false alarms gone).
@@ -88,6 +131,23 @@ run('three-1c1f', 'three', **C3F)                          # E-14b: 555,676 stat
 run('three-1c', 'three', **dict(C3F, FaultLimit=0))        # E-14b: 12,098 states, PASS (a smoke test)
 C2 = dict(Plan='stepback', ReconfigurationLimit=1, FaultLimit=1, MaxTermLimit=4, **LIVE)
 run('two-1c1f', 'two', **C2)                               # E-14b: 64,245 states, the two-voter window
+# --- the reduction's calibration: the three runs above that finish in
+# full, again with it. The judged states, the stuck states and the plan
+# verdict must be the same numbers.
+# The same with a lost disk as a second kind of fault (the calibration
+# above has crashes only; three-disk can also lose a disk).
+run('two-1c1f-d', 'two', AllowLoseDisk=True, **C2)
+run('two-1c1f-dz', 'two', AllowLoseDisk=True, **Z, **C2)
+run('three-1c1f-d', 'three', AllowLoseDisk=True, **C3F)
+run('three-1c1f-dz', 'three', AllowLoseDisk=True, **Z, **C3F)
+C22 = dict(C2, ReconfigurationLimit=2)
+run('two', 'two', **C22)                                   # E-14b: 558,605 states, 6 stuck (two changes)
+for _n, _s, _k in (('one', 'one', dict(Plan='grow', **T4)), ('three-1c1f', 'three', C3F),
+                   ('two-1c1f', 'two', C2), ('two', 'two', C22)):
+    run(_n + '-q', _s, **Q1, **_k)        # bound 1
+    run(_n + '-qc', _s, **Q12, **_k)      # bounds 1 and 2
+    run(_n + '-qf', _s, **QF, **_k)       # bounds 1 to 4
+    run(_n + '-z', _s, **Z, **_k)         # all six
 
 
 def cfg_text(r):
@@ -105,7 +165,7 @@ def cfg_text(r):
 
     def st(xs):
         return '{' + ', '.join(xs) + '}'
-    lines = ['SPECIFICATION CSpec', 'CONSTANTS',
+    lines = ['SPECIFICATION ' + r.get('spec', 'CSpec'), 'CONSTANTS',
              '    Server = %s' % st(server),
              '    InitServer = %s' % st(voters + learners),
              '    InitVoters = %s' % st(voters),
@@ -160,7 +220,7 @@ def segment(name, wd, r, k, seg_secs, ckpt_min, workers, heap, labels):
                                os.path.join(wd, 'seg%d' % k)] + fl,
                               stderr=open(os.path.join(wd, 'seg%d.filter.log' % k), 'w'))
         cmd += ['-dump', 'dot,actionlabels', fifo]
-    cmd.append('MCferoc.tla')
+    cmd.append(r.get('module', 'MCferoc') + '.tla')
     t0 = time.time()
     logp = os.path.join(wd, 'seg%d.out' % k)
     with open(logp, 'w') as lf:
@@ -181,8 +241,13 @@ def segment(name, wd, r, k, seg_secs, ckpt_min, workers, heap, labels):
 
 
 def go(name, seg_secs=1500, max_seg=1, ckpt_min=4, workers=2, heap='5g', labels=True, r=None,
-       result_name=None, redo=False, results_dir=None, record=True, keep_cfg=True):
+       result_name=None, redo=False, results_dir=None, record=True, keep_cfg=True, no_graph=False):
     r = r or RUNS[name]
+    if no_graph:
+        # Continue a run for its invariants only: no state graph is dumped
+        # from here on (about three times faster), so no AG EF is computed
+        # from this run's own graph (tools/partial.py judges it instead).
+        r = dict(r, dot=False)
     kw = dict(BASE)
     kw.update(r['kw'])
     wd = os.path.join(C.WORK, name)
@@ -210,6 +275,8 @@ def go(name, seg_secs=1500, max_seg=1, ckpt_min=4, workers=2, heap='5g', labels=
         out, secs, rc = segment(name, wd, r, k, int(min(seg_secs, left - 90)), ckpt_min, workers, heap, labels)
         s = C.summary(out)
         st['segments'] = k
+        if no_graph:
+            st.setdefault('no_graph_from', k)
         st['secs'].append(round(secs))
         st['last'] = s
         st['done'] = bool(s['complete'] or s['violated'])
@@ -226,9 +293,10 @@ def go(name, seg_secs=1500, max_seg=1, ckpt_min=4, workers=2, heap='5g', labels=
     if st['segments'] == 0 or 'last' not in st:
         return dict(name=name, segments=0, done=False)
     res = dict(name=name, scen=r['scen'], kw=r['kw'], invs=r['invs'], patched=sorted((r.get('patch') or {}).keys()),
+               module=r.get('module', 'MCferoc'),
                segments=st['segments'], secs=sum(st['secs']), **st['last'])
     agef_text = ''
-    if st['done'] and r['dot'] and st['last']['complete']:
+    if st['done'] and r['dot'] and st['last']['complete'] and not st.get('no_graph_from'):
         segs = sorted(glob.glob(os.path.join(wd, 'seg*.g.gz')))
         labs = sorted(glob.glob(os.path.join(wd, 'seg*.l.gz')))
         j = kw['MaxTermLimit'] - r.get('judge_off', 2)
@@ -241,9 +309,12 @@ def go(name, seg_secs=1500, max_seg=1, ckpt_min=4, workers=2, heap='5g', labels=
         f.write('# invariants: %s\n' % ', '.join(r['invs']))
         if r.get('patch'):
             f.write('# patched files: %s\n' % ', '.join(sorted(r['patch'])))
-        f.write('# spec CSpec (MCferoc.tla), CommunityModules-deps.jar, %d segment(s), %s s wall, '
-                'TLC -workers %d -fp %d\n' % (st['segments'], st['secs'], workers, FP))
+        f.write('# spec %s (%s.tla), CommunityModules-deps.jar, %d segment(s), %s s wall, '
+                'TLC -workers %d -fp %d\n' % (r.get('spec', 'CSpec'), r.get('module', 'MCferoc'), st['segments'],
+                                              st['secs'], workers, FP))
         f.write('# done: %s\n' % st['done'])
+        if st.get('no_graph_from'):
+            f.write('# segments %d and later ran without the graph dump (invariants only)\n' % st['no_graph_from'])
         for k in range(1, st['segments'] + 1):
             lp = os.path.join(wd, 'seg%d.out' % k)
             if not os.path.exists(lp):
@@ -261,6 +332,8 @@ def go(name, seg_secs=1500, max_seg=1, ckpt_min=4, workers=2, heap='5g', labels=
                 agef_text = agef_text[:300000] + '\n... (trace cut)\n'
             f.write('\n# agef2.py (AG EF goal over progress steps)\n' + agef_text + '\n')
     res['done'] = st['done']
+    if st.get('no_graph_from'):
+        res['no_graph_from'] = st['no_graph_from']
     if record:
         allr = json.load(open(allp)) if os.path.exists(allp) else {}
         allr[rn] = res
@@ -291,7 +364,7 @@ def main():
     names = [x for i, x in enumerate(a) if not x.startswith('--') and (i == 0 or not a[i - 1].startswith('--'))]
     for n in names:
         res = go(n, seg_secs=seg, max_seg=mx, workers=w, heap=heap, labels='--no-labels' not in a,
-                 redo='--redo' in a)
+                 redo='--redo' in a, no_graph='--no-graph' in a)
         print('==> %s: %s' % (n, json.dumps({k: res.get(k) for k in ('distinct', 'depth', 'violated', 'complete', 'secs')})
                                + ('  agef ' + json.dumps({k: res['agef'].get(k) for k in ('result', 'states', 'stuck_live', 'judged', 'plan_result')}) if 'agef' in res else '')),
               flush=True)

@@ -1,0 +1,11 @@
+SMALL three-disk-t2: 381270 states (finished).  BIG three-disk: 4584001 states (a part-graph).  Judged: highest term <= 2
+1. states in both: 380518, of which with any flag different: 0
+2. judged states: SMALL 381270, BIG 380528; in BIG and not in SMALL: 10 (in SMALL and not yet in BIG: 752)
+3. steps: SMALL 612422, BIG 6652225 (BIG expanded 4269763 states); SMALL steps out of states BIG expanded: 610403, of which BIG lacks: 0
+4. steps out of judged states in BIG: 626802; SMALL lacks 16399 of them (16395 of those go above term 2)
+5. small: 381270 states; judged with a live majority 376950: reach a working leader 309622, not shown 67328; plan: judged 65639, can finish 46240, not shown 19399
+5. big  : 4584001 states; judged with a live majority 376198: reach a working leader 313434, not shown 62764; plan: judged 65583, can finish 46472, not shown 19111
+5. union: 4584753 states; judged with a live majority 376950: reach a working leader 314500, not shown 62450; plan: judged 65639, can finish 46560, not shown 19079
+
+SMALL and BIG agree (checks 1 to 3): NO
+union: judged states with a live majority not shown to reach a working leader: 62450 (SMALL alone: 67328)

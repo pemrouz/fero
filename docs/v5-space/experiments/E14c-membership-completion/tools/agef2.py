@@ -37,6 +37,7 @@ def load(paths):
     ids, goal, live, faults, nup, mterm, init = (array('q'), bytearray(), bytearray(), array('h'),
                                                  array('h'), array('h'), [])
     plan = bytearray()
+    openf = bytearray()
     es, ed = array('q'), array('q')
     for p in paths:
         with gzip.open(p, 'rt') as f:
@@ -46,8 +47,10 @@ def load(paths):
                     es.append(int(a))
                     ed.append(int(b))
                 elif line[0] == 'N':
-                    _, i, g, l, fl, u, t, ini, pl = line.split()
+                    w = line.split()
+                    _, i, g, l, fl, u, t, ini, pl = w[:9]
                     plan.append(int(pl))
+                    openf.append(int(w[9]) if len(w) > 9 else 2)
                     ids.append(int(i))
                     goal.append(g == '1')
                     live.append(l == '1')
@@ -56,7 +59,7 @@ def load(paths):
                     mterm.append(int(t))
                     if ini == '1':
                         init.append(int(i))
-    return ids, goal, live, faults, nup, mterm, init, es, ed, plan
+    return ids, goal, live, faults, nup, mterm, init, es, ed, plan, openf
 
 
 def back_reach(target, rsrc, rptr):
@@ -81,8 +84,9 @@ def ranges(ptr, f):
 
 
 def check(paths, judge, ntrace=1, labels=()):
-    ids, goal, live, faults, nup, mterm, init, es, ed, plan = load(paths)
+    ids, goal, live, faults, nup, mterm, init, es, ed, plan, openf = load(paths)
     plan = np.frombuffer(plan, dtype=np.uint8)
+    openf = np.frombuffer(openf, dtype=np.uint8)
     ids = np.frombuffer(ids, dtype=np.int64)
     goal = np.frombuffer(goal, dtype=np.uint8).astype(bool)
     live = np.frombuffer(live, dtype=np.uint8).astype(bool)
@@ -93,6 +97,7 @@ def check(paths, judge, ntrace=1, labels=()):
     sid, first = np.unique(ids, return_index=True)
     goal, live, faults, nup, mterm = goal[first], live[first], faults[first], nup[first], mterm[first]
     plan = plan[first]
+    openf = openf[first]
     n = len(sid)
     es = np.frombuffer(es, dtype=np.int64)
     ed = np.frombuffer(ed, dtype=np.int64)
@@ -187,10 +192,29 @@ def check(paths, judge, ntrace=1, labels=()):
         res['plan_judged'] = int(pj.sum())
         res['plan_done_states'] = int((plan == 1).sum())
         res['plan_stuck'] = int(pstuck.sum())
-        lines.append('plan: judged fault-free states with a live majority %d, plan-done states %d, '
-                     'cannot finish the plan %d  -> %s' % (res['plan_judged'], res['plan_done_states'],
-                                                           res['plan_stuck'], 'FAIL' if pstuck.any() else 'PASS'))
-        res['plan_result'] = 'FAIL' if pstuck.any() else 'PASS'
+        if (openf != 2).all():
+            # MCferoq's openv: the change budget still allows the plan. A
+            # state where it does not (the leader's own choices spent the
+            # budget) can never finish the plan under any rule, so the plan
+            # goal is judged where openv holds; the others are counted apart.
+            po = pj & (openf == 1)
+            postuck = po & ~pgood
+            res['plan_open_judged'] = int(po.sum())
+            res['plan_open_stuck'] = int(postuck.sum())
+            res['plan_spent'] = int((pj & (openf == 0)).sum())
+            res['plan_spent_can_finish'] = int((pj & (openf == 0) & pgood).sum())
+            lines.append('plan: judged fault-free states with a live majority %d, plan-done states %d, '
+                         'cannot finish the plan %d' % (res['plan_judged'], res['plan_done_states'], res['plan_stuck']))
+            lines.append('  of the judged: the change budget still allows the plan in %d, cannot finish %d  -> %s' % (
+                res['plan_open_judged'], res['plan_open_stuck'], 'FAIL' if postuck.any() else 'PASS'))
+            lines.append('  the leader spent the budget another way in %d (not judged; of these can still '
+                         'finish: %d, which must be 0)' % (res['plan_spent'], res['plan_spent_can_finish']))
+            res['plan_result'] = 'FAIL' if postuck.any() else 'PASS'
+        else:
+            lines.append('plan: judged fault-free states with a live majority %d, plan-done states %d, '
+                         'cannot finish the plan %d  -> %s' % (res['plan_judged'], res['plan_done_states'],
+                                                               res['plan_stuck'], 'FAIL' if pstuck.any() else 'PASS'))
+            res['plan_result'] = 'FAIL' if pstuck.any() else 'PASS'
     res['result'] = 'FAIL' if stuck_live.any() else 'PASS'
     if missing:
         # An edge whose end has no node line means the graph is broken (for

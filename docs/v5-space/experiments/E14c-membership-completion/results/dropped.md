@@ -1,0 +1,9 @@
+# Runs that were started and not finished (E-14c, step 3)
+
+Each line: what it was, the last TLC progress line it printed, and why it stopped. None of them is used for a verdict.
+
+- **four-w1 (first try of `four`, -workers 1)**: second segment failed in `-recover` (a queue file the first segment had already used up was gone); restarted with 2 workers as `four`. Last line: `2290042 states generated, 823997 distinct states found, 96159 states left on queue. Depth 46.`
+- **three-disk, first try**: stopped after one segment: it ran before CommittedQuorumInv was added to the new invariant set (step 2), so it does not count; restarted as `three-disk`. Last line: `three-disk               seg 1: 1503 s  {"generated": 3973681, "distinct": 1473903, "queue": 132082, "depth": 60, "violated": null, "complete": false, "error": null}`
+- **four-lc (`four` with a crash only of the leader, E-14b's CrashLeaderOnly)**: dropped after one finished segment: barely smaller than `four` at the same depth (1,288,780 states at depth 52); its second segment was cut by a container restart. Last line: `2528422 states generated, 867305 distinct states found, 101679 states left on queue. Depth 51.`
+- **three-disk-lc (`three-disk` with a crash only of the leader; a lost disk of any member)**: dropped after one finished segment: barely smaller than `three-disk` at the same depth (1,037,915 states at depth 57); its second segment was cut by a container restart. Last line: `2444030 states generated, 897602 distinct states found, 88535 states left on queue. Depth 56.`
+- **three-disk-t3 and four-t3 with the graph dump (terms up to 3)**: stopped by hand after 5 minutes: the part-graphs of the full runs already showed that terms up to 3 hold over 3.4 million states each. Last line: `Progress(47) at 2026-11-10 02:08:31: 1,024,978 states generated (200,120 s/min), 406,569 distinct states found (73,759 ds/min), 43,088 states left on queue.`

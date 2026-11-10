@@ -1,0 +1,29 @@
+Error: Invariant none: four-z, shortest trace to a stuck state of kind window-2
+(v<t> = an empty entry of term t; x<t> = a client entry; C<t>:{...} = a configuration entry of term t with those voters)
+1 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 2, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2 >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2 >> | s4 :> << C1:{s1, s2, s3}, v2 >> )
+    applied config ( s1 [V{s1, s2, s3} L{s4}], s2 [V{s1, s2, s3} L{s4}], s3 [V{s1, s2, s3} L{s4}], s4 [V{s1, s2, s3} L{s4}] )
+2 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 2, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2 >> | s4 :> << C1:{s1, s2, s3}, v2 >> )
+9 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 2, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s4 :> << C1:{s1, s2, s3}, v2 >> )
+14 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 3, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+16 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 3, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    applied config ( s1 [V{s1, s3} L{s4}], s2 [V{s1, s2, s3} L{s4}], s3 [V{s1, s2, s3} L{s4}], s4 [V{s1, s2, s3} L{s4}] )
+18 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 3, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, C2:{s1, s3, s4} >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3} >> | s4 :> << C1:{s1, s2, s3}, v2 >> )
+25 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 3, s2 2, s3 2, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+    log ( s1 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, C2:{s1, s3, s4} >> | s2 :> << C1:{s1, s2, s3}, v2 >> | s3 :> << C1:{s1, s2, s3}, v2, C2:{s1, s3}, C2:{s1, s3, s4} >> | s4 :> << C1:{s1, s2, s3}, v2 >> )
+27 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 3, s2 2, s3 3, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+30 <step>
+    role (s1 Leader, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 4, s2 2, s3 3, s4 2) | up {s1, s2, s3, s4} | faults 0 | voted (s1 s1, s2 s1, s3 s1, s4 s1)
+32 <step>
+    role (s1 Follower, s2 Follower, s3 Follower, s4 Follower) | term (s1 2, s2 2, s3 2, s4 2) | commit (s1 4, s2 2, s3 3, s4 2) | up {s2, s3, s4} | faults 1 | voted (s1 s1, s2 s1, s3 s1, s4 s1)

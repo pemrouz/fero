@@ -1,0 +1,39 @@
+# run three-1c1f-q: scenario three, {"AllowDrop": false, "AllowStepDown": false, "Canon": false, "FaultLimit": 1, "LeaderLease": true, "MaxTermLimit": 4, "NoConfAfterFault": false, "Plan": "all", "ProgressAbove": 2, "ReconfigurationLimit": 1, "StopAtGoal": false}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec QSpec (MCferoq.tla), CommunityModules-deps.jar, 1 segment(s), [409] s wall, TLC -workers 2 -fp 7
+# done: True
+
+## segment 1
+# load at start: 11.16 11.41 10.13 13/209 29814
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -905919791891455565 with 2 workers on 4 cores with 1820MB heap and 64MB offheap memory [pid: 29819] (Linux 6.18.44-fc-v338 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-10 03:06:13)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-10 03:06:14.
+Progress(12) at 2026-11-10 03:06:17: 1,214 states generated (1,214 s/min), 676 distinct states found (676 ds/min), 194 states left on queue.
+Progress(40) at 2026-11-10 03:07:17: 146,810 states generated (145,596 s/min), 55,035 distinct states found (54,359 ds/min), 3,245 states left on queue.
+... (3 progress lines)
+Progress(78) at 2026-11-10 03:11:17: 704,454 states generated (143,707 s/min), 274,202 distinct states found (52,248 ds/min), 3,706 states left on queue.
+Progress(94) at 2026-11-10 03:12:17: 830,693 states generated (126,239 s/min), 328,656 distinct states found (54,454 ds/min), 3,252 states left on queue.
+Checkpointing of run st/26-11-10-03-06-11.684
+Checkpointing completed at (2026-11-10 03:10:17)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.1E-8
+  based on the actual fingerprints:  val = 5.9E-8
+921669 states generated, 366544 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 126.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 2).
+Finished in 06min 48s at (2026-11-10 03:13:00)
+
+# agef2.py (AG EF goal over progress steps)
+states 366544  edges 509584 (raw lines 921668, ends not found 0)  initial 1
+goal states 69532  can reach goal 333088
+judged states (highest term <= 2) 9024
+stuck states 616  of which with a live majority 0  (not judged, near the term bound: 32840)
+plan: judged fault-free states with a live majority 2464, plan-done states 69532, cannot finish the plan 0
+  of the judged: the change budget still allows the plan in 2464, cannot finish 0  -> PASS
+  the leader spent the budget another way in 0 (not judged; of these can still finish: 0, which must be 0)
+
+RESULT: PASS (no stuck state with a live majority)

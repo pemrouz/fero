@@ -1,0 +1,27 @@
+# run three-disk-q: scenario three+spare, {"AllowDrop": false, "AllowLoseDisk": true, "AllowStepDown": false, "Canon": false, "LeaderLease": true, "MaxTermLimit": 4, "NoConfAfterFault": true, "Plan": "replace", "ProgressAbove": 2, "StopAtGoal": false}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec QSpec (MCferoq.tla), CommunityModules-deps.jar, 1 segment(s), [1265] s wall, TLC -workers 2 -fp 7
+# done: False
+
+## segment 1
+# load at start: 1.55 2.00 2.97 5/110 8745
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -2431716233909471521 with 2 workers on 4 cores with 4551MB heap and 64MB offheap memory [pid: 8750] (Linux 6.18.44-fc-v338 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-10 02:21:09)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-10 02:21:10.
+Progress(14) at 2026-11-10 02:21:13: 3,728 states generated (3,728 s/min), 1,712 distinct states found (1,712 ds/min), 358 states left on queue.
+Progress(38) at 2026-11-10 02:22:13: 225,917 states generated (222,189 s/min), 94,127 distinct states found (92,415 ds/min), 12,194 states left on queue.
+... (18 progress lines)
+Progress(63) at 2026-11-10 02:41:14: 3,782,609 states generated (130,116 s/min), 1,323,665 distinct states found (43,419 ds/min), 100,819 states left on queue.
+Progress(63) at 2026-11-10 02:42:14: 3,909,773 states generated (127,164 s/min), 1,365,470 distinct states found (41,805 ds/min), 104,602 states left on queue.
+Checkpointing of run st/26-11-10-02-21-09.525
+Checkpointing completed at (2026-11-10 02:25:13)
+Checkpointing of run st/26-11-10-02-21-09.525
+Checkpointing completed at (2026-11-10 02:29:13)
+Checkpointing of run st/26-11-10-02-21-09.525
+Checkpointing completed at (2026-11-10 02:33:13)
+Checkpointing of run st/26-11-10-02-21-09.525
+Checkpointing completed at (2026-11-10 02:37:13)
+Checkpointing of run st/26-11-10-02-21-09.525
+Checkpointing completed at (2026-11-10 02:41:14)

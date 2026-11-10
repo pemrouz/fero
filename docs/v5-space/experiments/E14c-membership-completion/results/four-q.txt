@@ -1,0 +1,40 @@
+# run four-q: scenario four, {"AllowDrop": false, "AllowStepDown": false, "Canon": false, "LeaderLease": true, "MaxTermLimit": 4, "NoConfAfterFault": true, "Plan": "swap", "ProgressAbove": 2, "StopAtGoal": false}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec QSpec (MCferoq.tla), CommunityModules-deps.jar, 1 segment(s), [1502] s wall, TLC -workers 2 -fp 7
+# done: False
+
+## segment 1
+# load at start: 1.55 2.00 2.97 8/142 8782
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 2340611354648903500 with 2 workers on 4 cores with 4551MB heap and 64MB offheap memory [pid: 8787] (Linux 6.18.44-fc-v338 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-10 02:21:11)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-10 02:21:12.
+Progress(14) at 2026-11-10 02:21:15: 4,396 states generated (4,396 s/min), 2,060 distinct states found (2,060 ds/min), 556 states left on queue.
+Progress(34) at 2026-11-10 02:22:15: 236,549 states generated (232,153 s/min), 91,953 distinct states found (89,893 ds/min), 15,636 states left on queue.
+... (22 progress lines)
+Progress(55) at 2026-11-10 02:45:16: 4,638,236 states generated (146,173 s/min), 1,545,413 distinct states found (44,350 ds/min), 119,020 states left on queue.
+Progress(55) at 2026-11-10 02:46:12: 4,776,925 states generated (138,689 s/min), 1,588,531 distinct states found (43,118 ds/min), 121,482 states left on queue.
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:25:15)
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:29:15)
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:33:15)
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:37:15)
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:41:16)
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:45:16)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.7E-7
+  based on the actual fingerprints:  val = 1.6E-7
+4776925 states generated, 1588531 distinct states found, 121482 states left on queue.
+The depth of the complete state graph search is 55.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 12 and the 95th percentile is 3).
+Checkpointing of run st/26-11-10-02-21-10.736
+Checkpointing completed at (2026-11-10 02:46:12)
+Finished in 25min 02s at (2026-11-10 02:46:12)

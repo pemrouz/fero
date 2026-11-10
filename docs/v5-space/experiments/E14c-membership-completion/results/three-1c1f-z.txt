@@ -1,0 +1,32 @@
+# run three-1c1f-z: scenario three, {"AllowDrop": false, "AllowStepDown": false, "Canon": true, "FaultLimit": 1, "LeaderLease": true, "MaxTermLimit": 4, "NoConfAfterFault": true, "Plan": "all", "ProgressAbove": 2, "ReconfigurationLimit": 1, "StopAtGoal": true}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec ZSpec (MCferoz.tla), CommunityModules-deps.jar, 1 segment(s), [20] s wall, TLC -workers 2 -fp 7
+# done: True
+
+## segment 1
+# load at start: 5.32 7.62 9.52 5/222 10296
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 2821479510409299257 with 2 workers on 4 cores with 1820MB heap and 64MB offheap memory [pid: 10304] (Linux 6.18.44-fc-v338 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-10 03:30:40)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-10 03:30:40.
+Progress(13) at 2026-11-10 03:30:43: 2,133 states generated (2,133 s/min), 989 distinct states found (989 ds/min), 189 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.2E-11
+40374 states generated, 18613 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 107.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 2).
+Finished in 19s at (2026-11-10 03:30:58)
+
+# agef2.py (AG EF goal over progress steps)
+states 18613  edges 24728 (raw lines 40373, ends not found 0)  initial 1
+goal states 4832  can reach goal 17725
+judged states (highest term <= 2) 9024
+stuck states 616  of which with a live majority 0  (not judged, near the term bound: 272)
+plan: judged fault-free states with a live majority 2464, plan-done states 4832, cannot finish the plan 0
+  of the judged: the change budget still allows the plan in 2464, cannot finish 0  -> PASS
+  the leader spent the budget another way in 0 (not judged; of these can still finish: 0, which must be 0)
+
+RESULT: PASS (no stuck state with a live majority)

@@ -1,0 +1,11 @@
+SMALL four-t2: 485043 states (finished).  BIG four: 3576095 states (a part-graph).  Judged: highest term <= 2
+1. states in both: 453346, of which with any flag different: 0
+2. judged states: SMALL 485043, BIG 453346; in BIG and not in SMALL: 0 (in SMALL and not yet in BIG: 31697)
+3. steps: SMALL 760826, BIG 5364664 (BIG expanded 3278601 states); SMALL steps out of states BIG expanded: 701665, of which BIG lacks: 0
+4. steps out of judged states in BIG: 714298; SMALL lacks 12633 of them (12633 of those go above term 2)
+5. small: 485043 states; judged with a live majority 452004: reach a working leader 429886, not shown 22118; plan: judged 109327, can finish 89375, not shown 19952
+5. big  : 3576095 states; judged with a live majority 420816: reach a working leader 389473, not shown 31343; plan: judged 104092, can finish 82464, not shown 21628
+5. union: 3607792 states; judged with a live majority 452004: reach a working leader 430097, not shown 21907; plan: judged 109327, can finish 89375, not shown 19952
+
+SMALL and BIG agree (checks 1 to 3): yes
+union: judged states with a live majority not shown to reach a working leader: 21907 (SMALL alone: 22118)
