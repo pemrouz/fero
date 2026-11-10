@@ -1,0 +1,975 @@
+{
+ "group": "SC",
+ "cells": 300,
+ "same": 265,
+ "decisive": 22,
+ "minor": 13,
+ "disagreements": [
+  {
+   "req": "SC-03",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated, v4's ring was never run: it places by hash with no load-aware move, which E-18 shows balances badly under skew, but that is reasoned for a ring, not measured.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "E-18's run with a hash ring in place of slots"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-10 and SC-03\": as worded, the effective writer count is 12 to 22 for every design under Zipf 0.99, below F_w = 64 (the proposed value; E-18, simulated), because nothing splits the hottest partition. Restated it still fails: v4 places rows on members by ring hash alone, with no move that follows load, and E-18 shows hash-only placement passes max/mean 1.25 before 16 groups even with the app split (reasoned from E-18's fixN runs; the ring itself was not run). With `replicas` unset every member holds every row, so writes do not grow with servers at all.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "fails"
+   }
+  },
+  {
+   "req": "SC-03",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated, how an outside log spreads one resource over writers is theirs; on JetStream a stream is one group, and nothing here ran it.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "a write-scaling run on the outside log, 1 to 4 servers"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "construction",
+    "ev": [
+     "E-44",
+     "E-18"
+    ],
+    "why": "Step 1: on JetStream a resource is one stream (E-44). Step 2: a stream is one Raft group with one leader, so every write of the resource goes through one writer. Step 3: more servers add no writer, and spreading a resource over several streams is a count chosen by hand, so it fails as worded and restated (1.3 line \"SC-10 and SC-03\"): 1 writer against 64.",
+    "proof": "structural",
+    "depends_on": "restated",
+    "alt": "fails"
+   }
+  },
+  {
+   "req": "SC-04",
+   "part": "M",
+   "row": "SPLIT",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-17b",
+     "E-17c"
+    ],
+    "why": "It shrinks only through the merge, a second protocol (37 rules with the split; the `shrink` bound holds, model-checked, crash-only). Lineage is kept for ever, a small lasting cost, and no load-cycle run exists.",
+    "closes": "phase 4: the sim of a daily load cycle over 7 days with the real mover and its grow and shrink thresholds"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "model",
+    "ev": [
+     "E-17b",
+     "E-17"
+    ],
+    "why": "Step 1: P `split` splits a group by size and load and has no merge; merge is PD's option. Step 2: in E-17b's model a resource shrinks only through the merge protocol: \"a split alone never shrinks\". Step 3: so groups made at a peak stay for good, which is a lasting cost from a past peak.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "SC-05",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-34",
+     "E-44"
+    ],
+    "why": "1.3 line 'SC-05 at 10 GB': fero's client would fold rows in Node at E-34's 10 s a GB, over the bar at 10 GB in one process. E-44 ran no sleep or wake, and whether the outside log comes back from a store alone is theirs to show, so it is open as worded and restated.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "a sleep-and-wake run on the outside log, disks kept and lost"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "construction",
+    "ev": [
+     "E-44"
+    ],
+    "why": "Step 1: JetStream keeps a stream on its servers' file store (E-44) and has no object-store tier. Step 2: SC-05's test stops every server and wakes with servers that lost their disks. Step 3: then the streams are gone, so acknowledged writes are lost.",
+    "proof": "structural"
+   }
+  },
+  {
+   "req": "SC-06",
+   "part": "S",
+   "row": "V4",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Scoped replication (`replicas`) puts each partition on a few members, so a resource can pass one server's memory and disk. v4 has no cold rows and no object store, and no run at 3 x RAM exists."
+   },
+   "j2": {
+    "v": "not",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "v4 keeps every row a server holds in memory and has no cold rows and no object-store tier. `replicas: N` spreads partitions over members, which covers the disk half only."
+   }
+  },
+  {
+   "req": "SC-06",
+   "part": "S",
+   "row": "BUY",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-44"
+    ],
+    "why": "The outside log keeps streams on disk, but fero's client folds every row it follows in Node memory. Nothing ran a data set at 3 x RAM."
+   },
+   "j2": {
+    "v": "not",
+    "basis": "measured",
+    "ev": [
+     "E-44"
+    ],
+    "why": "E-44's client folds the whole stream into memory, and one stream sits whole on each of its replicas, so a resource cannot pass one server's disk without a hand-chosen number of streams."
+   }
+  },
+  {
+   "req": "SC-07",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "reasoned",
+    "ev": [
+     "E-44"
+    ],
+    "why": "Step 1: SC-07 asks clusters of 1 to 100 members to run in the sim. Step 2: BUY's members are an outside server's processes (nats-server). Step 3: fero's simulator cannot run their bytes, so no seed, sweep or replay of such a cluster can exist (E-44 says so in writing; SPACE 4.2).",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The sim cannot run nats-server's bytes (TEST-10), so only a real run of 100 servers could show this, and none was made.",
+    "closes": "A real 100-server JetStream run (not planned: BUY is the reference row)."
+   }
+  },
+  {
+   "req": "SC-08",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: in v4, adding or removing a server moves ring ownership of partitions. Step 2: STATUS.md pins a seed of v4's own simulator (scoped sweep A3, seed 6) where a forwarded write commits at the old owner and again at the new one across an ownership move. Step 3: SC-08(a) allows no doubled write during a scale change.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "v4's sim sweeps joins and leaves with monitors, but STATUS lists open cases: a held member that needs an operator, and a drain at one replica that loses rows when the new holder crashes. (b), (c) and (f) are not pinned at these bars.",
+    "closes": "Close STATUS's open membership cases, and pin (b), (c) and (f) in v4's scale tier."
+   }
+  },
+  {
+   "req": "SC-10",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-10 and SC-03\": as worded the effective writer count is 12 to 22 for every design, below the floor F_w = 64 (the proposed value; E-18, simulated). V4 fails restated too, twice: its ring places by hash alone, which E-18 shows passes max/mean 1.25 before 16 groups (reasoned from the fixN runs), and each resource binds its own port, so one member holds fewer than 65,536 resources, below N_res = 100,000.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "fails"
+   }
+  },
+  {
+   "req": "SC-10",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "construction",
+    "ev": [
+     "E-44",
+     "E-18"
+    ],
+    "why": "Step 1: a resource is one JetStream stream (E-44). Step 2: a stream has one leader, so writers per resource is 1. Step 3: 1 is below the floor of 64, as worded and restated (1.3 line \"SC-10 and SC-03\").",
+    "proof": "structural",
+    "depends_on": "restated",
+    "alt": "fails"
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "MIN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "RUST",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "SRV",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "LEAN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "PD",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "ISR",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "V4",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "MIN-P",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "MIN-TS",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "row": "COMP",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "N `proc`: each project has its own processes and its own volume, so a sleeping project holds nothing anywhere (E-26: 0 groups, 0 messages) and no log-tier process is shared. A busy project cannot reach another's journal or disk by construction (E-35 reasons this and did not test two machines). OPS-14's rules are judged under OPS-14."
+   }
+  },
+  {
+   "req": "SC-12",
+   "part": "S",
+   "row": "PD",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Its clients are native smart clients of a server cluster. No run here held 10,000 idle links or 1,000 subscribers on a PD-shaped server."
+   },
+   "j2": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-08"
+    ],
+    "why": "Its edge is native. E-08's Rust relay served 1,000 and 10,000 subscriber sockets from one core (13.4 and 11.9 million deliveries a second), so both counts hold. Idle-link memory in a native TLS stack was not measured (reasoned to be under Node's)."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "DRAFT",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "MIN",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "RUST",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "SRV",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "LEAN",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': it is a slot row, so per-slot state at about 85 B a touched slot puts an idle resource with 100 touched slots over 2 KB as worded (E-36). Restated it is open: its shape is reasoned to be MIN's (one group a resource, dormant when idle), and a loglet's idle cost was never measured.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). SLOG takes A-15 by reasoning only: E-26 counts one group per resource for it, and a loglet's idle cost was not measured. So it is open as worded and restated, at the proposed N_res of 100,000.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Measure a dormant loglet's idle cost; then Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "OBJ",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': it is a slot row, so per-slot state at about 85 B a touched slot puts an idle resource with 100 touched slots over 2 KB as worded (E-36). Restated it is open: it holds no group in memory (E-26), but its create is a PUT or more and nothing timed create, cold open or drop on a store.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). OBJ holds no group in memory (E-26), so its idle cost is the catalog row, the slot table and the touched slots; a create is a manifest PUT. None of this was measured for OBJ, so it is open as worded and restated, at the proposed N_res of 100,000.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Price an idle resource and a create on OBJ; then Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "MIN-P",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36"
+    ],
+    "why": "1.3 line 'SC-13's small, pslot too': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots is over 2 KB in shared groups too (E-36). Restated as 'few slots touched', `pslot` measured 0.4 to 1.2 KB with about 16 groups and creates in 1.6 to 1.8 ms, but its cold open is reasoned, E-36 priced one slot map shared by the project, and a drop out of a shared group was never run (K-06).",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-11",
+     "E-17c"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With G `pslot` an idle resource costs 0.4 to 1.2 KB at 1 to 10 touched slots in about 16 project groups, with no dormant groups, and a create takes 1.6 to 1.8 ms against 10.7 ms; at 100 touched slots it passes 2 KB either way. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because a resource dropped out of a shared group was never run (K-06) and 1e5 resources (the proposed N_res) were not created through `fero()`.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses. Also K-06: a drop out of a shared group."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "MIN-TS",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "RLOG",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "EMB-V8",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26",
+     "E-11"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource costs 1.4 KB at 10 touched slots and 8.8 KB at 100, against 2 KB; a create takes 4.6 to 5.3 ms against 10.7 ms, and a cold open 3.3 to 3.5 ms at the median but 5.4 to 7.6 ms at worst against 5 ms. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because 1e5 resources (the proposed N_res) were not created and dropped through `fero()` and the drop clauses were not run.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses."
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "row": "COMP",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36"
+    ],
+    "why": "1.3 line 'SC-13's small, pslot too': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots is over 2 KB in shared groups too (E-36). Restated as 'few slots touched', `pslot` measured 0.4 to 1.2 KB with about 16 groups and creates in 1.6 to 1.8 ms, but its cold open is reasoned, E-36 priced one slot map shared by the project, and a drop out of a shared group was never run (K-06).",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-11",
+     "E-17c"
+    ],
+    "why": "AMENDMENTS 1.3, line \"SC-13's small\": per-slot state costs about 85 B per touched slot in Node (E-36). With G `pslot` an idle resource costs 0.4 to 1.2 KB at 1 to 10 touched slots in about 16 project groups, with no dormant groups, and a create takes 1.6 to 1.8 ms against 10.7 ms; at 100 touched slots it passes 2 KB either way. As worded \"small\" is undefined; restated as \"few slots touched\" the memory clause holds, and it stays open because a resource dropped out of a shared group was never run (K-06), nor the move loop over many resources (K-04), and 1e5 resources (the proposed N_res) were not created through `fero()`.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the sim that creates and drops 1e5 resources at 100 a second through `fero()`, with a cold-open pin (G-16) and the drop clauses. Also K-06: a drop out of a shared group."
+   }
+  }
+ ]
+}

@@ -1,0 +1,483 @@
+[
+ {
+  "req": "SC-03",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "structural",
+  "gap": 0.98,
+  "basis": "construction",
+  "ev": [
+   "E-44",
+   "E-18"
+  ],
+  "why": "Judge 2 is right. Step 1: in BUY a resource is one JetStream stream (E-44). Step 2: a stream is one replicated group with one leader (E-44 kills 'the stream's leader'), so every write of the resource goes through one writer and more servers add none. Step 3: spreading a resource over several streams is a count chosen by hand, or a slot layer that BUY does not hold, so it has 1 effective writer against F_w = 64 (the proposed value), as worded and as restated by the 1.3 line 'SC-10 and SC-03'. It holds by construction, so judge 1's 'nothing here ran it' does not leave it open. It fails for any F_w above 1.",
+  "depends_on": "restated",
+  "alt": "fails"
+ },
+ {
+  "req": "SC-03",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.66,
+  "basis": "measured",
+  "ev": [
+   "E-18"
+  ],
+  "why": "Judge 2 is right. As worded it fails like every row (1.3 line 'SC-10 and SC-03': 12 to 22 effective writers against F_w = 64, the proposed value; E-18, simulated). Restated it still fails, in three steps: (1) v4 gives each partition its one writer by ring hash, and no move follows load (P `ring`; kernel/ring.ts reads no load); (2) so its placement is blind to load, as hashing onto a fixed count is, and a ring spreads keys no more evenly than that (reasoned; the ring itself was not run); (3) E-18 part B2 ran load-blind hashing under Zipf 0.99 with the app split: max/mean 1.58 at 16 groups and 1.95 at 64 at the median, above 1.25, so the effective number is under 16 (restated gap about 0.77). It would pass only at an F_w below 16.",
+  "depends_on": "restated",
+  "alt": "fails"
+ },
+ {
+  "req": "SC-04",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "model",
+  "ev": [
+   "E-17b",
+   "E-17c"
+  ],
+  "why": "Judge 1 is right. Judge 2's first step ('P `split` has no merge; merge is PD's option') cannot be confirmed: SPACE section 2 defines `split` as 'a group splits ..., and later merges', V5-UNITS plans its merges for phase 5, E-17b model-checked split + merge under SPLIT's name (the `shrink` bound holds, crash-only) and AMENDMENTS section 3 charges SPLIT both protocols (37 rules). So the row shrinks through the merge, at that price. It is open, not met: no load cycle was simulated, and lineage kept for ever is a small cost that stays.",
+  "closes": "The sim of a daily load cycle over 7 days with splits, merges and the rule that decides them. Before it, one decision: SPACE 4.1 and the mechanism list give the merge to PD only; if SPLIT keeps the merge, DEV-01 counts it for SPLIT, and if it does not, SC-04 fails for SPLIT."
+ },
+ {
+  "req": "SC-05",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "construction",
+  "ev": [
+   "E-44"
+  ],
+  "why": "Judge 2 is right; it is the argument both judges accept for PD and V4. Step 1: JetStream keeps each stream in the file store of the servers that hold its replicas (E-44), and nats-server 2.10.22 has two storage types, file and memory, with no object-store tier (checked in the binary E-44 ran). Step 2: SC-05's test stops every server and wakes with servers that lost their disks. Step 3: then no copy of any stream is left, so acknowledged writes are lost. The 1.3 line 'SC-05 at 10 GB' also covers BUY (its client folds in Node); restating it does not change this.",
+  "depends_on": "restated",
+  "alt": "fails"
+ },
+ {
+  "req": "SC-06",
+  "part": "S",
+  "row": "BUY",
+  "v": "not",
+  "basis": "construction",
+  "ev": [
+   "E-44"
+  ],
+  "why": "Judge 2 is right. In BUY a resource is one stream, and a stream sits whole on each of its replicas (E-44), so a resource cannot pass one server's disk without a hand-chosen number of streams. E-44's client also folds the whole stream in memory. The design does not provide it."
+ },
+ {
+  "req": "SC-06",
+  "part": "S",
+  "row": "V4",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. `replicas: N` puts each partition on N members only, so no member holds the whole resource in memory or on disk, and a read of a row a server does not hold is gathered from its holders (v4 README, scoped replication). That lets a resource pass one server by spreading, not by cold rows, and v4 has no object store. No run at 3 x RAM exists, so it is open, not shown missing."
+ },
+ {
+  "req": "SC-07",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "construction",
+  "ev": [
+   "E-44"
+  ],
+  "why": "Judge 1 is right. Step 1: SC-07 asks that clusters of 1 to 100 members run in the sim, and its test is an n = 100 sim sweep. Step 2: the members of a BUY cluster are nats-server processes (E-44 starts three). Step 3: fero's simulator cannot run their bytes (E-44 gap 10; SPACE 4.2), so no such sweep can exist at any size. Judge 2 agrees the sim cannot run it and reads a real 100-server run as enough, but the requirement's own sentence names the sim."
+ },
+ {
+  "req": "SC-08",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "model",
+  "ev": [],
+  "why": "Judge 1 is right, with the seed corrected. Step 1: in v4 a join moves ring ownership of partitions. Step 2: v4's own simulator pins a join with one slow member in which one attempt is committed twice, at the old owner and at the new one (sim/scoped-sweep.test.ts, KNOWN_UNSAFE 'A2-slow-owner-join' seed 9; STATUS.md: 'one forwarded write can commit twice across an ownership move'; the pinned test was re-run here on today's kernel and still holds). Step 3: SC-08(a) allows no doubled write during a scale change, and a join is one. Judge 2 named two other open cases from STATUS and missed this pin."
+ },
+ {
+  "req": "SC-10",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "structural",
+  "gap": 0.98,
+  "basis": "construction",
+  "ev": [
+   "E-44",
+   "E-18"
+  ],
+  "why": "Judge 2 is right. Step 1: in BUY a resource is one JetStream stream (E-44). Step 2: a stream has one leader, so the ceiling on writers per resource is 1. Step 3: SC-10 fails a ceiling below its floor, and 1 is below F_w = 64 (the proposed value), as worded and as restated by the 1.3 line 'SC-10 and SC-03'. It holds by construction, so 'not run or listed here' (judge 1) does not leave it open. It fails for any F_w above 1.",
+  "depends_on": "restated",
+  "alt": "fails"
+ },
+ {
+  "req": "SC-10",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.66,
+  "basis": "measured",
+  "ev": [
+   "E-18"
+  ],
+  "why": "Judge 2 is right. As worded it fails like every row (1.3 line 'SC-10 and SC-03': 12 to 22 effective writers against the floor F_w = 64, the proposed value; E-18, simulated). Restated it still fails: v4 places each partition's writer by ring hash with no move that follows load, and E-18 part B2 shows load-blind hashing under Zipf 0.99 with the app split at max/mean 1.58 at 16 groups and 1.95 at 64 (median), so its effective number is under 16, below 64 (the step from hashing onto a fixed count to a ring is reasoned; the ring was not run). Judge 2's second reason, one port per resource against N_res = 100,000, is not needed for this.",
+  "depends_on": "restated",
+  "alt": "fails"
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-11",
+  "part": "M",
+  "row": "V4",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-26",
+   "E-35"
+  ],
+  "why": "Judge 1 is right. Nothing is resident and nothing is sent for a sleeping project (E-26 counts 0 groups for N `proc`). But the 10 % clause rests on a promise, not a test: E-35 ran tenants on one disk only (1.20 to 1.36 times even with a journal each), marks `proc` 'reasoned, not tested', and says a cloud volume shared by tenants will not keep them apart (AMENDMENTS G-17). Whether two projects' volumes share hardware is the deploy target's to show, so 'by construction' is not shown.",
+  "closes": "The platform phase: two projects on the deploy target's own volumes under E-35's load, one of them at its quota; and a box test with 1,000 sleeping projects."
+ },
+ {
+  "req": "SC-12",
+  "part": "S",
+  "row": "PD",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-08",
+   "E-27"
+  ],
+  "why": "Judge 2 is right. PD's server and edge are native, with the same options as SRV on the axes SC-12 touches (L `rs-srv`, H `srv`, M `kwN`, Y `smart`), and both judges count SRV as met on E-08's one-thread Rust relay: 1,000 and 10,000 subscriber links on one core (13.4 and 11.9 million deliveries a second). Like rows get like verdicts, and a relay fits under every row (SPACE section 3). PD's own follow path (no W `any`) is judged under P-03, not here; a native TLS stack's memory per link was not measured."
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': with a run-length slot table, sparse per-slot state and dormant groups (A-15, A-16) an idle resource measured 1.4 KB at 10 touched slots and 8.8 KB at 100, at about 85 B a touched slot in a JS Map (E-36, Node). So the 2 KB bar holds or misses by how many slots a 'small' resource has touched, which the text does not say: that is no measured ceiling below the bar (E-36's own table reads 'holds while few slots are touched', and its denser form, about 12 B a slot, was not built). It is open as worded and restated: the cold-open tail is 5.4 to 7.6 ms against 5 ms, and the drop clauses and the sim of 1e5 creates and drops (N_res = 100,000, the proposed value) were never run.",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-17c"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small, pslot too': with G `pslot` an idle resource measured 0.4 to 1.2 KB at 1 to 10 touched slots in about 16 project groups, with no dormant groups, and a create took 1.6 to 1.8 ms against 10.7 ms; E-36's own table reads 'holds' for it. It passes 2 KB only near 100 touched slots (about 85 B each in a JS Map), and the text does not say whether such a resource is 'small', so there is no measured ceiling below the bar. It is open as worded and restated: its cold open is reasoned, E-36 priced one slot map shared by the project (G-16), a drop out of a shared group was never run (K-06), and 1e5 resources (N_res, the proposed value) were not created through fero().",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses. Also K-06: a resource dropped out of a shared group, and a slot table per resource in place of E-36's shared map.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-36",
+   "E-17c"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small, pslot too': with G `pslot` an idle resource measured 0.4 to 1.2 KB at 1 to 10 touched slots in about 16 project groups, with no dormant groups, and a create took 1.6 to 1.8 ms against 10.7 ms; E-36's own table reads 'holds' for it. It passes 2 KB only near 100 touched slots (about 85 B each in a JS Map), and the text does not say whether such a resource is 'small', so there is no measured ceiling below the bar. It is open as worded and restated: its cold open is reasoned, E-36 priced one slot map shared by the project (G-16), a drop out of a shared group was never run (K-06), and 1e5 resources (N_res, the proposed value) were not created through fero(). For COMP the move loop over many resources in shared groups is open too (K-04).",
+  "closes": "The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses. Also K-06: a resource dropped out of a shared group, and a slot table per resource in place of E-36's shared map. For COMP also K-04.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': SLOG is a slot row, and per-slot state at about 85 B a touched slot holds 2 KB only while few slots are touched (E-36); the text does not say what 'small' is, so that is no measured ceiling below the bar. Its own shape is reasoned only: E-26 counts one group a resource for it, it takes dormant groups by reasoning (A-15), and a loglet's idle cost was never measured. So it is open as worded and restated, at the proposed N_res of 100,000.",
+  "closes": "Measure an idle and a dormant loglet. The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ },
+ {
+  "req": "SC-13",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-36",
+   "E-26"
+  ],
+  "why": "Judge 2 is right. 1.3 line 'SC-13's small': OBJ is a slot row, and per-slot state at about 85 B a touched slot holds 2 KB only while few slots are touched (E-36); the text does not say what 'small' is, so that is no measured ceiling below the bar. OBJ holds no group in memory (E-26), and its create is a manifest PUT; nothing timed its create, cold open or drop on a store. So it is open as worded and restated, at the proposed N_res of 100,000.",
+  "closes": "Price an idle resource, a create, a cold open and a drop on an object store. The user defines 'small' (few slots touched), and phase 1 fixes the formats (run-length slot table, sparse per-slot state). Then the sim that creates and drops 1e5 resources at 100 a second through fero(), with pins for cold open (G-16) and for the drop clauses.",
+  "depends_on": "restated",
+  "alt": "open"
+ }
+]

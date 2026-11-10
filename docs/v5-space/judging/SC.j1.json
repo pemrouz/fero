@@ -1,0 +1,1129 @@
+{
+ "group": "SC",
+ "judge": "j1",
+ "cells": [
+  {
+   "req": "SC-01",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-11",
+     "E-33"
+    ],
+    "why": "No v5 stack exists to time. The parts point the right way: three Node processes on the TS Raft port start cold in 265 to 318 ms, quiet groups send nothing, and one box founds with no setup (E-26, E-33). But E-26's bare host already uses about 96 MB against the 100 MB bar, so memory is tight.",
+    "closes": "phase 1: example 01 and 02 timed on the v5 solo node (ready time, RSS, idle CPU), kept as pins"
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26"
+     ],
+     "why": "It runs only if npm ships the native binary and fero(name) starts it (SPACE 4.2). Nothing timed that start, its memory or its idle CPU, so the 1 s and 100 MB bars are unshown.",
+     "closes": "a spawned-binary prototype timed on example 01 (ready time, RSS of both programs)"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26"
+     ],
+     "why": "It runs only if npm ships the native binary and fero(name) starts it (SPACE 4.2). Nothing timed that start, its memory or its idle CPU, so the 1 s and 100 MB bars are unshown.",
+     "closes": "a spawned-binary prototype timed on example 01 (ready time, RSS of both programs)"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26"
+     ],
+     "why": "It runs only if npm ships the native binary and fero(name) starts it (SPACE 4.2). Nothing timed that start, its memory or its idle CPU, so the 1 s and 100 MB bars are unshown.",
+     "closes": "a spawned-binary prototype timed on example 01 (ready time, RSS of both programs)"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "TiKV's shape needs a controller and a store server beside the app, so fero(name) would have to start both. Nothing timed that, and an LSM store's empty memory against 100 MB is unknown here.",
+     "closes": "a PD-shaped prototype timed on example 01; not planned"
+    },
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "J's run of v4 shows 'ready in 0.8 s' with no config file, and REQUIREMENTS cites v4 at 70 to 100 MB empty. The top of that range sits on the 100 MB bar."
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: BUY's log is an outside server (JetStream) that fero neither holds nor ships (SPACE 4.2). Step 2: so `node app.ts` alone has nothing to write to until someone installs and starts that server. Step 3: that is a setup step and a second program, against 'one process, no setup'; E-44 says the same in writing.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "SC-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-33"
+    ],
+    "why": "Every row decides roles by node config in one code base, but no v5 example series exists to run at 1, 3 and 5 processes or hosted. E-33 changed the first start across boxes: a conditional create in the object store (MIN's family, SLOG, OBJ) or one `fero init` (DRAFT, CELL, LANE, SPLIT, SRV, EMB-V8, RLOG). The init is one setup step, a weak point, but the files stay the same.",
+    "closes": "phases 2 and 3: the example series unchanged on 1, 3 and 5 processes; the platform phase: a hosted run"
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "Apps are clients of a server cluster that is founded by an explicit step, as TiKV's is. The app's files can stay the same at every size, but nothing here ran it.",
+     "closes": "the example series on a PD-shaped prototype; not planned"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's examples are plain node files whose roles follow config, and J shows hosted runs of today's fero. But each example names its own set of terminals, and no run of the whole series unchanged at 1, 3 and 5 processes was found.",
+     "closes": "run v4's example series at 1, 3 and 5 processes and on a hosted run"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "The app's files would be the same at every size; only the outside log's cluster differs. E-44 ran four patterns on one three-node JetStream, not the example series at several sizes.",
+     "closes": "the example series on the outside log at 1, 3 and 5 app processes"
+    }
+   }
+  },
+  {
+   "req": "SC-03",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded, the hottest partition holds 5.5 to 9.8 % of the load under Zipf 0.99 and nothing splits a partition, so every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18, simulated). Restated with the app split, a slot row states 135 at 4,096 slots, above 64, but the 0.7 x n growth was run only as E-18's one loop with exact loads, never on the box. It also depends on F_w: above 135 the restated verdict fails too.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 4: the sim with load-aware placement at n = 1 to 32 run by the real mover, and the 1 to 4 process pin on the box"
+   },
+   "except": {
+    "CELL": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-17"
+     ],
+     "why": "Fails either way. 16 cells hashed with no load-aware move give 7 to 15 writers' worth under skew even with the app split (E-18), below F_w = 64. A re-key to more cells keeps the same load-blind hashing, which gives 1.35 to 2.72 max/mean at 64 groups.",
+     "proof": "ceiling",
+     "gap": 0.77,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "LANE": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-17b"
+     ],
+     "why": "Fails either way. 64 lanes are fixed per project and shared by every resource, so one resource gets 23 to 53 writers' worth under skew with the app split (E-18), below F_w = 64, and no move adds a lane (E-17b). The gap given is the as-worded one (12 to 22); restated it is 0.17.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "ISR": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-17"
+     ],
+     "why": "Fails either way. As worded it meets the 12 to 22 limit like every row. Restated it still fails: P `fixN` fixes the partition count when the resource is made, which SC-03 forbids ('no count to choose up front'), and hashing onto a fixed count gives 23 to 53 writers' worth at 64 groups under skew (E-18).",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "SPLIT": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-17b"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated with the app split, key-level splits balance within 5 % of slots to 64 groups and have no fixed ceiling (E-18, E-17b), but E-18 did not run them with the split, and no box run exists.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 4: the sim with load-aware placement at n = 1 to 32 run by the real mover, and the 1 to 4 process pin on the box"
+    },
+    "PD": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-17b"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated with the app split, key-level splits balance within 5 % of slots to 64 groups and have no fixed ceiling (E-18, E-17b), but E-18 did not run them with the split, and no box run exists.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 4: the sim with load-aware placement at n = 1 to 32 run by the real mover, and the 1 to 4 process pin on the box"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated, v4's ring was never run: it places by hash with no load-aware move, which E-18 shows balances badly under skew, but that is reasoned for a ring, not measured.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "E-18's run with a hash ring in place of slots"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded every design reaches only 12 to 22 effective writers, below F_w = 64 (E-18). Restated, how an outside log spreads one resource over writers is theirs; on JetStream a stream is one group, and nothing here ran it.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "a write-scaling run on the outside log, 1 to 4 servers"
+    }
+   }
+  },
+  {
+   "req": "SC-04",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-17",
+     "E-17b",
+     "E-18"
+    ],
+    "why": "The same slot move empties a group (E-17's `shrink` bound holds, model-checked, crash-only), and E-18's policy removes a group by copying its share (1.56 % at 64 groups), with a margin that stops two pieces swapping for ever. But no run followed a load cycle, and nothing yet decides when to add or drop a group, so 'no flapping' and 'no lasting cost' are unshown.",
+    "closes": "phase 4: the sim of a daily load cycle over 7 days with the real mover and its grow and shrink thresholds"
+   },
+   "except": {
+    "LANE": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-17",
+      "E-17b"
+     ],
+     "why": "Step 1: G `lane` fixes 64 groups per project for good (SPACE 2, axis G). Step 2: SC-04's test asks the group count to follow load down. Step 3: no rule ever removes a lane, so a project pays 64 groups whatever its load; range moves between lanes do not change that (E-17b states it).",
+     "proof": "structural"
+    },
+    "ISR": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-17"
+     ],
+     "why": "Step 1: P `fixN` fixes the partition count when the resource is made (SPACE 2, axis P). Step 2: no rule merges or removes a partition's group, so the count sized for the peak stays for good (E-17 part 1: 'groups never go away'). Step 3: SC-04 asks groups to shrink back with no lasting cost from a past peak.",
+     "proof": "structural"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-17"
+     ],
+     "why": "A re-key down holds in the model with the same rules (E-17's `shrink` bound), so 'never shrinks' is not a rule limit. But every shrink copies and freezes the whole resource, and no load-cycle run exists.",
+     "closes": "phase 4: the sim of a daily load cycle over 7 days with the real mover and its grow and shrink thresholds"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-17b",
+      "E-17c"
+     ],
+     "why": "It shrinks only through the merge, a second protocol (37 rules with the split; the `shrink` bound holds, model-checked, crash-only). Lineage is kept for ever, a small lasting cost, and no load-cycle run exists.",
+     "closes": "phase 4: the sim of a daily load cycle over 7 days with the real mover and its grow and shrink thresholds"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-17b"
+     ],
+     "why": "TiKV merges small regions and its controller paces splits and merges (cited as the row's precedent, not run here). The merge protocol holds in E-17b's model; no load-cycle run exists.",
+     "closes": "a load-cycle run on a PD-shaped prototype; not planned"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 has no groups to shrink: members leave by a vote, and a scoped leave drains first (README). STATUS lists leave shapes that need an operator, and no 7-day load-cycle run exists.",
+     "closes": "v4's scale tier run over a daily load cycle"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "On JetStream a stream's placement and replica count are set by hand, and E-44 ran no scale change. Whether an outside log shrinks with load is theirs to show.",
+     "closes": "a scale-down run on the outside log"
+    }
+   }
+  },
+  {
+   "req": "SC-05",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-34",
+     "E-28",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-05 at 10 GB': one Node process woke 10 GB of 2 KB rows in 86 to 122 s against 60 s on v4's codec; 5 GB took 36 s, and a worker that keeps rows encoded reached its first write in about 60 s (E-34). That is no design ceiling: 10 GB can sit in several groups and the faster wake forms are not built, so it is open, as A-13 says. Restated per storage form it stays open, because no sleep-and-wake run with an object store (disks kept and lost) exists.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 4: the sleep-and-wake test with an S3-compatible store, disks kept and disks lost; before it, a built wake path (native crc32c, blind writes while the fold catches up) timed at 10 GB"
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34"
+     ],
+     "why": "Not named by the 1.3 line: it folds rows in Rust, off the V8 heap. E-34's breakdown suggests a faster wake (reasoned, not measured), and no sleep-and-wake run with a store exists.",
+     "closes": "phase 4: the sleep-and-wake test with an S3-compatible store, disks kept and disks lost; before it, a built wake path (native crc32c, blind writes while the fold catches up) timed at 10 GB"
+    },
+    "PD": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Step 1: SC-05's test wakes servers that lost their disks, from an S3-compatible store. Step 2: PD keeps its state in an LSM store on each server's own disk, with no `+tier` and no log tier (SPACE 4.1, axis S). Step 3: with every server stopped and its disk lost, no copy is left, so the wake loses everything; meeting it needs another row's storage option.",
+     "proof": "structural"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-34"
+     ],
+     "why": "Step 1: SC-05's test wakes servers that lost their disks, from an S3-compatible store. Step 2: v4 keeps its state only in each member's own WAL dir (S `walg`, no `+tier`, no log tier). Step 3: with every server stopped and its disk lost, no copy is left. E-34 also timed v4's own codec at 86 to 122 s for 10 GB in one member, against 60 s.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34",
+      "E-44"
+     ],
+     "why": "1.3 line 'SC-05 at 10 GB': fero's client would fold rows in Node at E-34's 10 s a GB, over the bar at 10 GB in one process. E-44 ran no sleep or wake, and whether the outside log comes back from a store alone is theirs to show, so it is open as worded and restated.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "a sleep-and-wake run on the outside log, disks kept and lost"
+    }
+   }
+  },
+  {
+   "req": "SC-06",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-34"
+    ],
+    "why": "The draft designs it: cold rows read through from snapshot layers (opt in), and groups spread a resource over servers' disks (DESIGN-V5 4.1). No experiment built or timed a data set at 3 x RAM; E-34 only names it as the form to plan when the heap is too small."
+   },
+   "except": {
+    "PD": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "S `lsm` keeps state on disk by construction, and split regions spread a resource over stores; TiKV runs data sets far above RAM in production (cited as the row's precedent). A local LSM read is faster than one object-store get. Not measured here."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Scoped replication (`replicas`) puts each partition on a few members, so a resource can pass one server's memory and disk. v4 has no cold rows and no object store, and no run at 3 x RAM exists."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "The outside log keeps streams on disk, but fero's client folds every row it follows in Node memory. Nothing ran a data set at 3 x RAM."
+    }
+   }
+  },
+  {
+   "req": "SC-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-25",
+     "E-11"
+    ],
+    "why": "The idle cost at n = 100 is stated from a real run: 0.95 % of a core per member in Node (0.33 % in Rust) and 19,800 link pings a second, with quiet groups (E-25). Past 100 the knob is said: a bound on linked peers per member (A-12). But no v5 simulator exists yet, so the n = 100 sim sweep was not run, and E-25 injected no failure.",
+    "closes": "phase 2: the simulator's sweep at n = 1 to 100 with failures injected, as v4's scale tier"
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-25"
+     ],
+     "why": "Its idle cost is a count, not a run: sessions plus pairwise idle fetches come to 34,456 to 39,700 frames a second at n = 100 from about 10,000 partitions (E-25, from cited Kafka defaults). No sim sweep exists.",
+     "closes": "phase 2: the simulator's sweep at n = 1 to 100 with failures injected, as v4's scale tier"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-25"
+     ],
+     "why": "Its servers keep one session each to a controller: 400 idle frames a second at n = 100 and no peer bound needed (E-25, a count, not a run). No sim sweep exists.",
+     "closes": "phase 2: the simulator's sweep at n = 1 to 100 with failures injected, as v4's scale tier"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-25"
+     ],
+     "why": "It sends no idle frames, but its leases cost 500 to 50,000 PUTs a second at n = 100 unless they go quiet (E-25, a count). No sim sweep exists.",
+     "closes": "phase 2: the simulator's sweep at n = 1 to 100 with failures injected, as v4's scale tier"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-25"
+     ],
+     "why": "TiKV clusters run with far more than 100 stores in production (cited as the row's precedent). The sim sweep SC-07 asks for was not run on a PD-shaped kernel.",
+     "closes": "a PD-shaped kernel in the simulator; not planned"
+    },
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's own battery runs the n = 100 scale tier (CLAUDE.md: `npm test` and `npm run sim:scale`), DESIGN-SCALE pins its idle frames at n = 100, and it states its ceiling as 100 members. That tier is the test SC-07 names."
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: SC-07 asks clusters of 1 to 100 members to run in the sim. Step 2: BUY's members are an outside server's processes (nats-server). Step 3: fero's simulator cannot run their bytes, so no seed, sweep or replay of such a cluster can exist (E-44 says so in writing; SPACE 4.2).",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "SC-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-13",
+     "E-15",
+     "E-17c",
+     "E-18",
+     "E-31"
+    ],
+    "why": "1.3 line 'SC-08(b), every slot row': the three-commit move is unwritable 16.7 ms at p99 under 10,000 writes a second (bar 10 ms); A-17 cuts it to one or two commits, and one commit measured at most 4.7 ms (E-13), but the cut move is not modelled and carried no copy. (a), (d), (f) and 'others go on' hold in the move's models and in E-18's run (crash-only, one loop); (c) was never measured, and no sim sweep with scale events exists. Restated as a p50 and a load-tied p99 it is open for the same reasons.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "before phase 1: fix the move's window at one or two commits and model it with its carried set (K-03, K-25); phase 4: the sim sweep with scale events and the pins for (b), (c), (f)"
+   },
+   "except": {
+    "OBJ": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-13",
+      "E-17c",
+      "E-28"
+     ],
+     "why": "1.3 line 'SC-08(b), every slot row': it moves slots by the same protocol, but each commit is a PUT, which is above 7.3 ms at p99 on a real store (E-28, cited), so even a one-commit window may pass 10 ms. The move's safety holds in the slot models (crash-only); no timing or sim sweep exists for it, as worded or restated.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "before phase 1: fix the move's window at one or two commits and model it with its carried set (K-03, K-25); phase 4: the sim sweep with scale events and the pins for (b), (c), (f)"
+    },
+    "CELL": {
+     "v": "fails",
+     "basis": "model",
+     "ev": [
+      "E-17c",
+      "E-17"
+     ],
+     "why": "A model of CELL's own re-key shows it: a write to a partition that never moves must wait for the re-key (property L8, against (b) 'while others go on'), and that partition's rows are copied to the new generation (F8, against (f)). Both fail in every re-key set, as written and smallest (E-17c).",
+     "proof": "counterexample"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-17b",
+      "E-14c",
+      "E-31"
+     ],
+     "why": "Lanes never grow or shrink, so the only changes are servers joining and leaving, which move replicas by Raft membership changes (A-01, model-checked alone). No sim sweep with scale events exists, and its `off` positions hold only while no lane's range moves (E-31).",
+     "closes": "phases 2 to 4: the sim sweep with servers joining and leaving, and the pins for (c) and (f)"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-17b",
+      "E-17c"
+     ],
+     "why": "Not named by the 1.3 line. A split fences the moving half for one commit and copies nothing (model-checked, crash-only); a merge freezes every partition of the merged group (reasoned). No timing and no sim sweep with scale events exist for it.",
+     "closes": "phase 4: the sim sweep with splits, merges and scale events, and the pins for (b), (c), (f)"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-17b"
+     ],
+     "why": "TiKV splits, merges and rebalances online in production (cited as the row's precedent). The 10 ms and 2 x bars were not measured for it here.",
+     "closes": "a PD-shaped prototype under the SC-08 pins; not planned"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "With a fixed partition count the only change is moving replicas between servers under the controller (Kafka's reassignment, cited). Nothing here modelled or timed it.",
+     "closes": "a model and a sim sweep of replica moves under the in-sync-set rules"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: in v4, adding or removing a server moves ring ownership of partitions. Step 2: STATUS.md pins a seed of v4's own simulator (scoped sweep A3, seed 6) where a forwarded write commits at the old owner and again at the new one across an ownership move. Step 3: SC-08(a) allows no doubled write during a scale change.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "E-44 ran a leader kill, not a scale change. Moving a stream's replicas on JetStream is an operator's command (cited from memory), which would go against (e); it was not tested here.",
+     "closes": "a scale-change run on the outside log"
+    }
+   }
+  },
+  {
+   "req": "SC-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-29"
+    ],
+    "why": "Any row can give each limit a health row and a stderr line at 80 %, but no row has the six warnings built and tested. Only the disk limit was tried: E-29's prototype printed its 80 % line once.",
+    "closes": "one test per limit as each limit lands: disk in phase 2; memory, writer rate, groups, members and resources by phase 4"
+   },
+   "except": {}
+  },
+  {
+   "req": "SC-10",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-18",
+     "E-19",
+     "E-36",
+     "E-34",
+     "E-12",
+     "E-25"
+    ],
+    "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18), and a ceiling below its floor fails. Restated with the app split, slot rows state 135 at 4,096 slots, and the other floors have numbers (2,000 quiet groups, 100 members, 16.8 million rows per `data` source), but no ceiling is pinned and the 4,096-slot cursor and table sizes are reasoned only (G-06). It also depends on F_w and N_res.",
+    "proof": "ceiling",
+    "gap": 0.66,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the list of ceilings and the slot count (4,096, or 1,024 if the cursor is too big); each phase's perf suite pins them"
+   },
+   "except": {
+    "CELL": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "Fails either way: its writers-per-resource ceiling is 7 to 15 under skew even with the app split (16 cells hashed with no load-aware move, E-18), below the floor F_w = 64.",
+     "proof": "ceiling",
+     "gap": 0.77,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "LANE": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "Fails either way: 64 lanes shared by a project give one resource 23 to 53 writers' worth under skew with the app split (E-18), below the floor F_w = 64. The gap given is the as-worded one (12 to 22); restated it is 0.17.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "ISR": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-12"
+     ],
+     "why": "Fails either way: hashing onto a fixed partition count gives 23 to 53 writers' worth at 64 groups under skew with the app split (E-18), below F_w = 64. Its log file per group also loses to a shared journal well before the 2,000-group floor (p99 9 to 186 times worse at 2,000, E-12).",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "SPLIT": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+    },
+    "PD": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "1.3 line 'SC-10 and SC-03, every row': as worded the effective writer number is 12 to 22 for every design under Zipf 0.99, below the floor F_w = 64 (E-18). Restated with the app split, this row's own ceilings were not run or listed in this study, so it is open.",
+     "proof": "ceiling",
+     "gap": 0.66,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "the row's own list of ceilings, each with its number, and E-18's run for its placement"
+    }
+   }
+  },
+  {
+   "req": "SC-11",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-35"
+    ],
+    "why": "With a process per project (N `proc`) nothing is resident while a project sleeps, and it sends nothing (E-26 counts 0 groups). The 10 % clause is only reasoned: E-35 showed that tenants on one disk raise each other's p99 by 1.20 to 1.36 times even with a journal each, and no run gave each project its own volume.",
+    "closes": "the platform phase: two projects on the deploy target's volumes under E-35's load, and a box test with 1,000 sleeping projects"
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "1,000 sleeping projects fit one log-tier process (E-26: at most 1.04 GB with quiet groups, 0 Raft messages). But on the shared journal a tenant at a 10 to 40 MiB/s quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) is the fix, and it was not built. The shared tier also needs the user's yes on J (OPS-14).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "1,000 sleeping projects fit one log-tier process (E-26: at most 1.04 GB with quiet groups, 0 Raft messages). But on the shared journal a tenant at a 10 to 40 MiB/s quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) is the fix, and it was not built. The shared tier also needs the user's yes on J (OPS-14).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "1,000 sleeping projects fit one log-tier process (E-26: at most 1.04 GB with quiet groups, 0 Raft messages). But on the shared journal a tenant at a 10 to 40 MiB/s quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) is the fix, and it was not built. The shared tier also needs the user's yes on J (OPS-14).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "1,000 sleeping projects fit one log-tier process (E-26: at most 1.04 GB with quiet groups, 0 Raft messages). But on the shared journal a tenant at a 10 to 40 MiB/s quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) is the fix, and it was not built. The shared tier also needs the user's yes on J (OPS-14).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "1,000 sleeping projects fit one log-tier process (E-26: at most 1.04 GB with quiet groups, 0 Raft messages). But on the shared journal a tenant at a 10 to 40 MiB/s quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget (about 1 MiB/s) is the fix, and it was not built. The shared tier also needs the user's yes on J (OPS-14).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "Its 171,432 groups for 1,000 sleeping projects take 2.74 GB in TS, over 2 GB, so it needs A-15's dormant groups (57 B each, 10 MB in all, E-26). On the shared journal a tenant at quota raised another's p99 by 1.40 to 1.59 times against 1.1 (E-35); A-29's byte budget was not built, and the shared tier needs the user's yes on J.",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "It holds no group in memory for a sleeping project (E-26), and a quiet project sends no frames if its leases go quiet (E-25's count). Its shared tier is the object store itself, so it takes A-29's tenant budget, which was not built, and the 10 % clause was not measured for PUT commits.",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26",
+      "E-35"
+     ],
+     "why": "Its pool holds 11,652 groups for 1,000 sleeping projects in about 0.05 GB (Rust) with 0 messages (E-26's count). Tenants share one process and one disk, so it takes A-29's byte budget, which was not built, and isolation between isolates was never tested (G-25).",
+     "closes": "build the tenant byte budget (or a volume per tenant) and rerun E-35's two-tenant test; then the box test with 1,000 projects"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Tenancy is the outside log's: JetStream keeps tenants as accounts on shared servers. E-44 ran one tenant, so the 1,000 sleeping projects and the 10 % clause are unshown.",
+     "closes": "a two-tenant run on the outside log under E-35's load"
+    }
+   }
+  },
+  {
+   "req": "SC-12",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-27",
+     "E-40"
+    ],
+    "why": "One Node server held 10,000 idle links and 1,000 active subscribers at 10 messages a second each on under a fifth of a core, over TCP and over TLS (E-27). TLS memory (538 MB) is why A-11 puts a terminator in front; SC-12 itself sets no memory bar."
+   },
+   "except": {
+    "RUST": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-08",
+      "E-27"
+     ],
+     "why": "A one-thread Rust relay held 10,000 subscriber links and pushed 11.9 million deliveries a second (E-08), far above 1,000 active subscribers a core; a Node edge also holds the counts (E-27). A native TLS stack's memory per link was not measured."
+    },
+    "SRV": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-08",
+      "E-27"
+     ],
+     "why": "A one-thread Rust relay held 10,000 subscriber links and pushed 11.9 million deliveries a second (E-08), far above 1,000 active subscribers a core; a Node edge also holds the counts (E-27). A native TLS stack's memory per link was not measured."
+    },
+    "EMB-V8": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-08",
+      "E-27"
+     ],
+     "why": "A one-thread Rust relay held 10,000 subscriber links and pushed 11.9 million deliveries a second (E-08), far above 1,000 active subscribers a core; a Node edge also holds the counts (E-27). A native TLS stack's memory per link was not measured."
+    },
+    "SIDE": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-08",
+      "E-27"
+     ],
+     "why": "A one-thread Rust relay held 10,000 subscriber links and pushed 11.9 million deliveries a second (E-08), far above 1,000 active subscribers a core; a Node edge also holds the counts (E-27). A native TLS stack's memory per link was not measured."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Its clients are native smart clients of a server cluster. No run here held 10,000 idle links or 1,000 subscribers on a PD-shaped server."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "J shows 1,240 browser links on one project, through a bridge, and v4's fan-out was measured at about 9,000 deliveries a second. No run held 10,000 idle links or 1,000 active subscribers on one core."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09b"
+     ],
+     "why": "The edge is the outside server. E-09b measured NATS fan-out to 16 subscribers (4.13 million deliveries a second), not 10,000 idle links or 1,000 subscribers on a core."
+    }
+   }
+  },
+  {
+   "req": "SC-13",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-36",
+     "E-26"
+    ],
+    "why": "1.3 line 'SC-13's small': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots costs 8.8 KB against 2 KB (E-36, Node), and a denser form is still over once most slots are touched. Restated as 'few slots touched', a group per resource with dormant groups measured 1.4 KB and creates in 4.6 to 5.3 ms, but the cold-open tail is 5.4 to 7.6 ms against 5 ms, and drops and the create-and-drop sim were never run. It also depends on N_res.",
+    "proof": "ceiling",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+   },
+   "except": {
+    "MIN-P": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-36"
+     ],
+     "why": "1.3 line 'SC-13's small, pslot too': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots is over 2 KB in shared groups too (E-36). Restated as 'few slots touched', `pslot` measured 0.4 to 1.2 KB with about 16 groups and creates in 1.6 to 1.8 ms, but its cold open is reasoned, E-36 priced one slot map shared by the project, and a drop out of a shared group was never run (K-06).",
+     "proof": "ceiling",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+    },
+    "COMP": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-36"
+     ],
+     "why": "1.3 line 'SC-13's small, pslot too': as worded, per-slot state costs about 85 B a touched slot, so an idle resource that touched 100 slots is over 2 KB in shared groups too (E-36). Restated as 'few slots touched', `pslot` measured 0.4 to 1.2 KB with about 16 groups and creates in 1.6 to 1.8 ms, but its cold open is reasoned, E-36 priced one slot map shared by the project, and a drop out of a shared group was never run (K-06).",
+     "proof": "ceiling",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+    },
+    "SLOG": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-36",
+      "E-26"
+     ],
+     "why": "1.3 line 'SC-13's small': it is a slot row, so per-slot state at about 85 B a touched slot puts an idle resource with 100 touched slots over 2 KB as worded (E-36). Restated it is open: its shape is reasoned to be MIN's (one group a resource, dormant when idle), and a loglet's idle cost was never measured.",
+     "proof": "ceiling",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+    },
+    "OBJ": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-36",
+      "E-26"
+     ],
+     "why": "1.3 line 'SC-13's small': it is a slot row, so per-slot state at about 85 B a touched slot puts an idle resource with 100 touched slots over 2 KB as worded (E-36). Restated it is open: it holds no group in memory (E-26), but its create is a PUT or more and nothing timed create, cold open or drop on a store.",
+     "proof": "ceiling",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "phase 1 fixes the formats (run-length slot table, sparse per-slot state); phase 3 or 4: the sim that creates and drops 1e5 resources at 100 a second, with the cold-open and drop pins"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26",
+      "E-36"
+     ],
+     "why": "Not a slot row. 16 dormant groups a resource come to about 1.1 KB (16 x 57 B plus the catalog row, reasoned from E-26). But creating 16 groups and waking them cold were not timed against 10.7 ms and 5 ms; E-26 woke 20 groups in 10 to 16 ms.",
+     "closes": "E-36's create, cold-open and drop runs for 16 groups a resource"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-36"
+     ],
+     "why": "An idle resource costs 0.2 KB with 64 groups a project and creates in 1.6 to 1.8 ms (E-36). Dropping a resource whose records share a lane's log with others, and refusing old cursors of a re-created name, were not modelled or run.",
+     "closes": "a model and a run of dropping and re-creating a resource inside shared lanes"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-36",
+      "E-26"
+     ],
+     "why": "Not a slot row: one group a resource, dormant when idle (A-15, reasoned), with no slot table and no per-slot state. Nothing measured its idle cost, create, cold open or drop.",
+     "closes": "E-36's runs for a group per resource with lineage in place of slots"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "TiKV merges the regions of small tables (cross-table merge, cited in SC-13's own source). The cost of an idle table and the create and open times were not measured here.",
+     "closes": "E-36's runs on a PD-shaped prototype; not planned"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-25",
+      "E-12"
+     ],
+     "why": "Not priced (A-15 says so): every resource has N partition groups, each with its own log file (E-12), and idle fetches meet the frame bar only below about 10,000 partitions (E-25).",
+     "closes": "E-36's runs for N partitions a resource"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: in v4 each resource is its own cluster, with its own port, membership and heartbeats (DESIGN-V5 4.1). Step 2: heartbeats run every `heartbeat.ms` on every cluster, busy or idle (README). Step 3: so an idle resource sends frames of its own, which SC-13 forbids; 100,000 resources would also need 100,000 ports on a member.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "100,000 resources would be 100,000 streams, or subjects of a few streams, on the outside log. E-44 ran four patterns on a handful, so cost, create time and drop are unshown.",
+     "closes": "E-36's runs on the outside log"
+    }
+   }
+  },
+  {
+   "req": "SC-14",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-31",
+     "E-21"
+    ],
+    "why": "Learners or relays are in the row's design, and a relay with any delay keeps every subscribe property (E-31, model-checked; lag is not modelled). No sim ran 80 to 150 ms links, so false failover, the lease and TTL checks and the far-read lag bar are unshown. If the user wants writes homed in several regions, the row becomes WAN bars that no row here was built or tested for, so it stays open.",
+    "depends_on": "region scope",
+    "alt": "open",
+    "closes": "phase 2: the simulator with 80 to 150 ms links between regions (no false failover, Q-21's lease and TTL checks, far-read lag)"
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "It has no learners (V `full`), so far regions can follow only through relays, which keep the subscribe properties with any delay (E-31). No sim ran wide links; with multi-region writes it would face WAN bars nobody tested.",
+     "depends_on": "region scope",
+     "alt": "open",
+     "closes": "phase 2: the simulator with 80 to 150 ms links between regions (no false failover, Q-21's lease and TTL checks, far-read lag)"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "TiKV places learners in far regions and serves follower reads (cited as the row's precedent). No sim here ran 80 to 150 ms links for it; with multi-region writes it would face WAN bars nobody tested.",
+     "depends_on": "region scope",
+     "alt": "open",
+     "closes": "a PD-shaped kernel in the simulator with wide links; not planned"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no learner role and no rule that keeps a far member from voting; far regions could only run clients. Its scale tier has no wide-link run; with multi-region writes it would face WAN bars nobody tested.",
+     "depends_on": "region scope",
+     "alt": "open",
+     "closes": "v4's scale tier with 80 to 150 ms links"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Far-region reads would use the outside log's own mirrors, which E-44 did not run. With multi-region writes it would face WAN bars nobody tested.",
+     "depends_on": "region scope",
+     "alt": "open",
+     "closes": "a two-region run on the outside log"
+    }
+   }
+  },
+  {
+   "req": "SC-15",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-35",
+     "E-43"
+    ],
+    "why": "On the shared journal a 1 MiB record ten times a second raised others' p99 by 1.18 times in one set of three runs and 1.26 in another, against 1.2 (E-35): at the bar, inside the noise. The test was at the journal with no replication, not inside one group, and the 64 MB row and the `too-large` refusal were not built.",
+    "closes": "phase 2: E-35's load inside one Raft group with replication, with more runs, and the tests for 1 MB records, 64 MB rows and `too-large`"
+   },
+   "except": {
+    "MIN-P": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35"
+     ],
+     "why": "On the shared journal the ratio was 1.18 and 1.26 times in two sets of runs, against 1.2 (E-35): at the bar. `pslot` also puts one resource's big record in the batch of a group that other resources share, which no experiment ran (K-06), and the size limits were not built.",
+     "closes": "phase 2: E-35's load inside one Raft group with replication, with more runs, and the tests for 1 MB records, 64 MB rows and `too-large`"
+    },
+    "COMP": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35"
+     ],
+     "why": "On the shared journal the ratio was 1.18 and 1.26 times in two sets of runs, against 1.2 (E-35): at the bar. `pslot` also puts one resource's big record in the batch of a group that other resources share, which no experiment ran (K-06), and the size limits were not built.",
+     "closes": "phase 2: E-35's load inside one Raft group with replication, with more runs, and the tests for 1 MB records, 64 MB rows and `too-large`"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-12"
+     ],
+     "why": "A log file per group gave 1.16 times beside the big writer, but its victims are 1.19 times slower alone, and it loses to a journal from 256 groups (E-35, E-12). No run was inside one replicated partition, and the size limits were not built.",
+     "closes": "phase 2: E-35's load inside one Raft group with replication, with more runs, and the tests for 1 MB records, 64 MB rows and `too-large`"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-28"
+     ],
+     "why": "A 1 MB conditional PUT costs 7 to 11 ms at p99 on MinIO here (E-28). What it does to other partitions that share the writer's batch was not measured, and the size limits were not built.",
+     "closes": "E-35's load on the object-store commit path"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Its regions share an LSM store's write path on each server; nothing here measured a 1 MB record beside small ones on it.",
+     "closes": "E-35's load on a PD-shaped prototype; not planned"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-43"
+     ],
+     "why": "v4 keeps a WAL per resource, the shape E-35's journal-per-group variant measured at 1.16 times. v4's own path was not run with 1 MB records, and E-43 found that one 41-byte record can make a 10 MB row with nothing refusing it.",
+     "closes": "E-35's load on v4's own write path, and a size-limit test"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream takes records up to about 1 MB by default (cited in SC-15's own source). Its neighbours' p99 beside a big writer and the 64 MB row in frames were not run.",
+     "closes": "E-35's load on the outside log"
+    }
+   }
+  }
+ ]
+}
