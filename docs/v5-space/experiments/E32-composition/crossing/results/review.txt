@@ -1,0 +1,110 @@
+# E-32 (b) review: every check the review ran (README, "Review"), raw output
+
+## 1. re-runs of the smallest bound and two larger ones (compare with results/design.txt)
+src         26,724 states, 53,747 steps, 5.9s: all hold  judged 26,724
+slots-dst   234,540 states, 478,917 steps, 54.8s: all hold  judged 234,540
+heal2-src   1,373,695 states, 3,327,956 steps, 446.5s: all hold  judged 1,373,695
+src        state digest SAME as the stored run
+slots-dst  state digest SAME as the stored run
+heal2-src  state digest SAME as the stored run
+
+## 2. DESIGN-V5 4.1's guard (snap.nomove) dropped: the source may drop its log while a move copies from it
+src [drop snap.nomove]: 56,060 states, 114,243 steps, 11.4s: all hold  judged 56,060
+dst [drop snap.nomove]: 36,716 states, 67,875 steps, 6.7s: all hold  judged 36,716
+dst-src [drop snap.nomove]: 66,978 states, 149,000 steps, 14.4s: all hold  judged 66,978
+src-dst [drop snap.nomove]: 47,204 states, 104,335 steps, 10.8s: all hold  judged 47,204
+floor-src [drop snap.nomove]: 664,342 states, 1,593,570 steps, 157.1s: all hold  judged 664,342
+twice-src [drop snap.nomove]: 498,588 states, 917,981 steps, 115.9s: all hold  judged 498,588
+twice-dst [drop snap.nomove]: 637,830 states, 1,194,935 steps, 150.9s: all hold  judged 637,830
+slots-src [drop snap.nomove]: 560,368 states, 1,184,755 steps, 128.9s: all hold  judged 560,368
+heal2-src [drop snap.nomove]: 2,825,670 states, 6,688,670 steps, 892.6s: all hold  judged 2,825,670
+
+## 3. the review bounds (cbounds.py REVIEW): in full with liveness, or partial where marked
+read2-src   484,256 states, 1,603,291 steps, 117.1s: all hold  judged 484,256
+read2-dst   487,332 states, 1,482,279 steps, 114.1s: all hold  judged 487,332
+crash2-src  3,000,001 states, 8,149,855 steps, 453.7s: all hold (STOPPED: partial)  judged 0
+
+## 4. does any election ever see a live voter behind the log?
+src         26,724 states: no election ever sees a voter behind the log
+dst         36,716 states: no election ever sees a voter behind the log
+crash-src   162,142 states: no election ever sees a voter behind the log
+crash-dst   239,782 states: no election ever sees a voter behind the log
+giveup-dst  139,182 states: no election ever sees a voter behind the log
+crash2-src  392 states (partial): a voter behind the log at an election after 5 steps
+       1. member-crash 1
+       2. write ('w1', 'G0', 'floor=1')
+       3. commit G0 ('w', 'w1', 'p', ('s', 1), 1, 1, 0)
+       4. member-crash 0
+       5. member-back 1
+all         1,000,002 states (partial): no election ever sees a voter behind the log
+
+## 5. four planted bugs (model/creview.py): each on src, then on the smallest bound that reaches it
+b1 (a guard: a bulk copy counts as the final copy (final_cp loses its END check)), in crossing.py
+   src [none]: 15,350 states, 29,597 steps, 3.1s: L5 (1), L5b (0), L7 (7)  judged 15,350
+     L5: every move or re-key under way can end once faults and timers stop
+       shortest counterexample, 1 steps:
+          1. export ('s', 'G0', '->', 'G1')
+     L5b: grow and shrink finish: in every state reached without a give-up timer (cancel, abort, abandon), every planned change can still complete
+       shortest counterexample, 0 steps:
+     L7: every attempt can get an answer (applied or refused) once faults and timers stop
+       shortest counterexample, 7 steps:
+          1. export ('s', 'G0', '->', 'G1')
+          2. commit G0 ('exp', 's', 1)
+          3. import ((0, 0, 1), 's')
+          4. commit G1 ('imp', (0, 0, 1), 's')
+          5. copy ((0, 0, 1), 'G1', 'from', 'G0')
+          6. commit G1 ('cp', (0, 0, 1), 's', 'upto=1', [], [], 'tok=0', 'seq=0', 'end=-1')
+          7. fence ((0, 0, 1), 'to', 'G1')
+b2 (an update: a snapshot keeps a copy fact without its END(N)), in crossing.py
+   src [none]: 26,724 states, 53,747 steps, 5.6s: all hold  judged 26,724
+   dst [none]: 9,465 states, 18,969 steps, 1.3s: P1 (17) (STOPPED: partial)  judged 0
+     P1: no acknowledged write lost or extra: every group that holds a partition open has exactly its history as rows
+       shortest counterexample, 17 steps:
+          1. export ('s', 'G0', '->', 'G1')
+          2. commit G0 ('exp', 's', 1)
+          3. import ((0, 0, 1), 's')
+          4. commit G1 ('imp', (0, 0, 1), 's')
+          5. copy ((0, 0, 1), 'G1', 'from', 'G0')
+          6. commit G1 ('cp', (0, 0, 1), 's', 'upto=1', [], [], 'tok=0', 'seq=0', 'end=-1')
+          7. fence ((0, 0, 1), 'to', 'G1')
+          8. commit G0 ('fen', (0, 0, 1), 's', 0)
+          9. final ((0, 0, 1), 'END', 0)
+         10. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+         11. open ((0, 0, 1), 'at', 0)
+         12. commit G1 ('open', (0, 0, 1), 's', 0)
+         13. write ('w1', 'G1', 'floor=1')
+         14. commit G1 ('w', 'w1', 'p', ('s', 1), 1, 1, 0)
+         15. snap ('G1', 'below 5')
+         16. final ((0, 0, 1), 'END', 0)
+         17. commit G1 ('cp', (0, 0, 1), 's', 'upto=2', [], [], 'tok=0', 'seq=0', 'end=0')
+b3 (a guard: the reader's no-skip check ignores records kept only in a snapshot), in crossing.py
+   src [none]: 26,724 states, 53,747 steps, 5.7s: all hold  judged 26,724
+   read-src [none]: 49,360 states, 146,219 steps, 10.9s: all hold  judged 49,360
+   read-dst [none]: 66,036 states, 179,059 steps, 14.4s: all hold  judged 66,036
+   read2-src [none]: 551 states, 893 steps, 0.0s: P4 (7) (STOPPED: partial)  judged 0
+     P4: a cursor resumes with no gap or overlap: what the reader took is always a prefix of the history, and only ever grows
+       shortest counterexample, 7 steps:
+          1. write ('w1', 'G0', 'floor=1')
+          2. commit G0 ('w', 'w1', 'p', ('s', 1), 1, 1, 0)
+          3. ack w1
+          4. write ('w2', 'G0', 'floor=1')
+          5. commit G0 ('w', 'w2', 'p', ('s', 2), 2, 1, 0)
+          6. snap ('G0', 'below 2')
+          7. read ('G0', 'w2', ('s', 2))
+b4 (a guard: elections lose Raft's log check), in cworld.py
+   src [none]: 26,724 states, 53,747 steps, 6.0s: all hold  judged 26,724
+   crash-src [none]: 162,142 states, 422,400 steps, 39.2s: all hold  judged 162,142
+   crash2-src [none]: 983 states, 1,693 steps, 0.1s: LC (6) (STOPPED: partial)  judged 0
+     LC: E-14 LeaderCompletenessInv: a leader holds every committed entry
+       shortest counterexample, 6 steps:
+          1. member-crash 1
+          2. write ('w1', 'G0', 'floor=1')
+          3. commit G0 ('w', 'w1', 'p', ('s', 1), 1, 1, 0)
+          4. member-crash 0
+          5. member-back 1
+          6. elect G0 1 tail keeps 0
+
+## 6. mutants equivalent on the 18 sweep bounds, run on bounds outside the sweep
+read2-src [drop read.next]: 273 states, 403 steps, 0.0s: P4 (6) (STOPPED: partial)  judged 0
+floor-src [flip write.above]: 323,504 states, 766,693 steps, 77.3s: all hold  judged 323,504
+floor-src [flip refuse.above]: 278,232 states, 641,659 steps, 63.3s: L7 (1)  judged 278,232

@@ -30,3 +30,6 @@ floore-src  176,560 states, 358,609 steps, 39.1s: all hold  judged 176,560
 floore-dst  183,536 states, 341,089 steps, 40.2s: all hold  judged 183,536
 any         2,500,001 states, 6,003,555 steps, 552.7s: all hold (STOPPED: partial)  judged 0
 all         2,500,002 states, 7,151,236 steps, 380.7s: all hold (STOPPED: partial)  judged 0
+# the lock-token pair, added last on resuming
+lock-src    83,272 states, 144,241 steps, 17.2s: all hold  judged 83,272
+lock-dst    98,734 states, 160,663 steps, 19.6s: all hold  judged 98,734

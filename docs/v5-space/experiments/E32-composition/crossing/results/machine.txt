@@ -1,0 +1,4 @@
+Linux 6.18.44-fc-v338 x86_64
+Python 3.13.17
+4
+MemTotal:       16472400 kB

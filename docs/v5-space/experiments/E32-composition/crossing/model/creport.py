@@ -45,6 +45,8 @@ def what(b):
         extra.append('one write on the moving slot, one on the slot that stays')
     elif b.get('sess') and len(toks) > 1:
         extra.append('equal lock tokens' if len(set(toks)) == 1 else 'rising lock tokens')
+    elif not b.get('sess') and not b.get('derived') and len(set(toks)) > 1:
+        extra.append('two lock holders, no session')
     if extra:
         parts.append(', '.join(extra))
     return '; '.join(parts)
@@ -71,6 +73,8 @@ def design(path):
 def ff(x):
     if not x:
         return ''
+    if x[1] == 'LIMIT':
+        return f'no counterexample; the search stopped at the state limit on `{x[0]}` ({x[2]:,} states)'
     return f'{x[1]} on `{x[0]}` in {x[2]} steps'
 
 
@@ -79,6 +83,8 @@ def ablation(added_path, union_path):
     a = json.load(open(added_path))['result']
     print('## The rules added at the crossing (every other rule kept)\n')
     print(f"Bounds: {', '.join('`' + b + '`' for b in a['sweep'])}.\n")
+    if a.get('pinned'):
+        print('Pinned (written, never dropped, not counted): ' + ', '.join('`' + x + '`' for x in a['pinned']) + '.\n')
     print('| Rule | What it says | Dropped alone | In the smallest set | Kept because |')
     print('|---|---|---|---|---|')
     for r in a['rules']:

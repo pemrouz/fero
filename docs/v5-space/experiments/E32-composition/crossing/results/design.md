@@ -24,6 +24,8 @@
 | `floore-dst` | w1, w2; member 1 loses its disk (never back); heals: B; 1 drop at B; one write at a time, equal lock tokens | 183,536 | 341,089 | 183,536 | 40 | in full | every property holds |
 | `remit-src` | o1, o1r; member 0 loses its disk (never back); heals: A; 1 drop at A; derived outputs, one re-emitted under a new id | 51,180 | 92,391 | 51,180 | 11 | in full | every property holds |
 | `remit-dst` | o1, o1r; member 1 loses its disk (never back); heals: B; 1 drop at B; derived outputs, one re-emitted under a new id | 68,820 | 116,032 | 68,820 | 15 | in full | every property holds |
+| `lock-src` | w1, w2; member 0 loses its disk (never back); heals: A; 1 drop at A; two lock holders, no session | 83,272 | 144,241 | 83,272 | 17 | in full | every property holds |
+| `lock-dst` | w1, w2; member 1 loses its disk (never back); heals: B; 1 drop at B; two lock holders, no session | 98,734 | 160,663 | 98,734 | 20 | in full | every property holds |
 | `heal2-src` | w1; member 0 loses its disk (never back); heals: A, B; 1 drop at A | 1,373,695 | 3,327,956 | 1,373,695 | 407 | in full | every property holds |
 | `heal2-dst` | w1; member 1 loses its disk (never back); heals: A, B; 1 drop at B | 2,612,006 | 6,244,395 | 2,612,006 | 856 | in full | every property holds |
 | `any` | w1; member 0 or 1 or 2 loses its disk (never back); heals: A, B; 1 drop at A or B | 2,500,001 | 6,003,555 | 0 | 553 | PARTIAL: stopped at the state limit | no counterexample (safety only; liveness not judged) |
