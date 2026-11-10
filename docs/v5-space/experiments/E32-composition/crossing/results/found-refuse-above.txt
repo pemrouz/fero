@@ -1,0 +1,10 @@
+# the composed model without refuse.above (E-20's stale rule on E-17's refusal path)
+floors-src [drop refuse.above]: 257 states, 362 steps, 0.0s: P3 (6) (STOPPED: partial)  judged 0
+  P3: dedup and fence state survive: no attempt applied twice, lock tokens never fall along a partition's history, and an attempt told "refused" never commits
+    shortest counterexample, 6 steps:
+       1. write ('w1', 'G0', 'floor=1')
+       2. commit G0 ('w', 'w1', 'p', ('s', 1), 1, 1, 0)
+       3. ack w1
+       4. write ('w2', 'G0', 'floor=2')
+       5. commit G0 ('w', 'w2', 'p', ('s', 2), 2, 2, 0)
+       6. refuse ('w1', 'G0')

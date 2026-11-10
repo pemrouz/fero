@@ -39,7 +39,12 @@ def what(b):
     if b.get('serial'):
         extra.append('one write at a time')
     if b.get('derived'):
-        extra.append('derived outputs')
+        extra.append('derived outputs' + (', one re-emitted under a new id' if b.get('remit') else ''))
+    toks = [a[2] for a in b['attempts']]
+    if len({a[1] for a in b['attempts']}) > 1:
+        extra.append('one write on the moving slot, one on the slot that stays')
+    elif b.get('sess') and len(toks) > 1:
+        extra.append('equal lock tokens' if len(set(toks)) == 1 else 'rising lock tokens')
     if extra:
         parts.append(', '.join(extra))
     return '; '.join(parts)
@@ -49,7 +54,10 @@ def design(path):
     d = json.load(open(path))
     print('| Bound | What it holds | States | Steps | Judged for liveness | Seconds | Explored | Result |')
     print('|---|---|---|---|---|---|---|---|')
-    for n, x in d.items():
+    for n in list(BOUNDS):
+        if n not in d:
+            continue
+        x = d[n]
         res = 'every property holds' if not x['fail'] else 'FAILS ' + ', '.join(
             f'{p} ({v[0]} steps)' for p, v in sorted(x['fail'].items()))
         if not x['complete']:

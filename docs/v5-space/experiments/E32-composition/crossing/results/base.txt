@@ -1,0 +1,17 @@
+# E-17's slot model, unchanged, against E-17's stored results
+grow     22,797 states   65,563 steps    1.4s  fails: none  stored digest [22797, 65563, 5489392203732156271]  now [22797, 65563, 5489392203732156271]  SAME
+shrink   22,797 states   65,563 steps    1.3s  fails: none  stored digest [22797, 65563, 1757110895258182960]  now [22797, 65563, 1757110895258182960]  SAME
+both     39,409 states  113,242 steps    2.3s  fails: none  stored digest [39409, 113242, 10733321065662182499]  now [39409, 113242, 10733321065662182499]  SAME
+read     62,653 states  207,054 steps    4.3s  fails: none  stored digest [62653, 207054, 12249620993103202761]  now [62653, 207054, 12249620993103202761]  SAME
+deep     53,644 states  160,442 steps    3.1s  fails: none  stored digest [53644, 160442, 2601080371416890379]  now [53644, 160442, 2601080371416890379]  SAME
+twice     1,318 states    3,434 steps    0.1s  fails: none  stored digest [1318, 3434, 9822796148079088515]  now [1318, 3434, 9822796148079088515]  SAME
+base reproduced
+
+# this port, with every added part switched off, against the same
+grow    E-17 slot:  22,797 states   65,563 steps   this port:  22,797 states   65,563 steps  fails: none  SAME
+shrink  E-17 slot:  22,797 states   65,563 steps   this port:  22,797 states   65,563 steps  fails: none  SAME
+both    E-17 slot:  39,409 states  113,242 steps   this port:  39,409 states  113,242 steps  fails: none  SAME
+read    E-17 slot:  62,653 states  207,054 steps   this port:  62,653 states  207,054 steps  fails: none  SAME
+deep    E-17 slot:  53,644 states  160,442 steps   this port:  53,644 states  160,442 steps  fails: none  SAME
+twice   E-17 slot:   1,318 states    3,434 steps   this port:   1,318 states    3,434 steps  fails: none  SAME
+the port makes exactly E-17's states and steps

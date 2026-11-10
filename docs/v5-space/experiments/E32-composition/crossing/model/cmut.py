@@ -26,7 +26,9 @@ heavy lock.
      caught      a property breaks;
      ill-formed  the model cannot be evaluated (a dropped guard kept a read
                  in range): reported apart, as E-15 did;
-     undecided   a run stopped at the state limit with no counterexample;
+     unbounded   the search passed 10 times the model's own states on a bound
+                 with nothing broken (E-15's class), on two bounds, or on
+                 every bound where it differs if fewer;
      survived    every such bound runs to the end and nothing breaks.
 
     python3 model/cmut.py --out results/mutants.json [--budget 1500] [--jobs 2]
@@ -55,6 +57,8 @@ from crossing import Crossing                        # noqa: E402
 from dsl import Mutation, rules, FLIP                # noqa: E402
 
 LIMIT = 1_500_000
+UNB = 10            # E-15: a mutant past 10x the model's states on a bound, nothing broken, is unbounded there
+STOP_AFTER = 2      # stop a mutant once it is unbounded on this many bounds (CPU budget)
 ERRS = (TypeError, IndexError, KeyError, ValueError, AttributeError)
 
 
@@ -236,32 +240,40 @@ def diff_pass(args):
 
 
 # ------------------------------------------------------------------ stage 2
-def run_mutant(args):
-    mid, bounds, base_drop = args
+def run_one(args):
+    """One mutant on one bound, stopping at the first broken property, or
+    once the search passes UNB times the model's own states on that bound
+    (E-15's `unbounded`)."""
+    mid, b, base_drop, base_states = args
     m = mutation_of(tuple(mid), tuple(base_drop))
-    per = {}
-    verdict = 'survived'
-    for b in bounds:
-        t0 = time.time()
-        try:
-            w = CWorld(Crossing, BOUNDS[b], m)
-            r = explore(w, stop_first=True, liveness=True, limit=LIMIT)
-        except ERRS as e:
-            per[b] = {'error': f'{type(e).__name__}: {e}'[:200], 'secs': round(time.time() - t0, 1)}
-            verdict = 'ill-formed'
-            break
-        x = {'states': r.states, 'secs': round(r.secs, 1), 'complete': r.complete}
-        if r.fail:
-            p = min(r.fail, key=lambda k: r.fail[k][0])
-            x['fail'] = [p, r.fail[p][0], sorted(r.fail)]
-            x['trace'] = [' '.join(map(str, lab)) for lab in r.fail[p][1]][:60]
-            per[b] = x
-            verdict = 'caught'
-            break
-        per[b] = x
-        if not r.complete:
-            verdict = 'undecided'
-    return mid, {'verdict': verdict, 'per': per}
+    t0 = time.time()
+    try:
+        w = CWorld(Crossing, BOUNDS[b], m)
+        r = explore(w, stop_first=True, liveness=True, limit=min(LIMIT, UNB * base_states))
+    except ERRS as e:
+        return mid, b, {'error': f'{type(e).__name__}: {e}'[:200], 'secs': round(time.time() - t0, 1)}
+    x = {'states': r.states, 'secs': round(r.secs, 1), 'complete': r.complete}
+    if r.fail:
+        p = min(r.fail, key=lambda k: r.fail[k][0])
+        x['fail'] = [p, r.fail[p][0], sorted(r.fail)]
+        x['trace'] = [' '.join(map(str, lab)) for lab in r.fail[p][1]][:60]
+    return mid, b, x
+
+
+def verdict_of(per, dif):
+    """A mutant's runs are saved bound by bound (cheapest first), so a piece
+    cut by the lock's time limit loses at most one bound's run. A mutant
+    whose search stopped at the state limit on STOP_AFTER bounds, with
+    nothing broken, is not run further (CPU budget): `unbounded`."""
+    if any('error' in x for x in per.values()):
+        return 'ill-formed'
+    if any('fail' in x for x in per.values()):
+        return 'caught'
+    if sum(1 for x in per.values() if not x.get('complete')) >= STOP_AFTER:
+        return 'unbounded'
+    if all(b in per for b in dif):
+        return 'unbounded' if any(not x.get('complete') for x in per.values()) else 'survived'
+    return 'partial'
 
 
 # ------------------------------------------------------------------ driver
@@ -283,6 +295,14 @@ def key_of(mid):
     return f'{mid[0]} {mid[1]}'
 
 
+def more_bounds(run, dif):
+    """A mutant not caught yet must also run on bounds added to the sweep
+    after its run (the sweep grew on resuming: floore-*, remit-*)."""
+    if run['verdict'] != 'survived':
+        return []
+    return [b for b in dif if b not in run['per']]
+
+
 def classify(ck, muts, sweep):
     rows = []
     for mid in muts:
@@ -292,7 +312,7 @@ def classify(ck, muts, sweep):
             rows.append((mid, 'pending', dif, None))
         elif not dif:
             rows.append((mid, 'equivalent', dif, None))
-        elif k in ck['runs']:
+        elif k in ck['runs'] and ck['runs'][k]['verdict'] != 'partial' and not more_bounds(ck['runs'][k], dif):
             rows.append((mid, ck['runs'][k]['verdict'], dif, ck['runs'][k]))
         else:
             rows.append((mid, 'pending', dif, None))
@@ -303,7 +323,7 @@ def report(ck, muts, sweep, out=sys.stdout):
     rows = classify(ck, muts, sweep)
     kinds = {'G': 'drop a guard conjunct', 'C': 'flip a comparison', 'U': 'drop a state update',
              'S': 'swap two updates'}
-    cols = ('caught', 'ill-formed', 'undecided', 'survived', 'equivalent', 'pending')
+    cols = ('caught', 'ill-formed', 'unbounded', 'survived', 'equivalent', 'pending')
     print('| Kind | Made | ' + ' | '.join(cols) + ' |', file=out)
     print('|---|---|' + '---|' * len(cols), file=out)
     tot = {c: 0 for c in cols}
@@ -331,7 +351,7 @@ def report(ck, muts, sweep, out=sys.stdout):
         elif run and v == 'ill-formed':
             b = list(run['per'])[-1]
             where = f'on `{b}`: {run["per"][b]["error"][:70]}'
-        elif run and v == 'undecided':
+        elif run and v == 'unbounded':
             where = 'state limit on ' + ', '.join(f'`{b}`' for b, x in run['per'].items() if not x.get('complete', True))
         print(f'| {mid[0]} `{mid[1]}` | {v} | {where} | {len(dif)} of {len(sweep)} |', file=out)
 
@@ -354,6 +374,9 @@ def main():
     if a.report:
         report(ck, muts, sweep)
         return
+    if os.path.exists(a.out + '.stop'):          # lets a running piece loop end at a piece boundary
+        print('stop file found: not starting a piece')
+        return
     t0 = time.time()
     with mp.Pool(a.jobs) as pool:
         todo = [(b, base_drop) for b in sweep if b not in ck['diff']]
@@ -366,23 +389,50 @@ def main():
             print('differential pass not finished')
             sys.exit(3)
 
-        def tasks():
-            for mid in muts:
-                k = key_of(mid)
-                if k in ck['runs']:
-                    continue
-                dif = [b for b in sweep if k in ck['diff'][b]['differs']]
-                if not dif:
-                    continue
-                if time.time() - t0 > a.budget:
-                    return
-                yield (list(mid), dif, list(base_drop))
-        n = 0
-        for mid, res in pool.imap_unordered(run_mutant, tasks()):
-            ck['runs'][key_of(mid)] = res
-            n += 1
-            save(a.out, ck)
-            print(f'  {key_of(mid):44} {res["verdict"]}', flush=True)
+        def next_bound(mid):
+            k = key_of(mid)
+            dif = [b for b in sweep if k in ck['diff'][b]['differs']]
+            run = ck['runs'].get(k)
+            if run and run['verdict'] in ('caught', 'ill-formed', 'unbounded'):
+                return None, dif
+            per = run['per'] if run else {}
+            for b in dif:
+                if b not in per:
+                    return b, dif
+            return None, dif
+
+        # the added rules' G and U mutants first: the ablation's pass 1 reuses them
+        from crossing import ADDED
+        order = sorted(muts, key=lambda m: 0 if m[0] in 'GU' and m[1] in ADDED else 1)
+        inflight = {}
+        while True:
+            if time.time() - t0 < a.budget:
+                for mid in order:
+                    if len(inflight) >= a.jobs:
+                        break
+                    k = key_of(mid)
+                    if k in inflight:
+                        continue
+                    b, _ = next_bound(mid)
+                    if b is not None:
+                        inflight[k] = pool.apply_async(run_one, ((list(mid), b, list(base_drop), ck['diff'][b]['states']),))
+            if not inflight:
+                break
+            ready = [k for k, r in inflight.items() if r.ready()]
+            if not ready:
+                time.sleep(0.5)
+                continue
+            for k in ready:
+                mid, b, x = inflight.pop(k).get()
+                run = ck['runs'].setdefault(k, {'verdict': 'partial', 'per': {}})
+                run['per'][b] = x
+                _, dif = next_bound(mid)
+                run['verdict'] = verdict_of(run['per'], dif)
+                save(a.out, ck)
+                if run['verdict'] != 'partial':
+                    print(f'  {k:44} {run["verdict"]}', flush=True)
+                elif x['secs'] > 60:
+                    print(f'    {k}: {b} holds ({x["states"]:,} states, {x["secs"]:.0f}s)', flush=True)
     rows = classify(ck, muts, sweep)
     left = sum(1 for r in rows if r[1] == 'pending')
     print(f'{len(rows)} mutants; {left} still to run')

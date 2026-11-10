@@ -1,0 +1,32 @@
+# crun.py --design, in the order the runs were made (progress lines removed)
+# 2026-11-10 before the stop: floor-*, twice-* (design-big1); slots-*, heal2-src (design-big2)
+floor-src   323,504 states, 766,693 steps, 71.6s: all hold  judged 323,504
+floor-dst   350,768 states, 773,793 steps, 77.2s: all hold  judged 350,768
+twice-src   336,916 states, 628,516 steps, 74.8s: all hold  judged 336,916
+twice-dst   511,554 states, 931,076 steps, 114.4s: all hold  judged 511,554
+slots-src   264,308 states, 558,593 steps, 59.5s: all hold  judged 264,308
+slots-dst   234,540 states, 478,917 steps, 52.8s: all hold  judged 234,540
+heal2-src   1,373,695 states, 3,327,956 steps, 407.0s: all hold  judged 1,373,695
+# 2026-11-10 after resuming: the 12 small bounds again (the model's last edits came after their first runs), floors-*, heal2-dst
+src         26,724 states, 53,747 steps, 5.8s: all hold  judged 26,724
+dst         36,716 states, 67,875 steps, 6.8s: all hold  judged 36,716
+src-dst     47,204 states, 104,335 steps, 9.5s: all hold  judged 47,204
+dst-src     30,882 states, 67,151 steps, 6.3s: all hold  judged 30,882
+mark-src    56,196 states, 93,333 steps, 11.3s: all hold  judged 56,196
+mark-dst    63,438 states, 97,675 steps, 13.1s: all hold  judged 63,438
+read-src    49,360 states, 146,219 steps, 10.0s: all hold  judged 49,360
+read-dst    66,036 states, 179,059 steps, 14.2s: all hold  judged 66,036
+giveup-src  110,026 states, 223,547 steps, 23.0s: all hold  judged 110,026
+giveup-dst  139,182 states, 301,447 steps, 29.5s: all hold  judged 139,182
+crash-src   162,142 states, 422,400 steps, 34.9s: all hold  judged 162,142
+crash-dst   239,782 states, 594,267 steps, 52.8s: all hold  judged 239,782
+floors-src  176,560 states, 358,609 steps, 41.1s: all hold  judged 176,560
+floors-dst  183,536 states, 341,089 steps, 43.2s: all hold  judged 183,536
+heal2-dst   2,612,006 states, 6,244,395 steps, 855.5s: all hold  judged 2,612,006
+# the bounds added on resuming, then the two partial bounds (stopped at 2.5 million states)
+remit-src   51,180 states, 92,391 steps, 11.2s: all hold  judged 51,180
+remit-dst   68,820 states, 116,032 steps, 14.6s: all hold  judged 68,820
+floore-src  176,560 states, 358,609 steps, 39.1s: all hold  judged 176,560
+floore-dst  183,536 states, 341,089 steps, 40.2s: all hold  judged 183,536
+any         2,500,001 states, 6,003,555 steps, 552.7s: all hold (STOPPED: partial)  judged 0
+all         2,500,002 states, 7,151,236 steps, 380.7s: all hold (STOPPED: partial)  judged 0
