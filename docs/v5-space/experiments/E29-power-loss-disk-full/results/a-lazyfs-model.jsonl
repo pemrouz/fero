@@ -1,0 +1,13 @@
+{"probe":"write, no sync","afterPowerLoss":"size 0","lossModelled":true}
+{"probe":"write, fsync","afterPowerLoss":"\"synced\"","lossModelled":true}
+{"probe":"write that grows the file, fdatasync","afterPowerLoss":"size 10 \"datasynced\"","lossModelled":true}
+{"probe":"fdatasync, then more writes","afterPowerLoss":"\"AAAA\"","lossModelled":true}
+{"probe":"unsynced overwrite inside a synced file","afterPowerLoss":"\"AAAAAAAA\"","lossModelled":true}
+{"probe":"truncate, no sync","afterPowerLoss":"size 8","lossModelled":true}
+{"probe":"fsync through a second descriptor","afterPowerLoss":"\"AAAA\"","lossModelled":true}
+{"probe":"rename, no directory fsync","afterPowerLoss":"new name: \"new\", old name: ENOENT","lossModelled":false}
+{"probe":"create, no fsync","afterPowerLoss":"size 0","lossModelled":false}
+{"probe":"unlink, no directory fsync","afterPowerLoss":"ENOENT","lossModelled":false}
+{"probe":"mkdir, a synced file inside, no directory fsync","afterPowerLoss":"\"x\"","lossModelled":false}
+{"probe":"fallocate","afterPowerLoss":"not supported: fallocate: fallocate failed: Operation not supported","lossModelled":null}
+{"probe":"statfs through the mount","afterPowerLoss":"block size 512, 0 MB free reported","lossModelled":null}
