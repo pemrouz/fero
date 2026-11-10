@@ -80,9 +80,25 @@
       "tier +lrn",
       "tier +lrn(servers fold)"
      ]
+    },
+    {
+     "V": [
+      "full"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ],
+     "C": [
+      "self",
+      "self+p",
+      "self+mv",
+      "cent",
+      "cent-co"
+     ]
     }
    ],
-   "basis": "V +lrn in any form: non-voting replicas that copy the log and are promoted once caught up (A-01 (2)). SLOG's and RLOG's 'tier +lrn' make the servers learners. V full (ISR, V4) and plain tier (OBJ) have none."
+   "basis": "V +lrn in any form: non-voting replicas that copy the log and are promoted once caught up (A-01 (2)). SLOG's and RLOG's 'tier +lrn' make the servers learners. V full (ISR, V4) and plain tier (OBJ) have none. Closure referees (A3, B1): a row with V full whose controller or leaders heal a Raft group still adds a learner and promotes it (E-16, A-20, E-14b), so it carries learners."
   },
   {
    "key": "raft-snapshot",
@@ -166,9 +182,21 @@
       "raft",
       "rlog"
      ]
+    },
+    {
+     "C": [
+      "cent"
+     ],
+     "R": [
+      "raft",
+      "rlog"
+     ],
+     "K": [
+      "lib"
+     ]
     }
    ],
-   "basis": "The failure detector sub-choice of SPACE 2 C: one ping per member pair, standing in for the heartbeats of quiet Raft groups (A-12). Rows where members decide (self, self+p, self+mv) or where the decider is #meta's own leader (cent-co) use it. A separate controller (cent: PD, ISR, SLOG) uses sessions to the controller instead; OBJ has leases, V4 its own kernel."
+   "basis": "The failure detector sub-choice of SPACE 2 C: one ping per member pair, standing in for the heartbeats of quiet Raft groups (A-12). Rows where members decide (self, self+p, self+mv) or where the decider is #meta's own leader (cent-co) use it. A separate controller (cent: PD, ISR, SLOG) uses sessions to the controller instead; OBJ has leases, V4 its own kernel. Closure referee A (A4, A7): a separate controller over fero's own Raft groups still needs the pings its quiet groups and checks read (A-12, A-02, A-20). PD's shape is deferred (its own gap, TiKV hibernate heartbeats)."
   },
   {
    "key": "quiet-groups",

@@ -191,6 +191,15 @@
    "rules": [
     {
      "when": {
+      "S": [
+       "lsm +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): the object-store tier holds a copy, so PD's structural fail (no tier, disks lost) is gone; the rows live in the LSM, off the V8 heap, so AMENDMENTS 1.3's wake line does not apply and the cell carries no restated reading. No experiment woke an LSM from the store."
+    },
+    {
+     "when": {
       "R": [
        "outside"
       ]
@@ -253,7 +262,8 @@
     {
      "when": {
       "S": [
-       "lsm"
+       "lsm",
+       "lsm +tier"
       ],
       "G": [
        "shard",
@@ -264,7 +274,7 @@
       ]
      },
      "v": "met",
-     "basis": "PD: S `lsm` holds state larger than memory by construction (SPACE 2, S), as TiKV and CockroachDB do in production, and regions spread a resource over servers (G `shard`). A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28). Not measured here. K `kern` is named because the LSM is the state only where the kernel's state machine holds it (TiKV's shape); under K `lib` the state is `data`'s in-memory fold (X15), which no judge priced with an LSM"
+     "basis": "PD: S `lsm` holds state larger than memory by construction (SPACE 2, S), as TiKV and CockroachDB do in production, and regions spread a resource over servers (G `shard`). A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28). Not measured here. K `kern` is named because the LSM is the state only where the kernel's state machine holds it (TiKV's shape); under K `lib` the state is `data`'s in-memory fold (X15), which no judge priced with an LSM (Closure referee B: the same holds with a tier on the LSM.)"
     }
    ],
    "else": {

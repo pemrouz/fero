@@ -185,6 +185,16 @@ def mech_rows():
                 m['novel'] = x['novel']
         for x in load(rr).get('new', []) or []:
             ms[x['key']] = dict(x)
+        for x in load(rr).get('record_fixes', []) or []:
+            if x.get('ruling') != 'accept':
+                continue
+            m = ms[x['key']]
+            if x.get('reads_add'):
+                m['reads'] = m['reads'] + [r for r in x['reads_add'] if r not in m['reads']]
+            if x.get('writes_add'):
+                m['writes'] = m['writes'] + [r for r in x['writes_add'] if r not in m['writes']]
+            if x.get('field') and x.get('to'):
+                m[x['field']] = x['to']
     for nm, h in hybrid_cards().items():
         for k in h['mechs']:
             if k in ms and nm not in ms[k]['rows']:
@@ -358,7 +368,8 @@ def tally1(cells, scenario='restated', choice=None, only_req=None):
             continue
         if scenario == 'restated' and c.get('depends_on') == 'restated':
             v = c['alt']
-        if choice and c.get('depends_on') == choice and (only_req is None or only_req == c['req']):
+        chs = (choice,) if isinstance(choice, str) else tuple(choice or ())
+        if chs and c.get('depends_on') in chs and (only_req is None or only_req == c['req']):
             v = c['alt']
         if c['part'] == 'M':
             if v == 'fails':
@@ -500,7 +511,8 @@ def search(depth=2, scenario='restated', choice=None, only_req=None, top=30, out
     if not quiet:
         print('Searched %d rows: every row within %d axis changes of a judged row or a seed (%d), then %d more around the best rows; %d break a constraint.' % (
             total, depth, first, total - first, S.broken))
-        print('Scenario: %s%s.' % (scenario, (', choice ' + choice + (' (' + only_req + ' only)' if only_req else '')) if choice else ''))
+        chs = (choice,) if isinstance(choice, str) else tuple(choice or ())
+        print('Scenario: %s%s.' % (scenario, (', choices ' + ', '.join(chs) + (' (' + only_req + ' only)' if only_req else '')) if chs else ''))
         for lab in ('strict', 'lenient'):
             ub, order, inn = res[lab]
             print()
@@ -535,7 +547,8 @@ def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 5,
         r = inn[k]
         uns = cell_report(M, r['vec'], S.judged_keys.get(k))
         rows.append((len(uns), r, uns))
-    head = 'Scenario: %s%s. %d rows searched, %d in.' % (scenario, (', choice ' + choice + (' (' + only_req + ' only)' if only_req else '')) if choice else '', len(S.res), len(inn))
+    chs = (choice,) if isinstance(choice, str) else tuple(choice or ())
+    head = 'Scenario: %s%s. %d rows searched, %d in.' % (scenario, (', choices ' + ', '.join(chs) + (' (' + only_req + ' only)' if only_req else '')) if chs else '', len(S.res), len(inn))
     out = [head, '', '| At most this many unsupported cells | Rows in | Rule 3 unbeaten | novel / SHOULDs / pairs / open MUSTs | Unsupported cells of the first |', '|---|---|---|---|---|']
     tops = []
     for cap in caps:

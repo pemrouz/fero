@@ -1,0 +1,416 @@
+{
+ "family": "A",
+ "judge": "j2",
+ "rows": {
+  "A1": {
+   "changes": "C=cent-co on COMP (MIN-P+m: MIN-P with the memory rung)",
+   "cells": [],
+   "crossings": [],
+   "crossings_checked": "No supported cell changes. A1's card equals COMP's settled cells on all 148 parts, and MIN-P's on all but PERF-04 (computed with closure.py card on the three rows). The one pair of options no judged row held is C cent-co with Q mix. COMP and MIN-P, which differ on exactly C and Q, got the same verdict on every cell but PERF-04, so neither axis moved a cell alone. Where they meet (K-09: the memory rung with healing after unclean stops), the controller's healing sees an unclean replica as a new incarnation, the same event as E-16's lost disk; the parts that name both C and Q (F-01, F-04, F-05, TEST-01) are judged on the persisted rung (F-04's settled reason says so) or on Q put and C manifest CAS, which A1 does not hold. One shared blind spot, not from this crossing: a memory group whose whole majority stops uncleanly comes back only by F-12's step; COMP carries it too, so it is not a cell to change here.",
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Right as listed: MIN-P's 48 units plus memory-rung (49 units, 3 novel: slot-move, restore-mark, dir-lease; 264 pairs). Against COMP it drops healing-self, planner-hints and slow-leader-self and takes controller-commands and slow-leader-controller, as every cent-co row does. No planner-hints: the accepted ruling RM-04 puts DEP-17's hints inside controller-commands (A-20's epoch check) and meta-members (the gone, drain and retire marks). memory-rung is not novel (Kafka's acks=all with no fsync and its clean-shutdown mark) and reads group.class, which project-groups writes, as in COMP. Nothing is missing by DEV-10. One open point inside memory-rung, not a unit: after a majority of a memory group stops uncleanly, every replica returns as new under disk-incarnation's rule, so the group needs F-12's operator step (K-09). A design that wants Kafka's unclean recovery instead would add a rule to that unit; nobody modelled either."
+   }
+  },
+  "A2": {
+   "changes": "C=cent-co,Z=par on COMP (COMP2)",
+   "cells": [
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. A learner never votes, so a damaged learner is outside F-22; a learner whose commit index covers the entry is a valid repair source by Raft's state machine safety (reasoned). The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. Under the memory rung a replica that stops uncleanly comes back as new by its own rule (SPACE Q maj-m); that is the rung's trade, not damage, and the settled cells judge the default persisted rung (COMP's F-04: 'Judged for the persisted rung'). A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "crossings_checked": "No supported cell changes. A2's card is A1's plus F-22 (S) met. Z par is in no judged row, so every pair it forms is new; I read each part where a damaged entry could enter. F-01 (met): E-37's par runs keep NoLostCommit, and a lost disk still takes the incarnation (E-14c). F-04 (met) and P-07 (met): a damaged replica must never serve its bad entry to a reader or relay; the checksum makes that a read-path check, and the damage is found at restart, before any read is served (E-37's method), so no change, but par-repair's text should say it. F-20 (met): a repair write is not in A-09's reserve (E-29), so a damaged voter on a full disk waits for space; elections among the healthy voters still run from the reserve, so F-20's own test holds. F-05, F-07, F-12, F-16 (open): par needs the operator step in fewer cases than rejoin, but the open reasons (the handover tail, A-01's window, the unbuilt command, the snapshot after a long cut) stay. DEV-03 (open): E-37's par model catches 8 of 9 mutants (89 %), or 8 of 10 (80 %) counted as written, with one undecided; that is not a measured ceiling, and DEV-03 is open for every row anyway. DEV-01 (met, 3 novel) and DEV-02 (S not, 274 pairs) are unchanged. The memory rung with par: an unclean stop rejoins as new by the rung's own rule before par can act; that is the rung's trade, not F-22's case. The shared journal with par (as K-24 for rejoin): one bad journal record can mark entries of many groups, each repaired from its own group's peers; E-37 checked one entry per replica, which is F-22's case.",
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Right as listed: A1 plus par-repair (50 units, 3 novel, 274 pairs). par-repair is not novel; the accepted ruling RM-03 keeps it so (PAR's CTRL in LogCabin and ZooKeeper; TigerBeetle's WAL repair in production), and I agree. disk-incarnation must stay: par replaces only its 'damage means wipe' trigger, and a wiped or new disk (E-14b), an unclean stop under the memory rung, and a failed fsync still need the incarnation (F-10). Two corrections that change no unit. (1) par-repair's rules text says the damaged replica 'keeps its vote'; E-37 modelled, and the F-22 cells rest on, a replica that grants no vote and does not stand while an entry is bad, and E-37 shows that dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states). So the row carries E-37's 7 rules, or PAR's full possibly-committed rule with a model of its own (G-15). The text should also say a damaged replica never serves its bad entry to a reader or relay. (2) With E-37's 'does not stand' rule, the campaign in raft-prevote-checkquorum reads the bad mark (entry.badmark), which adds one pair: 275, computed with closure.py's own pair rule. par-repair's ten pairs are raft-log, raft-term-vote, raft-commit, raft-snapshot, memory-rung, journal, tier, disk-incarnation, dir-lease and input-recorder; none of them sits inside one model beyond E-37's Raft core (DEV-02 M stays open)."
+   }
+  },
+  "A3": {
+   "changes": "C=cent-co,Z=par,V=full on COMP (COMP2 with no learners)",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "The cell follows the wake path, not the replica kinds. As worded: AMENDMENTS 1.3, line 'SC-05 at 10 GB': one Node process woke 10 GB of 2 KB rows in 86 to 122 s against 60 s on v4's codec (5 GB in 36 s, E-34). That is no design ceiling: 10 GB can sit in several groups, and A-13's faster wake is planned and not built, so it is open. Restated per storage form it stays open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost. With no learners the woken state still comes from the shared journal and the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cells read the same. The two V full judged rows split on S, not on V: ISR (walg +tier) is open the same way; V4 fails only because S walg has no tier. "
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Open for every Raft row: the operator command (list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards) was neither built nor modelled. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states, TLC and the Python model), and E-33 refuses a cursor a restore does not hold. With no learners there is one place fewer to recover a copy from, but the clauses name no source, and no model gives a counterexample. The V full judged rows, ISR and V4, are open too (F settled cells). C cent-co: the controller loop on #meta's leader, as MIN-P, whose cell is open on the same grounds."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. Under the memory rung a replica that stops uncleanly comes back as new by its own rule (SPACE Q maj-m); that is the rung's trade, not damage, and the settled cells judge the default persisted rung (COMP's F-04: 'Judged for the persisted rung'). A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Right as listed: A2 without learners (49 units, 3 novel, 266 pairs). With V full there is no non-voting replica, so dropping learners is correct, and A-01's rule (2), 'learners grant votes', falls away with it. Not a unit, but a model debt: controller-commands' steps as E-16 modelled them and as their precedent runs them (add a learner, promote it once caught up; PD's AddLearner and PromoteLearner) become 'add a voter', which E-16 did not model and which leaves Raft's catch-up gap (Ongaro's thesis 4.2.1, cited in learners' precedent): a fourth, empty voter raises the majority to 3 of 4 while it catches up. controller-commands still lists group.learners among its writes; that adds no pair here, because each unit that reads it already pairs with controller-commands through another state (checked with closure.py's pair rule). Nothing is missing."
+   }
+  },
+  "A4": {
+   "changes": "C=cent,Z=par,V=full on COMP (COMP2 with a separate replicated controller and no learners)",
+   "cells": [
+    {
+     "req": "SC-03",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "measured ceiling: E-18 (simulated) puts the hottest partition at 5.5 to 9.8 % of the load under Zipf 0.99, so every design reaches only 12 to 22 effective writers as worded, against F_w = 64; gap 1 - 22/64 = 0.66",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "As worded it fails like every row: nothing splits the hottest partition, so 12 to 22 effective writers sit below F_w = 64 (AMENDMENTS 1.3, line 'SC-10 and SC-03'; E-18). Restated with the app split, a slot row states 135 at 4,096 slots, moved one slot at a time by A-18's policy, and A-18 says that in cent and cent-co rows the mover is the controller: a separate replicated controller runs the same policy as MIN-P's loop on #meta's leader. It stays open: the 0.7 x n growth was never run on real processes, and E-18's loop saw exact loads one resource at a time (G-32), never many resources in shared groups (K-04). It also turns on F_w: above 135 the restated verdict fails too. SLOG and OBJ, the judged slot rows with a cent controller, got this same cell (SC settled cells). A4's G pslot adds K-04 (many resources' slots in shared groups) to the open reasons, as in MIN-P's cell."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "The cell follows the wake path, not the replica kinds. As worded: AMENDMENTS 1.3, line 'SC-05 at 10 GB': one Node process woke 10 GB of 2 KB rows in 86 to 122 s against 60 s on v4's codec (5 GB in 36 s, E-34). That is no design ceiling: 10 GB can sit in several groups, and A-13's faster wake is planned and not built, so it is open. Restated per storage form it stays open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost. With no learners the woken state still comes from the shared journal and the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cells read the same. The two V full judged rows split on S, not on V: ISR (walg +tier) is open the same way; V4 fails only because S walg has no tier. A separate controller is one more kind of server to stop and wake; no run separates it."
+    },
+    {
+     "req": "SC-10",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "measured ceiling: the effective writer number is 12 to 22 for every design under Zipf 0.99 (E-18, simulated), below the floor F_w = 64, and SC-10 fails any ceiling below its floor; gap 0.66",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-19",
+      "E-36",
+      "E-34",
+      "E-12",
+      "E-25"
+     ],
+     "why": "As worded it fails like every row (AMENDMENTS 1.3; E-18). Restated with the app split, the stated writer ceiling is 135 at 4,096 slots (72 at 1,024) under A-18's policy, which the controller runs in cent rows; prototypes hold 2,000 groups a process (E-11, E-12) and 100 members (E-25). It stays open: no ceiling is pinned, and the price of 4,096 slots is reasoned only (G-06). A separate controller adds no ceiling below a floor that any run showed. It also depends on F_w and N_res. "
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Open for every Raft row: the operator command (list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards) was neither built nor modelled. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states, TLC and the Python model), and E-33 refuses a cursor a restore does not hold. With no learners there is one place fewer to recover a copy from, but the clauses name no source, and no model gives a counterexample. The V full judged rows, ISR and V4, are open too (F settled cells). C cent: a separate controller (PD's unsafe-recover is the nearest published command; PD's cell is open too)."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. Under the memory rung a replica that stops uncleanly comes back as new by its own rule (SPACE Q maj-m); that is the rung's trade, not damage, and the settled cells judge the default persisted rung (COMP's F-04: 'Judged for the persisted rung'). A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "link-pings",
+      "name": "Link pings (one ping per member pair)",
+      "state": "Per pair of members that share a group: whether the link is up and when it last answered, as each side sees it; the pings also carry each side's clock.",
+      "rules": "Two members of one cluster that share a group ping every ping.ms when no other frame went their way; a peer silent past evict.after is gone to this member. Past 100 members a bound on linked peers per member is needed (A-12, a placement rule).",
+      "reads": [
+       "cluster.id",
+       "group.config",
+       "group.learners",
+       "meta.members"
+      ],
+      "writes": [
+       "link.clocks",
+       "link.ping"
+      ],
+      "novel": false,
+      "precedent": "CockroachDB's store liveness (one heartbeat per pair of stores, shared by every range the two share) and its RPC heartbeat carrying clocks, as the settled entry cites. TiKV beside PD wakes hibernated regions from store-to-store link state, not from PD (from memory, not checked here)."
+     }
+    ],
+    "drop": [],
+    "why": "A4 as listed is A3 with controller-sessions in and link-pings out (49 units, 3 novel, 262 pairs), following PD, ISR and SLOG. But A4's data groups are Raft groups that go quiet, and five of its units read link.ping while no unit of A4 writes it: raft-prevote-checkquorum (CheckQuorum on a quiet group reads the pings, A-02), quiet-groups, slow-leader-controller, meta-members and controller-commands (computed from the units' read and write lists). By DEV-10 a state needs the rules that write it, so the list misses that writer. Two fixes. (a) Keep link-pings beside controller-sessions: the separate controller still needs sessions to hear from members it shares no group with, and the quiet groups keep the failure detector A-02 and A-12 were written for, whose cost E-25 measured (0.95 % of a core at n = 100). That is 50 units, 3 novel, 271 pairs (computed with closure.py's pair rule). (b) Let sessions stand in for pings: rewrite the five reads onto member.session (264 pairs) and add a wake rule (a follower wakes a quiet group when its leader's member is fenced), whose failover time (a session timeout plus #meta's spread) no experiment ran against F-05. I take (a). The settled PD row has the same unwritten read (checked the same way), so the referee may prefer PD's convention; then the fix is the reads (b), not a unit. A7 has the same gap (249 pairs, 258 with link-pings)."
+   }
+  },
+  "A5": {
+   "changes": "Z=par on MIN-P (MIN-P+par)",
+   "cells": [
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. A learner never votes, so a damaged learner is outside F-22; a learner whose commit index covers the entry is a valid repair source by Raft's state machine safety (reasoned). The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not named for mechanism review."
+   }
+  },
+  "A6": {
+   "changes": "Z=par,V=full on MIN-P",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "The cell follows the wake path, not the replica kinds. As worded: AMENDMENTS 1.3, line 'SC-05 at 10 GB': one Node process woke 10 GB of 2 KB rows in 86 to 122 s against 60 s on v4's codec (5 GB in 36 s, E-34). That is no design ceiling: 10 GB can sit in several groups, and A-13's faster wake is planned and not built, so it is open. Restated per storage form it stays open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost. With no learners the woken state still comes from the shared journal and the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cells read the same. The two V full judged rows split on S, not on V: ISR (walg +tier) is open the same way; V4 fails only because S walg has no tier. "
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Open for every Raft row: the operator command (list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards) was neither built nor modelled. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states, TLC and the Python model), and E-33 refuses a cursor a restore does not hold. With no learners there is one place fewer to recover a copy from, but the clauses name no source, and no model gives a counterexample. The V full judged rows, ISR and V4, are open too (F settled cells). C cent-co, as MIN-P."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not named for mechanism review."
+   }
+  },
+  "A7": {
+   "changes": "Z=par,V=full,C=cent on MIN-P",
+   "cells": [
+    {
+     "req": "SC-03",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "measured ceiling: E-18 (simulated) puts the hottest partition at 5.5 to 9.8 % of the load under Zipf 0.99, so every design reaches only 12 to 22 effective writers as worded, against F_w = 64; gap 1 - 22/64 = 0.66",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "As worded it fails like every row: nothing splits the hottest partition, so 12 to 22 effective writers sit below F_w = 64 (AMENDMENTS 1.3, line 'SC-10 and SC-03'; E-18). Restated with the app split, a slot row states 135 at 4,096 slots, moved one slot at a time by A-18's policy, and A-18 says that in cent and cent-co rows the mover is the controller: a separate replicated controller runs the same policy as MIN-P's loop on #meta's leader. It stays open: the 0.7 x n growth was never run on real processes, and E-18's loop saw exact loads one resource at a time (G-32), never many resources in shared groups (K-04). It also turns on F_w: above 135 the restated verdict fails too. SLOG and OBJ, the judged slot rows with a cent controller, got this same cell (SC settled cells). G pslot adds K-04 to the open reasons, as in MIN-P's cell."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "The cell follows the wake path, not the replica kinds. As worded: AMENDMENTS 1.3, line 'SC-05 at 10 GB': one Node process woke 10 GB of 2 KB rows in 86 to 122 s against 60 s on v4's codec (5 GB in 36 s, E-34). That is no design ceiling: 10 GB can sit in several groups, and A-13's faster wake is planned and not built, so it is open. Restated per storage form it stays open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost. With no learners the woken state still comes from the shared journal and the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cells read the same. The two V full judged rows split on S, not on V: ISR (walg +tier) is open the same way; V4 fails only because S walg has no tier. A separate controller is one more kind of server to stop and wake; no run separates it."
+    },
+    {
+     "req": "SC-10",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "measured ceiling: the effective writer number is 12 to 22 for every design under Zipf 0.99 (E-18, simulated), below the floor F_w = 64, and SC-10 fails any ceiling below its floor; gap 0.66",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-19",
+      "E-36",
+      "E-34",
+      "E-12",
+      "E-25"
+     ],
+     "why": "As worded it fails like every row (AMENDMENTS 1.3; E-18). Restated with the app split, the stated writer ceiling is 135 at 4,096 slots (72 at 1,024) under A-18's policy, which the controller runs in cent rows; prototypes hold 2,000 groups a process (E-11, E-12) and 100 members (E-25). It stays open: no ceiling is pinned, and the price of 4,096 slots is reasoned only (G-06). A separate controller adds no ceiling below a floor that any run showed. It also depends on F_w and N_res. "
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Open for every Raft row: the operator command (list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards) was neither built nor modelled. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states, TLC and the Python model), and E-33 refuses a cursor a restore does not hold. With no learners there is one place fewer to recover a copy from, but the clauses name no source, and no model gives a counterexample. The V full judged rows, ISR and V4, are open too (F settled cells). C cent: a separate controller (PD's unsafe-recover is the nearest published command; PD's cell is open too)."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, and copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's own spec with one damaged entry below the commit point (run par1: 62,743 states, complete): all 10 invariants hold, NoLostCommit included, and 0 of 1,897 judged states are stuck; with two client entries (par1r2: 455,856 states) safety holds. Each of the 7 rules is shown needed by a mutant. Dropping the no-vote guard loses a committed write (MoreUpToDateCorrectInv, 32 states), so the row must take E-37's form, not a form that 'keeps its vote' with no possibly-committed rule. The model has three voters and no membership change (G-15), the same bound on which every rejoin row's F-22 (M) was settled met. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. The controller's commands remove a member only when it is gone on the leader's own links (A-20), so a live damaged voter is not swapped out mid-repair (reasoned)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "With one bad entry on each of two replicas at different offsets, every judged state reaches a working leader (E-37 run par2d: 565,222 states, complete; 276 judged two-damage states, 0 stuck; all invariants hold). With the same offset allowed (par2: 1,362,748 states) only 4 of 1,388 judged states are stuck, each a committed entry with no good copy left anywhere, which is F-12's case, not this one. Repair must come from any peer, as E-37's rule does: repair only from the leader leaves 4 to 9 % of those states stuck. The judges of every rejoin row wrote that only Z par keeps the group writable (F settled cells, F-22 S). Not modelled with a voter change or with damage above the commit point (G-15): an open edge, not a counterexample. With V full every replica is a voter, three per group as in E-37's model; no learner is involved. A repair write is not in A-09's reserve list (E-29: removes, votes, member changes, handovers, retention marks), so on a full disk a damaged voter stays out until space is freed; F-22's own case is unaffected."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not named for mechanism review. The link.ping gap found for A4 applies here too (see A4)."
+   }
+  },
+  "A8": {
+   "changes": "V=full,Y=fwd on SRV",
+   "cells": [
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "Open for every Raft row: the operator command (list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards) was neither built nor modelled. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states, TLC and the Python model), and E-33 refuses a cursor a restore does not hold. With no learners there is one place fewer to recover a copy from, but the clauses name no source, and no model gives a counterexample. The V full judged rows, ISR and V4, are open too (F settled cells). SRV (a Rust server, apps are clients, C cent-co, Z rejoin): its own cell is open on the same grounds; forwarding writes (Y fwd) does not touch the command."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not named for mechanism review."
+   }
+  }
+ }
+}

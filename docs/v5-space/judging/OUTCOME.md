@@ -17,7 +17,7 @@ Built by `python3 tools/judging.py verdict` from the settled judging files in th
 
 A cell is one requirement part for one row. A decisive difference could change the ranking: a MUST that one judge failed and the other did not, or a SHOULD that one counted as met and the other did not. A referee ruled on every difference in writing.
 
-After the VERDICT review a referee re-ruled 48 cells and the mechanism count ([closure/rerulings.cells.json](closure/rerulings.cells.json), [closure/rerulings.mech.json](closure/rerulings.mech.json)). The arithmetic below applies those rulings; the table above counts the first settlement.
+After the VERDICT review a referee re-ruled 50 cells and the mechanism count ([closure/rerulings.cells.json](closure/rerulings.cells.json), [closure/rerulings.mech.json](closure/rerulings.mech.json)). The arithmetic below applies those rulings; the table above counts the first settlement.
 
 Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists requirement clauses that the evidence shows no row can meet as worded, and what each experiment asks instead. 169 cells carry two verdicts for that reason: one as the requirement is worded, one as restated. Part A uses the first, part B the second.
 
@@ -94,6 +94,7 @@ Each line changes one thing and runs the rule again.
 | the user chooses the other way on: region scope | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
 | the user chooses the other way on: shared tier | ISR | ISR, DRAFT, SPLIT | **no** |
 | the user chooses the other way on: fsync figure | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
+| the user chooses the other way on: DATA-01 reading | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
 | the user chooses the other way on: other | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
 | the user reads DEV-01 the other way (one of "other") | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
 | the user reads F-07 the other way (one of "other") | level: DRAFT, SPLIT, ISR | DRAFT, SPLIT, ISR | yes |
@@ -161,6 +162,7 @@ Each line changes one thing and runs the rule again.
 | the user chooses the other way on: region scope | COMP | COMP, SPLIT, DRAFT | yes |
 | the user chooses the other way on: shared tier | COMP | COMP | yes |
 | the user chooses the other way on: fsync figure | COMP | COMP, SPLIT, DRAFT | yes |
+| the user chooses the other way on: DATA-01 reading | COMP | COMP, SPLIT, DRAFT | yes |
 | the user chooses the other way on: other | level: DRAFT, SPLIT, COMP | DRAFT, SPLIT, COMP | **no** |
 | the user reads DEV-01 the other way (one of "other") | COMP | COMP, SPLIT, DRAFT | yes |
 | the user reads F-07 the other way (one of "other") | level: DRAFT, SPLIT, COMP | DRAFT, SPLIT, COMP | **no** |

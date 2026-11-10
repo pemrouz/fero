@@ -741,6 +741,20 @@
    "rules": [
     {
      "when": {
+      "S": [
+       "lsm",
+       "lsm +tier"
+      ],
+      "L": [
+       "ts→rs",
+       "ts"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): a TypeScript phase that keeps its log and rows in an LSM still ships the LSM as a native addon (the study names no LSM written in TypeScript), so the TS rows' \"no native part\" does not hold; no fero tarball with one was packed."
+    },
+    {
+     "when": {
       "R": [
        "outside"
       ]

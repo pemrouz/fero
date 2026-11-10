@@ -1,0 +1,557 @@
+{
+ "family": "B",
+ "judge": "j2",
+ "note": "Order of work: for B1 and B2 the none cells were listed with only their names and judged before the card's prediction was read. For B3 the card prints the predictions beside the none marks, so they were seen when the cells were listed; the verdicts were then set from the evidence named in each cell. Every pair count was computed with tools/closure.py's own pair rule on copies of the read and write lists, in the scratchpad; no study file was changed.",
+ "rows": {
+  "B3": {
+   "changes": "PD+fix: PD with Z=rejoin, S=lsm +tier, Q=mix (closure.py card '' PD+fix)",
+   "cells": [
+    {
+     "req": "P-01",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02",
+      "E-44",
+      "E-01"
+     ],
+     "why": "No judged row holds O hlc with Q mix. Q mix only adds rungs beside the default persisted one, and P-01's bar is the persisted write, so the memory rung does not move it; O hlc and T tso are PD's, and PD is open. The pattern held in E-22's simulation (600 of 600 partitions linearizable, every replica equal to the fold of the committed log), but TiKV's shape was never run here. Its bar is the native one, C + 0.5 ms = 1.2 ms: E-02's Rust pipeline reads p99 1.6 ms on this one shared disk and 0.67 ms with separate disks emulated, so this box cannot settle it. Every write here also takes an oracle timestamp, one more round trip (58 µs p99 in Rust, E-01). A held row reads in 81 ns through data (E-44). Open."
+    },
+    {
+     "req": "PERF-07",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09e",
+      "E-02",
+      "E-45",
+      "E-01"
+     ],
+     "why": "etcd here: 1,118 puts a second at one client (p99 1.73 ms) and 22,800 at 1,000 clients (E-09e). The throughput rows sit 40 to 120 times under E-02's ceilings. The risk is the one-client p99. The memory rung does not match etcd, which syncs every put, so the persisted path counts, and here it is a Raft commit plus an oracle round trip. E-02's Rust tail is 1.58 ms on this shared disk, read at 10,000 to 50,000 writes a second, never one write in flight, so it bounds nothing. W lease ridx gives the linearizable reads the range rows need. The etcd gateway only drove a simulator (E-45). Open."
+    },
+    {
+     "req": "PERF-08",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-02"
+     ],
+     "why": "PERF-08 is the persisted write's p99, so the memory rung does not count here. Native bar C + 0.5 ms = 1.23 ms: E-02's Rust pipeline reads 0.67 ms with separate disks emulated (Go 0.75) and 1.58 ms on this shared disk, so the box cannot settle it, and no native kernel was built. This row's write path is an LSM's WAL plus a timestamp from the oracle, which no experiment measured. The tier sits behind the commit and adds nothing to it. Open, as PD."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28",
+      "E-34"
+     ],
+     "why": "PD fails SC-05 only because its LSM sits on each server's own disk with no tier and no log tier, so nothing is left when every disk is lost (both PD judges, a structural proof). With S lsm +tier that proof is gone: a planned sleep can flush the memtable, sync the memory rung's tail and upload what the store lacks, as the jrnl +tier rows do. What is not shown: no sleep-and-wake run against an S3-compatible store, with disks kept or lost, ran for any row (E-28 timed single PUTs only), and how fast a server that lost its disk is writable again from the store's files was never measured. The 1.3 line on the 10 GB wake does not name this row. That line is about a Node process that folds 10 GB of rows into data on the V8 heap (E-34: 86 to 122 s). Here the server keeps its rows in the LSM, off any JS heap, as SRV's cell says for its native fold, and an LSM opens without folding every row again. So there is no restated reading to depend on."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "PD's met reason holds unchanged. S lsm keeps state on disk, larger than memory, by construction, and split regions spread one resource over several servers' disks (TiKV and CockroachDB in production, cited by both PD judges). Adding a tier does not take the LSM away. If cold files move to the store, a cold read is one object-store get, which is the bar itself; if they stay local, a cold read is a local disk read, under it. Not measured here: no run at 3 x RAM. The card says open only because PD's met rule keys on the tag lsm, and this row's tag is lsm +tier, so the else rule fires."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "E-35 ran a shared journal (1.18 and 1.26 times against 1.2). This row's log and state sit in an LSM store, as in PD, which E-35 did not run. Nothing measured a 1 MB record beside small ones on an LSM's WAL and memtable, or what its compaction does to the neighbours' p99. The 1 MB, 64 MB and too-large limits were not built. The tier and the rungs do not change this. Open, with no fsync-figure dependence, as PD."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "PD's referee holds F-01 open on one ground: the store must give back, after a power cut, what it synced, and no experiment power-cut an LSM. E-29's LazyFS runs were on its own journal (0 of 10,020 acknowledged batches lost with A-09's rules; a recovery bug had lost one batch in 2 of 1,200 rounds before that). Raft's commit rule keeps a synced entry (E-14c). The tier holds old data, not the synced tail, so it does not help here. The memory rung's writes are not persisted, so F-01 does not cover them. Z rejoin is F-22's ground, not F-01's (PD's referee). Open until a LazyFS run on this store."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "PD meets F-15 only because it has no store at all. This row adds one, so the cell is now about what waits for it. Writes, elections and new replicas use the local LSM and peers (a new replica copies a snapshot from a peer, as in TiKV), and the tier uploads behind the local store, as ISR's Kafka-style tier does, so a down store should hold back only uploads, sleep, wake and old history, which F-15 allows. Not shown: no sim ran with the store down for an hour (E-33's store is always reachable), and local data grows while uploads wait (ISR's judge). The 1.3 clash: A-08 records every new epoch in the restore mark before it is used. This row founds by init (DEP-18, PD's own start) and needs no store across boxes, so the mark's home is open, as for SPLIT and CELL. If the mark lives in the store, every split and merge (each raises the region epoch) waits for the store, and as worded that is the clash. The controller's own replicated store, which already keeps the oracle's high-water mark, would be a home with no clash (reasoned). So open as worded and restated, like SPLIT."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "E-29(b) filled a journal that keeps A-09's reserve segment. This row's store is an LSM, as PD's: a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (both PD judges). The tier could free local space by uploading old files, but nothing ran it. The memory rung changes nothing here: F-20's 'never acknowledges bytes it did not sync' is read for persisted writes, as for the other mix rows, which were judged on E-29. Open."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "S lsm was not run in this study. An LSM shares one WAL sync among a group of writes (RocksDB's write groups, TiKV's raft engine: cited from memory by both PD judges), but no pipeline of this shape was measured, so the pin is not shown. The tier and the rungs do not touch group commit. Open, as PD."
+    },
+    {
+     "req": "TEST-07",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-06"
+     ],
+     "why": "E-06 timed data's undo (0.03 to 0.05 ms a rerun) and data's snapshots. Here the state that judges a write is the kernel's multi-version rows in an LSM, folded natively, not by data, so E-06 does not cover it (both PD judges). Reading at the timestamp just before an input is natural with MVCC, and the tier could keep older versions, but no rerun was built or timed. Open."
+    },
+    {
+     "req": "TEST-10",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "As PD: a Rust server that holds all of L2, an LSM store, an oracle and two-phase commit, and no experiment built any of it for a sim; its native fold needs A-30's guard against data (reasoned). The tier adds object-store completions as sim inputs, and the memory rung adds an unclean-stop path; neither ran in any sim. E-04 compared only two small twins. Open."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42's cheap recorder refers to one shared journal for its bulk bytes, and its cost (1.1 to 1.7 % of a core, a disk budget of the journal kept for the window) was measured there. Here the bulk bytes sit in an LSM with background compaction, as in PD, and the tier adds object-store completions, which E-42 did not record. So the 24 h cost and the disk budget are unknown. Open."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "PD met it only because no tier holds more than one project. This row adds an object-store tier, and the hosted store holds many projects. Keys per project at rest, and no read path from one project to another, are not designed in any row: the same ground as the MIN rows and COMP, which also hold N proc with a tier. Each project still has its own processes and disks (N proc), so E-35's shared-journal result (1.40 to 1.59 times) does not apply, and there is no pooled tier to make it depend on the shared-tier choice. Open."
+    }
+   ],
+   "crossings": [
+    {
+     "req": "P-15",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "Predicted from PD (Percolator, cited) on X alone. This row adds Q mix to X 2pc, which no judged row holds together. Percolator's promise rests on every participant's locks and commit record being durable. Under the memory rung a write commits in memory at a majority, and a majority that stops uncleanly before its disks catch up loses it; its replicas rejoin as new (AMENDMENTS 2, Q; SPACE 2, Z notes that three replicas can share one box). Steps: (1) a unit writes key a in a memory-rung resource and key b in a persisted one; (2) its commit record and a's write commit on a's group, and b's secondary is resolved forward on b's group; (3) a's group stops uncleanly inside its sync window. Now b's half is kept and a's half is gone: half a unit, which P-15 forbids. A rule closes it with no new unit: a unit that touches a memory-rung partition writes its locks and commit record at persisted, or such units are refused. The row states no such rule, and nothing modelled the rung after an unclean stop (K-09; G-05: its safety never modelled). So open, not met. Not failed: the fix is a rule inside the row. The same gap sits under the saga rows with Q mix (COMP, DRAFT, CELL, SPLIT): E-24 left unclean recovery out."
+    },
+    {
+     "req": "P-15",
+     "part": "S",
+     "predicted": "met",
+     "v": "open",
+     "why": "The same crossing as the MUST. After the loss above, a reader at a later timestamp sees b's write and not a's: a fractured read, which Percolator's snapshot reads exclude only when every participant is durable. The same rule (units touching a memory-rung partition commit at persisted, or are refused) brings back the cited route. Not stated, not modelled: open. This takes one SHOULD off the row's count."
+    }
+   ],
+   "crossings_checked": "Every supported cell read, with closure.py's support and the deciding axes of each part. Only P-15 (M and S) changes. Checked and kept: F-22 (M) met with rejoin on an LSM (safety holds; the cost is K-24's whole-store wipe); PERF-04 open (the memory rung must come in under about 0.30 ms, RR-04, and here a write also takes an oracle round trip, a weak point, not a ceiling); F-03, F-11, F-14, DEP-14, DEP-18, OPS-01, SC-12 (S), DEV-04 (S) met as PD or the mix rows; DEP-21 open in both readings (RR-06 kept PD open; the tier's upload is not a proof); SC-10 and SC-03 as PD. The S lsm rules of the attribution do not match lsm +tier; every such part either falls to open anyway or is a none cell judged above.",
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Right as listed: PD's 46 units plus disk-incarnation (Z rejoin), memory-rung (Q mix) and tier (S +tier): 49 units, 0 novel, 238 pairs. None of the three is novel. disk-incarnation: Paxos Made Live's disk-corruption handling and PAR, as settled; on TiKV's shape it maps onto store ids and peer ids that the controller already hands out, so a wiped replica comes back under a new peer id. memory-rung: Kafka's default with a clean-shutdown mark, as settled; on an LSM it is the WAL written without sync, and the clean-stop mark is per store, so after an unclean stop every memory-rung replica on that store rejoins as new (more catch-up, same state). tier: Redpanda's tiered storage and KIP-405, as settled. No crossing here needs a new unit, but three need rules the list does not count, and two change read sets. (1) memory-rung with two-phase-commit: a unit that touches a memory-rung partition must write its locks and commit record at persisted, or be refused (the P-15 crossing). two-phase-commit then reads each participant's rung from the catalog: +2 pairs (meta-catalog, forks). (2) The tier's reads are written for a journal (journal.segments, which no unit writes here). On an LSM the tier exports a region's versions and locks at an oracle timestamp and uploads raft-log entries before log GC drops them (TiKV's BR and log backup; Neon's pageserver keeps its LSM layer files in S3: both from memory, not checked). Its reads become lsm.files, mvcc.versions, txn.intents and tso.high: +3 pairs (mvcc, two-phase-commit, timestamp-oracle). (3) rejoin on an LSM: the damage unit is a block or file, which can hold entries and rows of several regions, and an LSM store stops compacting on a corrupt file until it is removed, so one bad file wipes every replica whose keys it held, in practice the whole store (K-24 in its LSM form). Same state, more rules, not modelled. With (1) and (2) written in: 243 pairs, still 0 novel (computed with closure.py's pair rule on a scratch copy of the read lists). Inherited from PD, not from B3's changes: link.ping is read by five units (raft-prevote-checkquorum, quiet-groups, slow-leader-controller, meta-members, controller-commands) and written by none. Family A's judge adds link-pings for that shape; if the referee takes it, B3 takes it too: 50 units, 0 novel, 247 pairs."
+   }
+  },
+  "B1": {
+   "changes": "V=full,L=ts→rs,I=port,Y=fwd,M=kw,Z=par on PD+fix (closure.py card 'V=full,L=ts→rs,I=port,Y=fwd,M=kw,Z=par' PD+fix)",
+   "cells": [
+    {
+     "req": "P-01",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-22",
+      "E-02",
+      "E-11",
+      "E-44",
+      "E-01"
+     ],
+     "why": "No judged row holds O hlc with Q mix. Q mix only adds rungs beside the default persisted one, and P-01's bar is the persisted write, so the memory rung does not move it; O hlc and T tso are PD's, and PD is open. The pattern held in E-22's simulation (600 of 600 partitions linearizable, every replica equal to the fold of the committed log), but TiKV's shape was never run here. Its bar is the TypeScript one, C + 5 ms = 5.7 ms: E-02's TS pipeline reads p99 4.3 ms with no protocol work, and E-11's real TS Raft on a simple host read 10 to 11 ms at 10,000 writes a second, a weak point but not a ceiling. Every write here also takes an oracle timestamp and, under Y fwd, one forward: two more loopback round trips, 96 µs p99 each in Node (E-01). A held row reads in 81 ns through data (E-44). Open."
+    },
+    {
+     "req": "PERF-07",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09e",
+      "E-02",
+      "E-45",
+      "E-01"
+     ],
+     "why": "etcd here: 1,118 puts a second at one client (p99 1.73 ms) and 22,800 at 1,000 clients (E-09e). The throughput rows sit 40 to 120 times under E-02's ceilings. The risk is the one-client p99. The memory rung does not match etcd, which syncs every put, so the persisted path counts, and here it is a Raft commit plus an oracle round trip. E-02's TS tail is 2.4 to 4.3 ms, above etcd's 1.73 ms, and this row starts in TS, read at 10,000 to 50,000 writes a second, never one write in flight, so it bounds nothing. W lease ridx gives the linearizable reads the range rows need. The etcd gateway only drove a simulator (E-45). Open."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28",
+      "E-34"
+     ],
+     "why": "PD fails SC-05 only because its LSM sits on each server's own disk with no tier and no log tier, so nothing is left when every disk is lost (both PD judges, a structural proof). With S lsm +tier that proof is gone: a planned sleep can flush the memtable, sync the memory rung's tail and upload what the store lacks, as the jrnl +tier rows do. What is not shown: no sleep-and-wake run against an S3-compatible store, with disks kept or lost, ran for any row (E-28 timed single PUTs only), and how fast a server that lost its disk is writable again from the store's files was never measured. The 1.3 line on the 10 GB wake does not name this row either. That line is about folding 10 GB of rows into data on the V8 heap (E-34: 86 to 122 s). Even in the TypeScript phase this row keeps its rows in the LSM (K kern, S lsm), and an LSM opens by replaying only its WAL tail, not every row. So both readings give open, with no dependence."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "PD's met reason holds unchanged. S lsm keeps state on disk, larger than memory, by construction, and split regions spread one resource over several servers' disks (TiKV and CockroachDB in production, cited by both PD judges). Adding a tier does not take the LSM away. If cold files move to the store, a cold read is one object-store get, which is the bar itself; if they stay local, a cold read is a local disk read, under it. Not measured here: no run at 3 x RAM. In the TypeScript phase the LSM must be a real one (a native addon; see the DEP-20 crossing), but the property belongs to the store, not to the language that calls it. The card says open only because PD's met rule keys on the tag lsm, and this row's tag is lsm +tier, so the else rule fires."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "E-35 ran a shared journal (1.18 and 1.26 times against 1.2). This row's log and state sit in an LSM store, as in PD, which E-35 did not run. Nothing measured a 1 MB record beside small ones on an LSM's WAL and memtable, or what its compaction does to the neighbours' p99. The 1 MB, 64 MB and too-large limits were not built. The tier and the rungs do not change this. Open, with no fsync-figure dependence, as PD."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "PD's referee holds F-01 open on one ground: the store must give back, after a power cut, what it synced, and no experiment power-cut an LSM. E-29's LazyFS runs were on its own journal (0 of 10,020 acknowledged batches lost with A-09's rules; a recovery bug had lost one batch in 2 of 1,200 rounds before that). Raft's commit rule keeps a synced entry (E-14c). The tier holds old data, not the synced tail, so it does not help here. The memory rung's writes are not persisted, so F-01 does not cover them. Z par is F-22's ground, not F-01's (PD's referee). Open until a LazyFS run on this store."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-15",
+      "E-37"
+     ],
+     "why": "Every row with voters needs the operator command, and none built or modelled it: list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards. TiKV's unsafe-recover is the published command for this shape (PD's judge), but whether it lists losses and refuses was not checked. V full and the core (etcd's raft ported) do not change that. Z par shrinks the case: with par only a committed entry with no good copy left needs the operator (E-37, run par2: 4 stuck states of 1,388, all with no good copy). The command is still owed. Open, as PD."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "PD meets F-15 only because it has no store at all. This row adds one, so the cell is now about what waits for it. Writes, elections and new replicas use the local LSM and peers (a new replica copies a snapshot from a peer, as in TiKV), and the tier uploads behind the local store, as ISR's Kafka-style tier does, so a down store should hold back only uploads, sleep, wake and old history, which F-15 allows. Not shown: no sim ran with the store down for an hour (E-33's store is always reachable), and local data grows while uploads wait (ISR's judge). The 1.3 clash: A-08 records every new epoch in the restore mark before it is used. This row founds by init (DEP-18, PD's own start) and needs no store across boxes, so the mark's home is open, as for SPLIT and CELL. If the mark lives in the store, every split and merge (each raises the region epoch) waits for the store, and as worded that is the clash. The controller's own replicated store, which already keeps the oracle's high-water mark, would be a home with no clash (reasoned). So open as worded and restated, like SPLIT."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "E-29(b) filled a journal that keeps A-09's reserve segment. This row's store is an LSM, as PD's: a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (both PD judges). The tier could free local space by uploading old files, but nothing ran it. The memory rung changes nothing here: F-20's 'never acknowledges bytes it did not sync' is read for persisted writes, as for the other mix rows, which were judged on E-29. Open."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it on etcd's spec: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, takes no append, and copies the entry from a peer that knows it is committed and whose own copy is good. Run par1 (one damaged entry below the commit point, 62,743 states, complete): all 10 invariants hold and 0 of 1,897 judged states are stuck, so no committed write is lost and the replica never votes on the bad entry. The core here is the TypeScript port of etcd's raft, which passes etcd's own files (E-10). Limits: three voters, one group, no membership change (G-15), and the controller here heals by changing members. And a crossing with the LSM: an LSM's damage comes as a bad block or file, which can hold several entries and rows of several regions, and the store cannot overwrite in place, so the bad file must be dropped and its entries repaired or its rows re-copied by snapshot. E-37 modelled one entry. That is a rule to state, not a counterexample: met, as for COMP2's par."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par keeps the group writable with one bad entry on each of two replicas: run par2d, 565,222 states, complete, 276 two-damage states, 0 stuck, every invariant held. With the same offset bad on two replicas it stays writable whenever a good copy is left (par2: the only 4 stuck states have no good copy anywhere, which is F-12's case). Repair must come from any peer, not only the leader (4 to 9 % stuck otherwise). Same limits as the MUST: no membership change modelled (G-15), and on an LSM the damage unit is a block or file, not one entry. Met by the acceptance test the requirement names (E-37)."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "S lsm was not run in this study. An LSM shares one WAL sync among a group of writes (RocksDB's write groups, TiKV's raft engine: cited from memory by both PD judges), but no pipeline of this shape was measured, so the pin is not shown. In the TypeScript phase the LSM is a native addon or a store nobody named (see the DEP-20 crossing), and neither was run. The tier and the rungs do not touch group commit. Open, as PD."
+    },
+    {
+     "req": "TEST-10",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04",
+      "E-10",
+      "E-46"
+     ],
+     "why": "The TypeScript phase runs the ported Raft core, so the sim and the server share that code by construction (E-46, E-42). But the server's store is an LSM with its own background threads (compaction), which a seeded sim cannot schedule, so the sim needs a stand-in store, and nothing built one or compared it. The planned native step has no second build to compare: raft-rs cannot run etcd's 28 interaction files and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins. Its native fold also needs A-30's guard against data (reasoned for PD). Open."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42's cheap recorder refers to one shared journal for its bulk bytes, and its cost (1.1 to 1.7 % of a core, a disk budget of the journal kept for the window) was measured there. Here the bulk bytes sit in an LSM with background compaction, as in PD, and the tier adds object-store completions, which E-42 did not record. So the 24 h cost and the disk budget are unknown. Open."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "PD met it only because no tier holds more than one project. This row adds an object-store tier, and the hosted store holds many projects. Keys per project at rest, and no read path from one project to another, are not designed in any row: the same ground as the MIN rows and COMP, which also hold N proc with a tier. Each project still has its own processes and disks (N proc), so E-35's shared-journal result (1.40 to 1.59 times) does not apply, and there is no pooled tier to make it depend on the shared-tier choice. Open."
+    }
+   ],
+   "crossings": [
+    {
+     "req": "P-15",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "Predicted from PD (Percolator, cited) on X alone. This row adds Q mix to X 2pc, which no judged row holds together. Percolator's promise rests on every participant's locks and commit record being durable. Under the memory rung a write commits in memory at a majority, and a majority that stops uncleanly before its disks catch up loses it; its replicas rejoin as new (AMENDMENTS 2, Q; SPACE 2, Z notes that three replicas can share one box). Steps: (1) a unit writes key a in a memory-rung resource and key b in a persisted one; (2) its commit record and a's write commit on a's group, and b's secondary is resolved forward on b's group; (3) a's group stops uncleanly inside its sync window. Now b's half is kept and a's half is gone: half a unit, which P-15 forbids. A rule closes it with no new unit: a unit that touches a memory-rung partition writes its locks and commit record at persisted, or such units are refused. The row states no such rule, and nothing modelled the rung after an unclean stop (K-09; G-05: its safety never modelled). So open, not met. Not failed: the fix is a rule inside the row. The same gap sits under the saga rows with Q mix (COMP, DRAFT, CELL, SPLIT): E-24 left unclean recovery out."
+    },
+    {
+     "req": "P-15",
+     "part": "S",
+     "predicted": "met",
+     "v": "open",
+     "why": "The same crossing as the MUST. After the loss above, a reader at a later timestamp sees b's write and not a's: a fractured read, which Percolator's snapshot reads exclude only when every participant is durable. The same rule (units touching a memory-rung partition commit at persisted, or are refused) brings back the cited route. Not stated, not modelled: open. This takes one SHOULD off the row's count."
+    },
+    {
+     "req": "TEST-07",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "Predicted from the rows where data folds the state (rule F all, E-06). It fires only because PD's open rule keys on the tag lsm and this row's tag is lsm +tier. Here, in the TypeScript phase too, the state that judges a write is the kernel's multi-version rows in an LSM (K kern, S lsm), not data, and E-06 timed data's undo only (0.03 to 0.05 ms a rerun). Both PD judges hold it open on exactly this ground. Open."
+    },
+    {
+     "req": "DEP-20",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "Predicted from the TypeScript-first rows, which ship plain TS and data as v4 did (a 451 KB tarball ran example 02 on Node 22 and 26). Those rows keep a journal written in TS. This row's TS phase must still run an LSM store (S lsm). The study names no LSM written in TypeScript; RocksDB and LevelDB reach Node as native addons (from memory, not checked), so npm must ship a prebuilt binary per platform. That is RUST's open ground: an addon loads on Node 22 and 26 here, but no fero tarball with prebuilt addons was packed or run (E-03). The server's own process (H srv) is plain node in this phase, which is fine. Open until a tarball with the store runs on Node 22 and 26, or a pure TS store is named."
+    }
+   ],
+   "crossings_checked": "Every supported cell read. Four change: P-15 (M, S), TEST-07, DEP-20. Kept: F-14 met (U cli: no user code on a server, whatever L and M); SC-12 (S) met (E-27's Node server is this row's TS phase); DEV-04 (S) met (I port); F-03, F-11, DEP-14, DEP-18, OPS-01, DATA-02, DEV-01 met; DEP-15 (S) not (V full, no witness, no log tier); PERF-04 and PERF-08 open as the mix rows, with the oracle round trip as a weak point; F-07 open with its alternative (I port).",
+   "mechanisms": {
+    "add": [
+     {
+      "key": "learners",
+      "name": "Learners (non-voting replicas)",
+      "state": "The group's non-voting replicas: each copies the log and, once caught up, is promoted to a voter. With V full they exist only during a heal, never as standing read replicas.",
+      "rules": "The controller adds a replacement as a learner, lets it catch up, promotes it (re-checked alive at the group's leader, A-20), then removes the gone voter (E-16's swap); a learner grants votes (A-01 (2), shown necessary in E-14b: 12 more stuck states when learners refuse).",
+      "reads": [
+       "group.commit",
+       "group.config",
+       "group.log",
+       "group.snapshot"
+      ],
+      "writes": [
+       "group.learners"
+      ],
+      "novel": false,
+      "precedent": "etcd's learners (v3.4 learner design: a member is added as a learner and promoted); Ongaro's thesis 4.2.1 (a new server catches up as a non-voting member); TiKV PD's AddLearner and PromoteLearner operators, which controller-commands' own settled precedent names."
+     }
+    ],
+    "drop": [],
+    "why": "Listed: 47 units, 0 novel, 225 pairs. It drops learners for V full, but this row still heals through its controller, and the settled controller-commands writes group.learners: E-16's swap is 'add a replacement as a learner, let it catch up, promote it, remove the gone voter', A-20's alive re-check is for that promotion, and E-14b shows learners must grant votes. Without learners a heal adds an empty voter, which raises the majority while it catches up (Ongaro's thesis 4.2.1), a step no experiment modelled. V full removes standing read replicas, not the catch-up step, and SPACE's own precedent for V full (etcd) adds members as learners. So learners stays: 48 units, 0 novel, 232 pairs (+7: controller-commands, meta-directory, raft-commit, raft-config, raft-log, raft-snapshot, raft-term-vote). Family A's judge read V full the other way (A3) and called the empty voter a model debt; the referee may want one reading for both families. par-repair and disk-incarnation are both needed: par repairs entries, while the incarnation keeps a lost disk from returning under its old id (A-01 (4)) and brings back as new a replica that stopped uncleanly under the memory rung. Neither is novel (PAR's CTRL, settled; Paxos Made Live). route-smart and worker-map go rightly with Y fwd and M kw. No crossing here needs a new unit, but three need rules the list does not count, and two change read sets. (1) memory-rung with two-phase-commit: a unit that touches a memory-rung partition must write its locks and commit record at persisted, or be refused (the P-15 crossing). two-phase-commit then reads each participant's rung from the catalog: +2 pairs (meta-catalog, forks). (2) The tier's reads are written for a journal (journal.segments, which no unit writes here). On an LSM the tier exports a region's versions and locks at an oracle timestamp and uploads raft-log entries before log GC drops them (TiKV's BR and log backup; Neon's pageserver keeps its LSM layer files in S3: both from memory, not checked). Its reads become lsm.files, mvcc.versions, txn.intents and tso.high: +3 pairs (mvcc, two-phase-commit, timestamp-oracle). (3) par on an LSM: E-37 modelled one bad entry per replica; an LSM's damage is a block or file holding several entries and rows, possibly of several regions. The bad file must be dropped and rewritten (an LSM cannot overwrite in place, and it stops compacting on a corrupt file), its entries repaired from peers, and its damaged rows re-copied by snapshot while the replica neither leads nor serves lease reads. Same state (the bad mark, widened from an entry to a range), more rules, not counted; PAR's CTRL was built into LogCabin and ZooKeeper, not an LSM, so the novelty of this form is open (TiKV's tikv-ctl bad-ssts is an operator procedure, from memory). With learners and (1) and (2): 237 pairs. Inherited from PD: link.ping is read by five units and written by none; with family A's link-pings fix as well, 49 units, 241 pairs."
+   }
+  },
+  "B2": {
+   "changes": "V=full,S=lsm +tier,F=all(srv),L=rs-srv or go-srv,I=raft-rs or etcd raft,Y=fwd,M=kw,Z=par on PD (closure.py card '...' PD)",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28",
+      "E-34"
+     ],
+     "why": "PD fails SC-05 only because its LSM sits on each server's own disk with no tier and no log tier, so nothing is left when every disk is lost (both PD judges, a structural proof). With S lsm +tier that proof is gone: a planned sleep can flush the memtable and upload what the store lacks, as the jrnl +tier rows do. What is not shown: no sleep-and-wake run against an S3-compatible store, with disks kept or lost, ran for any row (E-28 timed single PUTs only), and how fast a server that lost its disk is writable again from the store's files was never measured. The 1.3 line on the 10 GB wake does not name this row. That line is about a Node process that folds 10 GB of rows into data on the V8 heap (E-34: 86 to 122 s). Here the server keeps its rows in the LSM, off any JS heap, as SRV's cell says for its native fold, and an LSM opens without folding every row again. So there is no restated reading to depend on."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "PD's met reason holds unchanged. S lsm keeps state on disk, larger than memory, by construction, and split regions spread one resource over several servers' disks (TiKV and CockroachDB in production, cited by both PD judges). Adding a tier does not take the LSM away. If cold files move to the store, a cold read is one object-store get, which is the bar itself; if they stay local, a cold read is a local disk read, under it. Not measured here: no run at 3 x RAM. The card says open only because PD's met rule keys on the tag lsm, and this row's tag is lsm +tier, so the else rule fires."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "E-35 ran a shared journal (1.18 and 1.26 times against 1.2). This row's log and state sit in an LSM store, as in PD, which E-35 did not run. Nothing measured a 1 MB record beside small ones on an LSM's WAL and memtable, or what its compaction does to the neighbours' p99. The 1 MB, 64 MB and too-large limits were not built. The tier and the rungs do not change this. Open, with no fsync-figure dependence, as PD."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "PD's referee holds F-01 open on one ground: the store must give back, after a power cut, what it synced, and no experiment power-cut an LSM. E-29's LazyFS runs were on its own journal (0 of 10,020 acknowledged batches lost with A-09's rules; a recovery bug had lost one batch in 2 of 1,200 rounds before that). Raft's commit rule keeps a synced entry (E-14c). The tier holds old data, not the synced tail, so it does not help here. Z par is F-22's ground, not F-01's (PD's referee). Open until a LazyFS run on this store."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-15",
+      "E-37"
+     ],
+     "why": "Every row with voters needs the operator command, and none built or modelled it: list what may be lost, refuse while a voter it would drop answers, refuse stale cursors afterwards. TiKV's unsafe-recover is the published command for this shape (PD's judge), but whether it lists losses and refuses was not checked. V full and the core (raft-rs or etcd's raft in Go) do not change that. Z par shrinks the case: with par only a committed entry with no good copy left needs the operator (E-37, run par2: 4 stuck states of 1,388, all with no good copy). The command is still owed. Open, as PD."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "PD meets F-15 only because it has no store at all. This row adds one, so the cell is now about what waits for it. Writes, elections and new replicas use the local LSM and peers (a new replica copies a snapshot from a peer, as in TiKV), and the tier uploads behind the local store, as ISR's Kafka-style tier does, so a down store should hold back only uploads, sleep, wake and old history, which F-15 allows. Not shown: no sim ran with the store down for an hour (E-33's store is always reachable), and local data grows while uploads wait (ISR's judge). The 1.3 clash: A-08 records every new epoch in the restore mark before it is used. This row founds by init (DEP-18, PD's own start) and needs no store across boxes, so the mark's home is open, as for SPLIT and CELL. If the mark lives in the store, every split and merge (each raises the region epoch) waits for the store, and as worded that is the clash. The controller's own replicated store, which already keeps the oracle's high-water mark, would be a home with no clash (reasoned). So open as worded and restated, like SPLIT."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "E-29(b) filled a journal that keeps A-09's reserve segment. This row's store is an LSM, as PD's: a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (both PD judges). The tier could free local space by uploading old files, but nothing ran it. Open."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par as E-37 modelled it on etcd's spec: a checksum per entry marks the bad entry; the replica keeps its id, grants no vote, does not stand, takes no append, and copies the entry from a peer that knows it is committed and whose own copy is good. Run par1 (one damaged entry below the commit point, 62,743 states, complete): all 10 invariants hold and 0 of 1,897 judged states are stuck, so no committed write is lost and the replica never votes on the bad entry. The core here is raft-rs (reasoned, as A-01 is for it) or etcd's raft in Go (the spec's own code). Limits: three voters, one group, no membership change (G-15), and the controller here heals by changing members. And a crossing with the LSM: an LSM's damage comes as a bad block or file, which can hold several entries and rows of several regions, and the store cannot overwrite in place, so the bad file must be dropped and its entries repaired or its rows re-copied by snapshot. E-37 modelled one entry. That is a rule to state, not a counterexample: met, as for COMP2's par."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z par keeps the group writable with one bad entry on each of two replicas: run par2d, 565,222 states, complete, 276 two-damage states, 0 stuck, every invariant held. With the same offset bad on two replicas it stays writable whenever a good copy is left (par2: the only 4 stuck states have no good copy anywhere, which is F-12's case). Repair must come from any peer, not only the leader (4 to 9 % stuck otherwise). Same limits as the MUST: no membership change modelled (G-15), and on an LSM the damage unit is a block or file, not one entry. Met by the acceptance test the requirement names (E-37)."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "S lsm was not run in this study. An LSM shares one WAL sync among a group of writes (RocksDB's write groups, TiKV's raft engine: cited from memory by both PD judges), but no pipeline of this shape was measured, so the pin is not shown. The tier and the rungs do not touch group commit. Open, as PD."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42's cheap recorder refers to one shared journal for its bulk bytes, and its cost (1.1 to 1.7 % of a core, a disk budget of the journal kept for the window) was measured there. Here the bulk bytes sit in an LSM with background compaction, as in PD, and the tier adds object-store completions, which E-42 did not record. So the 24 h cost and the disk budget are unknown. Open."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "PD met it only because no tier holds more than one project. This row adds an object-store tier, and the hosted store holds many projects. Keys per project at rest, and no read path from one project to another, are not designed in any row: the same ground as the MIN rows and COMP, which also hold N proc with a tier. Each project still has its own processes and disks (N proc), so E-35's shared-journal result (1.40 to 1.59 times) does not apply, and there is no pooled tier to make it depend on the shared-tier choice. Open."
+    }
+   ],
+   "crossings": [],
+   "crossings_checked": "Not named for a full review. Read in passing: P-15 (M, S) stay met here, because B2 has no memory rung (Q maj-d), so the crossing of B1 and B3 does not arise; TEST-07 and DEP-20 are open from SRV's native rows, as they should be.",
+   "mechanisms": {
+    "add": [
+     {
+      "key": "learners",
+      "name": "Learners (non-voting replicas)",
+      "state": "The group's non-voting replicas: each copies the log and, once caught up, is promoted to a voter. With V full they exist only during a heal, never as standing read replicas.",
+      "rules": "The controller adds a replacement as a learner, lets it catch up, promotes it (re-checked alive at the group's leader, A-20), then removes the gone voter (E-16's swap); a learner grants votes (A-01 (2), shown necessary in E-14b: 12 more stuck states when learners refuse).",
+      "reads": [
+       "group.commit",
+       "group.config",
+       "group.log",
+       "group.snapshot"
+      ],
+      "writes": [
+       "group.learners"
+      ],
+      "novel": false,
+      "precedent": "etcd's learners (v3.4 learner design: a member is added as a learner and promoted); Ongaro's thesis 4.2.1 (a new server catches up as a non-voting member); TiKV PD's AddLearner and PromoteLearner operators, which controller-commands' own settled precedent names."
+     }
+    ],
+    "drop": [],
+    "why": "Listed: 46 units, 0 novel, 214 pairs: PD's 46 minus learners (V full), route-smart (Y fwd) and worker-map (M kw), plus disk-incarnation, par-repair and tier. Learners must stay for the same reason as in B1: the controller heals by adding a learner and promoting it (E-16, A-20, E-14b; TiKV PD's AddLearner and PromoteLearner), and controller-commands writes group.learners. With it: 47 units, 0 novel, 221 pairs (+7). No memory rung here, so the P-15 crossing does not arise, and disk-incarnation is needed for par's checksum and A-01 (4)'s lost disk. Read-set note as B1 and B3: the tier on an LSM reads the store's files, versions, locks and the oracle's mark, not journal segments: +3 pairs, 224. The par-on-an-LSM rules of B1 apply unchanged. No unit is novel. Inherited from PD: the unwritten link.ping read; with family A's fix, 48 units, 230 pairs."
+   }
+  }
+ }
+}

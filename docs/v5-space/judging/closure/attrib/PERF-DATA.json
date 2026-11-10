@@ -521,6 +521,32 @@
      },
      "v": "fails",
      "basis": "v4 replicates by per-cell last-writer-wins with Lamport stamps over per-origin logs (R `lww`, O `lamp`): a replica keeps the cell with the higher stamp whatever order records arrive in, which is a last-writer-wins compare, and no partition has one log order. DATA-01 forbids exactly that."
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ]
+     },
+     "v": "open",
+     "depends_on": "DATA-01 reading",
+     "alt": "fails",
+     "basis": "SRV: the server folds plain rows in Rust or Go. RR-10: rows whose servers fold natively are open on DATA-09's path (a differential test against data, never run) and fail by structure if the user reads DATA-01 as data's own code folding on writers and followers (the cell referee's user choice; BRIEF item 6)."
+    },
+    {
+     "when": {
+      "K": [
+       "kern"
+      ],
+      "S": [
+       "lsm",
+       "lsm +tier"
+      ]
+     },
+     "v": "open",
+     "depends_on": "DATA-01 reading",
+     "alt": "fails",
+     "basis": "PD's shape: server state is MVCC versions in an LSM written by kernel commands and 2PC; only clients fold with data. RR-10: rows whose servers fold natively are open on DATA-09's path (a differential test against data, never run) and fail by structure if the user reads DATA-01 as data's own code folding on writers and followers (the cell referee's user choice; BRIEF item 6)."
     }
    ],
    "else": {
