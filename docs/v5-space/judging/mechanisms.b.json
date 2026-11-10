@@ -1,0 +1,1909 @@
+{
+ "judgments": [
+  {
+   "key": "raft-log",
+   "novel": false,
+   "precedent": "Ongaro and Ousterhout, 'In Search of an Understandable Consensus Algorithm', USENIX ATC 2014, section 5.3; etcd's raft (log.go, raft.go)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (each replica's entries by index and term), same rules (only the leader appends; a follower checks the entry before; a conflicting tail is cut), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-term-vote",
+   "novel": false,
+   "precedent": "Raft paper sections 5.2 and 5.4.1; etcd's raft, raft.go: hup() refuses to campaign while a committed config change is unapplied",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (term and vote on disk), same rules (one vote a term, only for a log at least as up to date), same role. The campaign guard of A-01 is in etcd's code. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-commit",
+   "novel": false,
+   "precedent": "Raft paper sections 5.3 and 5.4.2; Ongaro's thesis section 10.2.1 (the leader writes its disk in parallel and counts itself only once its write lands); etcd's raft async storage writes",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (the commit index), same rules (a majority of voters hold an entry of the leader's own term), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-config",
+   "novel": false,
+   "precedent": "Ongaro's thesis chapter 4 (one change at a time; joint consensus); etcd's raft confchange package, where a change takes effect when it is applied, and StepDownOnRemoval; TiKV's region epoch (conf_ver) for the count of changes; Kafka KIP-853 for 'a lost disk never returns under its old id'",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (voters, the one pending change, a change count), same rules, same role. Taking effect on commit is etcd's own published choice. cited from memory, sure of the system and the mechanism; KIP-853 checked on the web on 2026-11-10."
+  },
+  {
+   "key": "learners",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 4.2.1 (non-voting members catch up first); etcd learners (v3.4 design); etcd's raft, raft.go Step: a learner answers a vote request and never campaigns",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (non-voting replicas in the config), same rules (join as a learner, promote once caught up, grant a vote when asked), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-snapshot",
+   "novel": false,
+   "precedent": "Raft paper section 7 (log compaction, InstallSnapshot); etcd's raft MsgSnap",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (a snapshot at one index and the dropped prefix), same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-prevote-checkquorum",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 9.6 (PreVote); etcd's raft Config.PreVote and Config.CheckQuorum; CockroachDB's quiesced ranges, which lean on node or store liveness while a range does not tick",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "It holds no durable state, so by DEV-10 (a)'s letter it is a rule set of the leadership state, not a mechanism. Its rules are published; E/4 is a constant (A-02). cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-leader-transfer",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 3.10 (leadership transfer, TimeoutNow); etcd's raft MsgTransferLeader, MsgTimeoutNow, and ErrProposalDropped for a write caught in a transfer",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "No durable state. Same rules (stop new writes, bring the target to the log end, TimeoutNow; refuse, never drop), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "raft-readindex",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 6.4; etcd's raft ReadIndex (ReadOnlySafe)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "No durable state. Same rules (one round to a majority, then wait for the fold to reach that index), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "link-pings",
+   "novel": false,
+   "precedent": "CockroachDB: pkg/rpc heartbeat (one ping per node pair; PingRequest and PingResponse carry the sender's clock, read by RemoteClockMonitor in pkg/rpc/clock_offset.go) and store liveness (pkg/kv/kvserver/storeliveness: one heartbeat per store pair, shared by every range)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (per pair: is the link up, when it last answered, the peer's clock), same rules (one ping per pair whatever the number of groups; silence means gone), same role. The peer bound past 100 members (A-12) is a placement rule with no state; its published form is the scatter width of Copysets (Cidon et al., USENIX ATC 2013). cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "quiet-groups",
+   "novel": false,
+   "precedent": "CockroachDB's quiesced ranges (pkg/kv/kvserver/replica_raft_quiesce.go: the leader quiesces when it has nothing pending and its followers hold the commit index; any proposal or message wakes it); TiKV's hibernate regions",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (a quiet flag per group and the index it went quiet at), same rules, same role. cited from memory, sure of the system and the mechanism; TiKV's hibernate regions checked on the web on 2026-11-10 (they cut ticks and messages)."
+  },
+  {
+   "key": "dormant-groups",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "SPLIT",
+    "SLOG",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "why": "No precedent holds. TiKV's hibernate regions, the one on offer, only stop a region's ticks and messages (checked on the web on 2026-11-10: TiDB docs and forum); the peer stays in memory, as CockroachDB's quiesced ranges do. That is the precedent for quiet groups, not for dropping a group from memory. A web search today found no production multi-Raft system that unloads an idle group and loads it on wake. Nearest by rule but in another role: Orleans grains and Durable Objects (an idle unit is unloaded and the next message wakes it); Pulsar loads a topic only when a client opens it. So the state (a dormant mark and a 24-byte record) and the wake rule are fero's."
+  },
+  {
+   "key": "slow-leader-controller",
+   "novel": false,
+   "precedent": "TiKV and PD: each TiKV store computes a slow score (1 to 100) and reports it; PD's evict-slow-store-scheduler evicts the leaders from the one store whose score reaches 80 (TiDB docs: slow node detection since v5.2.0, PD scheduling)",
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "why": "REQUIREMENTS X17 says to count a slow-leader rule in DEV-01 and to prefer a published fix, so it is judged though it names no durable state. Same state (a slowness score per member, known to the controller), same rule (the controller moves leadership off the slow member), same role. checked on the web on 2026-11-10."
+  },
+  {
+   "key": "slow-leader-self",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "why": "REQUIREMENTS X17 says to count it, though it names no durable state. No system I can name has the same rule. Nearest: CockroachDB can make a leaseholder shed its leases when its own store is IO-overloaded (kv.allocator.lease_io_overload_threshold; PR 117703, checked on the web on 2026-11-10), but that is off by default and it scores LSM overload, not latency against the followers; CockroachDB also stops a node whose disk sync stalls. fero's rule was named, not written (A-03), so it cannot be shown to be the same. Unsure: if CockroachDB's lease shedding is accepted, this is not novel."
+  },
+  {
+   "key": "meta-members",
+   "novel": false,
+   "precedent": "Kafka KRaft broker registration records (KIP-631: broker id, incarnation id, epoch, endpoints, features, fenced, in controlled shutdown); CockroachDB's node liveness records (epoch, draining, membership: active, decommissioning, decommissioned)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (one record per member in the metadata group, with its life and a state mark), same rules (a joiner registers itself; the metadata leader marks a silent member; a leaver is marked first), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "meta-catalog",
+   "novel": false,
+   "precedent": "Kafka KRaft TopicRecord, PartitionRecord and ConfigRecord in the metadata log (a topic is created on first use, a second create is refused); NATS JetStream stream configs (a create with a different config is refused); CockroachDB descriptors",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (one config record per resource in the metadata group), same rules (the first create writes it; a differing open is refused; alter changes it online), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "meta-directory",
+   "novel": false,
+   "precedent": "TiKV PD's region records, refreshed by each region leader's heartbeat with the newest region epoch winning; CockroachDB's meta2 range descriptors, used as routing hints while the range itself is the truth",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (per group: last known replicas and leader, as a hint), same rules (the leader refreshes it; the newest config wins), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "healing-self",
+   "novel": false,
+   "precedent": "CockroachDB's replicate queue and allocator, run by each range's leaseholder (pkg/kv/kvserver/replicate_queue.go; allocatorimpl Allocator.ComputeAction: AddVoter, ReplaceDeadVoter, RemoveDeadVoter, RemoveVoter, RemoveLearner; filterUnremovableReplicas keeps a removal from leaving too few live, caught-up voters); Kafka's preferred leader election for the hand-back after settle.ms",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "why": "It keeps no state of its own. E-16's 14 rules (add a learner when a voter is gone; promote a caught-up learner from three to four; remove a voter gone to the leader; remove a surplus voter only once the others answer and hold the commit offset; grow before shrink) are the allocator's actions and guards, in the same role: every group's leader heals, with no controller. The ring only ranks the candidates. SPACE counted 1 because fero wrote the text itself; DEV-10 (b) asks for a precedent, and there is one. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "controller-commands",
+   "novel": false,
+   "precedent": "TiKV PD operators (one per region, built on a region epoch, dropped on timeout) with TiKV's checks where the command runs (the region epoch check; raftstore check_conf_change refuses a change that would leave no healthy quorum); Kafka KRaft keeps reassignments as records in the metadata log, checked by partition epoch",
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "why": "Same state (pending commands, each tied to the config epoch it was decided at), same rules (run only on a matching epoch; the group's leader checks again with what only it knows; a refused command times out), same role. The form of the leader's re-check differs a little (gone or alive on its own links here; a healthy quorum in TiKV). cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "planner-hints",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "why": "Novel, but a close call. Parts are published: CockroachDB's drain and decommission marks in its liveness records, and AdminChangeReplicas with ExpDesc (a change is refused if the range descriptor is not the one the caller read). Not matched: a 'gone' hint that a leader ignores while its own link is up, and a placement target and preferred leader stored in the group's own log for healing to follow. It was never modelled (K-08), and E-16 expects more rules if a hint can change membership. So I cannot show the same state and rules in one system. CELL holds C `self` with no planner, so it is left out as SPACE 4.1 has it, though DEP-17 asks every row for hints."
+  },
+  {
+   "key": "log-replicas",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT"
+   ],
+   "why": "The state has precedents: Spanner's and Megastore's witness replicas vote and keep the log but hold no rows. The rule does not: those witnesses never lead, and here a log replica leads, only to repair (commit an entry of its own term, bring a full voter up, hand over). TiKV's witness may be close, but I could not check it today (docs.pingcap.com is not reachable from this session), so it does not count. Never modelled in this study."
+  },
+  {
+   "key": "project-groups",
+   "novel": false,
+   "precedent": "CockroachDB's span-config coalescing (spanconfig.storage_coalesce_adjacent.enabled): adjacent tables with equal span configs share one range, and a different config forces a range boundary; TiKV's enable-cross-table-merge",
+   "rows": [
+    "MIN-P",
+    "COMP"
+   ],
+   "why": "Same state (a group holds data of many resources of one settings class), same rules (a new resource starts inside an existing group; other settings force a boundary; load splits it off), same role (many small resources without one group each). cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "lanes",
+   "novel": false,
+   "precedent": "Fixed hash partitioning: Elasticsearch primary shards (the count is fixed when the index is made; hash of the routing key modulo the count); Kafka's default partitioner; Redis Cluster's fixed 16,384 slots shared by every key",
+   "rows": [
+    "LANE"
+   ],
+   "why": "Same state (a fixed count and a hash), same rules (fixed at founding; never moves), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "slot-table",
+   "novel": false,
+   "precedent": "Redis Cluster's slot map with config epochs (cluster spec: a claim for a slot with a greater configEpoch wins; CLUSTER SETSLOT); Couchbase's vBucket map (1,024 vBuckets to nodes, versioned by the cluster manager)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (per fixed slot, the owner, with a version where the highest wins), same role (routing; MOVED). The order of its writes inside a move belongs to the slot move. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "slot-move",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Novel. Moves of a hash bucket are published (Couchbase's vBucket takeover; MongoDB's moveChunk with its migration coordinator and its carried retryable-write history; Redis Cluster's MIGRATING and IMPORTING), but none has these entries and guards: the fence in the source's log as the decision, the open in the target's log only after the delta and the carried set commit there, one give-up decider, and a carried set of sequence and epoch, dedup floors, the lock fence table, srchi marks and segment names. fero wrote and corrected the protocol itself (E-15, E-17c)."
+  },
+  {
+   "key": "move-policy",
+   "novel": false,
+   "precedent": "TiKV PD's balance-region and hot-region schedulers (move from the most loaded store to the least, with tolerant-size-ratio as the margin, under schedule limits); CockroachDB's allocator rebalance threshold and load-based splitting and merging; redis-cli --cluster rebalance --cluster-threshold",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "It holds no durable state and no safety rule (A-18), so by DEV-10 (a)'s letter it is no mechanism: 0 in every slot row. The policy itself (one move at a time, busiest to least loaded, only past a margin) is published. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "rekey",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "CELL"
+   ],
+   "why": "Novel, judged as the slot move is. Vitess Reshard (VReplication) and MongoDB's reshardCollection do the same job (copy into a new generation, block writes, flip the catalog), but the entries (rk, cut, frz, cp, flip), the dedup and fence carry across the flip, and the refused cursor are fero's own (35 rules as written, E-17)."
+  },
+  {
+   "key": "split-record",
+   "novel": false,
+   "precedent": "CockroachDB's AdminSplit and split trigger (pkg/kv/kvserver/batcheval/cmd_end_transaction.go: the right-hand range starts once, from the committed split; no rows are copied; per-range state such as the abort span is copied to it); TiKV's BatchSplit",
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "why": "Same state (a split entry in the parent's log), same rules (split only what you hold; the parent stops taking writes to the split-off range; the child starts once and carries per-range request state), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "merge-record",
+   "novel": false,
+   "precedent": "TiKV's region merge (PrepareMerge freezes the source, CommitMerge runs in the target, RollbackMerge); CockroachDB's AdminMerge with Subsume",
+   "rows": [
+    "PD"
+   ],
+   "why": "Same state, same rules (the removed group freezes; the survivor takes its rows once), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "range-table",
+   "novel": false,
+   "precedent": "CockroachDB's range descriptors with a generation that rises on every split and merge; TiKV's region epoch (version)",
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "why": "Same state, same rules (an older generation is refused and refreshed), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "split-policy",
+   "novel": false,
+   "precedent": "CockroachDB's split queue (by size and by load) run by each leaseholder, and its merge queue; PD's merge checker",
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "why": "No durable state. Same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "slot-sequence",
+   "novel": false,
+   "precedent": "Couchbase DCP (kv_engine docs/dcp): every mutation in a vBucket, one of 1,024 fixed hash buckets, gets that vBucket's next sequence number from the active node; a position is (vBucket UUID, seqno) with a failover log; the numbers and the failover log go with the vBucket when it moves between nodes. Kafka's (leader epoch, offset) per partition is the same pair (KIP-101, KIP-320)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (the last sequence per fixed slot, read with an epoch of the slot's history), same rules (the slot's one writer stamps the next number; it never goes back; it travels with the slot), same role (positions for cursors and versions that survive a move). DESIGN-V5 10.2 and SPACE call it new ('1 small'); DEV-10 (b) asks for a precedent, and this is a per-slot sequence in production, not just 'a log'. Close call. checked on the web on 2026-11-10 (Couchbase's blog and DCP docs: seqno per vBucket, vBucket UUID, failover log)."
+  },
+  {
+   "key": "lineage",
+   "novel": false,
+   "precedent": "Amazon Kinesis shards (API type Shard: ParentShardId, AdjacentParentShardId, SequenceNumberRange.StartingSequenceNumber; a reader finishes the parent, then goes on in the children); DynamoDB Streams has the same; Pravega's segment successors",
+   "rows": [
+    "SPLIT"
+   ],
+   "why": "Same state (per child, its parent and the position it starts at), same rules (written once when the child starts; a reader's cursor is resolved from parent to child), same role. Kinesis keeps it for the retention time, not for ever. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "closed-timestamps",
+   "novel": false,
+   "precedent": "CockroachDB's closed timestamps; TiKV's resolved timestamp",
+   "rows": [
+    "PD"
+   ],
+   "why": "The published mechanism, as PD's row takes it. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "writer-judging",
+   "novel": false,
+   "precedent": "ZooKeeper's request pipeline (PrepRequestProcessor judges each request against its outstanding, not yet committed changes and proposes only the resulting state change; every answer, an error included, leaves in commit order; Junqueira, Reed and Serafini, 'Zab', DSN 2011); CockroachDB's proposer-evaluated KV (RFC 20160420); Kafka's group coordinator runtime (KIP-848), which holds an answer until its records commit",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "No durable state. Same rules (judge on the log-end state; append results only; answer only after the judged log end commits), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "dedup-window",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "V4"
+   ],
+   "why": "Novel. The parts are known (Kafka keeps the last five batches per producer; deadlines are cut hop by hop in gRPC), but the composition (issuer window, floor, outcomes by id, and per-hop time budgets as the reason a forgotten issuer is safe) is the draft's own, 17 to 19 rules after three review rounds (E-20). No system has the same state and rules."
+  },
+  {
+   "key": "client-sessions",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 6.3 (a session per client, a serial number per request, cached answers, the client's lowest unanswered number as the floor, expiry by a time agreed through the log); LogCabin",
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state, same rules, same role. The registry apart from the per-group tables is how Kafka splits producer ids (handed out centrally) from per-partition state. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "producer-state",
+   "novel": false,
+   "precedent": "Kafka KIP-98 (producer id, epoch, a sequence per partition, five cached batches) and KIP-360 (a give-up bumps the epoch)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. A-22's second fix (answer 'unknown producer' only once the forget has committed) is A-04's answer rule, published as writer-judging is. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "caller-keys",
+   "novel": false,
+   "precedent": "Stripe's idempotency keys (API docs, 'Idempotent requests'); AWS Lambda Powertools idempotency (a conditional claim with an in-progress expiry, then the stored result); for a re-run that must issue the same effects, Temporal's replay against its event history (a command that differs is a non-determinism error)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (per key: a claim with a lease and the first result), same rules (claim before the handler runs; a retry gets the first result; a re-run repeats the same effect ids), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "srchi-marks",
+   "novel": false,
+   "precedent": "Apache Pulsar: PIP-6 keeps, in the output topic's own log, the last sequence id per producer, and Pulsar Functions' effectively-once mode uses one producer per input and the source message id as that sequence id; Delta Lake's transaction identifiers (PROTOCOL.md: appId and version written inside the commit; options txnAppId and txnVersion); KafkaConsumer javadoc, 'Storing Offsets Outside Kafka'",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (per source and per output unit, the highest source position applied, written with the output itself), same rules (apply only above the mark; commit the reader's cursor after the outputs), same role (derived outputs once, with no time horizon in Delta and in the Kafka pattern). The key per output slot is the analogue of 'per output partition': the mark lives in the unit that moves. The carry on a move is a rule of the slot move, which is counted novel there. A-05 leaves this open; close call. checked on the web on 2026-11-10 (Pulsar and Delta)."
+  },
+  {
+   "key": "writer-time",
+   "novel": false,
+   "precedent": "CometBFT's BFT Time (spec/consensus/bft-time.md: a block's time is the median of the validators' vote times, and it never goes back); Ongaro's thesis section 6.3 for expiry by a time carried in the log; etcd's lease revoke as a log entry",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (the log's last time; the members' clock readings), same rules (stamp the median; never back; expiry judged by the log's time and written as entries), same role (a log time that one wrong clock cannot move). The readings come from pings here and from votes there. SPACE called it '1 small'. checked on the web on 2026-11-10 (BFT Time)."
+  },
+  {
+   "key": "timestamp-oracle",
+   "novel": false,
+   "precedent": "Percolator's timestamp oracle (Peng and Dabek, OSDI 2010); TiKV PD's TSO, which saves a window before it hands timestamps out",
+   "rows": [
+    "PD"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "lock-rows",
+   "novel": false,
+   "precedent": "Chubby (Burrows, OSDI 2006: locks with sequencers); etcd's lock on a lease, with the key's revision as the token; Kleppmann, 'How to do distributed locking', 2016",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (holder, lease end, a version that is the token), same rules (claim when absent or lapsed), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "fence-tokens",
+   "novel": false,
+   "precedent": "Chubby section 2.4 (a server may check a sequencer against the most recent one it has seen); Kleppmann 2016 (the store keeps the highest token and refuses a lower one); HDFS QJM epoch numbers at the journal nodes",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (the highest token seen per lock, at the place of the write), same rules, same role. The carry on a move is a rule of the slot move. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "saga-intents",
+   "novel": false,
+   "precedent": "Garcia-Molina and Salem, 'Sagas', SIGMOD 1987 (the saga log, backward recovery); Percolator (resolve another transaction's lock first); for 'a failed run undoes every step': the TCC pattern's empty rollback and anti-hanging rules as Apache Seata builds them (tcc_fence_log since 1.5.1: a cancel for a branch whose try never ran writes a marker, and a late try is then refused); Kafka KIP-98's end markers and epoch bump",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (an intent with its direction), same rules, same role. E-24 counted 1 novel rule, 'undo every step', where the undo also raises each partition's fence. That is TCC's cancel of a branch that never ran, which also blocks the late try: same rule, same role, in production. So 0 novel rules. Close call. checked on the web on 2026-11-10 (Seata)."
+  },
+  {
+   "key": "two-phase-commit",
+   "novel": false,
+   "precedent": "Percolator (OSDI 2010); TiKV's transactions",
+   "rows": [
+    "PD"
+   ],
+   "why": "The published mechanism, as PD's row takes it. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "mvcc",
+   "novel": false,
+   "precedent": "TiKV's MVCC with a GC safe point; Percolator",
+   "rows": [
+    "PD"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "ktxn-coordinator",
+   "novel": false,
+   "precedent": "Kafka's transaction coordinator (KIP-98)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "ktxn-markers",
+   "novel": false,
+   "precedent": "Kafka's control markers and last stable offset (KIP-98)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "memory-rung",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "why": "Novel, but a close call. Committing at a majority in memory is published (Kafka's default; Redpanda's write caching; Viewstamped Replication Revisited needs no disk write). The rule for a replica that stopped uncleanly is not the same anywhere I can name: VR Revisited section 4.3 keeps the replica's identity and runs a recovery protocol before it votes again; Kafka KIP-966 removes such a broker from the in-sync and eligible sets (checked on the web on 2026-11-10), in a design with no voting by data replicas. Here the replica comes back as a new member through a membership change. Its safety was never modelled (K-09)."
+  },
+  {
+   "key": "none-rung",
+   "novel": false,
+   "precedent": "Core NATS publish and subscribe (at most once, in order, to the subscribers of the moment); Redis Pub/Sub, which in Redis Cluster is a second delivery path beside the replicated keyspace",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "No durable state. Same rules (straight to the current subscribers; nothing is logged; after a failover a subscriber subscribes again), same role. REQUIREMENTS X1 and SPACE 4.2 write 'counted in DEV-01', but DEV-01 lists only what has no precedent, and this is NATS core under another name. It is the same in all 20 rows, so no row moves against another. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "journal",
+   "novel": false,
+   "precedent": "Apache BookKeeper's bookie (one journal for every ledger, one fsync per batch, then indexed ledger storage; a journal file is removed only after a checkpoint has synced what it covers); TiKV's raft-engine (one log for every region, an index per region); CockroachDB's shared engine (a replaced Raft tail is deleted in the same batch as the new entries) and its emergency ballast file for the reserve",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (one journal per process for every group, then per-group files with indexes), same rules (group commit; a record that cuts a replaced tail; truncate only below what is synced elsewhere), same role. SPACE called it '1 small'. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "wal-per-group",
+   "novel": false,
+   "precedent": "etcd's WAL; Kafka's per-partition logs",
+   "rows": [
+    "ISR",
+    "V4"
+   ],
+   "why": "The published form. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "lsm-store",
+   "novel": false,
+   "precedent": "TiKV on RocksDB; CockroachDB on Pebble",
+   "rows": [
+    "PD"
+   ],
+   "why": "The published form. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "tier",
+   "novel": false,
+   "precedent": "Redpanda's tiered storage (the leader uploads a segment, then replicates an archival metadata command in the partition's own Raft log; local data is dropped only below what is uploaded); Kafka KIP-405; Neon (image and delta layers in the object store, merged in the background; the safekeepers drop WAL only below what the pageserver has made durable in the store; a branch pins its parent's history)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (old segments and layered snapshots in an object store, named after the upload), same rules (upload, then name; drop the local log only below what is covered; a reader or a fork pins it), same role. SPACE counted 1 for 'snapshot layers against retention'; Neon has that coupling. Close call. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "restore-mark",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Novel, but near a precedent. PostgreSQL's timelines do the first half: a restore takes a timeline id above every history file in the WAL archive (timeline.c, findNewestTimeLine), and a position is (timeline, LSN). Two rules are not matched: every new epoch is recorded in the mark before use, so a slot move waits on the store; and a session generation that a restore raises. E-33 names no precedent. The list puts two pieces of state in this one unit (see 'regrouped')."
+  },
+  {
+   "key": "fold-all",
+   "novel": false,
+   "precedent": "Raft paper section 5.3 (each server applies committed entries in log order); etcd's apply loop",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "fold-leader",
+   "novel": false,
+   "precedent": "Kafka Streams with one standby replica (num.standby.replicas = 1: the active task folds, one standby keeps a warm copy, any other instance rebuilds from the changelog)",
+   "rows": [
+    "LEAN",
+    "OBJ",
+    "SIDE"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "fold-lazy",
+   "novel": false,
+   "precedent": "Tango (Balakrishnan et al., SOSP 2013: an object's view is played forward from the shared log when it is read); TiKV's follower read waits until its applied index reaches the read index",
+   "rows": [
+    "OBJ"
+   ],
+   "why": "Same state, same rules (fold when asked; serve only once the fold has reached the position), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "fold-version",
+   "novel": false,
+   "precedent": "Kafka KIP-584 and metadata.version (a finalized feature level is a record in the metadata log, raised only when every broker supports it); etcd's cluster version, set through Raft as the lowest member version; CockroachDB's cluster version; Cosmos SDK x/upgrade (a plan in the log takes effect at a height and an old binary stops there)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "Same state (a log entry that names the version in force from that point), same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "subscribe",
+   "novel": false,
+   "precedent": "Couchbase DCP stream requests (a cursor of vBucket UUID and seqno; a snapshot marker, then mutations; a stream end when the vBucket moved; a rollback answer); Kafka's fetch from a follower (KIP-392) with leader epoch checks (KIP-320) and committed offsets for a consumer; etcd's watch from a revision, with ErrCompacted",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Mostly no durable state (AMENDMENTS section 4 lists it as no mechanism). Same rules (serve up to the commit point; snapshot, then deltas; 'go elsewhere' against 'expired'; an old epoch is refused), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "read-lease",
+   "novel": false,
+   "precedent": "Ongaro's thesis section 6.4.1 (lease reads); CockroachDB's leases; etcd's raft ReadOnlyLeaseBased",
+   "rows": [
+    "PD",
+    "OBJ"
+   ],
+   "why": "The published form. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "route-forward",
+   "novel": false,
+   "precedent": "ZooKeeper followers forward a write to the leader, one hop; etcd's raft forwards a proposal to the leader and answers ErrProposalDropped when it has none; Raft paper section 8 (a follower redirects the client); Redis Cluster's MOVED",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "No durable state. Same rules (forward once to the known leader; else refuse at once with a redirect), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "route-smart",
+   "novel": false,
+   "precedent": "Redis Cluster clients (a slot table in the client; MOVED and ASK); Kafka clients' metadata cache",
+   "rows": [
+    "SRV",
+    "PD",
+    "ISR",
+    "EMB-V8"
+   ],
+   "why": "The published form. BUY's smart client is the bought system's own, so BUY is left out as the list has it. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "worker-map",
+   "novel": false,
+   "precedent": "Redpanda's shard table (each Raft group is pinned to one core; other cores hand work over with Seastar's submit_to); CockroachDB's Raft scheduler shards",
+   "rows": [
+    "SRV",
+    "PD",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "side-seam",
+   "novel": false,
+   "precedent": "Aeron Cluster (the consensus module and the clustered service are separate agents, or processes, joined by Aeron IPC: shared-memory log buffers); Dapr and Envoy sidecars for the role split",
+   "rows": [
+    "SIDE"
+   ],
+   "why": "It holds no durable or replicated state, so by DEV-10 (a)'s letter it is no mechanism. As a seam it is published: a replication daemon and the app's state machine joined by a shared-memory ring. SPACE counted 1. Close call; it touches SIDE only. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "leader-calls",
+   "novel": false,
+   "precedent": "Cloudflare Durable Objects; Orleans grains; VoltDB procedures run at the partition's leader",
+   "rows": [
+    "SIDE"
+   ],
+   "why": "No durable state. Same rule (a call runs at the unit's one owner; a call in flight across a handover fails or runs again), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "admission-credits",
+   "novel": false,
+   "precedent": "HTTP/2 SETTINGS_MAX_CONCURRENT_STREAMS (RFC 9113 section 5.1.2) and QUIC MAX_STREAMS (RFC 9000 section 4.6): the server grants how many requests a client may have open; AMQP 1.0 link credit; RSocket's LEASE frame; HAProxy maxsslrate for a budget of TLS handshakes per second",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "why": "REQUIREMENTS X17 says to count admission control and to prefer a published fix. Same state (a grant per client link), same rules (the client never holds more than the grant outstanding; the rest wait in the client), same role (keep goodput under overload). The server-side grant was not built here; a row can take the published form as it is. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "tenant-budget",
+   "novel": false,
+   "precedent": "Kafka's quotas (KIP-13: a byte rate per client, held back by the broker); CockroachDB's tenant rate limiter (pkg/kv/kvserver/tenantrate: a token bucket of bytes per tenant)",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "OBJ",
+    "RLOG",
+    "EMB-V8"
+   ],
+   "why": "No durable state. Same state (a byte budget per tenant in a shared process), same rule, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "disk-incarnation",
+   "novel": false,
+   "precedent": "Kafka KIP-853 (a directory id made when the log dir is formatted; a voter is (node id, directory id), so a replaced disk is not the old voter and joins by AddVoter); CockroachDB's StoreIdent (a wiped disk gets a new store id); etcd's WAL (a chained CRC; only a torn tail is repaired, other damage means the member is replaced); Chandra et al., 'Paxos Made Live', PODC 2007, section 5.1 (checksums; a replica that lost its disk state does not vote at first)",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (an incarnation per dir, a checksum per record), same rules (damage means a wipe; a wiped disk is a new replica that never votes as the old one; only a torn, never acknowledged tail is cut), same role. SPACE called it '1 small'. KIP-853 checked on the web on 2026-11-10; the rest cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "genesis-conditional-create",
+   "novel": false,
+   "precedent": "Patroni's /initialize key (patroni/ha.py bootstrap): the first node to create the key in the DCS, an atomic create-if-absent, founds the cluster alone and writes its system id there; every other node joins it as a replica; a data dir with another id is refused ('system ID mismatch'). S3's If-None-Match is the same create-if-absent on an object store",
+   "rows": [
+    "MIN",
+    "RUST",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "SIDE",
+    "COMP"
+   ],
+   "why": "Same state (the cluster's id, created once in an outside store and kept in every dir), same rules (only the winner of the create founds; the others adopt the stored id; a dir with an id never founds again), same role. E-33 calls it 'new here'; it is Patroni's race under another store. checked on the web on 2026-11-10."
+  },
+  {
+   "key": "genesis-init",
+   "novel": false,
+   "precedent": "CockroachDB's `cockroach init` (run once; the cluster id is kept in every store); Kafka KRaft's `kafka-storage format --cluster-id`",
+   "rows": [
+    "DRAFT",
+    "SRV",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "RLOG",
+    "EMB-V8"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "writer-epoch-rlog",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "RLOG"
+   ],
+   "why": "Novel. Fencing a writer by an epoch is published (Kafka's producer epochs; BookKeeper's ledger fencing; Neon's terms on safekeepers), but in each of those the writer is the log's own proposer, or the epoch lives in a metadata store. Here a Raft group with its own leader also carries a writer entry for a server outside it, and the group's leader checks every append against it (9 rules, E-16). I cannot name a system with that state and those rules."
+  },
+  {
+   "key": "loglet",
+   "novel": false,
+   "precedent": "Apache BookKeeper ledgers (an ensemble, a write quorum, an ack quorum); Delos loglets (Balakrishnan et al., OSDI 2020)",
+   "rows": [
+    "SLOG"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "loglet-seal",
+   "novel": false,
+   "precedent": "BookKeeper's ledger recovery (fence the bookies, read forward, write the tail again, close the ledger); Delos's seal and checkTail; Corfu's seal",
+   "rows": [
+    "SLOG"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "loglet-chain",
+   "novel": false,
+   "precedent": "Delos's VirtualLog MetaStore (a chain of loglets changed by a versioned conditional write); Pulsar's managed ledger list in its metadata store",
+   "rows": [
+    "SLOG"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "writer-epoch-slog",
+   "novel": false,
+   "precedent": "Apache Pulsar: a topic's owner broker is named in the metadata store; a new owner opens the managed ledger, which fences the old owner's ledger; the owner itself changes its bookies",
+   "rows": [
+    "SLOG"
+   ],
+   "why": "Same state, same rules (the controller names the writer; the seal fences the old one; the writer changes its own log nodes), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "controller-sessions",
+   "novel": false,
+   "precedent": "Kafka KRaft broker heartbeats and broker epochs (KIP-631: a broker whose heartbeats stop is fenced and must register again); TiKV's store heartbeats to PD",
+   "rows": [
+    "PD",
+    "ISR",
+    "SLOG"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "isr-log",
+   "novel": false,
+   "precedent": "Kafka's partition log and follower fetch",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "isr-set",
+   "novel": false,
+   "precedent": "Kafka's in-sync replicas under KRaft (AlterPartition; KIP-841, KIP-903)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "high-watermark",
+   "novel": false,
+   "precedent": "Kafka's high watermark with acks=all and min.insync.replicas",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "leader-epoch",
+   "novel": false,
+   "precedent": "Kafka's leader epoch (KIP-101, KIP-279, KIP-320)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "eligible-leaders",
+   "novel": false,
+   "precedent": "Kafka KIP-966 (eligible leader replicas)",
+   "rows": [
+    "ISR"
+   ],
+   "why": "The published mechanism. checked on the web on 2026-11-10."
+  },
+  {
+   "key": "obj-log",
+   "novel": false,
+   "precedent": "Delta Lake's commit log (Armbrust et al., VLDB 2020, section 3: numbered log objects, a commit is a put-if-absent of the next number); SlateDB's numbered WAL objects",
+   "rows": [
+    "OBJ"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "obj-manifest",
+   "novel": false,
+   "precedent": "SlateDB's manifest (RFC 0001: every change of writer, WAL position or snapshot is a compare-and-swap on the manifest); Apache Iceberg's catalog pointer swap",
+   "rows": [
+    "OBJ"
+   ],
+   "why": "Same state, same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "obj-writer-lease",
+   "novel": false,
+   "precedent": "Kubernetes leader election on a Lease object (holder, renew time, lease length, a transition count; taken over by a compare-and-swap once the lease has lapsed; the holder stops when it cannot renew); HashiCorp Vault's GCS backend in HA mode (a lock object, a TTL, generation preconditions)",
+   "rows": [
+    "OBJ"
+   ],
+   "why": "Same state (a lease end and an epoch in one compare-and-swap register), same rules, same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-lanes",
+   "novel": false,
+   "precedent": "Bayou (Petersen et al., 'Flexible Update Propagation for Weakly Consistent Replication', SOSP 1997: each server's writes carry its own rising accept stamp and every server holds a prefix of each other server's writes); Golding's timestamped anti-entropy (UCSC thesis, 1992): one message log per originator",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state (a numbered log per author, held by the replicas), same rules (the author stamps; replicas copy in order), same role (leaderless replication). Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-stamps",
+   "novel": false,
+   "precedent": "The last-writer-wins register (Shapiro et al., 'A comprehensive study of Convergent and Commutative Replicated Data Types', 2011) with Lamport's total order (1978); Cassandra's per-cell timestamps; the (view, counter) order of viewstamps (Oki and Liskov, PODC 1988)",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state (a stamp per cell), same rule (the newer stamp wins), same role. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-digests",
+   "novel": false,
+   "precedent": "Bayou's version vectors in anti-entropy (SOSP 1997); Scuttlebutt digests (van Renesse et al., LADIS 2008), as Cassandra's gossip sends them",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state (per author, the highest number held), same rules (swap, then send what the other lacks), same role. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-tombstones",
+   "novel": false,
+   "precedent": "Wuu and Bernstein, 'Efficient solutions to the replicated log and dictionary problems', PODC 1984 (a delete record is kept until every node is known to have it); Cassandra's tombstones",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state (a marker per removed cell), same rules (it blocks an older change; it is dropped once every holder is past it), same role. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-frontiers",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "Purging a log once every node has acknowledged it is published (Golding 1992; Wuu and Bernstein 1984), but here the frontier is per (author, row), over holder sets that change, on floors that must be crash-stable. I am not sure the published rule covers that, so it is novel. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-orphans",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "No precedent I can name: a frozen slice copy that waits for a teacher or for the new keepers' proof is v4's own. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-sheds",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "No precedent I can name for a keeper that deletes its copy only on its successors' proof, or for a link queue thrown away and healed by a digest. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-latches",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "DESIGN-V5 10.1 lists the teacher latch among 'protocols with no literature'. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-teachers",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "A staged state transfer with an end marker is close to Raft's InstallSnapshot, but the 'part of a slice the learner lacks' and its tie to latches and floors are v4's own. Not sure, so novel. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-floors",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "DESIGN-V5 10.1 lists the pp floor law among 'protocols with no literature'. Acknowledgement matrices are published (Wuu and Bernstein), but not this law per (author, row) with a possession floor and a durable floor. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-feed-words",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "DESIGN-V5 10.1 lists FEED words among 'protocols with no literature'. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-in-sync-sets",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "The name is Kafka's, but there a controller keeps the set in its log; here holders prove it to each other with floors. The list says its reading of v4 was not checked. Not sure, so novel. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-eligible-leaders",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "The name is Kafka's (KIP-966), but with no controller and ring ownership the rules are not the same. The list says its reading of v4 was not checked. Not sure, so novel. Judged from the list's text of v4; the code was not re-read. REQUIREMENTS section 5 counts it among v4's 13 without a precedent test."
+  },
+  {
+   "key": "v4-views",
+   "novel": true,
+   "precedent": "",
+   "rows": [
+    "V4"
+   ],
+   "why": "Joint consensus is published (Raft thesis chapter 4), but v4 runs it as ballots among leaderless members, with held members (DESIGN-V5 10.1: 'no literature') and a leave ballot that drops the dead. Not one of the thirteen."
+  },
+  {
+   "key": "v4-ring",
+   "novel": false,
+   "precedent": "Dynamo (DeCandia et al., SOSP 2007, sections 4.2, 4.3 and 4.5: a ring over the members picks the coordinator of a key, and a request is forwarded to it); Riak's vnode-coordinated puts",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state (the ring's pick per row), same rules (forward to the owner, which stamps; a view change moves ownership), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "v4-confirm-ladder",
+   "novel": false,
+   "precedent": "MongoDB's write concern per write ({w: n or majority, j: true}: how many members hold it, in memory or on disk); Cassandra's consistency level per write",
+   "rows": [
+    "V4"
+   ],
+   "why": "Same state, same rule (answer once enough holders attest, at the rung asked for), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "outside-log",
+   "novel": false,
+   "precedent": "NATS JetStream itself (a bought production system; E-44 ran fero's patterns on 2.10.22)",
+   "rows": [
+    "BUY"
+   ],
+   "why": "Everything in it is the bought system's own published work, so nothing here is fero's to count."
+  }
+ ],
+ "added": [
+  {
+   "key": "consumer-groups",
+   "name": "Consumer groups (#groups)",
+   "axis": "all",
+   "option": "every row that serves P-08 (the groups library)",
+   "layer": "L5",
+   "state": "In #groups: the members of each consumer group, as rows with leases, and the group's generation. The group's committed cursors are rows written under a fence on the generation.",
+   "rules": "A member joins and renews its lease. The assignment of slots to members is a pure function of the live members and the generation. A cursor commit carries the generation and is refused below it, so a zombie consumer cannot commit.",
+   "reads": [
+    "slot.table",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "group.members",
+    "sub.cursor"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 5.3 'Consumer groups' and 5.1; REQUIREMENTS P-08; E-30 (the cursor side). On BUY the consumers are JetStream's own, inside outside-log.",
+   "model": "E-30 modelled the cursor and the outputs, not the membership or the generation fence",
+   "novel": false,
+   "precedent": "Kafka's group coordinator (members kept alive by heartbeats under a session timeout, a generation id, an assignment per generation, OffsetCommit refused with ILLEGAL_GENERATION; KIP-848)",
+   "why": "The list has the cursor (sub.cursor) but not the group's member rows and generation, which are named, replicated state with their own rules. Same state, same rules, same role as Kafka's. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "queue-claims",
+   "name": "Queue claims (leases and delivery counts on message rows)",
+   "axis": "all",
+   "option": "every row that serves P-09 (the queue library, on the claim op)",
+   "layer": "L5",
+   "state": "Per message row of a queue: its claim's lease end and its delivery count. A dead-letter resource holds the rows past the limit.",
+   "rules": "take(n) is one claim at the writer: the first n unclaimed rows, leased from writer time, with the count raised. An ack removes the row; a lapsed lease makes it claimable again; past the limit it moves to the dead-letter resource. A take hands over what it has at once (A-10).",
+   "reads": [
+    "outside.log",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "queue.claims"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 5.3 'Queue'; REQUIREMENTS P-09; AMENDMENTS A-10 (a take hands over what it has at once); E-44 (measured on JetStream: 294 jobs acked once, 6 dead-lettered)",
+   "model": "",
+   "novel": false,
+   "precedent": "Amazon SQS (a visibility timeout per received message, a receive count, a redrive to a dead-letter queue past maxReceiveCount); Redis Streams' pending entries with delivery counts (XCLAIM)",
+   "why": "Missed by the list, which names the claim op only inside writer-judging. Same state, same rules, same role as SQS. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "presence-rows",
+   "name": "Presence (rows that live while a session lives)",
+   "axis": "all",
+   "option": "every row that serves presence (rows: { while: 'session' })",
+   "layer": "L2",
+   "state": "A session is a row in #sessions with a lease the client renews. Rows written while: 'session' carry its id.",
+   "rules": "Each group's writer follows #sessions and removes a lapsed session's rows, as log entries.",
+   "reads": [
+    "group.leader",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "group.rows",
+    "session.registry"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 5.3 'Presence' and 5.1; AMENDMENTS K-11 (session expiry by #sessions' writer time). The registry exists in the rows with D win, pid and txn too, where the list's client-sessions does not put it.",
+   "model": "",
+   "novel": false,
+   "precedent": "ZooKeeper's ephemeral nodes (a node carries its session's id and is deleted, through the log, when the session expires); etcd's leases with attached keys; across groups, CockroachDB's sqlliveness sessions (system.sqlliveness; holders elsewhere check the session and clean up its claims)",
+   "why": "Missed by the list. Same state (a session with a lease; rows tagged with it), same rule (the rows go when the session lapses), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "cluster-credentials",
+   "name": "Cluster credentials in #meta (CA envelopes, join tokens, certificates, the rotating secret)",
+   "axis": "all",
+   "option": "every row with a metadata group",
+   "layer": "L4",
+   "state": "In #meta: the cluster CA key as envelopes encrypted to each #meta voter's key; single-use join tokens; one certificate per member and the revoked ones; the cluster secret, current and next.",
+   "rules": "A join spends one join token and gets the member its certificate. A removed member's certificate is revoked. The secret rotates through a window in which both values are valid.",
+   "reads": [
+    "group.config",
+    "meta.members"
+   ],
+   "writes": [
+    "meta.credentials"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.5 'Identity and security'; REQUIREMENTS OPS-14",
+   "model": "",
+   "novel": false,
+   "precedent": "Docker swarm mode (its Raft store holds the cluster CA, the join tokens and the node certificates; `docker swarm join-token --rotate`, `docker swarm ca --rotate`); CockroachDB's join tokens (`cockroach node create-join-token`); kubeadm bootstrap tokens",
+   "why": "Missed by the list: named, replicated state with its own rules. Same state, same rules, same role as swarm mode. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "forks",
+   "name": "Forks (a new resource that starts from the parent's snapshots)",
+   "axis": "all",
+   "option": "every row with a metadata group (fero test, TEST-05 and TEST-06)",
+   "layer": "L1",
+   "state": "In #meta, per fork: a new resource whose groups start from named snapshots and segments of the parent's groups.",
+   "rules": "A fork writes one #meta record per group and copies nothing. The parent may not drop a snapshot or a segment that a fork names.",
+   "reads": [
+    "group.snapshot",
+    "journal.segments",
+    "store.objects"
+   ],
+   "writes": [
+    "meta.catalog",
+    "meta.directory",
+    "meta.forks"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 6.2 (piece 8: 'a fork is a new resource whose shards start from the parent's shards' snapshots') and 4.1 ('no fork references it'); REQUIREMENTS TEST-05, TEST-06; E-06 (measured)",
+   "model": "",
+   "novel": false,
+   "precedent": "Neon's branches (a timeline with an ancestor timeline and an ancestor LSN shares the parent's layers, and GC keeps what a branch still needs); Delta Lake's shallow clones",
+   "why": "Missed by the list, which has only the tier's guard 'no fork still reads it'. Same state (a record that names the parent's immutable files), same rules (copy nothing; pin what is named), same role. cited from memory, sure of the system and the mechanism."
+  },
+  {
+   "key": "input-recorder",
+   "name": "Recorder of kernel inputs",
+   "axis": "all",
+   "option": "every row with a deterministic kernel of its own (OPS-11 d)",
+   "layer": "L0",
+   "state": "Per process: a recording of every kernel input (whole frames, ticks, disk and object-store completions), with bulk bytes named by journal reference.",
+   "rules": "Every input is recorded before the kernel steps on it. The journal is kept for as long as the recorder's window refers to it. A dump replays byte for byte.",
+   "reads": [
+    "durable.log"
+   ],
+   "writes": [
+    "journal.segments",
+    "recorder.tape"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "REQUIREMENTS OPS-11 (d); AMENDMENTS A-09 (three recorder rules, counted there as format rules); E-42 (measured: 1.1 to 1.7 % of a core; BUY and V4 cannot have it)",
+   "model": "",
+   "novel": false,
+   "precedent": "Aeron Cluster with Aeron Archive (every input to the state machine is recorded in order and can be replayed); VoltDB's command logging (inputs logged, replayed deterministically); rr (record every nondeterministic input, replay exactly)",
+   "why": "A-09 counts it as format rules, but it is durable state (the tape) with a rule that holds the journal's retention, so by DEV-10 (a) it is a mechanism. Recording inputs for an exact replay is published. PD, ISR, SLOG and OBJ are not in E-42's list, so they are left out. cited from memory, sure of the system and the mechanism."
+  }
+ ],
+ "regrouped": [
+  {
+   "keys": [
+    "client-sessions"
+   ],
+   "into": "two units: (1) the session registry, #sessions (per client life, a lease; one resource in its own group); (2) the per-group session tables (outcomes and floor, tagged by slot)",
+   "why": "The list merged two pieces of state with different homes and different writers. The registry is also in the rows with D win, pid and txn, for presence (DESIGN-V5 5.3); the added entry presence-rows carries it there. Both units are published, so DEV-01 does not move; DEV-02's pairs can."
+  },
+  {
+   "keys": [
+    "restore-mark"
+   ],
+   "into": "kept as one unit (the restore), but it holds two pieces of state: the epoch high-water mark in the store, which every slot move also writes, and the session generation, which only a restore writes",
+   "why": "The list merged two. If the settle step splits them, both halves are novel by my test (PostgreSQL's timelines are near the first half only), and every row with #meta gains one more; no row moves against another."
+  },
+  {
+   "keys": [
+    "planner-hints"
+   ],
+   "into": "one unit: the placement record in the group's log (target and preferred leader), written only by a hint that names the config it read. The drain, retire and gone marks are the state mark of meta-members; the lease row is the mover's lease (move.lease)",
+   "why": "The list merged three pieces of state. Only the placement record and the gone rule lack a precedent."
+  },
+  {
+   "keys": [
+    "genesis-conditional-create",
+    "genesis-init"
+   ],
+   "into": "one mechanism, genesis (the cluster id), with two founding rules; no row carries both",
+   "why": "The list split one piece of state (cluster.id) in two. AMENDMENTS A-08 says genesis stays 1 mechanism. The split changes no row's count."
+  },
+  {
+   "keys": [
+    "slow-leader-controller",
+    "slow-leader-self"
+   ],
+   "into": "one mechanism, the slow-leader rule (a latency score per member and a move of leadership), in two forms; no row carries both",
+   "why": "The list split one piece of state (link.score) in two. Kept apart for the count only because the two forms differ in precedent."
+  },
+  {
+   "keys": [
+    "raft-term-vote",
+    "raft-prevote-checkquorum",
+    "raft-leader-transfer",
+    "raft-readindex"
+   ],
+   "into": "by DEV-10 (a) one unit, leadership (term, vote and who leads); PreVote, CheckQuorum, leader transfer and ReadIndex hold no durable state and are rules of it",
+   "why": "The list split the rules of one piece of state. All are published, so DEV-01 does not move; fewer units mean fewer pairs for DEV-02."
+  },
+  {
+   "keys": [
+    "raft-config",
+    "healing-self"
+   ],
+   "into": "by DEV-10 (a)'s letter one unit: the group's configuration and every rule that writes it. Healing keeps no state of its own",
+   "why": "Kept apart here, as SPACE's ladder does (R1.H), so the healing rules get their own precedent test. Both pass it."
+  },
+  {
+   "keys": [
+    "move-policy",
+    "split-policy"
+   ],
+   "into": "no unit of their own by DEV-10 (a): each is a load policy with no durable state and no safety rule (A-18). The one durable piece, DRAFT's lease row in #meta, is state of the mover",
+   "why": "Counted 0 in every row either way, since the policy is published."
+  }
+ ]
+}
