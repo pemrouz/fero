@@ -1,0 +1,6 @@
+stuck with a live majority, judged at term <= 2: 112
+  candidate  0
+  nonvoter   0
+  window-2   112
+  other      0
+

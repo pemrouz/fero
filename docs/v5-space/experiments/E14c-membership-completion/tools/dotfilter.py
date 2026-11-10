@@ -6,14 +6,14 @@ states fits on the disk.
   dotfilter.py IN.dot OUT_PREFIX [--labels]
 
 Writes OUT_PREFIX.g.gz, one line per node and per edge:
-  N id goal live faults nup maxterm init plan
+  N id goal live faults nup maxterm init plan open
   E src dst
 and, with --labels, OUT_PREFIX.l.gz with each node's full TLC label
 ("id<TAB>label"), for printing a trace later.
 
 The flags are read from MCferoraft's variables in each state's label:
 goalv, livev, faults, up (counted), currentTerm (its largest value) and
-planv (2 when the model has no such variable).
+planv and openv (2 when the model has no such variable).
 """
 import gzip
 import re
@@ -27,6 +27,7 @@ F_LIVE = re.compile(r'/\\\\ livev = (TRUE|FALSE)')
 F_FAULTS = re.compile(r'/\\\\ faults = (\d+)')
 F_UP = re.compile(r'/\\\\ up = (\{[^}]*\})')
 F_PLAN = re.compile(r'/\\\\ planv = (TRUE|FALSE)')
+F_OPEN = re.compile(r'/\\\\ openv = (TRUE|FALSE)')
 F_TERM = re.compile(r'/\\\\ currentTerm = \(([^)]*)\)')
 TERMV = re.compile(r':> (\d+)')
 
@@ -57,7 +58,8 @@ def main():
             t = F_TERM.search(lab)
             mt = max([int(x) for x in TERMV.findall(t.group(1))] or [0]) if t else 0
             pl = F_PLAN.search(lab)
-            g.write('N %s %d %d %s %d %d %d %d\n' % (
+            op = F_OPEN.search(lab)
+            g.write('N %s %d %d %s %d %d %d %d %d\n' % (
                 m.group(1),
                 F_GOAL.search(lab).group(1) == 'TRUE',
                 F_LIVE.search(lab).group(1) == 'TRUE',
@@ -65,7 +67,8 @@ def main():
                 count_up(F_UP.search(lab).group(1)),
                 mt,
                 'filled' in (m.group(5) or ''),
-                2 if pl is None else (pl.group(1) == 'TRUE')))
+                2 if pl is None else (pl.group(1) == 'TRUE'),
+                2 if op is None else (op.group(1) == 'TRUE')))
             if lf:
                 lf.write('%s\t%s\n' % (m.group(1), lab))
             nn += 1

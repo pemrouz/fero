@@ -1,0 +1,32 @@
+judged states (highest term <= 2) in three-disk and not in three-disk-t2: 10; of which with a live majority: 0
+steps into them: 12, from states of highest term {2: 4, 3: 8}
+721968819796947994: up {s1, s2, s4} | lost disk {s3} | terms (s1 :> 2 @@ s2 :> 2 @@ s3 :> 0 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s3} L{}] @@ s2 :> [V{s1, s2, s3} L{}] @@ s3 :> [V{} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s3}, {s3}
+-3194174234249501946: up {s1, s2, s4} | lost disk {s3} | terms (s1 :> 2 @@ s2 :> 2 @@ s3 :> 0 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s3} L{}] @@ s2 :> [V{s1, s2, s3} L{}] @@ s3 :> [V{} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s3}, {s3}
+-6749248121705296101: up {s1, s3, s4} | lost disk {s2} | terms (s1 :> 2 @@ s2 :> 0 @@ s3 :> 2 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s2} L{}] @@ s2 :> [V{} L{}] @@ s3 :> [V{s1, s2, s3} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s2}, {s2}
+-8276374653843752188: up {s1, s3, s4} | lost disk {s2} | terms (s1 :> 2 @@ s2 :> 0 @@ s3 :> 2 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s2} L{}] @@ s2 :> [V{} L{}] @@ s3 :> [V{s1, s2, s3} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s2}, {s2}
+-1323784744950926994: up {s1, s2, s4} | lost disk {s3} | terms (s1 :> 2 @@ s2 :> 2 @@ s3 :> 0 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s3} L{}] @@ s2 :> [V{s1, s2, s3} L{}] @@ s3 :> [V{} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s3}, {s3}
+-719487537279750885: up {s1, s3, s4} | lost disk {s2} | terms (s1 :> 2 @@ s2 :> 0 @@ s3 :> 2 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s2} L{}] @@ s2 :> [V{} L{}] @@ s3 :> [V{s1, s2, s3} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s2}, {s2}
+-5399381397614455410: up {s1, s2, s4} | lost disk {s3} | terms (s1 :> 2 @@ s2 :> 2 @@ s3 :> 0 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s3} L{}] @@ s2 :> [V{s1, s3} L{}] @@ s3 :> [V{} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s3}, {s3}
+5689324069435818948: up {s1, s3, s4} | lost disk {s2} | terms (s1 :> 2 @@ s2 :> 0 @@ s3 :> 2 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s2} L{}] @@ s2 :> [V{} L{}] @@ s3 :> [V{s1, s2} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s2}, {s2}
+3808517776823009968: up {s1, s2, s4} | lost disk {s3} | terms (s1 :> 2 @@ s2 :> 2 @@ s3 :> 0 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s3} L{}] @@ s2 :> [V{s1, s3} L{}] @@ s3 :> [V{} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s3}, {s3}
+7836737440316177932: up {s1, s3, s4} | lost disk {s2} | terms (s1 :> 2 @@ s2 :> 0 @@ s3 :> 2 @@ s4 :> 0) | livev FALSE
+    applied config ( s1 :> [V{s2} L{}] @@ s2 :> [V{} L{}] @@ s3 :> [V{s1, s2} L{}] @@ s4 :> [V{} L{}] )
+    committed configurations, in order: {s1, s2, s3}, {s1, s2}, {s2}

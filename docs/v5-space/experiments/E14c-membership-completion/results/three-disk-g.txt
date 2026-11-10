@@ -1,0 +1,43 @@
+# run three-disk-g: scenario three+spare, {"AllowDrop": false, "AllowLoseDisk": true, "AllowStepDown": false, "Canon": true, "LeaderLease": true, "MaxTermLimit": 4, "NoConfAfterFault": true, "Plan": "replace", "ProgressAbove": 2, "StopAtGoal": true}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec GSpec (MCferog.tla), CommunityModules-deps.jar, 1 segment(s), [750] s wall, TLC -workers 2 -fp 7
+# done: True
+
+## segment 1
+# load at start: 2.22 4.85 7.31 8/128 22579
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed 2366720416782276546 with 2 workers on 4 cores with 2731MB heap and 64MB offheap memory [pid: 22584] (Linux 6.18.44-fc-v338 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-10 03:48:59)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-10 03:49:00.
+Progress(10) at 2026-11-10 03:49:03: 481 states generated (481 s/min), 255 distinct states found (255 ds/min), 65 states left on queue.
+Progress(37) at 2026-11-10 03:50:03: 72,762 states generated (72,281 s/min), 32,716 distinct states found (32,461 ds/min), 4,868 states left on queue.
+... (9 progress lines)
+Progress(65) at 2026-11-10 04:00:04: 884,146 states generated (124,824 s/min), 372,131 distinct states found (48,923 ds/min), 8,379 states left on queue.
+Progress(82) at 2026-11-10 04:01:04: 997,416 states generated (113,270 s/min), 419,309 distinct states found (47,178 ds/min), 1,535 states left on queue.
+Checkpointing of run st/26-11-10-03-48-59.229
+Checkpointing completed at (2026-11-10 03:53:04)
+Checkpointing of run st/26-11-10-03-48-59.229
+Checkpointing completed at (2026-11-10 03:57:04)
+Checkpointing of run st/26-11-10-03-48-59.229
+Checkpointing completed at (2026-11-10 04:01:04)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.4E-8
+  based on the actual fingerprints:  val = 6.4E-9
+1035509 states generated, 437510 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 149.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 16 and the 95th percentile is 3).
+Finished in 12min 29s at (2026-11-10 04:01:28)
+
+# agef2.py (AG EF goal over progress steps)
+states 437510  edges 649357 (raw lines 1035508, ends not found 0)  initial 1
+goal states 206339  can reach goal 437510
+judged states (highest term <= 2) 340671
+stuck states 0  of which with a live majority 0  (not judged, near the term bound: 0)
+plan: judged fault-free states with a live majority 59627, plan-done states 65219, cannot finish the plan 0
+  of the judged: the change budget still allows the plan in 59627, cannot finish 0  -> PASS
+  the leader spent the budget another way in 0 (not judged; of these can still finish: 0, which must be 0)
+
+RESULT: PASS (no stuck state with a live majority)

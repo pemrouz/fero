@@ -13,6 +13,16 @@ Kinds (checked in this order):
               Raft, where a candidate times out and stands again.
   nonvoter    an up server leads but is not a voter of its own applied
               configuration (E-14's goal asks for a voter leader).
+  window-N    E-14b's two-voter window, in general form: nobody leads or
+              stands; a majority of the latest COMMITTED configuration is
+              up; but no up server could win an election in the latest
+              configuration IT knows to be committed (it is no voter of it,
+              or a majority of its voters is not up, or a voter it needs
+              holds a more up-to-date log). N is the size of the older
+              configuration known to the up servers that could win in the
+              latest one (its voters with the most up-to-date log): they
+              have not heard that the change committed. N is 0 when no
+              such server is up.
   other       anything else.
 Needs the run's graph and label files (run with E14C_KEEP=1).
 """
@@ -47,6 +57,55 @@ def field(lab, name):
     return re.sub(r'\s+', ' ', m.group(1)) if m else ''
 
 
+ENT = re.compile(r'\[\s*term \|-> (\d+),\s*type \|-> "(\w+)",\s*value \|->\s*\[(?:newconf \|-> \{([^}]*)\}, learners \|-> \{[^}]*\}|[^\]]*)\]\s*\]')
+CIDX = re.compile(r'(s\d) :> (\d+)')
+
+
+def names(v):
+    return set(x.strip() for x in (v or '').split(',') if x.strip())
+
+
+def logs_of(lab):
+    """Each server's log as a list of (term, voters or None)."""
+    out = {}
+    for part in re.split(r'\s*@@\s*(?=s\d :>)', field(lab, 'log').strip('() ')):
+        m = re.match(r'\s*(s\d) :>', part)
+        if m:
+            out[m.group(1)] = [(int(t), names(v) if ty == 'ConfigEntry' else None) for t, ty, v in ENT.findall(part)]
+    return out
+
+
+def window(lab, up, roles):
+    """The size N of the window (see the header), or None."""
+    committed = [names(v) for v in re.findall(r'newconf \|-> \{([^}]*)\}', field(lab, 'ctl'))]
+    latest = committed[-1] if committed else set()
+    if not latest or len(latest & up) * 2 <= len(latest):
+        return None
+    logs = logs_of(lab)
+    ci = {s: int(v) for s, v in CIDX.findall(field(lab, 'commitIndex'))}
+
+    def known(s):
+        cs = [v for _, v in logs.get(s, [])[:ci.get(s, 0)] if v is not None]
+        return cs[-1] if cs else set()
+
+    def key(s):
+        lg = logs.get(s, [])
+        return (lg[-1][0] if lg else 0, len(lg))
+
+    def can_win(s):
+        k = known(s)
+        if s not in k:
+            return False
+        ok = [j for j in k & up if j == s or key(j) <= key(s)]
+        return len(ok) * 2 > len(k)
+    if not up or any(can_win(s) for s in up):
+        return None
+    # The up servers with the most up-to-date log that are voters of the
+    # latest configuration: the ones that would win in it, if they knew it.
+    top = max(key(s) for s in up)
+    return max([len(known(s)) for s in up if key(s) == top and s in latest] or [0])
+
+
 def kind(lab):
     lab = unescape(lab)
     up = set(x.strip() for x in (UP.search(lab).group(1) if UP.search(lab) else '').split(',') if x.strip())
@@ -57,6 +116,10 @@ def kind(lab):
         return 'candidate'
     if any(roles.get(s) == 'Leader' and s not in conf.get(s, set()) for s in up):
         return 'nonvoter'
+    if not any(roles.get(s) == 'Leader' for s in up):
+        n = window(lab, up, roles)
+        if n is not None:
+            return 'window-%d' % n
     return 'other'
 
 
@@ -64,7 +127,7 @@ def main():
     wd, judge = sys.argv[1], int(sys.argv[2])
     segs = sorted(glob.glob(os.path.join(wd, 'seg*.g.gz')))
     labs = sorted(glob.glob(os.path.join(wd, 'seg*.l.gz')) + glob.glob(os.path.join(wd, 'seg*.l.xz')))
-    ids, goal, live, faults, nup, mterm, init, es, ed, plan = agef2.load(segs)
+    ids, goal, live, faults, nup, mterm, init, es, ed, plan, _open = agef2.load(segs)
     ids = np.frombuffer(ids, dtype=np.int64)
     goal = np.frombuffer(goal, dtype=np.uint8).astype(bool)
     live = np.frombuffer(live, dtype=np.uint8).astype(bool)
@@ -97,7 +160,7 @@ def main():
     for k in want:
         kinds.setdefault(kind(lab.get(k, '')), []).append(k)
     print('stuck with a live majority, judged at term <= %d: %d' % (judge, len(want)))
-    for kk in ('candidate', 'nonvoter', 'other'):
+    for kk in ['candidate', 'nonvoter'] + sorted(k for k in kinds if k.startswith('window')) + ['other']:
         print('  %-10s %d' % (kk, len(kinds.get(kk, []))))
     if '--trace' not in sys.argv:
         return

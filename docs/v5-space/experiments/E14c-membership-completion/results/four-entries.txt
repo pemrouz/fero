@@ -1,0 +1,4 @@
+nodes 3576095 by term {2: 453346, 3: 2974195, 4: 148554}
+term-2 states with a step into term 3: 7500  distinct term-3 states they enter: 12633
+above term 2: 3122749  goal (faulted) above term 2: 168185  strictly after such a goal state: 54261
+above term 2 and not after a faulted goal state: 3068488  of which faults=0: 0
