@@ -1,0 +1,1558 @@
+{
+ "group": "TEST-OPS",
+ "judge": "j2",
+ "cells": [
+  {
+   "req": "TEST-01",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-04"
+    ],
+    "why": "A solo node with the whole stack in one process ran on E-22's prototype: a fresh node plus a scenario took 3.6 ms at p99 (bar 5 ms) and 200 chaos seeds took 0.65 s (bar 1 s). With a real Raft core in the sim, 200 seeds took 396 ms for the TS port and 384 ms for raft-rs built as WASM, one instance per worker (E-04, A-30). T's café itself does not exist for v5 yet, so this is the prototype's number."
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "Its Rust variant has the shape E-04 measured (raft-rs as WASM in the sim, 384 ms for 200 seeds). But the row has not chosen between Rust and Go, and no Go server was run in process or as WASM. Its native row fold was not in E-04's run either: data folded in JS there.",
+     "closes": "Fix the row on its Rust variant and re-time E-04 with the native fold, or run etcd's Go raft in the sim. Then phase 1's solo bench."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "No experiment built a PD-shaped kernel (an LSM store, two-phase commit, a timestamp oracle) or ran it in one process. E-04's WASM result is for a small log kernel and raft-rs only.",
+     "closes": "A PD-shaped solo node timed against the 5 ms and 1 s bars. Nothing in this study built it."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "ISR's kernel is TypeScript first, so one process can hold it. But E-22 timed the API on five kernel operations (K lib), and no ISR-shaped prototype was timed.",
+     "closes": "TEST-01's bench on an ISR-shaped prototype, phase 1."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has a socketless solo node in one process (listen: false). Nothing here timed a fresh node plus a scenario, or 200 chaos seeds, on v4, and T's café was not run on it.",
+     "closes": "Time T's café on v4 against the 5 ms and 1 s bars."
+    },
+    "BUY": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: BUY's log, replication and failover are nats-server, a separate Go program; fero owns 0 lines of L0 and L1 there (E-44). Step 2: a Node process can reach nats-server only over sockets; it cannot load that program into itself. Step 3: so no socketless solo node can hold the whole stack. A fake log in its place is other code, which TEST-10 rules out. E-44 lists TEST-01 among BUY's gaps by construction (gap 10)."
+    }
+   }
+  },
+  {
+   "req": "TEST-02",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-21",
+     "E-04"
+    ],
+    "why": "E-22 ran each seed twice and got the same trace hash and the same client history (200 worlds), with timers, ids and ctx on the world's clock. Writer time is the median of the members' clocks at window 0 (A-23, E-21), so in a world it follows the world's clock. A Rust kernel in WASM also replayed a seed exactly (E-04)."
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "Its Rust variant holds as RUST does (a seed replays exactly in WASM, E-04). Its Go variant never ran under a seed: Go's scheduler and map order would have to be pinned first, and the row has not chosen.",
+     "closes": "Pick the Rust variant, or show two byte-identical runs of the Go kernel under one seed."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Writer time comes from a timestamp oracle (T tso) and positions from hybrid clocks. No experiment ran either under a world's clock and seed.",
+     "closes": "A seeded run of a PD-shaped prototype, twice, compared byte for byte."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21",
+      "E-22"
+     ],
+     "why": "E-21 gives ISR the same writer time rule (the median, window 0). But the byte-identical check ran on E-22's K lib prototype only; no ISR-shaped kernel ran under a seed.",
+     "closes": "E-22's determinism check on an ISR-shaped prototype, phase 1."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4's simulator replays a seed (CLAUDE.md). But fero.now(), fero.id() and ctx.now() are fero test's pieces and are not in v4, and v4 has no writer time (its T cell is empty).",
+     "closes": "Build T's clock and ids on v4 and run one seed twice."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "fero's own layers can follow a world's clock. But the writer's time and every election timer belong to nats-server, which no seed controls (E-44). A run is byte-identical only against a stand-in log.",
+     "closes": "Not closable on the real log. A stand-in world would need its own check against JetStream."
+    }
+   }
+  },
+  {
+   "req": "TEST-03",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-20",
+     "E-22"
+    ],
+    "why": "Call keys in #calls ran in E-22's prototype: one check with no faults, and a smoke re-run after a server died that wrote the row once. The retried-call chaos phase was not run. E-20 did not model keyed calls apart (G-12); it reasons one more rule: a session per call under sess, or the call key as issuer under win.",
+    "closes": "Make E-22's smoke test a chaos check with zero doubles, and add keyed calls to E-20's model. Phase 2."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Transaction ids under two-phase commit (D txn) could hold a call's claim, but no experiment modelled or built keyed calls for this shape.",
+     "closes": "A keyed-call model and a retried-call check on a PD-shaped prototype."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "Producer ids (D pid, A-22: 16 rules) dedup a producer's sends, not a call key. How a keyed call maps onto them was neither modelled nor built.",
+     "closes": "Keyed calls in E-20's pid model, then the retried-call chaos phase."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 has no call keys. Its own sim pins one forwarded write that commits twice across an ownership move (STATUS.md, scoped sweep A3 seed 6, KNOWN_UNSAFE), which is the kind of double this test counts.",
+     "closes": "Call keys on v4, and a fix for the stranded-commit class, then the retried-call phase."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A claim row per key works on JetStream as 'publish only if the subject is empty' (E-44's lock: 60 acquires through a leader kill, never two holders). But a re-run's writes are counted twice after the row's next write, and expiry is per stream, so one ttl per stream (E-44 gaps 2 and 7).",
+     "closes": "A keyed-call check on JetStream through a leader kill. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-04",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22"
+    ],
+    "why": "API.md has fero.world and stand-ins, but E-22's prototype built only the sim world: bind, the config cascade and the loud 'unbound' error are marked not built. The piece sits above the kernel, so no row differs on it.",
+    "closes": "Bind tests in the fero test build (L4 and L5), phase 1."
+   }
+  },
+  {
+   "req": "TEST-05",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "E-22's P-18 check records a tape as a resource, finds an answer by match key, replays in order and forgets past its window. It passed in 300 of 300 worlds in each of the three modes. A tape keeps its recordings in one partition, so replay order is that partition's log order (a simulation; no real disk)."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "A tape is a resource with history, which this row can hold. But the record-then-replay check ran on E-22's K lib prototype only.",
+     "closes": "P-18's check on a PD-shaped prototype."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "A tape is a resource with history, which a Kafka-shaped log holds well. But the record-then-replay check ran on E-22's K lib prototype only.",
+     "closes": "P-18's check on an ISR-shaped prototype."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 keeps cells by last-writer-wins and compacts its lanes. It has no history window, so a 14-day tape read back in order is not there today.",
+     "closes": "A history resource on v4, then P-18's check."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A stream with a 14-day age limit and one subject per match key fits JetStream. E-44 built four other patterns, not tapes.",
+     "closes": "P-18's check on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-06",
+     "E-22"
+    ],
+    "why": "A fork is designed as one record that points at immutable snapshots and segments (DESIGN-V5 6.2), but no prototype built it: E-22 left fero.fork unbuilt, and E-06 measured only the memory side. There a fork that runs costs O(rows): 2.6 s and about 250 B a row at 1e6 rows. The bytes written by a fork of a 1 GB resource were never counted.",
+    "closes": "The tier phase: fork a 1 GB resource and count the bytes written; crossing K-21."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "An LSM store can share files between two stores without copying them (cited practice, not checked here), so a fork need not copy. Nothing here built or measured it.",
+     "closes": "A fork test on a PD-shaped store."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no immutable snapshot layers and no object tier to point at (S walg; cells are overwritten and lanes compacted), so a fork today would be a copy. No option of the row forbids adding such a store.",
+     "closes": "An immutable snapshot store on v4, then the 1 GB fork test."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream offers mirrors and sources, which copy. A fork as one record would need an overlay that fero writes above the stream; it was not built.",
+     "closes": "A fork overlay on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-07",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-06"
+    ],
+    "why": "Undoing a rerun's records by their inverses costs 0.03 to 0.05 ms at every size up to 1e6 rows, and a rerun from a snapshot costs 0.6 to 1.2 ms at the café's size, against 10 ms (E-06, on fero v4's real seam with data). It serves reruns in tape order; a jump costs the inputs between. A group view adds its own cost (165 ms at 1e6 rows) until data's group emits per-row deltas (A-10)."
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-06"
+     ],
+     "why": "The server folds plain rows in Rust, so the state to rewind is not held by data. E-06 measured data's undo only.",
+     "closes": "E-06's rerun bench on the native fold, beside DATA-09's differential test."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-06"
+     ],
+     "why": "The server's state is in its own store with many versions per row, not in data. E-06 measured data's undo only.",
+     "closes": "A rerun bench on a PD-shaped store."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-06",
+      "E-44"
+     ],
+     "why": "The fold is data in the client, so E-06's undo applies to it. But the state just before an input also lives in the JetStream stream, which fero cannot rewind in place; a rerun needs a stand-in log.",
+     "closes": "A rerun bench against a stand-in log. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22"
+    ],
+    "why": "Every record has a log position in these designs, and E-22's client histories already carry versions. But no capture format and no viewer test exist for v5 yet.",
+    "closes": "The viewer test in the fero test phase; DEV-09 fixes the capture's position shape in phase 1."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has a capture viewer, but its positions are Lamport stamps per cell and per-origin lanes (O lamp: no total order per partition). T's captures of inputs, asks and answers are not in v4.",
+     "closes": "T's capture format on v4, then the viewer test."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Stream sequence numbers can serve as positions for client-side captures. No capture format or viewer was built on JetStream.",
+     "closes": "A viewer test on JetStream captures. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22",
+     "E-04"
+    ],
+    "why": "E-22 ran every pattern's methods as seeded sim steps with kills, races and resends, over data's real fold but a modelled log, not the real replication layer. E-04 ran a real Raft core with data's fold in the sim, with no app steps. No run had a planner whose hints arrive stale, duplicated and out of order (G-09).",
+    "closes": "Phase 2: the --schedules phase on T's café with the real L1 in the sim, and DEP-17's hint sim."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "No prototype of this shape ran app steps in a simulator, and its kernel was never run in one.",
+     "closes": "A PD-shaped kernel in the sim with app steps."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Its TypeScript kernel could run in the sim, but no ISR-shaped prototype ran app steps there, and its controller's hints were not simulated.",
+     "closes": "An ISR-shaped kernel in the sim with app steps, phase 2."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4's sim runs the same kernel bytes under seeded schedules (CLAUDE.md). But methods live in the api layer above it, and T's --schedules phase was not built on v4.",
+     "closes": "T's --schedules phase on v4."
+    },
+    "BUY": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: the test asks that methods run as sim steps against the real replication layer, under one seed. Step 2: BUY's replication layer is nats-server (E-44), which fero's simulator cannot run or schedule. Step 3: a sim over a stand-in log is not the real layer, and no seed controls JetStream's elections or timers. So the --schedules phase cannot run on BUY. E-44 lists TEST-09 among its gaps by construction (gap 10)."
+    }
+   }
+  },
+  {
+   "req": "TEST-10",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-04",
+     "E-10"
+    ],
+    "why": "In the TS phase the sim, the site and the server run one TS kernel, by construction. For the native step, E-04's TS and Rust twins stayed byte-identical over 1,000 seeds (883,902 events), and the guard caught all five planted traps once state was compared (A-30). E-10's TS port already matches Go's etcd raft byte for byte on 41 of 41 files and 4,000 of 4,000 scripts."
+   },
+   "except": {
+    "MIN-TS": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-04"
+     ],
+     "why": "One TypeScript kernel for good (L ts): the sim, the site and the server run the same source, and there is no second implementation to compare."
+    },
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "v4's sim executive runs the same kernel bytes the shell runs on real TCP, and the site runs the type-stripped kernel (CLAUDE.md). There is one TypeScript kernel and no second implementation."
+    },
+    "RUST": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-04"
+     ],
+     "why": "One Rust kernel: the sim and the site run the same source as WASM (E-04: raft-rs 0.7.0 in WASM was the sim's kernel, 200 chaos seeds in 384 ms, and a seed replayed exactly). There is no twin to keep in step (A-30)."
+    },
+    "EMB-V8": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-04"
+     ],
+     "why": "One Rust kernel: the sim and the site run the same source as WASM (E-04: raft-rs 0.7.0 in WASM was the sim's kernel, 200 chaos seeds in 384 ms, and a seed replayed exactly). There is no twin to keep in step (A-30)."
+    },
+    "SIDE": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-04"
+     ],
+     "why": "One Rust kernel in the daemon: the sim and the site run the same source as WASM (E-04: raft-rs 0.7.0 in WASM was the sim's kernel, 200 chaos seeds in 384 ms). There is no twin to keep in step (A-30)."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "Its Rust variant is as RUST (the same source as WASM in the sim, E-04). Its Go variant never ran in the sim, and the row has not chosen. Its native row fold also needs A-30's guard against data, which was specified, not run.",
+     "closes": "Choose the variant; run the Go kernel in the sim or drop it; run the fold differential (DATA-09, 1e6 records)."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04"
+     ],
+     "why": "A Rust server with its own storage engine and a native fold. A-30's guard is only reasoned for it, and nothing ran a PD-shaped kernel in the sim.",
+     "closes": "A PD-shaped kernel as WASM in the sim, and the fold differential."
+    },
+    "BUY": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: the server's replication code is nats-server, a Go binary that fero does not own (E-44). Step 2: fero's simulator runs TypeScript or WASM kernels under a seed; it cannot load or schedule nats-server. Step 3: so the simulator cannot run the code the server runs, and no differential run over seeds is possible. SPACE 4.2 and E-44 (gap 10) state this by construction."
+    }
+   }
+  },
+  {
+   "req": "TEST-11",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "No design and no prototype has fero test --perf yet. It is a tool above the kernel that must time a real solo node (the sim's virtual time cannot measure throughput), so no row's options block it or provide it.",
+    "closes": "The fero test build: a per-resource baseline and a pin."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 pins its own code (64 perf pins that are never widened, CLAUDE.md). It has no per-resource pin under fero test.",
+     "closes": "fero test --perf on v4."
+    }
+   }
+  },
+  {
+   "req": "TEST-12",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22"
+    ],
+    "why": "E-22 ran every pattern check under 100 seeds of the shuffle: all 22 pass, and the planted two-partition app fails in 25 of 100 shuffled seeds and never without the shuffle. The shuffle sits in the delivery layer. In log mode the prototype shuffled across groups; the slot cursor also allows a shuffle per slot (API-NOTES C7), and partitions of one slot never part."
+   },
+   "except": {
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "In state mode the shuffle is the same delivery rule as in the other rows. But with one offset per group (O off), a log reader's cursor is exact only if delivery inside a group keeps log order (E-22, API-NOTES C7). So the log-mode shuffle cannot part two partitions that share a group, yet a later re-key or split does part them.",
+     "closes": "The shuffle and the planted app on a prototype with group offsets, in log mode."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "In state mode the shuffle is the same delivery rule as in the other rows. But with one offset per group (O off), a log reader's cursor is exact only if delivery inside a group keeps log order (E-22, API-NOTES C7). So the log-mode shuffle cannot part two partitions that share a group, yet a later re-key or split does part them.",
+     "closes": "The shuffle and the planted app on a prototype with group offsets, in log mode."
+    },
+    "LANE": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The state-mode shuffle is the delivery rule E-22 ran (all 22 checks pass under 100 seeds; the planted app fails in 25 of 100). In log mode it can only shuffle across lanes, but a lane's partitions never part in this row (it has no move), so no order is kept that will not last."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shuffle is a delivery rule a client can run, but it ran on E-22's K lib prototype only, and this row lists no follower subscriptions (W lease, ridx).",
+     "closes": "The shuffle and the planted app on a PD-shaped prototype."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22"
+     ],
+     "why": "The shuffle is a delivery rule a client can run, but it ran on E-22's K lib prototype only.",
+     "closes": "The shuffle and the planted app on an ISR-shaped prototype."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no shuffle today, and its Lamport stamps give no total order per partition to keep (O lamp).",
+     "closes": "Build the shuffle in v4's delivery and run the planted app."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "fero's client could shuffle what it folds from the stream. E-44 did not build it.",
+     "closes": "The shuffle on the JetStream client. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "TEST-13",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-22",
+     "E-22b",
+     "E-46"
+    ],
+    "why": "E-22 recorded every client history: Porcupine found all 183,159 partition histories linearizable once A-04 was in, the fencing checker was clean, and Elle found no G0 with A-24's rules; real Knossos and real Elle agree (E-22b). The TS port of etcd raft ran under Maelstrom's partition nemesis behind a 273-line adapter: 26 of 26 runs linearizable (E-46). Real-TCP runs of a v5 kernel wait for phase 1."
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46",
+      "E-10"
+     ],
+     "why": "The sim checkers ran on E-22's prototype, which has this row's API shape. But no checker and no Maelstrom run ever drove a raft-rs kernel: E-46 ran the TS port only, and raft-rs cannot run etcd's 28 interaction files (E-10).",
+     "closes": "E-46's adapter around the raft-rs kernel, from phase 1."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46",
+      "E-10"
+     ],
+     "why": "The sim checkers ran on E-22's prototype, which has this row's API shape. But no checker and no Maelstrom run ever drove a raft-rs kernel: E-46 ran the TS port only, and raft-rs cannot run etcd's 28 interaction files (E-10).",
+     "closes": "E-46's adapter around the raft-rs kernel, from phase 1."
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46",
+      "E-10"
+     ],
+     "why": "The sim checkers ran on E-22's prototype, which has this row's API shape. But no checker and no Maelstrom run ever drove a raft-rs kernel: E-46 ran the TS port only, and raft-rs cannot run etcd's 28 interaction files (E-10).",
+     "closes": "E-46's adapter around the raft-rs kernel, from phase 1."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46",
+      "E-10"
+     ],
+     "why": "The sim checkers ran on E-22's prototype, which has this row's API shape. But neither of its cores ran under Maelstrom here: E-46 drove the TS port only, not raft-rs and not Go's etcd raft.",
+     "closes": "E-46's adapter around the chosen core, from phase 1."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46"
+     ],
+     "why": "Its data path is a shared log, not Raft. E-46's Maelstrom runs cover only its metadata group, and no checker has seen its seal-and-reconfigure path.",
+     "closes": "A Maelstrom adapter around a loglet prototype."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-46"
+     ],
+     "why": "Its commits are conditional PUTs and its leadership is a manifest swap. No checker run covers that path; E-46 is Raft only.",
+     "closes": "A checker run on an object-store log prototype under a partition nemesis."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Two-phase commit over its own Raft core. Nothing here recorded a client history from a PD-shaped prototype.",
+     "closes": "Histories from a PD-shaped prototype through Porcupine and Elle."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "Its dedup was modelled (pid, E-20), but no client history from an ISR-shaped prototype ever met a checker, and its data path is not Raft.",
+     "closes": "Histories from an ISR-shaped prototype through Porcupine, Elle and Maelstrom."
+    },
+    "V4": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: TEST-13 asks that per-partition histories pass Porcupine as linearizable. Step 2: v4 merges cells by last-writer-wins and collects tombstones, and STATUS.md pins two red probes on today's kernel: a later remove loses to an older write after a heal, and one forwarded write commits twice across an ownership move. Step 3: in each, an acknowledged operation is undone or applied twice, and no linear order explains that. Step 4: the root is the row's R option: last-writer-wins cannot hold conditions without consensus (SPACE section 2 R, cited)."
+    },
+    "BUY": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "E-44",
+      "E-46"
+     ],
+     "why": "Step 1: Maelstrom runs each node as a process and carries every node-to-node message through its own network, so its nemesis can cut links (E-46). Step 2: BUY's replication is inside nats-server, which talks to its peers over its own sockets; fero owns no code on that path. Step 3: so no adapter can put BUY's server under Maelstrom's partition nemesis, which the requirement asks for from phase 1. Also measured: an incr whose answer was lost, retried after one other write, was counted twice (E-44 gap 2), a history Porcupine rejects."
+    }
+   }
+  },
+  {
+   "req": "OPS-01",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-18",
+     "E-22"
+    ],
+    "why": "The design has no count to set: the slot count is a constant (4,096, A-16), copies and standbys have defaults (3 voters; every server up to 5 holds a group), and groups are added and slots moved by one policy with no user number (A-18; E-18 simulated it to 64 groups). E-22's 22 pattern examples set no shard, partition or replica count."
+   },
+   "except": {
+    "LANE": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-18"
+     ],
+     "why": "64 lanes per project is a constant and copies has a default, so nothing is chosen to start. Its limit is that writers never grow past the lanes (23 to 53 writers' worth under skew, E-18), which is SC-03's failure, not a number to choose."
+    },
+    "SPLIT": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-18"
+     ],
+     "why": "Groups split by size and load with no count to set, and copies has a default. E-18 simulated key-level splits to 64 groups."
+    },
+    "PD": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-18"
+     ],
+     "why": "Regions split and merge by size and load under the controller, as in TiKV, and the replica count has a default. No count is set to start or to grow."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-17",
+      "E-18"
+     ],
+     "why": "16 cells is a default, so the examples set none. But growth is a re-key into a new generation with more cells (V5-PRIMITIVE: outgrowing shards means a re-key), and the row does not say who picks the new count.",
+     "closes": "State who picks the count at a re-key. If the app must, this fails."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "N groups are fixed when a resource is defined, and the row has no move, split or re-key (AMENDMENTS section 3: P fixN has no growth). A default N lets the examples set none, but growing past N writers means defining a larger N.",
+     "closes": "State how a resource grows past N. If a person sets N, this fails."
+    },
+    "V4": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: an unscoped v4 cluster keeps every row on every member, so data cannot grow past one member's memory. Step 2: the only way past that is scoped replication, which is turned on by a count, replicas: N (v4 README, 'Scoped replication'). Step 3: so growing needs a replica count, and v4's own example 16 sets replicas: 2. OPS-01 says no such count is needed to grow, and its test is 'the examples set none'."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A stream takes a replica count with a default. But one stream has one leader and JetStream does not split a stream, so growing writers needs fero to cut subjects over more streams, which it did not build.",
+     "closes": "A growth path on JetStream with no count. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22"
+    ],
+    "why": "cluster.writable, cluster.health and cluster.shards are designed (DESIGN-V5 4.5), and E-22's prototype shows pending writes and 'unplaced'. No health test per failure of section 4 was run.",
+    "closes": "Health tests per failure of section 4, phase 2."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 shows its members and its pending writes (cluster.writes) and names states such as held and joining. The facts asked here (who writes, live copies, lag, each wait with its reason) were not checked against the failures of section 4.",
+     "closes": "Health tests per failure on v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Stream info gives the leader, the replicas and their lag. But the waits are nats-server's, and fero cannot name the reason for each: in E-44 the longest write through a failover took 44 s.",
+     "closes": "Health tests on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-03",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The cascade and its one importer are v4's and sit above the kernel, so they carry over. Changing cluster keys online through #meta, with range and cross-key checks, is designed (DESIGN-V5 4.5) but not built or modelled.",
+    "closes": "config.test.ts tiers on v5, and an online cluster-key test, phase 2."
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "As in the other rows, online cluster keys are designed, not built. Also, the cascade reads project files written in TypeScript or JavaScript, which a server with no JS engine cannot load; the client must resolve them and hand them to the binary it spawns, which is not built.",
+     "closes": "config.test.ts tiers against the spawned binary, and an online cluster-key test, phase 2."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "As in the other rows, online cluster keys are designed, not built. Also, the cascade reads project files written in TypeScript or JavaScript, which a server with no JS engine cannot load; the client must resolve them and hand them to the binary it spawns, which is not built.",
+     "closes": "config.test.ts tiers against the spawned binary, and an online cluster-key test, phase 2."
+    },
+    "V4": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's cascade and its one importer exist and pass their tests (CLAUDE.md). Step 2: but v4's contract refuses a peer whose cluster keys differ (heartbeat.ms, replicas, methods, validation, ring). Step 3: so a member with the new value and a member with the old one do not link, and a change is a full stop and start of every member and client (STATUS.md, open limits). OPS-03 asks that cluster keys change online."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "fero's cascade stays for its own keys. But the cluster's keys (replicas, election timers, the sync interval) are nats-server's settings, changed by its own tools.",
+     "closes": "A config test on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-04",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-42"
+    ],
+    "why": "The parts exist: v4's viewer opens captures and live clusters, and E-42 replayed 18 of 18 recorded runs byte for byte. A v5 debugger over log positions, with its DOM gates, is not built.",
+    "closes": "Debugger DOM gates on v5 captures and recordings, phase 2."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's viewer could be carried over, but no v5 debugger is built, and E-42's replay of recorded runs does not list this row (its storage is not the one journal the recorder leans on).",
+     "closes": "Debugger DOM gates on this row's captures, and a recorder that fits its storage."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's viewer could be carried over, but no v5 debugger is built, and E-42's replay of recorded runs does not list this row (its storage is not the one journal the recorder leans on).",
+     "closes": "Debugger DOM gates on this row's captures, and a recorder that fits its storage."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's viewer could be carried over, but no v5 debugger is built, and E-42's replay of recorded runs does not list this row (its storage is not the one journal the recorder leans on).",
+     "closes": "Debugger DOM gates on this row's captures, and a recorder that fits its storage."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's viewer could be carried over, but no v5 debugger is built, and E-42's replay of recorded runs does not list this row (its storage is not the one journal the recorder leans on).",
+     "closes": "Debugger DOM gates on this row's captures, and a recorder that fits its storage."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's viewer opens captures and live clusters and its DOM gates pass (CLAUDE.md). But its journal is a 4,096-row ring that can turn over in about 34 minutes, so it cannot replay any run, and STATUS lists replays that show a node behind the kernel.",
+     "closes": "A full-run recorder on v4, then the replay gate."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42",
+      "E-44"
+     ],
+     "why": "A viewer can show client-side captures with stream sequence numbers. The server's side of a run cannot be recorded or replayed (E-42, E-44).",
+     "closes": "Not closable for the server's side."
+    }
+   }
+  },
+  {
+   "req": "OPS-05",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Frames with a protocol version, and a cluster version that rises only when every member runs the new kernel, are designed (DESIGN-V5 4.2; CockroachDB's cluster versions are the precedent). No roll across two kernel builds was run.",
+    "closes": "A roll test across two kernel builds, phase 2."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's decision V4-14 says mixed versions are unsupported (STATUS.md). Step 2: its records show what that means: across one change a mixed pair fails the door's proof at both ends, and across another an old feeder strands its clients' writes (DECISIONS.md; README, 'Mixed versions do not link'). Step 3: v4 has no cluster version that holds new behaviour back until every member is new. So a roll across kernel versions is not safe on v4 as it is; the supported way is to stop every member."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The kernel is nats-server, which has its own rolling upgrade. fero cannot gate a cluster version on it, and nothing here tested a roll.",
+     "closes": "A roll test across two nats-server builds. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-39"
+    ],
+    "why": "The door is v4's (V4-30), and E-40 ran a pipelined door on a prototype client. TLS was measured for cost only (538 MB for 10,000 links, E-27; a TLS storm p99 27 to 45 times steady, E-39). Client tokens with claims, the admin key and rotation through #meta (current and next) are designed, not built or modelled.",
+    "closes": "Door and TLS tests, and a rotation under load, phase 3."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's door admits a peer only if it proves the one configured secret; there is no second key and no window (DESIGN-DOOR section 4). Step 2: so a member on the new secret and a member on the old one refuse each other, and the client key is derived from the same secret. Step 3: changing the secret is a full stop and start of every member and client (STATUS.md). OPS-06 asks for rotation with no downtime, and its own text says v4 cannot."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "NATS has TLS, accounts and signed user tokens of its own. fero's door, claims and admin key would have to map onto them; E-44 used none of them.",
+     "closes": "Door, token and rotation tests on NATS. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-33"
+    ],
+    "why": "E-33 model-checked the restore with A-08's rules (an epoch above a high-water mark in the store's manifest, and a fresh session generation; 8 rules, every mutant caught): no position, lock token or retry repeats, and an unknown cursor is refused. The export round trip, a fork at a past position and F-08 under a restore were not built or modelled.",
+    "closes": "The tier phase: a restore test beside an outside token holder, and an NDJSON export round trip; crossings K-13 and K-23."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33's restore rules hold only with a high-water mark kept outside the restored data, in the store's manifest. This row does not require an object store across boxes, so the mark has no stated home (A-08, G-21). The export round trip was not built either.",
+     "closes": "Name the mark's home and re-run E-33's restore model; then the tier phase tests."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33's restore rules hold only with a high-water mark kept outside the restored data, in the store's manifest. This row does not require an object store across boxes, so the mark has no stated home (A-08, G-21). The export round trip was not built either.",
+     "closes": "Name the mark's home and re-run E-33's restore model; then the tier phase tests."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33's restore rules hold only with a high-water mark kept outside the restored data, in the store's manifest. This row does not require an object store across boxes, so the mark has no stated home (A-08, G-21). The export round trip was not built either.",
+     "closes": "Name the mark's home and re-run E-33's restore model; then the tier phase tests."
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33's restore rules hold only with a high-water mark kept outside the restored data, in the store's manifest. This row does not require an object store across boxes, so the mark has no stated home (A-08, G-21). The export round trip was not built either.",
+     "closes": "Name the mark's home and re-run E-33's restore model; then the tier phase tests."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33 modelled a restore over (epoch, seq) per slot. This row's positions are group offsets, so the model is only reasoned for it, and it requires no object store across boxes, so the high-water mark has no stated home (G-21).",
+     "closes": "A restore model over group offsets with a named home for the mark; then the tier phase tests."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33 modelled a restore over (epoch, seq) per slot. This row's positions are group offsets, so the model is only reasoned for it, and it requires no object store across boxes, so the high-water mark has no stated home (G-21).",
+     "closes": "A restore model over group offsets with a named home for the mark; then the tier phase tests."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "E-33 modelled a restore over (epoch, seq) per slot. This row's positions are group offsets, so the model is only reasoned for it, and it requires no object store across boxes, so the high-water mark has no stated home (G-21).",
+     "closes": "A restore model over group offsets with a named home for the mark; then the tier phase tests."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Backup and restore are published practice for this shape (TiKV; cited, not checked here). Nothing here checked that tokens, cursors and retries stay honest across one, or built an export.",
+     "closes": "E-33's restore model on PD's timestamps, and an export round trip."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "Its positions are group offsets with leader epochs. E-33 did not model a restore for it, and no export was built.",
+     "closes": "A restore model over group offsets, and an export round trip."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no object-store snapshots, no forks and no positions in one log order per partition, so point in time and the token rules have nothing to stand on yet.",
+     "closes": "Snapshots, positions and a restore on v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-44"
+     ],
+     "why": "A stream restore brings back old sequence numbers, and JetStream has no epoch. Old cursors and lock tokens would be accepted unless fero keeps an epoch outside, as A-08 does; that was not built.",
+     "closes": "A restore test on JetStream with an outside epoch. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "These are plain counters per copy (writes a second, waiting writes, lag, memory, clients). Every row can expose them; none has built the API or its test.",
+    "closes": "The API test, phase 2."
+   },
+   "except": {
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The server-side numbers are nats-server's own monitoring; fero would have to relay them per resource. Not built.",
+     "closes": "An API test over JetStream's numbers. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-33"
+    ],
+    "why": "The dir lock with a lease is v4's (V4-59), and a TS shell can keep it. E-33's models keep the cluster id in each dir and found one cluster per project (one box holds at one to three faults); that a dir refuses another cluster's id is the design's rule, not a tested one. No wrong-project test ran on a v5 shell.",
+    "closes": "V4-59's tests and a wrong-project test on v5's shell, phase 1."
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The lock with a lease and the cluster id in the dir are designed as in the other rows. But the journal and its dir are handled by native code here, so v4's lock does not carry over as code; it must be rebuilt and tested.",
+     "closes": "The lock tests and a wrong-project test on the native shell, phase 1."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The lock with a lease and the cluster id in the dir are designed as in the other rows. But the journal and its dir are handled by native code here, so v4's lock does not carry over as code; it must be rebuilt and tested.",
+     "closes": "The lock tests and a wrong-project test on the native shell, phase 1."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The lock with a lease and the cluster id in the dir are designed as in the other rows. But the journal and its dir are handled by native code here, so v4's lock does not carry over as code; it must be rebuilt and tested.",
+     "closes": "The lock tests and a wrong-project test on the native shell, phase 1."
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The lock with a lease and the cluster id in the dir are designed as in the other rows. But the journal and its dir are handled by native code here, so v4's lock does not carry over as code; it must be rebuilt and tested.",
+     "closes": "The lock tests and a wrong-project test on the native shell, phase 1."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The lock with a lease and the cluster id in the dir are designed as in the other rows. But the journal and its dir are handled by native code here, so v4's lock does not carry over as code; it must be rebuilt and tested.",
+     "closes": "The lock tests and a wrong-project test on the native shell, phase 1."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "No local dir is the durable store: one writer is held by a compare-and-swap on the store's manifest. The cache dir still needs one owner. Neither was tested.",
+     "closes": "A two-writer test on the manifest, and the lock tests on the cache dir."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "V4-59's lock (a lock file with a lease) exists and its tests pass. v4 has no project: a dir belongs to one resource's cluster, and no wrong-project test exists.",
+     "closes": "A wrong-cluster test on v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The durable dirs are nats-server's store dirs; fero holds none. Whether nats-server refuses a dir of another cluster was not tested.",
+     "closes": "A wrong-cluster test on nats-server's store dir. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-10",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "fero.token(claims) and the check points are in API.md. The check is a signature when a link or a follow opens and a set lookup per write, so the 2 µs bar is plausible but unmeasured. No hostile-client suite and no revocation under load was run (QUESTIONS left it to a phase test).",
+    "closes": "The hostile-client suite and a revocation under load, phase 3."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 has one client key derived from the cluster secret, and no per-user tokens or claims (STATUS.md; J: a new key restarts every copy). The feature is absent, not blocked by an option of the row.",
+     "closes": "Per-user tokens on v4, then the hostile-client suite."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "NATS can limit subjects per user at the server. But fero's own checks run in the client library there: a write with no token to a protected row was accepted (E-44 gap 6), so each check must be mapped onto NATS permissions, which was not built.",
+     "closes": "The hostile-client suite on NATS permissions. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-11",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-42"
+    ],
+    "why": "E-42 recorded every kernel input of E-02's TS pipeline in the ref form and replayed 18 of 18 recordings byte for byte with no sockets and no disk; a one-step reordering changed the effects in 8 of 10 follower cases, so the check is live. A-09 puts the three recorder rules in L0's format. Metrics, the trace context and the slow-op log are counters and headers with no mechanism; they are not built yet."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "Its kernel is TypeScript and deterministic by plan, but E-42 does not list it: the ref form leans on one journal that holds the bulk bytes in arrival order, and ISR keeps a log file per group (S walg).",
+     "closes": "E-42's recorder on a per-group log layout."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "Its servers keep no journal of their own (durability sits in the log tier), so E-42's ref form, which reads bulk bytes back from the local journal, has nothing to refer to. E-42 does not list it.",
+     "closes": "A recorder for a server with no local journal, replayed in the sim."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "The log is the object store, with only a local cache. The ref form needs the journal kept for the window, and object-store completions were not part of E-42's pipeline.",
+     "closes": "A recorder with object-store completions as inputs, replayed in the sim."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "A native server with an LSM store that compacts in the background and several kernel threads. No experiment showed that its inputs can be recorded and replayed byte for byte.",
+     "closes": "A recorder on a PD-shaped kernel, replayed in the sim."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4's kernel is pure (no I/O, CLAUDE.md), so its inputs could be recorded. Today it keeps only a 4,096-row journal ring that can turn over in about 34 minutes (STATUS.md). E-42 names V4 as a row that cannot get the recorder, but gives no reason.",
+     "closes": "A recorder of kernel inputs on v4, replayed in its sim."
+    },
+    "BUY": {
+     "v": "fails",
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "E-42",
+      "E-44"
+     ],
+     "why": "Step 1: clause (d) asks for a recorder of every kernel input whose dump replays byte for byte in the sim. Step 2: BUY's kernel is nats-server; fero sees none of its inputs (peer frames, ticks, disk completions) and cannot run its code in the sim (TEST-10). Step 3: so no recording of a BUY incident can replay as a failing seed. E-42 names BUY as a row that cannot, and E-44 lists OPS-11(d) among its gaps by construction."
+    }
+   }
+  },
+  {
+   "req": "OPS-11",
+   "part": "S",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-42"
+    ],
+    "why": "In the ref form the recorder costs 1.1 to 1.7% of a core per process at 50,000 appends a second (bar 3%) and 0.15 to 0.4% of the journal's bytes. Its stated disk budget is the journal kept for the replay window: 441 GB a day at that rate, 8.8 GB a day at 1,000 appends a second. The runs were 11 s long; the 24 h figure is read from the rate, and the Rust rows are reasoned to pay less."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42 does not list this row: its cost was measured on one shared journal, and ISR keeps a log file per group.",
+     "closes": "E-42's cost run on a per-group log layout."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42 does not list this row: its servers have no local journal for the ref form to point at, so the cheap form's cost does not carry over.",
+     "closes": "The recorder's cost on a server with no local journal."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42 does not list this row: with the object store as the log there is no local journal to keep for the window, so the cost and the disk budget are unknown.",
+     "closes": "The recorder's cost with the object store as the log."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "E-42 does not list this row, and no recorder was costed on an LSM store with several kernel threads.",
+     "closes": "The recorder's cost on a PD-shaped kernel."
+    },
+    "V4": {
+     "v": "not",
+     "basis": "cited",
+     "ev": [
+      "E-42"
+     ],
+     "why": "v4 keeps a 4,096-row journal ring that turns over in about 34 minutes under a redial loop (STATUS.md). It has no always-on recorder of kernel inputs, and E-42 lists V4 as a row that cannot get one."
+    },
+    "BUY": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [
+      "E-42",
+      "E-44"
+     ],
+     "why": "BUY has no kernel of its own to record: the inputs are nats-server's (E-42, E-44)."
+    }
+   }
+  },
+  {
+   "req": "OPS-12",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-43"
+    ],
+    "why": "E-43 folded 1,000,000 records on Node 22 and Node 26, and on data builds one version bump apart, with 0 differences. But two data commits under one SCHEDULE_VERSION differ in 578 rows, so the fold-version entry must name data's build (five pins, A-10). The format corpus, a roll from A to B and back, and a roll across a changed clause were not run (the 4 to 5 bump is not published, G-23).",
+    "closes": "Phase 1 puts the pins in the record header; the roll tests and the corpus from 5.0 are phase 2; G-23."
+   },
+   "except": {
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-43"
+     ],
+     "why": "As in the other rows, the pins are named and the roll tests are not run. Also, its native fold must match data across versions, and that differential test was not run (E-43 names it as left out).",
+     "closes": "The pins in phase 1, the roll tests in phase 2, and DATA-09's fold differential across two data versions."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-43"
+     ],
+     "why": "As in the other rows, the pins are named and the roll tests are not run. Also, its native fold must match data across versions, and that differential test was not run (E-43 names it as left out).",
+     "closes": "The pins in phase 1, the roll tests in phase 2, and DATA-09's fold differential across two data versions."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-43"
+     ],
+     "why": "As in the other rows, the pins are named and the roll tests are not run. Also, data folds inside the server's embedded V8 but inside Node's V8 under test, and E-43 compared only Node 22 and 26 (8 of 61 JavaScript behaviours differed there for user functions).",
+     "closes": "The pins in phase 1, the roll tests in phase 2, and E-43's stream folded in the embedded V8."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's contract refuses a peer whose methods or validation text differs, which is a coarse form of the refusal asked here. It has no fold-version entry in a log and no format corpus across releases, and mixed versions are unsupported (V4-14).",
+     "closes": "A fold-version entry and a format corpus on v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-43"
+     ],
+     "why": "A fold-version message in the stream is possible, and data folds in the client as elsewhere. The dirs and journals are nats-server's, with its own upgrade rules. Not built.",
+     "closes": "A roll test with a fold-version message on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-13",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22",
+     "E-28"
+    ],
+    "why": "No row has an erase path yet: E-22's prototype throws 'not built' for erase, and E-28's literature part on crypto-shredding was not written. Immutable shared segments, tapes, forks and snapshots cannot drop one partition in place (X16), so each row owes per-project keys and a segment rewrite within 30 days.",
+    "closes": "Erase tests across every store in the tier phase; E-28's literature part."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "An LSM store erases by a delete plus compaction. Backups and per-project keys are owed the same way as in the other rows. Not checked here.",
+     "closes": "Erase tests across the store and its backups."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 removes cells with tombstones and compacts its lanes, and STATUS.md pins cases where a removed row comes back. It has no erase verb, no erased marker and no per-project keys.",
+     "closes": "An erase verb on v4 and a fix for the rows that come back."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream can purge one subject. fero would still owe the erased marker and the erase from backups and the object store. Not built.",
+     "closes": "Erase tests on JetStream. Not planned: a reference row."
+    }
+   }
+  },
+  {
+   "req": "OPS-14",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-35"
+    ],
+    "why": "This row shares no log tier and no pooled process: one process and one volume per project, as J promises (E-35 reasons that this keeps tenants off one disk; not tested). What is left is the object store, where many projects may sit in one bucket; keys per project there are owed by OPS-13 and are not built.",
+    "closes": "The hosted build: a cross-project read test on the object store with a key per project."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Its hosted shape pools projects in one log-tier process, where a tenant at its quota raised another's p99 by 1.40 to 1.59 times against SC-11's 1.1 (E-35). A-29 gives it a byte budget per tenant (about 1 MiB/s here) or a volume per tenant; neither is built, nor are keys per project or the cross-project read test. If the user keeps J as it is, the shared tier is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; the cross-project read test on the log tier's wire.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "It pools many projects in one process, with user code in V8 isolates, so E-35's shared-journal result applies (1.40 to 1.59 times against SC-11's 1.1). A-29 gives it a byte budget per tenant, which is not built, and the isolation of a pool was never examined (G-25). If the user keeps J as it is, the pool is not allowed and the row fails as it stands.",
+     "closes": "Build A-29's budget and re-run E-35's tenant test; a cross-project read test between isolates.",
+     "depends_on": "shared tier",
+     "alt": "fails"
+    },
+    "PD": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No tier holds more than one project: a server set per project (N proc), and the row has no object-store tier (S lsm). There is nothing here to keep apart."
+    },
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No tier holds more than one project: one cluster per resource, one process per project, no log tier and no object store."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-41"
+     ],
+     "why": "Tenancy is theirs. One NATS cluster per project keeps projects apart at 2.4 to 3.7 times the cost at small loads (E-41); a shared NATS cluster would lean on NATS accounts, which fero does not control. Not tested.",
+     "closes": "A cross-project read test on a shared NATS cluster. Not planned: a reference row."
+    }
+   }
+  }
+ ]
+}
