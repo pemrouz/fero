@@ -1,0 +1,572 @@
+[
+ {
+  "req": "OPS-01",
+  "part": "M",
+  "row": "CELL",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "reasoned",
+  "ev": [
+   "E-17",
+   "E-18"
+  ],
+  "depends_on": "F_w",
+  "alt": "met",
+  "why": "Judge 1 is right; I confirm each step. Step 1: a CELL resource has a cell count fixed when it is defined, 16 by default (V5-PRIMITIVE; SPACE P `fixN`). Step 2: 16 cells give 7 to 15 writers' worth under skew (E-18, B4), below F_w = 64, so the resource must grow past 16 to reach the floor. Step 3: its only growth is a re-key into a new generation with more cells, and E-17 part 1 says \"the count is chosen per re-key\". Step 4: nothing in the row chooses it: its P cell has no `+ rule`, its C is `self` (healing only, no planner), and SPACE's ladder keeps the automatic grow rule as one more mechanism on the slot path, outside CELL's count of about 3. So a person picks a shard count to grow, at define time or at a re-key; a rule that picks it would be another row's option. That answers judge 2's open point (who picks). If the user lowers F_w to 7 or less, the default 16 is enough and no count is needed: met."
+ },
+ {
+  "req": "OPS-03",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I confirm each step in v4's own records. Step 1: v4 has the cascade and its one importer (CLAUDE.md), so that half holds. Step 2: every v4 server says its cluster values (heartbeat.ms, replicas, methods, the validation text, the ring) in its first frame, and two servers whose values differ refuse to link (README, the scope note; STATUS.md, open limits). Step 3: a change made online means one member has the new value while another has the old; the two refuse each other, so the cluster splits until every member and client is stopped and started. STATUS.md calls this \"refused by design\" (DESIGN-DOOR section 4). OPS-03 asks that cluster keys change online. Judge 1 names the same fact and leaves it open, but closing it needs a new mechanism, which is not v4 as it is."
+ },
+ {
+  "req": "OPS-05",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I confirm each step. Step 1: OPS-05 asks that a roll across two kernel builds works, with new behaviour held back by a cluster version until every member is new. Step 2: v4 has no cluster version, and its decision V4-14 says mixed versions are unsupported (STATUS.md). Step 3: its code makes a mixed pair refuse each other on purpose: the door's proof label was raised so that an old and a new member both fail `bad-proof` (kernel/door.ts; DECISIONS, V4-55), and an old feeder strands its clients' writes (DECISIONS, V4-43). Step 4: so in a roll across such builds the first restarted member is refused by the rest, and the roll test fails; the supported way is to stop every member (README, \"Mixed versions do not link\")."
+ },
+ {
+  "req": "OPS-06",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 2 is right; I confirm each step. Step 1: v4's door admits a peer only if it proves the one configured secret; there is no second key and no window (DESIGN-DOOR: \"No rotation key\"; \"no revocation, no rotation window\"). Step 2: so a member on the new secret and a member on the old one refuse each other, and the client key is derived from the same secret. Step 3: changing the secret is a full stop and start of every member and client (README, the `secret` row; STATUS.md, open limits). OPS-06 asks for rotation with no downtime, and its own sentence says v4 cannot. v4 also has no TLS, no tokens with claims and no admin key."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run: E-42's recorder on E-02's TS pipeline replayed 18 of 18 recordings byte for byte at 1.1 to 1.7% of a core. The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. E-42's pipeline also had no elections, and no ticks or object-store completions, two of the inputs (d) names. If the user reads the MUST as (d) alone, E-42 would carry this row.",
+  "closes": "Phase 1: the recorder in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run, on E-02's TS pipeline (18 of 18 recordings replayed byte for byte). The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. For this row (d) is not shown either: E-42 built no recorder in Rust, and its pipeline had no elections, and no ticks or object-store completions, two of the inputs (d) names.",
+  "closes": "Phase 1: the recorder built in the Rust kernel in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run, on E-02's TS pipeline (18 of 18 recordings replayed byte for byte). The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. For this row (d) is not shown either: E-42 built no recorder in Rust, and its pipeline had no elections, and no ticks or object-store completions, two of the inputs (d) names.",
+  "closes": "Phase 1: the recorder built in the Rust kernel in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run, on E-02's TS pipeline (18 of 18 recordings replayed byte for byte). The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. For this row (d) is not shown either: E-42 built no recorder in Rust, and its pipeline had no elections, and no ticks or object-store completions, two of the inputs (d) names.",
+  "closes": "Phase 1: the recorder built in the Rust kernel in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "OPS-11",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-42"
+  ],
+  "why": "Judge 1 is right. The MUST half lists four things, (a) to (d), and only (d) was run, on E-02's TS pipeline (18 of 18 recordings replayed byte for byte). The metrics with the latency split, the trace context and the slow-op log are not built, so judge 2 passed them on a promise. For this row (d) is not shown either: E-42 built no recorder in Rust, and its pipeline had no elections, and no ticks or object-store completions, two of the inputs (d) names.",
+  "closes": "Phase 1: the recorder built in the Rust kernel in L0's format (A-09), with ticks and object-store completions among its inputs, and one recorded run replayed in the sim. The operations phase: the metrics with the latency split, the trace context and the slow-op log."
+ },
+ {
+  "req": "TEST-01",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-04"
+  ],
+  "why": "Judge 1 is right. Both timings come from kernels with a Raft-shaped log: E-22's prototype (3.6 ms at p99, 0.65 s for 200 seeds) and E-04's Raft cores. OBJ's solo node commits by a PUT under a lease taken by compare-and-swap, and no such node was timed. ISR, the other TypeScript row with another kernel shape, is open by both judges on the same ground.",
+  "closes": "Phase 1: the same two timings on an OBJ-shaped solo node over a local-folder store."
+ },
+ {
+  "req": "TEST-01",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-04"
+  ],
+  "why": "Judge 1 is right. Both timings come from kernels with a Raft-shaped log: E-22's prototype (3.6 ms at p99, 0.65 s for 200 seeds) and E-04's Raft cores. SLOG's solo stack is a server, its loglets and a metadata group in one process (SPACE: \"local dev runs a log tier\"), and no such node was timed. ISR, the other TypeScript row with another kernel shape, is open by both judges on the same ground.",
+  "closes": "Phase 1: the same two timings on a SLOG-shaped solo node."
+ },
+ {
+  "req": "TEST-01",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 2 is right. SRV is two variants, and a `met` must hold for the one that gets built. E-04 covers the Rust variant's core only (raft-rs as WASM, 384 ms for 200 seeds, with data folding in JS). No Go server ran in one process, and SRV's own Rust row fold and L2 were in no timed run. Both judges already hold TEST-10 open for SRV on the same ground.",
+  "closes": "Fix the row on its Rust variant and time the whole server (kernel, L2 and row fold) as WASM in one process; or run etcd's Go raft in the sim. Then phase 1's solo bench."
+ },
+ {
+  "req": "TEST-02",
+  "part": "M",
+  "row": "ISR",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-21"
+  ],
+  "why": "Judge 1 is right. TEST-02 touches the time rule and the runtime, and on both ISR holds what SLOG and OBJ hold (T `clamp`, a TypeScript kernel first), which both judges score met though their kernels never ran under a seed either. E-22 ran each seed twice in 200 worlds with the same trace hash, with the four calls on the world's clock; writer time is the median (A-23), and E-21's closing line names ISR among the rows it moves up on TEST-02. The carry to ISR's own kernel is reasoned: a TypeScript kernel stepped by a seeded sim is a function of its inputs."
+ },
+ {
+  "req": "TEST-02",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 2 is right. The Rust variant replays a seed exactly as WASM (E-04). But the row has not chosen, and the Go variant never ran under a seed: Go's scheduler and map order are not fixed by a seed. A `met` must hold for the variant that gets built.",
+  "closes": "Fix the row on its Rust variant, or show two byte-identical runs of the Go kernel under one seed."
+ },
+ {
+  "req": "TEST-07",
+  "part": "M",
+  "row": "BUY",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-06",
+   "E-44"
+  ],
+  "why": "Judge 2 is right. E-06 timed data's undo only (0.03 to 0.05 ms a rerun). In BUY the state that judges a write, the stream's sequences and its dedup window (E-44), lives in nats-server and not in data, so undoing data's records does not put the log back; a rerun needs a stand-in log, which was not built. SRV and PD are open by both judges on the same ground: state held outside data.",
+  "closes": "A rerun bench against a stand-in log, or a fresh stream per rerun. Not planned: a reference row."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04",
+   "E-10",
+   "E-42",
+   "E-46"
+  ],
+  "why": "Judge 1 is right. The TS phase holds by construction: E-46 ran the TS port unchanged in real processes, and E-42 replayed 18 of 18 real-socket runs of a TS pipeline byte for byte. But this row plans a native step, and its second kernel does not exist: raft-rs cannot run etcd's 28 interaction files, so it cannot match the port byte for byte, and a Rust port of etcd's raft was not tried (E-10, G-24). E-04's 1,000 clean seeds come from two 300-line twins by one author, and E-10's byte-for-byte match is with Go, not Rust. AMENDMENTS (axis I) calls the later half open.",
+  "closes": "The native step: a Rust core that passes etcd's files, then A-30's guard over 1,000 seeds with state compared; or retire the TS kernel and run the Rust kernel as WASM in the sim, with the native and WASM builds compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-04",
+   "E-10"
+  ],
+  "why": "Judge 1 is right. A TS kernel first, so the sim and the server share it by construction. Its data path is not etcd's raft, so E-10's and E-46's checks cover its metadata group only. This row plans a native step and its second kernel is not built: the only differential run is E-04's, on two 300-line twins by one author (0 of 1,000 seeds differ). Judge 2 read that run as this row's own.",
+  "closes": "The native step: A-30's guard over 1,000 seeds on this row's two real kernels, with state compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-04",
+   "E-10"
+  ],
+  "why": "Judge 1 is right. A TS kernel first, so the sim and the server share it by construction. Its data path is not etcd's raft, so E-10's and E-46's checks cover its metadata group only. This row plans a native step and its second kernel is not built: the only differential run is E-04's, on two 300-line twins by one author (0 of 1,000 seeds differ). Judge 2 read that run as this row's own.",
+  "closes": "The native step: A-30's guard over 1,000 seeds on this row's two real kernels, with state compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 1 is right. A TS kernel first, so the sim and the server share it by construction. It has no Raft core, so E-10 and E-46 do not bear on it. This row plans a native step and its second kernel is not built: the only differential run is E-04's, on two 300-line twins by one author (0 of 1,000 seeds differ). Judge 2 read that run as this row's own.",
+  "closes": "The native step: A-30's guard over 1,000 seeds on this row's two real kernels, with state compared."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 1 is right. One Rust source is not yet one kernel's bytes: the sim runs the WASM build and the server runs the native build, and E-04 never compared the two. It compared a TS twin with a WASM twin, and its native replay was timed, not checked. WASM's 32-bit sizes are the kind of trap E-04 planted as a 32-bit varint, which showed in only 101 of 1,000 seeds. Judge 2's `by construction` holds for the source, not for the bytes.",
+  "closes": "Phase 1 of a Rust row: 1,000 seeds through the native build and the WASM build, with state compared and inputs at and above 2^32."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 1 is right. One Rust source is not yet one kernel's bytes: the sim runs the WASM build and the server runs the native build, and E-04 never compared the two. It compared a TS twin with a WASM twin, and its native replay was timed, not checked. WASM's 32-bit sizes are the kind of trap E-04 planted as a 32-bit varint, which showed in only 101 of 1,000 seeds. Judge 2's `by construction` holds for the source, not for the bytes.",
+  "closes": "Phase 1 of a Rust row: 1,000 seeds through the native build and the WASM build, with state compared and inputs at and above 2^32."
+ },
+ {
+  "req": "TEST-10",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-04"
+  ],
+  "why": "Judge 1 is right. One Rust source is not yet one kernel's bytes: the sim runs the WASM build and the server runs the native build, and E-04 never compared the two. It compared a TS twin with a WASM twin, and its native replay was timed, not checked. WASM's 32-bit sizes are the kind of trap E-04 planted as a 32-bit varint, which showed in only 101 of 1,000 seeds. Judge 2's `by construction` holds for the source, not for the bytes.",
+  "closes": "Phase 1 of a Rust row: 1,000 seeds through the native build and the WASM build, with state compared and inputs at and above 2^32."
+ },
+ {
+  "req": "TEST-12",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-17b"
+  ],
+  "why": "Judge 1 is right. LANE holds one offset per lane (O `off`), so in log mode the shuffle must keep each lane's own order for a cursor to stay exact (E-22, API-NOTES C7), and two partitions of one lane are never shuffled apart. Judge 2 says they never part, but the row moves key ranges between lanes in a later phase (SPACE 4.2: \"range moves later\"; E-17b priced that move), and that parts them. CELL and SPLIT hold the same O `off` and are open by both judges on this ground.",
+  "closes": "A shuffle inside a lane that keeps O `off` cursors exact, run on the 22 examples and the planted app; or the row states that a lane's range never moves."
+ },
+ {
+  "req": "TEST-13",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-46",
+   "E-10"
+  ],
+  "why": "Judge 2 is right. E-22's sim checkers ran over a modelled log, so they show the layers above a core, not the core. The one run that put a real core under Maelstrom's partition nemesis is E-46, and it drove the TS port only; its own header says it decides trust in the `port` rows. raft-rs is a drifted fork that cannot run etcd's files (E-10), and no checker here saw a history from it. Judge 1's carry-over is reasoned, not run. SLOG and OBJ are open by both judges on the same ground: their own log never met a checker.",
+  "closes": "E-46's adapter around the raft-rs kernel, with Knossos and Porcupine on its histories, from phase 1."
+ },
+ {
+  "req": "TEST-13",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-46",
+   "E-10"
+  ],
+  "why": "Judge 2 is right. E-22's sim checkers ran over a modelled log, so they show the layers above a core, not the core. The one run that put a real core under Maelstrom's partition nemesis is E-46, and it drove the TS port only; its own header says it decides trust in the `port` rows. raft-rs is a drifted fork that cannot run etcd's files (E-10), and no checker here saw a history from it. Judge 1's carry-over is reasoned, not run. SLOG and OBJ are open by both judges on the same ground: their own log never met a checker.",
+  "closes": "E-46's adapter around the raft-rs kernel, with Knossos and Porcupine on its histories, from phase 1."
+ },
+ {
+  "req": "TEST-13",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-46",
+   "E-10"
+  ],
+  "why": "Judge 2 is right. E-22's sim checkers ran over a modelled log, so they show the layers above a core, not the core. The one run that put a real core under Maelstrom's partition nemesis is E-46, and it drove the TS port only; its own header says it decides trust in the `port` rows. raft-rs is a drifted fork that cannot run etcd's files (E-10), and no checker here saw a history from it. Judge 1's carry-over is reasoned, not run. SLOG and OBJ are open by both judges on the same ground: their own log never met a checker.",
+  "closes": "E-46's adapter around the raft-rs kernel, with Knossos and Porcupine on its histories, from phase 1."
+ },
+ {
+  "req": "TEST-13",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-22",
+   "E-22b",
+   "E-46",
+   "E-10"
+  ],
+  "why": "Judge 2 is right. E-22's sim checkers ran over a modelled log, so they show the layers above a core, not the core. The one run that put a real core under Maelstrom's partition nemesis is E-46, and it drove the TS port only. Neither of SRV's cores ran there: not raft-rs, a drifted fork that cannot run etcd's files (E-10), and not Go's etcd raft. Judge 1's carry-over is reasoned, not run.",
+  "closes": "Choose the variant, then E-46's adapter around that core, with Knossos and Porcupine on its histories, from phase 1."
+ }
+]
