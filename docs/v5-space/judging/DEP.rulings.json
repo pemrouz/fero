@@ -1,0 +1,490 @@
+[
+ {
+  "req": "DEP-02",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 is right. V4 is 'v4 as it is' (SPACE 4.2) and takes no fix (AMENDMENTS 3); both judges pass it on v4's own runs (DEP-01, DEP-03, DEP-04), so its own failed run counts the same way. Confirmed step by step: (1) v4 reports no caught-up number (none in api/; STATUS.md lists 'a public caught-up signal' as the platform's first need), and it opens its write gate by membership, not by the rows it holds (api/index.ts, `membership.gate`); (2) STATUS.md records a member back inside the eviction window that says writable about 100 ms before it holds its peers' rows; (3) that run is this requirement's own acceptance test. The per-peer tails in kernel/confirm.ts could feed a fix, but the fix is not in the row."
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 is right. Confirmed step by step: (1) a v4 member whose fold is empty at boot applies its `data:` seed, and on first contact with a cluster 'fresh keys ride in' (api/index.ts, the seed's own comment); (2) a deleted row's tombstone is collected within a heartbeat (tombstone GC, kernel/log.ts), so nothing is left to say the key was deleted; (3) so a fresh joiner's seed row looks new and last-writer-wins spreads it: the deleted row came back in 2 runs of 2 on v4 63e0679, which is this requirement's own regression case (STATUS.md). The skip-seed-on-join fix is not in the row, and V4 takes no fix (AMENDMENTS 3)."
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-05",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [],
+  "why": "Judge 1 is right. The design gives this one line: a seed applies at create, and the catalog keeps a 'seed applied' mark (DESIGN-V5 4.2 and 6.1; in `#meta`, or in the row's own controller or manifest), so a joining copy folds the log and never seeds. But the mark and the seed rows sit in two places, and nothing ran a crash between the two or two creators at once. E-33's 'seeds' are founding members, not `data:` seeds, and API.md still asks who creates a resource (Q-A1).",
+  "closes": "v4's revived-seed-row case as a regression test in the phase-1 simulator, with a crash between the catalog entry and the seed rows, and with two creators at once"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40",
+   "E-27"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40), and 10,000 TLS links cost 538 MB in Node, so a terminator stands in front (E-27, A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40); the native edge this row may use was not measured (A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. Forwarding alone does not give this: v4 forwards from any member too, and still needs TLS and a client that reconnects only through one address (STATUS.md). What is measured: one client on one wss address to one server reaches its first committed write in 13 to 17 ms (E-40); the native edge this row may use was not measured (A-11). No test put one proxy address in front of several copies with a write forwarded to its leader (G-25).",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. This row's server clients are `smart`: behind one public address they need a proxy that routes by a hint, and nobody examined that or the MOVED and ASK path (G-25). Browsers stay `fwd`, and for them the only measurement is one client on one wss address to one server, 13 to 17 ms to its first committed write (E-40). No test put one proxy address in front of several copies.",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address; for `smart` clients also the proxy that routes by a hint"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. This row's server clients are `smart`: behind one public address they need a proxy that routes by a hint, and nobody examined that or the MOVED and ASK path (G-25). Browsers stay `fwd`, and for them the only measurement is one client on one wss address to one server, 13 to 17 ms to its first committed write (E-40). No test put one proxy address in front of several copies.",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address; for `smart` clients also the proxy that routes by a hint"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. This row's server clients are `smart`: behind one public address they need a proxy that routes by a hint, and nobody examined that or the MOVED and ASK path (G-25). Browsers stay `fwd`, and for them the only measurement is one client on one wss address to one server, 13 to 17 ms to its first committed write (E-40). No test put one proxy address in front of several copies.",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address; for `smart` clients also the proxy that routes by a hint"
+ },
+ {
+  "req": "DEP-07",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-40"
+  ],
+  "why": "Judge 1 is right. This row's server clients are `smart`: behind one public address they need a proxy that routes by a hint, and nobody examined that or the MOVED and ASK path (G-25). Browsers stay `fwd`, and for them the only measurement is one client on one wss address to one server, 13 to 17 ms to its first committed write (E-40). No test put one proxy address in front of several copies.",
+  "closes": "the client test through one proxy address on the phase-3 build: a TLS terminator, several copies, a write forwarded to its leader, and a client that never dials a member's own address; for `smart` clients also the proxy that routes by a hint"
+ },
+ {
+  "req": "DEP-12",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "gap": 0.995,
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 is right, and it matches PERF-02 to PERF-07, where both judges fail V4 on the same fact. Confirmed step by step: (1) v4's shell runs one write and one fsync per persist call, in order, and its own comment says many appends per fsync is not built (shell/runtime.ts, `persist`); (2) so single-row writes share no fsync; (3) STATUS.md measured about 250 persisted writes a second per member, and 10,000 single-row writes not all on disk in 20 s, against PERF-09's 50,000: 99.5 % under the bar. Group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
+ },
+ {
+  "req": "DEP-12",
+  "part": "M",
+  "row": "BUY",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 0.93,
+  "basis": "measured",
+  "ev": [
+   "E-09b",
+   "E-44",
+   "E-09d"
+  ],
+  "why": "Judge 2 is right. BUY is JetStream first (SPACE 4.1); it was built on JetStream (E-44) and priced on it (E-41), and both judges of PERF-02, PERF-05, PERF-06 and PERF-07 fail BUY on this same ceiling. On JetStream `persisted` is `sync_interval: always`, which fsyncs each message alone whatever the batching: 3,668 messages a second from one async publisher and 3,275 from 16 clients (E-09b), against PERF-09's 50,000, and fero cannot change the store. A Redpanda base would pass (175,420 a second, E-09d), but that is not the base the row was run on."
+ },
+ {
+  "req": "DEP-12",
+  "part": "M",
+  "row": "SLOG",
+  "v": "met",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-12"
+  ],
+  "why": "Judge 1 is right. E-02's followers are log nodes in shape: each appends the writer's batch to its journal, runs one fdatasync per batch and acks, and the batch commits when a quorum is durable: 2.8 million 100 B appends a second in TS. The log-first draft's node keeps a journal (V5-LOG-FIRST-REVIEW), and even a file per loglet, the form both judges pass ISR on, shares each fsync and reaches 0.59 to 2.25 million appends a second (E-12), against 50,000. The seal and the shared tier's budget belong to other requirements."
+ },
+ {
+  "req": "DEP-15",
+  "part": "S",
+  "row": "BUY",
+  "v": "not",
+  "basis": "reasoned",
+  "ev": [
+   "E-41",
+   "E-44"
+  ],
+  "why": "Judge 2 is right. BUY as run (E-44) and as shaped for costing (E-41) keeps its log on three NATS servers of the project's own, with the app's two machines beside them as clients: the shape of SRV and PD, which both judges score 'not'. Every JetStream replica is a full copy (three per stream in E-44), so there is no log-only voter and no platform tier that stands in as the third, and a project cannot run on two copies. A crash of an app machine is harmless, but that is as true of SRV; a NATS tier shared by projects would be SLOG's shape, and it was not run, priced or checked against OPS-14."
+ },
+ {
+  "req": "DEP-18",
+  "part": "M",
+  "row": "V4",
+  "v": "fails",
+  "proof": "structural",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 is right. Confirmed step by step: (1) v4's box directory is a registry from a name to listen addresses, and it hands each server every other server registered under its name (api/directory.ts); (2) v4 has no project: nothing in a dir, a registration or a HELLO names one; (3) so two unrelated apps with the same name and contract join: two `todos` servers showed each other's rows within seconds (STATUS.md, 2026-10-21), the requirement's own regression case. STATUS.md calls 'same name, same object' the design and a project scope 'a decision'; a secret keeps strangers out only where one is set."
+ }
+]
