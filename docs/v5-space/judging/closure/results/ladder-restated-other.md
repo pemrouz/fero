@@ -1,8 +1,8 @@
-# Support ladder: restated, other
+# Support ladder: restated, choices: other
 
-Built by `python3 tools/closure.py ladder --choice 'other'`. Rule 3 among the rows that are in, as more cells that no judged row supports are allowed. novel / SHOULDs / pairs / open MUSTs.
+Built by `python3 tools/closure_ladders.py`. Rule 3 among the rows that are in, as more cells that no judged row supports are allowed (the judged rows include the closure pass's, judging/closure/hybrids/cards.json). Columns: novel / SHOULDs / pairs / open MUSTs.
 
-Scenario: restated, choice other. 88448 rows searched, 0 in.
+Scenario: restated, choices other. 88448 rows searched, 0 in.
 
 | At most this many unsupported cells | Rows in | Rule 3 unbeaten | novel / SHOULDs / pairs / open MUSTs | Unsupported cells of the first |
 |---|---|---|---|---|
