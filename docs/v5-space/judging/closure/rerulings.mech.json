@@ -1,0 +1,282 @@
+{
+ "by": "The mechanism referee for the VERDICT review (closure pass), 2026-11-10. Rulings on the evidence; where it was not clear, the settled count stands.",
+ "about": "Proposed re-rulings of judging/mechanisms.json (DEV-01 and DEV-02) for the items the VERDICT review raised (VERDICT.md sections 4 and 10; judging/VERDICT.review.json). Only entries with ruling 'accept' change anything when the coordinating session copies them into rerulings.mech.json. Every number below was computed on a scratch copy of judging/ and tools/ with tools/judging.py's own mechanisms, pairs and verdict commands and tools/closure.py mechrow (scripts: /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/mech-ref/scripts/variants.py). Sources read for this file are cloned under /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/mech-ref/src/.",
+ "mechanisms": [
+  {
+   "id": "RM-01",
+   "item": 1,
+   "key": "merge-record",
+   "add_rows": [
+    "SPLIT"
+   ],
+   "drop_rows": [],
+   "ruling": "accept",
+   "why": "SPLIT carries the merge. Every source the study judged SPLIT by gives it one. SPACE section 2 defines P `split` as 'a group splits at a key or hash bit, and later merges; lineage'. SPLIT's own source (decision 20a; V5-UNITS option 1) plans its merges for phase 5 ('Scale down: merges, phase 5'), and SPACE 4.2 says 'no shrink until merges'. E-17b and E-17c model-checked split + merge under SPLIT's name: the `shrink` bound holds only with the merge (33 to 34 rules; 39 with a merge give-up that the merging group decides). AMENDMENTS section 3 charges SPLIT 37 rules in two protocols. The referee's SC-04 cell keeps SPLIT open only because 'the row shrinks through the merge, at that price', and adds that if SPLIT keeps the merge, DEV-01 counts it for SPLIT. Both counters gave merge-record to PD only, with no reason beyond 'PD only': they followed SPACE 4.1's matrix label (`split` against PD's `split + merge`), which names how the row starts, not how it shrinks. So the unit's rows were short; its judgment (not novel, both counters) stands. For SPLIT the closer match is CockroachDB, whose merges are started by each range's leaseholder with no controller, as SPLIT's are. SPLIT's SC-04 cell needs no re-ruling: it already assumes the merge.",
+   "precedent": "Unchanged: TiKV's region merge (PrepareMerge, CommitMerge, RollbackMerge) and CockroachDB's AdminMerge with Subsume (both counters). For SPLIT's form, CockroachDB's merge queue run by each range's leaseholder (counter a, in split-policy's precedent; from memory).",
+   "evidence": [
+    "SPACE.md section 2, P `split`; section 3, R1.X.M; section 4.2, SPLIT",
+    "docs/V5-UNITS.md, option 1 ('merges, phase 5')",
+    "experiments/E17b-partitioning-part2/README.md (split + merge (SPLIT); finding 2; the SC-04 row)",
+    "experiments/E17c-partitioning-rerun/README.md",
+    "AMENDMENTS.md section 3, SPLIT",
+    "judging/SC.settled.json, SC-04 M, SPLIT (referee)",
+    "judging/mechanisms.a.json and mechanisms.b.json, merge-record ('PD only')",
+    "judging/VERDICT.review.json: skeptic arithmetic S2, evidence S6, alternatives S4"
+   ],
+   "effect": "SPLIT 5 novel, 278 pairs -> 5 novel, 295 pairs (17 new pairs: with raft-log, raft-term-vote, raft-commit, raft-snapshot, raft-prevote-checkquorum, dormant-groups, meta-catalog, meta-directory, split-record, range-table, split-policy, lineage, fold-all, subscribe, route-forward, presence-rows, forks). No other judged row changes. Outcome B among the judged rows: COMP either way; the sweep lines 'SPLIT with -2 novel -> SPLIT' and 'COMP with +2 novel -> SPLIT' go. SPLIT2 as VERDICT section 1 describes it (N `tier` kept) has 270 pairs; 266 only with N `proc`.",
+   "follow_up": "Not edited here (other owners): closure/mechanisms.json's merge-record `when` must become [{\"P\": [\"split\", \"split+merge\"]}], or check-mech reports SPLIT once this is applied (a scratch copy with that change shows 0 mismatches). No axes.json tag split is needed: `split` and `split+merge` now carry the same P-axis mechanisms, and who starts a merge (each leader, or PD's controller) is the C axis's business. For the second check of reads and writes (skeptic alternatives S6), two details that change no pair count: lineage should also read merge.record (E-17b's `merged.base`: a reader across a merge needs the merged entry's base; it already pairs with merge-record through range.table), and merge-record's read of meta.commands has no writer in SPLIT, so it adds no pair there. split-policy's text 'each leader decides in SPLIT' should say it decides splits and merges."
+  },
+  {
+   "id": "RM-02",
+   "item": 2,
+   "key": "log-replicas",
+   "add_rows": [],
+   "drop_rows": [],
+   "novel": false,
+   "ruling": "accept",
+   "why": "Checked at the source in this session. TiKV's witness has the same state, the same core rules and the same role. State: a per-peer witness flag in the group's member list (kvproto metapb.Peer.is_witness); the witness votes and keeps the Raft log, applies no rows and serves no client (follower reads skip it). Rules: (1) it can win an election only when the full voter's log is behind it: TiKV gives a witness election priority -1 (raftstore peer.rs), and raft-rs grants a vote only to a candidate whose log is up to date and either strictly longer or of equal or higher priority (raft.rs), so a full voter backs a witness only when the witness holds more log; (2) while it leads it refuses every request except a leader transfer, with IsWitness (raftstore fsm/peer.rs; kvproto errorpb.IsWitness); (3) it brings the lagging voter up to date and hands it leadership (RFC 0106, 'The leader is down and the witness has more logs', steps 1 to 6: 'The witness proposes a transfer leader command', and Raft's transfer first replicates the latest log to the target). Role: a cheap third voter that keeps a group writable and durable through one crash ('2 Replicas With 1 Log Only'), which is SPACE's R1.W and DEP-15's role. It shipped: TiKV v6.6.0 has the priority and the IsWitness refusal; PD v6.6.0 has `enable-witness` (off by default) and a transfer-witness-leader scheduler. Both counters named TiKV's witness and set it aside only because they could not check it. Counter b: 'I could not check it today, so it does not count.' Counter a: 'None of them lets the witness lead', resting on a search that found TiKV refuses to hand leadership TO a witness (peer.rs: 'shouldn't transfer leader to witness peer'); the source shows a witness can be ELECTED when its log is newer. So both counters' reasons for novel are gone. What still differs, and why it does not keep the unit novel: (a) fero's guard is a wait of twice election.ms where TiKV lowers the witness's priority; both let a witness lead only when no full voter can, a different trigger for the same rule, the kind of difference the referee accepted for slow-leader-self ('only the score's input differs'); (b) in TiKV's shipped code PD's scheduler files the hand-off, while the RFC has the witness propose it and fero's witness rows (no controller) have the witness do it; TiKV accepts a transfer proposal at a witness leader, so the self hand-off is in the precedent's own design; (c) DESIGN-V5 4.2's step 3 lets a log replica that leads with no live full voter add a full replica that loads the object store's latest snapshot and the log replica's tail. TiKV cannot do this (losing both data voters loses data). That step is healing's own add-a-learner rule (DESIGN-V5 4.2: 'a new replica loads a snapshot (from the object store, or streamed from the leader) and the tail'; healing-self, not novel, carried by all four rows) run while a log replica leads, as the referee read the memory rung's rejoin as 'the published disk-incarnation rule with one more trigger'. Neither counter named step 3 as the novel part. The rule was never modelled here (G-25): a debt to DEV-03, not novelty. A close call for the user: step 3 and the 'sleep with a log tier' role are fero's own use of it.",
+   "precedent": "TiKV's witness (log-only replica): tikv/rfcs pull request 106, text/0106-witness.md at commit 12bde3b (2023-02-08; the RFC branch was not merged into the RFC repo's main, but the design shipped); TiKV v6.6.0 and master 3b72fdb, components/raftstore/src/store/peer.rs (a witness has election priority -1) and fsm/peer.rs (a witness refuses every request but a leader transfer, error IsWitness); raft-rs master src/raft.rs (a vote needs a strictly longer log or an equal or higher priority); PD v6.6.0 and master 2a68de8 (`enable-witness`, default false; transfer_witness_leader.go); kvproto master 0b8072e (metapb.Peer.is_witness, errorpb.IsWitness). All read at the source in this session.",
+   "evidence": [
+    "tikv/rfcs PR 106, text/0106-witness.md at 12bde3b",
+    "tikv/tikv v6.6.0 and master 3b72fdb: components/raftstore/src/store/peer.rs, fsm/peer.rs",
+    "tikv/raft-rs master: src/raft.rs, the vote rule",
+    "tikv/pd v6.6.0 and master 2a68de8: enable-witness; pkg/schedule/schedulers/transfer_witness_leader.go",
+    "pingcap/kvproto master 0b8072e: proto/metapb.proto, proto/errorpb.proto",
+    "docs/DESIGN-V5.md 4.2, 'Log replicas' and 'Healing'",
+    "MECHANISMS.md section 3, V",
+    "judging/mechanisms.a.json and mechanisms.b.json, log-replicas",
+    "VERDICT.md section 10, 3-S5; judging/VERDICT.review.json, skeptic alternatives S5"
+   ],
+   "effect": "Novel counts: DRAFT 6 -> 5, SPLIT 5 -> 4, CELL 5 -> 4, LANE 4 -> 3. COMP, MIN-P and COMP2 carry no log replicas and do not change. Outcome B among the judged rows: with RM-01, COMP (SPLIT 4 novel, 295 pairs, against COMP 3, 283; SHOULDs level); without RM-01, SPLIT (278 against 283). So RM-02 must not be applied without RM-01. One new line in B's sweep: 'every open SHOULD counted as met -> SPLIT' (DEP-15 S is open for SPLIT). AMENDMENTS 2's V axis loses its one-mechanism gap: `+lrn` and `+lrn +wit` tie on novel mechanisms.",
+   "follow_up": "No closure condition changes. The closure search should price rows with V `+lrn +wit` again, since a witness now costs pairs only (COMP2 with `+lrn +wit` and H `both`: 3 novel, 297 pairs; its DEP-15 S stays open, so COMP2 keeps the lead on pairs)."
+  },
+  {
+   "id": "RM-03",
+   "item": 3,
+   "key": "par-repair",
+   "add_rows": [],
+   "drop_rows": [],
+   "ruling": "reject",
+   "asked": "count par-repair as novel (E-37's '+1 mechanism'; AMENDMENTS sections 2 and 4, 'novelty open'; the recheck's V-18)",
+   "why": "Keep it not novel. AMENDMENTS section 2 (Z) and G-15 left one question to the counters: 'whether PAR counts as par's precedent decides Z'. Counter a answered it with PAR itself (Alagappan et al., FAST'18: checksums tell damage from a crash; the entry is repaired from a peer; a node whose damaged entry may be committed does not lead), the paper SPACE names for the option, and the referee took it. Counter b did not judge the unit at all: it was not in the list b was given, and no row held Z `par`, so b's silence is not a vote for novel. E-37's '+1 mechanism' counts a carried unit, not a novel one, which is why AMENDMENTS 2 and 4 say 'novelty open'. E-37's own text names PAR as the source of its rules ('the two-bad-replicas case needs peer repair, as PAR (FAST'18) does it'; 'adds PAR's repair') and models a subset of PAR (damage below the commit point; PAR's possibly-committed query left out, G-15). A production system does the same repair: TigerBeetle repairs a damaged prepare from any peer and, 'per PAR's CTRL protocol', never counts a damaged copy toward discarding an entry (docs/internals/vsr.md and docs/ARCHITECTURE.md, read here). No reviewer named a rule of E-37's that PAR lacks. The paper itself could not be fetched in this session (usenix.org is blocked here), so the rule-by-rule match rests on counter a's citation and E-37's text. The recheck's V-18 is a wording fix: VERDICT section 4 should list par-repair among the close calls, judged by one counter.",
+   "precedent": "Unchanged: Alagappan et al., 'Protocol-Aware Recovery for Consensus-Based Storage' (FAST 2018), CTRL in LogCabin (Raft) and ZooKeeper; TigerBeetle's WAL repair in production (docs/internals/vsr.md: 'Per PAR's CTRL Protocol, we do not nack corrupt entries').",
+   "evidence": [
+    "experiments/E37-bad-entry/README.md (method, section 3, verdict line)",
+    "AMENDMENTS.md section 2, Z; section 4; section 5, G-15",
+    "judging/mechanisms.json, par-repair (referee, counter a's addition)",
+    "tigerbeetle/tigerbeetle master 68958eb: docs/ARCHITECTURE.md 'Protocol Aware Recovery'; docs/internals/vsr.md 'Repair WAL'",
+    "judging/VERDICT.review.json, recheck V-18"
+   ],
+   "effect": "None. Were it novel: COMP2 4, COMP+par 4, MIN-P+par 4, MIN-P+m 3. COMP2 would still beat MIN-P+m under rule 3 as written (one apart; 6 SHOULDs against 5); under rule 4's 'fewer novel first' reading MIN-P+m would win."
+  },
+  {
+   "id": "RM-04",
+   "item": 4,
+   "key": "planner-hints",
+   "add_rows": [],
+   "drop_rows": [],
+   "ruling": "reject",
+   "asked": "add planner-hints to the cent-co rows MIN, RUST, SRV, LEAN, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE (the recheck's V-09; DEP-17 asks every row for hints)",
+   "why": "The cent-co rows (and the cent rows PD, ISR, SLOG, OBJ) already carry the hint path, in units they hold, so planner-hints is not added to them. Each rule of planner-hints has a home there. (1) 'A hint names the config it read; the group refuses a stale one' is controller-commands' config-epoch check at the group's leader (A-20). E-16 says so: 'a planner hint that names the config it read is a command checked by epoch, so it would need the same re-checks as cent-co's commands'. (2) 'A leader whose link to a member is up ignores a gone hint' is A-20's re-check of 'gone' on the leader's own links, which E-16 found cent-co needs and calls 'DESIGN-V5's own planner rule ... here exec.gone'. (3) The drain, retire and gone marks are meta-members' state, whose rule already reads 'the metadata group's leader (or a hint) marks a member gone'. (4) The planner lease keeps two planners from fighting (DESIGN-V5 4.2); with one loop on #meta's leader deciding every change, a hint is an input to that loop and there is no second decider to keep apart. The judges read it the same way: judge 2's DEP-17 cell for every cent-co row says 'A platform hint ends as a change in a group's own log. For the controller's commands A-20's re-checks ... are model-checked'. Counter a and AMENDMENTS section 4 call the hints 'inputs to the controller's loop', and SPACE's ladder adds R1.C 'instead of R1.H and R1.H.P'. In self+p and COMP there is no controller, so the same checks must live at each group's leader as rules of their own: that is planner-hints, and it pairs where controller-commands pairs in the cent-co rows. So the 16 pairs V-09 points to are the price of doing at each leader what the cent-co rows do in the controller, not a hint path the cent-co rows skip, and the 19-pair C margin stands as computed. One seam stays open, and it is small: a lasting placement target under cent-co has no named home. The controller already reads meta.catalog and meta.members, where it would sit. If a judge wants it as a unit of its own, it is a placement record in #meta read by controller-commands (TiKV PD's placement rules: not novel, about 1 to 2 pairs), not planner-hints with its group.placement and planner.lease. No reason or experiment shows it is needed, so no new unit is proposed.",
+   "precedent": "Unchanged.",
+   "evidence": [
+    "experiments/E16-controller-loop/README.md (the exec.gone counterexample; 'self+p ... was not modelled here: a planner hint that names the config it read is a command checked by epoch')",
+    "judging/DEP.settled.json, DEP-17 M, every cent-co row (judge 2's why2)",
+    "judging/mechanisms.json: controller-commands, meta-members, planner-hints",
+    "judging/mechanisms.a.json, planner-hints ('in the cent and cent-co rows they are inputs to the controller's loop')",
+    "AMENDMENTS.md section 4, 'The count against MIN-P'",
+    "SPACE.md section 3, R1.C",
+    "docs/DESIGN-V5.md 4.2, 'The planner (optional)'",
+    "judging/VERDICT.review.json, recheck V-09; skeptic alternatives S1"
+   ],
+   "effect": "None. Taken as asked: MIN-P 252 -> 268 pairs, MIN-P+m 264 -> 280, MIN-P+par 261 -> 277, COMP2 274 -> 290 against COMP+par 293; COMP2 would still lead its neighbours (V-09's 3-pair margin)."
+  },
+  {
+   "id": "RM-05",
+   "item": 4,
+   "key": "planner-hints",
+   "add_rows": [
+    "CELL"
+   ],
+   "drop_rows": [],
+   "ruling": "accept",
+   "why": "The other half of V-09's question, which rows with C `self` carry the hint path. CELL does, for the reason COMP does. CELL holds C `self` and no controller, so DEP-17's hints can only land at each cell's leader, and AMENDMENTS 4 (footnote 15) gives COMP planner-hints for exactly that case. CELL's own source keeps the planner: V5-PRIMITIVE says 'Planner hints (§4.2 \"The planner\") are ASKs to the leader with an admin claim', and that bringing a server up and handing over 'is the planner's or system object's job through change() and lead()'. Judge 2's DEP-17 cell for CELL says the same: 'Hints are admin calls to a cell's leader, served by the kernel's change() and lead()'. CELL already carries healing-self, which reads group.placement, and planner-hints is that state's only writer. Counter a's own reason ('Every row owes DEP-17's hints; in the cent and cent-co rows they are inputs to the controller's loop') puts the hint path at the leader in every Raft row without a controller, though a left CELL off its list without a word. Counter b left CELL off 'as SPACE 4.1 has it' because CELL holds 'C self with no planner', which CELL's source contradicts. V4 also holds C `self` but has no planner (judge 2: 'No gone report or placement hint comes from outside') and no Raft group, so it stays out.",
+   "precedent": "Unchanged (CockroachDB's drain, decommission, zone configs and exp_desc; Kubernetes' Lease).",
+   "evidence": [
+    "docs/V5-PRIMITIVE.md, changes 2 and 6",
+    "judging/DEP.settled.json, DEP-17 M, CELL (judge 2's why2)",
+    "AMENDMENTS.md section 4, footnote 15",
+    "judging/mechanisms.json: healing-self (reads group.placement), planner-hints",
+    "judging/mechanisms.a.json and mechanisms.b.json, planner-hints",
+    "judging/VERDICT.review.json, recheck V-09"
+   ],
+   "effect": "CELL's novel count does not change (planner-hints is not novel); its pairs go 262 -> 277 (15 pairs). No other judged row changes. In the closure search, a row with C `self` and a Raft group now carries the hint path: COMP with C=self goes 267 -> 283 pairs, so it no longer gains 16 pairs it did not earn.",
+   "follow_up": "Not edited here: closure/mechanisms.json's planner-hints `when` must add {\"C\": [\"self\"], \"R\": [\"raft\", \"rlog\"]} (a scratch copy with it shows 0 mismatches). No axes.json tag split is needed."
+  },
+  {
+   "id": "RM-06",
+   "item": 5,
+   "key": "dedup-window",
+   "add_rows": [],
+   "drop_rows": [],
+   "ruling": "reject",
+   "asked": "re-judge dedup-window as not novel 'by the same set-of-precedents standard used for the memory rung' (skeptic alternatives S5; VERDICT section 10 left it as a lead)",
+   "why": "Keep it novel. The referee's standard has been one system that holds every piece in the same role: the memory rung's clean-stop mark and commit rule are both Kafka's (and VR Revisited's); planner-hints' pieces are all CockroachDB's; client-sessions' set is Ongaro's thesis 6.3 with RIFL, and its forward-once is how etcd's raft forwards. For the dedup window the pieces were placed in different systems (Kafka's last five batches per producer, NFSv4.1's session slots, deadlines cut at each hop), and no one placed one system with the set: a floor at the highest id minus a window over ids that may have gaps, refusals of resends kept as outcomes, a time budget cut at each hop as the reason a forgotten issuer is safe, and forward-once. Both counters knew those parts and judged the set novel, and the referee keeps an agreed judgment unless it is plainly wrong. So the standard is even, and section 10's 'left as a lead' stands. The nearest single system, from memory and not checked here, is Kafka's idempotent producer (a few cached batches per producer, producer state expired after a set time, the producer's own delivery timeout); it has no gaps in its sequence, keeps no refusals and has no relays.",
+   "precedent": "None (both counters), unchanged.",
+   "evidence": [
+    "judging/mechanisms.json, dedup-window, memory-rung, planner-hints, client-sessions",
+    "experiments/E20-dedup/README.md (17 rules, 19 under fwd)",
+    "VERDICT.md section 10, 3-S5; judging/VERDICT.review.json, skeptic alternatives S5"
+   ],
+   "effect": "None (dedup-window is in DRAFT, LANE, SPLIT, SLOG and V4, not in COMP, MIN-P or COMP2)."
+  },
+  {
+   "id": "RM-07",
+   "item": 5,
+   "key": "dormant-groups",
+   "add_rows": [],
+   "drop_rows": [],
+   "ruling": "reject",
+   "asked": "count Neon's safekeeper timeline eviction as the precedent for dormant groups (skeptic alternatives S9: 'unchecked lead'; VERDICT section 10 recorded it, not checked)",
+   "why": "Keep it novel. Checked at the source here (neondatabase/neon master fa50421: safekeeper/src/timeline_eviction.rs, timeline.rs, timeline_manager.rs, state.rs). The shape is close: a quiet timeline with nothing in flight, fully committed and uploaded, is marked Offloaded(flush_lsn) in its control file, which also keeps its term and commit LSN, and it is restored on the next access. But it evicts the other half. It deletes the local WAL files (they live in the object store) and keeps the timeline, its control-file state and its manager task loaded in memory. fero's dormant group keeps its log on local disk and drops the group from memory to a 24-byte record and a 57-byte entry, which is what SC-13's 2 KB per idle resource needs (E-36). A safekeeper is also an acceptor for an outside proposer (the compute), not a group that elects its own leader, so its wake restarts no election (fero's open crossing K-22). So the same state and rules in the same role are not shown, and both counters' reason ('no multi-Raft system ... drops the group from memory and loads it on the first message') still holds. The lead goes to the user beside TiKV's hibernate regions.",
+   "precedent": "None (both counters), unchanged. Leads for the user: TiKV's hibernate regions and CockroachDB's quiesced ranges (quiet, kept in memory); Neon's safekeeper timeline eviction (local WAL evicted to the object store, timeline kept in memory).",
+   "evidence": [
+    "neondatabase/neon master fa50421: safekeeper/src/timeline_eviction.rs (ready_for_eviction), timeline.rs (switch_to_offloaded, switch_to_present), timeline_manager.rs (the manager loop keeps running when offloaded), state.rs (EvictionState)",
+    "judging/mechanisms.json, dormant-groups",
+    "experiments/E36-many-resources/README.md",
+    "AMENDMENTS.md section 4, K-22",
+    "judging/VERDICT.review.json, skeptic alternatives S9"
+   ],
+   "effect": "None (dormant-groups is not in COMP, MIN-P or COMP2)."
+  }
+ ],
+ "new": [],
+ "counts": {
+  "how": "Accepted rulings only (RM-01, RM-02, RM-05), on a scratch copy; settled first, then proposed. Novel / pairs. Outcome B is 'with the clauses of AMENDMENTS 1.3 restated'.",
+  "judged": {
+   "SPLIT": {
+    "settled": [
+     5,
+     278
+    ],
+    "proposed": [
+     4,
+     295
+    ]
+   },
+   "COMP": {
+    "settled": [
+     3,
+     283
+    ],
+    "proposed": [
+     3,
+     283
+    ]
+   },
+   "MIN-P": {
+    "settled": [
+     3,
+     252
+    ],
+    "proposed": [
+     3,
+     252
+    ]
+   },
+   "DRAFT": {
+    "settled": [
+     6,
+     309
+    ],
+    "proposed": [
+     5,
+     309
+    ]
+   },
+   "CELL": {
+    "settled": [
+     5,
+     262
+    ],
+    "proposed": [
+     4,
+     277
+    ]
+   },
+   "LANE": {
+    "settled": [
+     4,
+     232
+    ],
+    "proposed": [
+     3,
+     232
+    ]
+   }
+  },
+  "neighbours (closure.py mechrow)": {
+   "COMP2": {
+    "settled": [
+     3,
+     274
+    ],
+    "proposed": [
+     3,
+     274
+    ]
+   },
+   "COMP+par": {
+    "settled": [
+     3,
+     293
+    ],
+    "proposed": [
+     3,
+     293
+    ]
+   },
+   "MIN-P+m": {
+    "settled": [
+     3,
+     264
+    ],
+    "proposed": [
+     3,
+     264
+    ]
+   },
+   "MIN-P+par": {
+    "settled": [
+     3,
+     261
+    ],
+    "proposed": [
+     3,
+     261
+    ]
+   },
+   "SPLIT2 (N tier, as VERDICT section 1 describes it)": {
+    "settled": [
+     3,
+     252
+    ],
+    "proposed": [
+     3,
+     270
+    ]
+   },
+   "SPLIT2 (N proc)": {
+    "settled": [
+     3,
+     248
+    ],
+    "proposed": [
+     3,
+     266
+    ]
+   }
+  },
+  "outcome B, judged rows": "COMP, before and after. In B's sweep the lines 'SPLIT with -2 novel -> SPLIT' and 'COMP with +2 novel -> SPLIT' go, and 'every open SHOULD counted as met -> SPLIT' comes in. RM-02 alone (without RM-01) would make SPLIT the winner."
+ }
+}

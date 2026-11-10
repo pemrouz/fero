@@ -461,11 +461,8 @@
        "fixN+rekey"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: CELL: a re-key refuses old cursors (E-17), so a reconnect within history across a re-key is not shown to miss nothing"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: CELL: a re-key refuses old cursors (E-17), so a reconnect within history across a re-key is not shown to miss nothing"
     },
     {
      "when": {
@@ -473,11 +470,8 @@
        "isr"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
     },
     {
      "when": {
@@ -485,11 +479,8 @@
        "hyb"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
     },
     {
      "when": {
@@ -497,11 +488,8 @@
        "pid"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: ISR's family was never run here, so per-room order and the reconnect cursor are not shown on it (ISR's family: 'Kafka's shape: an in-sync set under a controller, K hyb, D pid' (R isr, K hyb, D pid) was never built or modelled here; E-22's prototype is a Raft kernel with K lib and an attempt table)"
     },
     {
      "when": {
@@ -509,11 +497,8 @@
        "slog"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: SLOG: the reconnect cursor across a failover rests on R slog's writer change, never modelled here"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: SLOG: the reconnect cursor across a failover rests on R slog's writer change, never modelled here"
     },
     {
      "when": {
@@ -521,11 +506,8 @@
        "outside"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: BUY: rooms on JetStream were not tried in E-44"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: BUY: rooms on JetStream were not tried in E-44"
     },
     {
      "when": {
@@ -533,11 +515,8 @@
        "kern"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
     },
     {
      "when": {
@@ -545,11 +524,8 @@
        "2pc"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
     },
     {
      "when": {
@@ -557,11 +533,8 @@
        "tso"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
     },
     {
      "when": {
@@ -569,11 +542,8 @@
        "lsm"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
     },
     {
      "when": {
@@ -581,11 +551,8 @@
        "hlc"
       ]
      },
-     "v": "fails",
-     "depends_on": "restated",
-     "alt": "open",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
+     "v": "open",
+     "basis": "Re-ruled (rerulings.cells.json RR-03): E-08's 1.2 ms is one working point at about half a core, and P-05 names no load, so as worded it is open, not a fail. As worded it fails like every row (AMENDMENTS 1.3: E-08's relay p99 1.2 ms against a bar under 1 ms). Restated it stays open: PD's family was never run here, so per-room order and the reconnect cursor are not shown on it (PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown)"
     },
     {
      "when": {
@@ -593,11 +560,10 @@
        "slot"
       ]
      },
-     "v": "fails",
+     "v": "open",
      "depends_on": "restated",
      "alt": "met",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. Per-slot cursors (E-31)"
+     "basis": "Re-ruled (RR-02): open as worded (E-08's 1.2 ms is one working point; a probe at 0.38 of a core gave 0.79 ms), met as restated. As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. Per-slot cursors (E-31)"
     },
     {
      "when": {
@@ -609,11 +575,10 @@
        "fixN(lanes)"
       ]
      },
-     "v": "fails",
+     "v": "open",
      "depends_on": "restated",
      "alt": "met",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. LANE: nothing moves between lanes, so group offsets keep the cursor (E-31's off option holds without a move)"
+     "basis": "Re-ruled (RR-02): open as worded (E-08's 1.2 ms is one working point; a probe at 0.38 of a core gave 0.79 ms), met as restated. As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. LANE: nothing moves between lanes, so group offsets keep the cursor (E-31's off option holds without a move)"
     },
     {
      "when": {
@@ -625,19 +590,15 @@
        "split+merge"
       ]
      },
-     "v": "fails",
+     "v": "open",
      "depends_on": "restated",
      "alt": "met",
-     "gap": 0.45,
-     "basis": "As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. SPLIT: the cursor crosses a split by lineage (E-17c's model)"
+     "basis": "Re-ruled (RR-02): open as worded (E-08's 1.2 ms is one working point; a probe at 0.38 of a core gave 0.79 ms), met as restated. As worded it fails like every row: C + one hop is about 0.83 ms and E-08's relay alone had p99 1.2 ms (Node) at 1,000 subscribers; the gap counts 1.2 against 0.83. Restated with a window per room and about 1,000 sockets a core it is met: per-room order and rooms-only delivery held in E-22, the reconnect cursor holds in E-31's model, and E-08's relay encodes each room once at 0.57 to 1.5 M deliveries a second a core. SPLIT: the cursor crosses a split by lineage (E-17c's model)"
     }
    ],
    "else": {
-    "v": "fails",
-    "depends_on": "restated",
-    "alt": "open",
-    "gap": 0.45,
-    "basis": "As worded it fails like every row (AMENDMENTS 1.3). Restated: no judged row: group offsets with a P that moves partitions are not shown, and E-31 breaks cursors made of group offsets at the first move in 5 steps (the reason CELL's and LANE's judges give for needing no move)"
+    "v": "open",
+    "basis": "Re-ruled (RR-03): open as worded. As worded it fails like every row (AMENDMENTS 1.3). Restated: no judged row: group offsets with a P that moves partitions are not shown, and E-31 breaks cursors made of group offsets at the first move in 5 steps (the reason CELL's and LANE's judges give for needing no move)"
    },
    "why": "Every row fails as worded with the relay's 0.45 gap. The restated alt follows the reconnect cursor (O, and P for group offsets, as on P-03), OBJ's PUT commit (R obj, Q put, gap 2.2), V4's lack of one order (R lww, O lamp, gap 0.91), CELL's re-key (P fixN+rekey), and the families never run."
   },

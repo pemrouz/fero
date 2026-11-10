@@ -145,10 +145,11 @@
    },
    "then": {
     "S": [
-     "lsm"
+     "lsm",
+     "lsm +tier"
     ]
    },
-   "source": "SPACE 5: X 2pc forces a multi-version S (lsm)",
+   "source": "SPACE 5: X 2pc forces a multi-version S (lsm) (lsm +tier is an LSM store too)",
    "why": "Readers need a snapshot timestamp, so the store must keep several versions."
   },
   {

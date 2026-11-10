@@ -1,0 +1,385 @@
+{
+ "by": "referee for the VERDICT review's proposed re-rulings (closure pass, 2026-11-10)",
+ "about": "Rulings on the eight items of VERDICT section 10's re-rule table and the recheck's notes. Each entry lists every judged row it touches. 'accept' entries change the settled cells when this file is renamed to rerulings.cells.json; 'reject' entries keep the settled cell (from equals to) and say why. A null in 'to' means the cell loses that field.",
+ "cells": [
+  {
+   "id": "RR-01",
+   "item": 1,
+   "group": "F",
+   "req": "F-05",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "COMP",
+    "RUST",
+    "SRV",
+    "PD",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": 1.44,
+    "proof": "ceiling"
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "accept",
+   "why": "The fail called E-13 a measured ceiling. It is not one, so the cell is open as worded. (1) E-13 reads its own result as 'met at the median on this disk and not at the tail': the group's longest gap was 9.8 and 9.7 ms at the median of 15 handovers, against 10 ms. (2) The 24.4 and 30.8 ms worst cases are the longest gap between any two acks in a window from 0.2 s before to 3 s after the handover. The same measure over a quiet window with no handover reached 22.9 ms (4.4 to 22.9), and E-01 found 22 to 52 ms flush stalls in every fio run. So the tail is this disk's stalls; the handover itself adds about 4 ms, and the first new write after it was acked in 2.0 and 2.5 ms at the median (1.0 to 6.7). (3) The numbers are etcd's Go server. A port runs the same steps (a vote, an fsync, a commit), so etcd's figure bounds nothing for it the way E-02's pipeline bounds a kernel. (4) The native bar of 2 ms names NVMe, which this box lacks; judge 2's own native reason says 'the gap is this disk's'. (5) AMENDMENTS 1.3, the line both judges cite, ends 'or it stays open'. The failover clause is open in both readings (E + 0.25 E sums to 2.5 s, reasoned, not run), and the writes etcd drops in a transfer are A-02's refuse-at-once rule, which every Raft row takes. So as worded the cell equals the restated one: open, with no alternative, no dependence and no gap. Its closer stays: pins on three processes of the port with A-02's constants and the refuse-at-once handover.",
+   "evidence": [
+    "E-13",
+    "E-01",
+    "AMENDMENTS 1.3 (F-05's handover line)",
+    "A-02",
+    "experiments/E13-handover/README.md (tables and 'Against the thresholds')",
+    "VERDICT.review.json: skeptic evidence S3"
+   ]
+  },
+  {
+   "id": "RR-02",
+   "item": 2,
+   "group": "P",
+   "req": "P-05",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP",
+    "LANE",
+    "SPLIT"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "met",
+    "depends_on": "restated",
+    "gap": 0.45,
+    "proof": "ceiling"
+   },
+   "to": {
+    "v": "open",
+    "alt": "met",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "accept",
+   "why": "The fail called E-08's p99 a ceiling. It is one working point, so as worded the cell is open. E-08 measured p99 1.2 ms (Node) and 3.5 ms (Rust) 'at a load where each relay used about half a core' (1,723 and 3,337 records a second, 1,000 subscribers in 64 rooms). Its own sweep shows the latency follows the load: one probe at 0.38 of a core gave p99 0.79 ms, under the bar of about 0.83 ms, while the three timed runs at the same rate gave 1.0 to 1.4 ms. Rust being slower than Node at equal load shows the build set the number, not the language or the protocol, and E-08 calls the result a latency budget. P-05 names no load and no socket count, so no measured point bounds every load. The bar is likely missed above light load; it is not shown missed by design. The restated cells do not move: met for these rows (a window per room and about 1,000 sockets a core; E-22, E-31, E-08). OBJ and V4 are not touched: they fail as worded on their own reasons too (OBJ's commit is a PUT at 2.67 ms p99, E-28; V4 has no one order per room).",
+   "evidence": [
+    "E-08",
+    "E-22",
+    "E-31",
+    "AMENDMENTS 1.3 (P-05's latency line)",
+    "experiments/E08-relay-fanout/README.md (the half-CPU rows and the sweep table)",
+    "VERDICT.review.json: skeptic evidence S7"
+   ]
+  },
+  {
+   "id": "RR-03",
+   "item": 2,
+   "group": "P",
+   "req": "P-05",
+   "part": "M",
+   "rows": [
+    "CELL",
+    "PD",
+    "ISR",
+    "SLOG",
+    "BUY"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": 0.45,
+    "proof": "ceiling"
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "accept",
+   "why": "The same reason as RR-02: E-08's 1.2 ms is one prototype's working point at about half a core, not a ceiling, and P-05 names no load. As worded these rows are open, the same as restated, so the cell loses its alternative, its dependence and its gap. BUY: judge 2 also cited JetStream's 1.31 ms p99 ack with fsync on three replicas (E-09b). That is a fail only if a room message must be `persisted`, which P-05 does not say; at its default JetStream acks one publisher at 0.55 ms p99 (E-09b). So it does not prove the fail either.",
+   "evidence": [
+    "E-08",
+    "E-09b",
+    "E-22",
+    "E-31",
+    "AMENDMENTS 1.3 (P-05's latency line)",
+    "VERDICT.review.json: skeptic evidence S7"
+   ]
+  },
+  {
+   "id": "RR-04",
+   "item": 3,
+   "group": "PERF-DATA",
+   "req": "PERF-04",
+   "part": "M",
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "LANE",
+    "PD",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "PERF-01 losses",
+    "gap": 0.33,
+    "proof": "ceiling"
+   },
+   "to": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "PERF-01 losses",
+    "gap": 0.39,
+    "proof": "ceiling",
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "why": "The fail stands; its reason and gap change. Old reason: 'C = 0.73 ms is the floor of any persisted commit'. C is a sum of two p99s (three-writer fsync 676 us plus round trip 58 us), not a floor: a commit needs only the second-fastest of three fsyncs (VERDICT section 1 says so too). New reason, PERF-01's own win rule: a win needs fero's median better than JetStream's by more than the larger spread. JetStream's default one-publisher p99 was 0.550 ms over runs of 0.536 to 0.783 ms (E-09b), so a win needs a p99 below about 0.30 ms. The best a `persisted` commit can do here: the second-fastest of the leader's fsync and two followers' fsync plus a round trip, sampled from E-01's one-writer fdatasync table (290,235 samples), with independent disks, has p99 0.364 ms; with the client's hop, 0.422 ms. The evidence skeptic, the recheck (V-17) and this referee each computed it; it has no CPU, batching or forwarding cost, so a real kernel can only approach it (rule 1's ceiling, as E-02's pipeline). On this box's one shared disk a real commit is slower still. So these rows, whose only durable rung is `persisted`, cannot win the default row, and PERF-01 allows no loss today. Gap: (0.422 - 0.303) / 0.303 = 0.39. That is the distance the proof shows. A gap counted from C (1.41) would count from a sum the study itself says is not this row's floor, so it would claim more than is shown. The alternative and its dependence stay: if the user accepts this row as a loss by name (PERF-01, VERDICT item 2), the cell is open. Basis: reasoned from measured parts.",
+   "evidence": [
+    "E-09b",
+    "E-01",
+    "PERF-01",
+    "experiments/E09b-nats/README.md (js-default:pub-sync-1c-100B: p99 0.550, 0.536 to 0.783 ms)",
+    "experiments/E01-floors/results/fdatasync-1w-cdf.txt",
+    "VERDICT.review.json: skeptic evidence S1; recheck V-17"
+   ]
+  },
+  {
+   "id": "RR-05",
+   "item": 4,
+   "group": "F",
+   "req": "F-02",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "LANE",
+    "SPLIT"
+   ],
+   "from": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "accept",
+   "why": "Both judges scored met on E-20's model. E-20 has no lock token. E-32's crossing model put E-20's dedup beside E-17's lock-token refusal and found, in 6 steps, a write both applied and told 'refused': the refusal judged a late copy whose outcome the dedup floor had already forgotten. The fix (the floor guards the refusal path, `refuse.above`) was model-checked only with D `sess`. These three rows carry both pieces: `dedup-window` (forgets outcomes at or below highest id minus the window) and `fence-tokens` (judging/mechanisms.json). E-32 says of them: 'not checked here, and owed the same floor rule by reasoning'. So the path that broke is in these rows and is not shown safe in a model of their own dedup. By the referee's own F-02 rulings for SLOG, OBJ, ISR and SIDE, a row's own rule must be shown before it is met. Not fails: the fix is small, has a precedent (Raft thesis 6.3) and no model of these rows breaks with it. Closer: E-32's `floor-*` bounds run with D `win` and the floor on the refusal path. The `sess` rows keep met: the counterexample needs no move and no healing, and E-32 checked the fix with `sess`. SLOG is already open.",
+   "evidence": [
+    "E-32 (crossing)",
+    "E-20",
+    "E-17",
+    "experiments/E32-composition/crossing/README.md (the counterexample and 'Which rows this covers')",
+    "judging/mechanisms.json (dedup-window, fence-tokens)",
+    "judging/F.rulings.json (F-02: SLOG, OBJ, ISR, SIDE)",
+    "VERDICT.review.json: skeptic arithmetic S4"
+   ]
+  },
+  {
+   "id": "RR-06",
+   "item": 5,
+   "group": "DEP",
+   "req": "DEP-21",
+   "part": "M",
+   "rows": [
+    "PD"
+   ],
+   "from": {
+    "v": "open",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "reject",
+   "why": "Kept open in both readings. A structural fail needs PD's own shape to miss $10 whatever the machine count. The price check prices a PD shape at $9.58 to $10.11: its placement processes inside the three stores and one app machine, at prices read from Fly's docs source (recheck/results/floors.md). That is under the bar with no transfer charge and 1 % over at Fly's internet rate for the upload to Tigris, a rate Fly does not publish. SPACE's C `cent` names a separate replicated controller, not separate machines; E-41 itself prices ISR, also `cent`, with 'the controller inside them'. The extra machines are E-41's assumption: three placement machines, and two app machines 'so one can fail'. Judge 2 ruled SRV the same way: 'With one app machine it would be $9.45, so this is not a failure by design'. So only E-41's assumed shape misses the bar. The price-reading part of the old reason is gone (prices now read at the source); the assumed machine count remains. The second agent (the recheck, V-03) objects in writing, so rule 1's 'structural argument a second agent confirms' is not met. Note: floors.py drops the placement machines without adding the controller's memory to the stores; E-41's 256 MB store machines hold about 100 MB at this load, so a small controller fits (reasoned). Under DEP-21's subscribers-outside reading every row is over alike, as the judges ruled. PD+fix keeps its copied open cell.",
+   "evidence": [
+    "E-41",
+    "E-41 price re-check (2026-11-10)",
+    "experiments/E41-hosted-cost/recheck/results/floors.md",
+    "experiments/E41-hosted-cost/cost.py (SHAPES: PD, ISR, SRV)",
+    "SPACE 2 C (`cent`, `cent-co`)",
+    "judging/DEP.settled.json (SRV why2)",
+    "VERDICT.review.json: price check P-3; recheck V-03"
+   ]
+  },
+  {
+   "id": "RR-07",
+   "item": 6,
+   "group": "PERF-DATA",
+   "req": "DATA-01",
+   "part": "M",
+   "rows": [
+    "PD"
+   ],
+   "from": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "reject",
+   "why": "Kept open. Both judges wrote 'data is not the engine on PD's servers' and still scored open, on purpose: PD 'meets DATA-01 only if a differential test proves that store's rows equal data's fold'. That path is in the requirements: DATA-09 says that if any layer moves to native code, 'the fold's results stay data's, proven by a differential test against data'. AMENDMENTS A-30 names PD (by reasoning) and SRV as the rows that fold natively and take that test. The proposed argument, 'a differential test cannot show that data's lane folds', reads DATA-01 without DATA-09. Read that way it fails SRV by the same steps (its servers fold plain rows in Rust or Go), yet only PD was proposed. No step shows PD's rows cannot equal data's fold: under Percolator's locks the commits on one key land in one order, and MVCC picks no winner between concurrent writes, so there is no last-writer-wins compare to point at (reasoned). No second agent confirmed the argument in writing. Whether a server may fold natively at all is a reading of the user's own two requirements; it is listed as a user choice. Closer unchanged: DATA-09's differential test of the server's fold, 1e6 records.",
+   "evidence": [
+    "REQUIREMENTS DATA-01, DATA-09",
+    "AMENDMENTS A-30",
+    "SPACE 4.2 (PD row)",
+    "judging/PERF-DATA.settled.json (DATA-01: PD and SRV, both judges)",
+    "E-43"
+   ]
+  },
+  {
+   "id": "RR-08",
+   "item": 7,
+   "group": "F",
+   "req": "F-17",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": "counterexample"
+   },
+   "to": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": "counterexample"
+   },
+   "ruling": "reject",
+   "why": "Kept as fails; the reading is the user's. F-17 does not define 'connected majority'. E-38 defines it as a server with two-way links to a majority ('the least a Raft leader needs'), records the stricter clique reading per run, and the judges used E-38's. Under that reading the 5 stuck runs of 280 are a counterexample on etcd's own raft, by Raft's vote rule, which no constant of A-02 changes. Checked here in E-38's raw sweep5 and sweep3 files: the 5 stuck runs all lack a clique majority, and like for like (leader up) 0 of 188 five-node and 0 of 111 three-node clique runs got stuck (299 and 159 include leader-crash runs). So the fail holds under the reading the judges used, and the other reading removes the counterexample. The meaning of the user's own word is the user's to set (VERDICT item 23), so the cell is not changed here. If the user picks the clique reading, the cell becomes open as worded (v open, no alternative, no dependence, no gap): no counterexample, and the 2E clause waits for the sweeps re-run with A-02's CheckQuorum at E/4 (23 five-node and 15 three-node clique runs took 3.0 to 3.9 E with etcd's timers; 1.52 E at worst on the named cases with E/4). The star reading fits F-17's own sources better: it cites Jensen, Howard and Mortier's scenarios, and E-38 says the stuck shape is their 'constrained election'.",
+   "evidence": [
+    "E-38",
+    "E-38c",
+    "AMENDMENTS 1.3 (F-17 line)",
+    "A-02",
+    "experiments/E38-raft-gray-failures/results/sweep5.jsonl.gz",
+    "experiments/E38-raft-gray-failures/results/sweep3.jsonl.gz",
+    "VERDICT.review.json: skeptic evidence S4; recheck V-11",
+    "VERDICT section 8 item 23"
+   ]
+  },
+  {
+   "id": "RR-09",
+   "item": 8,
+   "group": "DEP",
+   "req": "DEP-21",
+   "part": "M",
+   "rows": [
+    "MIN",
+    "RUST",
+    "LEAN",
+    "ISR",
+    "MIN-P",
+    "MIN-TS",
+    "SIDE",
+    "COMP",
+    "V4"
+   ],
+   "from": {
+    "v": "open",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": "open",
+    "depends_on": "restated",
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "reject",
+   "why": "No cell changes. As worded, the free bar is judged asleep: DEP-21 lists its first load as 'a sleeping free project', and '(J's figure for a free project with a live app)' says where the $2.19 comes from. DEP-04 says a free project sleeps with no client. Both judges read it so ('Asleep every row costs $0.00 to $0.60 against $2.19'). Asleep, MIN's shape costs $0.19. Awake all month is not one of DEP-21's three loads; E-41 priced it as an extra column. If the user means the bar to cover it, that is a restatement, listed as a user choice. Even then no cell becomes fails here: MIN's shape is $2.34 only because E-41 gives the one free copy its own 1 GB volume ($0.15), and REQUIREMENTS X14 lets a free copy keep its bytes elsewhere and state a loss window; at Fly's 730-hour month one always-on machine alone is about $2.22, over the bar in every row that has one, DRAFT's family included. So a fail would need a judge's structural ruling, not a price. Rows: MIN's machine shape in E-41 (MIN, MIN-TS, MIN-P, RUST, SIDE, LEAN, ISR, V4) and COMP, which has MIN-P's shape; COMP2 has it too.",
+   "evidence": [
+    "REQUIREMENTS DEP-21, DEP-04, X14",
+    "E-41 (Against DEP-21's two bars; What the numbers say, point 6)",
+    "E-41 price re-check (730-hour month)",
+    "judging/DEP.settled.json (DEP-21 cells, both judges)",
+    "VERDICT.review.json: recheck V-05"
+   ]
+  }
+ ],
+ "user_choices": [
+  "DEP-21's free bar (item 8): judged asleep, as worded (DEP-21's load is 'a sleeping free project'), or also for a free project awake all month? Asleep: every row passes ($0.00 to $0.60). Awake, on E-41's shapes: MIN's machine shape (MIN, MIN-TS, MIN-P, RUST, SIDE, LEAN, ISR, V4, COMP and COMP2) $2.34, over by its own volume; DRAFT's family, SLOG, RLOG and OBJ exactly $2.19; EMB-V8 $1.42; SRV $4.53, PD $6.72, BUY $8.91; and at Fly's 730-hour month every row with one always-on machine is about 1 % over. No cell fails on that alone. If a judge then ruled the volume structural, the MIN-shaped rows go out and, by the recheck (V-05), SPLIT wins B.",
+  "DATA-01 with DATA-09 (item 6): may a server fold rows natively when a differential test proves the result equals data's fold? Yes (the judges' and AMENDMENTS A-30's reading): SRV and PD stay open. No (data's own code must fold on writers and followers): SRV and PD both fail by structure, never PD alone, and PD+fix goes out with them. No judged row that is in moves.",
+  "F-17's 'connected majority' (item 7; already VERDICT item 23): star (E-38's, used by the judges; the 15 Raft rows fail as worded) or clique (the as-worded cells become open: 0 of 188 five-node and 0 of 111 three-node runs with the leader up stuck)."
+ ]
+}
