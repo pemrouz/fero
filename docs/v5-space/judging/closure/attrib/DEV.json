@@ -1,0 +1,167 @@
+{
+ "group": "DEV",
+ "by": "the coordinating session, from judging/DEV.settled.json (every cell is uniform or follows axis R or X)",
+ "parts": [
+  {
+   "req": "DEV-01",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "lww"
+      ]
+     },
+     "v": "met",
+     "depends_on": "other",
+     "alt": "fails",
+     "basis": "V4: 8 settled novel mechanisms, below 13; the other reading counts REQUIREMENTS thirteen names (MECHANISMS 4.1)"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "every non-V4 row has at most 8 settled novel mechanisms (judging/mechanisms.json); the bar is 13. For an unjudged row the search also checks its own count"
+   }
+  },
+  {
+   "req": "DEV-02",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "no row has every pair placed by a model or an argument (E-32 pairs.md section 9): open for all 20"
+   }
+  },
+  {
+   "req": "DEV-02",
+   "part": "S",
+   "rules": [],
+   "else": {
+    "v": "not",
+    "basis": "every row carries more than 10 interacting pairs (judging/pairs.json): BUY has 12, the rest 52 to 309"
+   }
+  },
+  {
+   "req": "DEV-03",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "no row reaches the 85% mutant bar on every model (E-32 crossing 70%): open for all 20"
+   }
+  },
+  {
+   "req": "DEV-04",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "raft",
+       "rlog",
+       "outside"
+      ]
+     },
+     "v": "met",
+     "basis": "the replication core is etcd raft (ported) or raft-rs, or JetStream itself"
+    },
+    {
+     "when": {
+      "R": [
+       "isr",
+       "slog",
+       "obj",
+       "lww"
+      ]
+     },
+     "v": "not",
+     "basis": "the replication core is fero's own code (ISR, loglets, manifest CAS, LWW cells); only #meta runs the ported Raft"
+    }
+   ]
+  },
+  {
+   "req": "DEV-05",
+   "part": "S",
+   "rules": [
+    {
+     "when": {
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "no line estimate for a 2PC, TSO and MVCC kernel (E-44 leaves PD out)"
+    },
+    {
+     "when": {
+      "R": [
+       "isr",
+       "obj"
+      ]
+     },
+     "v": "open",
+     "basis": "no line estimate (E-44 leaves ISR and OBJ out)"
+    }
+   ],
+   "else": {
+    "v": "met",
+    "basis": "E-44: about 8,000 fero-owned lines for a Raft-per-group row, about 13,500 for SLOG, RLOG, SPLIT; within 2 times"
+   }
+  },
+  {
+   "req": "DEV-06",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20"
+   }
+  },
+  {
+   "req": "DEV-07",
+   "part": "M",
+   "rules": [
+    {
+     "when": {
+      "R": [
+       "outside"
+      ]
+     },
+     "v": "fails",
+     "basis": "structural: JetStream replicates inside nats-server; fero owns no step function for it (E-44)"
+    }
+   ],
+   "else": {
+    "v": "open",
+    "basis": "open for every row fero builds"
+   }
+  },
+  {
+   "req": "DEV-08",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20"
+   }
+  },
+  {
+   "req": "DEV-09",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "open",
+    "basis": "open for all 20"
+   }
+  },
+  {
+   "req": "DEV-10",
+   "part": "M",
+   "rules": [],
+   "else": {
+    "v": "met",
+    "basis": "met for all 20: the counting convention was applied by two blind counters and a referee"
+   }
+  }
+ ]
+}
