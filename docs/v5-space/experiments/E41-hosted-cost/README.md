@@ -137,3 +137,34 @@ Asleep, the cheapest row costs about nothing, so a ratio says nothing there; the
 - **Two things for the user:** say where DEP-21's subscribers are and what each receives (it decides whether the $10 bar can be met at all), and confirm every price on the vendor's page.
 
 Q-41: on Fly a project costs $0.00 to $0.60 asleep, $4.94 to $7.26 at 10 writes/s for every row that runs inside the app (DRAFT's shared third voter cheapest, MIN 1.5 ×) and $79 to $129 at 5,000 writes/s, with OBJ 17 to 28 × the cheapest (a PUT per commit window: $131 a month at 10 writes/s) and SRV, PD and BUY 2.4 to 3.7 × at 10 writes/s (the app's machines beside the servers); on AWS traffic between zones is 85 % of the bill at 5,000 writes/s and levels every three-copy row at about $620; neither OBJ nor SLOG is cheapest by 2 ×, so decision 2b is not reopened; all prices are cited from search summaries, not the vendors' pages (this session cannot open them). Moves: OBJ down on DEP-21 (fails the $10 bar by 13 ×); SRV, PD and BUY down on DEP-21 at small loads (over both bars when awake); DRAFT, CELL, LANE, SPLIT, SLOG, RLOG and EMB-V8 up a little on DEP-21 (a shared tier or pool saves a third, if OPS-14 and J allow it); MIN, MIN-TS, MIN-P, RUST, SIDE, LEAN and ISR hold DEP-21 (LEAN's saving shows only above about 2 GB of rows per copy; RUST and SRV gain nothing from their language at these loads); every row: DEP-21's $10 bar needs the subscribers placed (inside, or at most 5 % of the writes each).
+
+## Price re-check (2026-11-10)
+
+**Why.** The verdict above said every price must be re-read at the vendor before VERDICT.md is final. A checker re-read them on 2026-11-10, during the VERDICT review ([judging/VERDICT.review.json](../../judging/VERDICT.review.json), "check: E-41 prices").
+
+**How.** The vendors' rendered pages still fail from this session ("host not found"). So the checker read the vendors' own published sources through git instead:
+- Fly: the source of `fly.io/docs/about/pricing/` in `github.com/superfly/docs`, commit `ed9082f9` of 2026-11-09 (`about/pricing.mdx`, `about/billing.mdx`, `snippets/RegionPricingSelector.jsx`, which holds the per-second rates and the region markups).
+- Tigris: Tigris's own docs, `github.com/tigrisdata/tigris-os-docs`, commit `358b7edb` of 2026-11-10 (`docs/ai-agents/tigris-vs-cloudflare-r2.md`, `tigris-vs-s3.md`).
+- AWS: not read. Its hosts are outside this session's network. The 13 AWS prices stay unconfirmed. No DEP-21 cell uses them.
+
+**What matched.** All 10 Fly and Tigris prices E-41 uses match the vendor's source: the shared machine ($2.19 per 30 days), RAM ($6.00 a GB), the shared and performance CPU (derived, $0.69 and $21), volumes and root disks ($0.15 a GB), egress ($0.02, $0.04, $0.12 a GB by region group), same-region private traffic (free for organizations on granular transfer rates, which is every one made after 18 July 2024), Tigris storage ($0.02 a GB, which E-41 had marked unconfirmed) and Tigris writes ($0.005 per 1,000).
+
+**What did not match.** E-41 assumed that sending data from Fly to Tigris is free. Fly's billing page says the opposite: "You will be billed separately for data transfer to these external third-party services, including Tigris Object Storage." It names no rate. So the re-check bills the log's upload at two bounds: $0.006 a GB (Fly's private cross-region rate) and $0.02 a GB (its internet rate in North America and Europe). Two smaller corrections: Fly bills per second, so a month is 730 hours, not the 720 its list prices assume; and the exact per-second rates move each row by a few cents.
+
+**The numbers** (`recheck/run.sh` reruns them; [recheck/results/](recheck/results)):
+
+| Row (Fly, iad) | Asleep | 10 writes/s, subscribers inside | 5,000 writes/s |
+|---|---|---|---|
+| MIN's shape (MIN, MIN-TS, MIN-P, RUST, SIDE, LEAN, ISR, COMP) | $0.19 | $7.52 to $7.89 (was $7.26) | $198 to $382 (was $118) |
+| DRAFT's shape | $0.04 | $5.17 to $5.54 | $176 to $360 |
+| SLOG, RLOG | $0.04 | $5.23 to $5.60 | $204 to $388 |
+| EMB-V8 | $0.00 | $6.02 to $6.38 | $158 to $342 |
+| SRV | $0.23 | $11.97 to $12.34 | $203 to $387 |
+| PD | $0.23 | $18.64 to $19.01 | $209 to $393 |
+| BUY | $0.60 | $16.14 | $136 |
+| OBJ | $0.04 | $136.02 to $136.39 | $1,468 to $1,652 |
+
+- **At 10 writes/s nothing changes in DEP-21.** The same rows pass the $10 bar, with margins of 1.3 to 2 times instead of 1.4 to 2. In other Fly regions MIN's shape passes $10 at the top of its range: São Paulo $11.86 to $12.52, Johannesburg $10.70 to $12.54, Tokyo $9.81 to $10.46, Singapore and Sydney $9.55 to $10.21 (`recheck/results/regions.md`).
+- **At 5,000 writes/s the upload dominates.** The log is 13,140 GB a month. At $0.02 a GB that is $263, and BUY, which keeps no log in the object store, becomes the cheapest row. Every row with the store tier is then 1.2 to 2.9 times BUY, and OBJ 12 times. E-41's reopening test (OBJ or SLOG cheapest by 2 times) is still not met. But the store tier's transfer is now the largest cost at high load, and a row that uploads less (compacted state, not the raw log) would save most of it.
+- **Other machine shapes** (`recheck/results/floors.md`): SRV with one app machine is $9.58 to $10.11. PD with one app machine is $16.26 to $16.78. PD with its placement process inside the stores and one app machine is $9.58 to $10.11.
+- **Still open.** AWS's 13 prices, and Fly's rate for traffic to Tigris. To read them, the session's network must allow `aws.amazon.com`, `pricing.us-east-1.amazonaws.com`, `fly.io` and `www.tigrisdata.com`.
