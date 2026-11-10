@@ -287,7 +287,8 @@ def tally(cells, dev01, pairs, opt=None):
     t = {r: {'fails': [], 'open': 0, 'met': 0, 's_met': [], 's_not': [], 's_open': [], 'gap': 0.0} for r in ROWS}
     for c in cells:
         r, v = c['row'], c[opt['use']] if opt.get('use') else c['v']
-        if opt.get('choice') and c.get('depends_on') == opt['choice'] and not opt.get('use'):
+        if opt.get('choice') and c.get('depends_on') == opt['choice'] and not opt.get('use') \
+                and opt.get('only_req', c['req']) == c['req']:
             v = c['alt']
         if (c['req'], c['part']) in opt.get('drop', ()):
             continue
@@ -321,10 +322,12 @@ def beats(a, b, t, shoulds_first=False):
 def rank(t, shoulds_first=False):
     inn = [r for r in ROWS if not t[r]['fails']]
     if not inn:  # rule 2: every row fails a MUST
-        order = sorted(ROWS, key=lambda r: (len(set(t[r]['fails'])), t[r]['gap']))
-        best = len(set(t[order[0]]['fails']))
-        return {'all_out': True, 'order': order, 'winner': order[0], 'in': [], 'wins': {}, 'losses': {}, 'unbeaten': [],
-                'tied_first': [r for r in order if len(set(t[r]['fails'])) == best], 'clear': False}
+        key = lambda r: (len(set(t[r]['fails'])), round(t[r]['gap'], 6))
+        order = sorted(ROWS, key=key)
+        tied = [r for r in order if key(r) == key(order[0])]
+        # Rule 2 names no tie-break past the gap sum, so an exact tie is reported as a tie, not settled by list order.
+        return {'all_out': True, 'order': order, 'winner': order[0] if len(tied) == 1 else 'level: ' + ', '.join(tied), 'in': [], 'wins': {}, 'losses': {},
+                'unbeaten': [], 'tied_first': tied, 'clear': False}
     wins = {r: sum(beats(r, o, t, shoulds_first) > 0 for o in inn if o != r) for r in inn}
     losses = {r: sum(beats(r, o, t, shoulds_first) < 0 for o in inn if o != r) for r in inn}
     order = sorted(inn, key=lambda r: (-wins[r], losses[r], t[r]['dev01'] if t[r]['dev01'] is not None else 99, -len(t[r]['s_met'])))
@@ -350,6 +353,12 @@ def outcome(cells, dev01, pairs, mech):
     for ch in CHOICES:
         if ch != 'restated' and any(c.get('depends_on') == ch for c in cells):
             case('the user chooses the other way on: ' + ch, {'choice': ch})
+    # 'other' gathers unrelated readings, so each requirement in it is also flipped alone.
+    oth = sorted({c['req'] for c in cells if c.get('depends_on') == 'other'})
+    if len(oth) > 1:
+        for req in oth:
+            case('the user reads %s the other way (one of "other")' % req,
+                 {'choice': 'other', 'only_req': req})
     for req, part in sorted({(c['req'], c['part']) for c in cells if c['part'] == 'S'}):
         case('without the SHOULD %s' % req, {'drop': {(req, part)}}, sweep='one SHOULD left out, each in turn')
     for r in ROWS:
@@ -377,10 +386,12 @@ def write_outcome(o, res, head):
     o += ['', '### %s.2 The ranking' % head, '']
     if base['all_out']:
         o.append('Every row fails at least one MUST, so rule 2 applies: fewest MUSTs failed first, then the smaller sum of gap over bar. '
-                 + ('First: **%s**.' % base['winner'] if len(base['tied_first']) == 1 else 'Level on the count of MUSTs failed: %s.' % ', '.join(base['tied_first'])))
+                 + ('First: **%s**.' % base['winner'] if len(base['tied_first']) == 1 else 'Level first, on both counts: %s. Rule 2 names no further tie-break.' % ', '.join(base['tied_first'])))
         o += ['', '| Place | Row | MUSTs failed | Sum of gap over bar |', '|---|---|---|---|']
+        k = lambda r: (len(set(t[r]['fails'])), round(t[r]['gap'], 6))
         for i, r in enumerate(base['order']):
-            o.append('| %d | %s | %d | %.2f |' % (i + 1, r, len(set(t[r]['fails'])), t[r]['gap']))
+            place = 1 + next(j for j, q in enumerate(base['order']) if k(q) == k(r))
+            o.append('| %d | %s | %d | %.2f |' % (place, r, len(set(t[r]['fails'])), t[r]['gap']))
     else:
         o.append('Rows still in (no MUST failed by design): ' + ', '.join(base['in']) + '.')
         o.append('')
