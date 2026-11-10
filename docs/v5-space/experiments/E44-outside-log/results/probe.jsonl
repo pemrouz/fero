@@ -1,0 +1,3 @@
+{"loadavg":"7.89 9.67 10.47 9/214 31566","check":"probe"}
+{"probe":"a refused publish burns its message id","replicas":3,"firstTry":"wrong last sequence: 1","secondTry":{"seq":0,"duplicate":true},"messagesInStream":1,"burned":true}
+{"probe":"a refused publish burns its message id","replicas":1,"firstTry":"wrong last sequence: 1","secondTry":{"seq":2,"duplicate":false},"messagesInStream":2,"burned":false}

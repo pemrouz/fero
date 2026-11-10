@@ -1,0 +1,9 @@
+{"loadavg":"6.18 8.72 10.03 7/212 4894","check":"p10"}
+{"check":"P-10 at most one holder at a time, 4 contenders, a leader kill (n3)","ok":true,"acquires":60,"overlaps":0,"gaveUp":0}
+{"check":"P-10 tokens strictly rise in acquire order, across the failover","ok":true,"first":1,"last":60}
+{"check":"P-10 acquire time, uncontended (rough; the bar is one commit)","ok":true,"p50ms":2.51,"p99ms":13.52}
+{"check":"P-10 a second holder gets the lock after the first one stops, with a higher token","ok":true,"lapsedAfterMs":1007,"leaseMs":1000,"fenceA":91,"fenceB":92}
+{"check":"P-10 a write under an older token than the row has seen is refused","ok":true,"w3":{"ok":false,"why":"fenced","retries":0}}
+{"check":"P-10 (as designed) a stale holder may still write a row the new holder has not touched","ok":true,"note":"fencing is per protected row, as in the requirement (\"older than one a writer has seen\")"}
+{"check":"gap: P-10 the token check is enforced for every writer","ok":false,"why":"the check runs in the client library; a writer that leaves the token out (old code, another tool) is not refused: JetStream cannot tie a write to a token","unfencedWriteAccepted":true}
+{"check":"gap: P-10 one lock name is one lock whatever its lease","ok":false,"why":"expiry is the stream's max age (2.10 has no per-message expiry), so each lease length needs its own stream, with its own sequence","bothHeld":true,"fences":[93,1]}
