@@ -1,0 +1,67 @@
+version.node	26.13.0
+version.v8	14.6.202.34-node.40
+version.icu	78.3
+version.unicode	17.0
+version.cldr	48.0
+version.tz	2026e
+num.toString	["0.30000000000000004","1e+21","1e-7","123456789012345680000","0","5e-324","9007199254740992"]
+num.toFixed	["1.00","123.5","1","3","1e+21"]
+num.toPrecision	["123.5","1.23e-4","ff","0.0022002200220022002200220022002201"]
+num.parse	["3e7ad7f29abcaf48","4030000000000000","4020000000000000","4028000000000000","7ff8000000000000","4014000000000000"]
+json.numbers	[1e+21,0.1,0,0.3333333333333333,9007199254740992]43e56a95319d63e1,7ff0000000000000,8000000000000000
+json.strings	["\ud800"," ","","é","😀"]
+math.sin	3fdeaee8744b05f0 3feaed548f090cee 3fefeb7a9b2c6d8b 3fed18f6ead1b446 3fc210386db6d55b bfe1689ef5f34f52 bfe03425b78c4db8 3ee4f8b588e1e8a2 3fb98eaecb8bcb2c 3fe49d6e694619b8 bfdf334c7896a4e3 bfe9b9dadc41aeb6 bfe326af0dcfcab0
+math.cos	3fec1528065b7d50 3fe14a280fb5068c 3fb21bd54fc5f9a7 bfdaa22657537205 bfefae04be85e5d2 bfead9ac890c6b1f 3feb981dbf665fdf 3feffffffff920c8 3fefd712f9a817c0 3fe87996529f9d93 3febf098901c931a bfe307e5980a1558 bfe9a2f7ef858b7d
+math.tan	3fe17b4f5bf3474a 3ff8eb245cbee3a6 402c33ed50b88777 c0017af62e0950f8 bfc23ef71254b86f 3fe4bf5f34be3782 bfe2ca74d62b5d38 3ee4f8b588e6698e 3fb9af8877430b80 3feaf406c2fc78ae bfe1de000f443f50 3ff5a0fe5da94891 3fe7e79b4e00bb15
+math.asin	3fe0c152382d7366 3ff921fb54442d18 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 3ee4f8b588e4e940 3fb9a49276037884 3fe8d00e692afd95 7ff4000000000000 7ff4000000000000 7ff4000000000000
+math.acos	3ff0c152382d7366 0000000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 3ff921f0d7e968a6 3ff787b22ce3f590 3fe973e83f5d5c9b 7ff4000000000000 7ff4000000000000 7ff4000000000000
+math.atan	3fddac670561bb4f 3fe921fb54442d18 3fef730bd281f69b 3ff1b6e192ebbe44 3ff3fc176b7a8560 3ff789bd2c160054 3ff8f905eb2def22 3ee4f8b588e06854 3fb983e282e2cc4d 3fe38b112d7bd4ad 3ff921fb543d4de0 3ff900cdfeb560b4 bff30b6d796a4da8
+math.sinh	3fe0acd00fe63b97 3ff2cd9fc44eb982 400108c3aabd6a60 400d03cf63b6e1a0 40240926e70949ae 40c5829dced69992 48e3494a9b171bf5 3ee4f8b588e4e940 3fb9a487337b59b3 3fe8465153d5bdbc 7ff0000000000000 4b01428e1cbc0143 c0183368cdb0b6d3
+math.cosh	3ff20ac1862ae8d0 3ff8b07551d9f550 4002d1bc21e22022 400e18fa0df2d9bc 402422a497d6185e 40c5829dd053712e 48e3494a9b171bf5 3ff0000000036f9c 3ff0147f40224b38 3ff4152c1862342f 7ff0000000000000 4b01428e1cbc0143 40188776e4b30aa3
+math.tanh	3fdd9353d7568af3 3fe85efab514f394 3fecf6f9786df577 3feed9505e1bc3d4 3fefd77d111a0b00 3feffffffdc96f35 3ff0000000000000 3ee4f8b588e06854 3fb983d7795f413a 3fe356fb17af2e92 3ff0000000000000 3ff0000000000000 bfef9258260a71c2
+math.asinh	3fdecc2caec5160a 3fec34366179d427 3ff31dc0090b63d9 3ff719218313d087 3ffd185b507edc0e 4007fc5c506d2bdb 40153180a93d3c2a 3ee4f8b588e1e8a2 3fb98eb9e7e5fc3f 3fe4e2a4fe9085dd 4037b810429a7c2a 40160943fbdae50b bffa5b0f0be9dcf6
+math.acosh	7ff4000000000000 0000000000000000 3feecc2caec5160a 3ff5124271980434 3ffc34366179d426 4007f21ed1ce05d4 401531738dcbc626 7ff4000000000000 7ff4000000000000 7ff4000000000000 4037b810429a7c2a 4016093b62521257 7ff4000000000000
+math.atanh	3fe193ea7aad030a 7ff0000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 7ff4000000000000 3ee4f8b588e6698f 3fb9af93cd234412 3febc0ed0947fbe8 7ff4000000000000 7ff4000000000000 7ff4000000000000
+math.exp	3ffa61298e1e069c 4005bf0a8b145769 4011ed3fe64fc541 401d8e64b8d4ddae 403415e5bf6fb106 40d5829dcf950560 48f3494a9b171bf5 3ff0000a7c5e340e 3ff1aec7b35a00d4 40001c2a61268987 7ff0000000000000 4b11428e1cbc0143 3fb50385c094f425
+math.expm1	3fe4c2531c3c0d38 3ffb7e151628aed2 400bda7fcc9f8a83 40198e64b8d4ddae 403315e5bf6fb106 40d5825dcf950560 48f3494a9b171bf5 3ee4f8bc681cdfb6 3fbaec7b35a00d3a 3ff03854c24d130d 7ff0000000000000 4b11428e1cbc0143 bfed5f8f47ed617c
+math.log	bfe62e42fefa39ef 0000000000000000 3fd9f323ecbf984c 3fe62e42fefa39ef 3ff193ea7aad030a 40026bb1bbb55516 40126bb1bbb55516 c027069e2aa2aa5b c0026bb1bbb55515 bfd6d3c324e13f50 4037069e2aa2aa5b 401343774f3e2362 7ff4000000000000
+math.log1p	3fd9f323ecbf984c 3fe62e42fefa39ef 3fed5240f0e0e078 3ff193ea7aad030a 3ff62e42fefa39ef 40032ee3b77f374c 401275e2271bba31 3ee4f8aea9ae7317 3fb8663f793c46c7 3fe0fae81914a991 4037069e2aa3184e 40134bba22cd5df5 7ff4000000000000
+math.log2	bff0000000000000 0000000000000000 3fe2b803473f7ad1 3ff0000000000000 3ff95c01a39fbd68 400a934f0979a371 401a934f0979a371 c0309c1165ec0627 c00a934f0979a371 bfe0776228967d13 40409c1165ec0627 401bca9a03b1083a 7ff4000000000000
+math.log10	bfd34413509f79ff 0000000000000000 3fc68a288b60b7fc 3fd34413509f79ff 3fde8927964fd5fd 3ff0000000000000 4000000000000000 c014000000000000 bff0000000000000 bfc3d3d3d21ccf04 4024000000000000 4000bb6abfc968ef 7ff8000000000000
+math.cbrt	3fe965fea53d6e3d 3ff0000000000000 3ff250bfe1b082f5 3ff428a2f98d728b 3ff7137449123ef6 40013c484138704f 401290fca9c761f8 3f960fb8a566f628 3fddb4c7760bcff3 3fec69b5a72f1a99 40a0d4de8fb11dad 4013ead4f488ee35 bff5b7209557b0ed
+math.sqrt	3fe6a09e667f3bcd 3ff0000000000000 3ff3988e1409212e 3ff6a09e667f3bcd 3ffbb67ae8584caa 40094c583ada5b53 4024000000000000 3f69e7c6e43390b7 3fd43d136248490f 3feac5eb3f7ab2f8 40f86a0000000000 402638dee52c80ed fff8000000000000
+math.pow	3ff6a09e667f3bcd 3ee4f8b588e368f1 40caea4e6126bb95 3fdb8d809c615f41 424dd7a73d040917 4023ffffffffffff
+math.atan2,hypot	3fd4978fa3269ee1 bff8555a2787981f 401c48c6001f0ac0 697d8f9811335b57 3fb99999a0000000
+math.new	["undefined","function"]
+object.keyOrder	["1","2","4294967294","b","a","-1","01","4294967295","1.5"]
+array.sortDefault	["1","10","2","9","B","a","b","null","z","é","😀","undefined"]
+array.sortStable	true
+array.sortBoolComparator	[764,496,384,544,536,184,536,464,800,992,384,312]
+array.sortNaNComparator	[3,1,2,5,4]
+array.sortMixedNumbers	["5","NaN","-1","0","0","1","Infinity","NaN"]
+typed.sort	["-1","0","0","3","NaN"]
+forIn.order	["0","b","a","1","z"]
+str.case	["53+53",2,"1c4","a7f5","10cc0","1c89","a7d1"]
+str.normalize	["e9/65+301/e9","c5/41+30a/c5","fb01/fb01/66+69","2460/2460/31","1e9b+323/17f+323+307/1e69"]
+str.wellFormed	["function","function","function"]
+regexp.props	["011","001","001","011","101","101","011","001","101"]
+regexp.flags	["v","d","s","y","function"]
+str.localeCompare	[-1,-1,-1,-1,1,1,1,-1,-1]
+collator.en	["20","5f","2d","1fae9","10d40","31+30","39","61","e4","e9","a7f6","7a","5a"]
+collator.sv	["a","v","w","z","å","ä","ö"]
+segmenter.graphemes	[1,2,1,1,1,1]
+segmenter.words	6
+date.parse	[1794268800000,1794312000000,1794312000000,1794268800000,1794312000000,1794268800000,1794268800000,1794308400000,1794268800000,null,1791676800000]
+date.toString	["Tue Nov 10 2026 12:34:56 GMT+0000 (Coordinated Universal Time)","2026-11-10T12:34:56.000Z","Tue, 10 Nov 2026 12:34:56 GMT","11/10/2026","12:34:56 PM","10/11/2026, 12:34:56","10.11.2026, 12:34:56","2026/11/10 12:34:56"]
+date.defaultLocale	["en-US","UTC","11/10/2026, 12:34:56 PM","1,234,567.891"]
+date.zoneOffsets2027	["Europe/Kyiv=GMT+02:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Nuuk=GMT-02:00,GMT-01:00,GMT-01:00,GMT-01:00","Asia/Almaty=GMT+05:00,GMT+05:00,GMT+05:00,GMT+05:00","Africa/Casablanca=GMT+00:00,GMT+00:00,GMT+00:00,GMT+00:00","America/Mexico_City=GMT-06:00,GMT-06:00,GMT-06:00,GMT-06:00","Asia/Amman=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","Europe/Moscow=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Sao_Paulo=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Tehran=GMT+03:30,GMT+03:30,GMT+03:30,GMT+03:30","Pacific/Fiji=GMT+12:00,GMT+12:00,GMT+12:00,GMT+12:00","Africa/Cairo=GMT+02:00,GMT+02:00,GMT+03:00,GMT+03:00","America/Asuncion=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Manila=GMT+08:00,GMT+08:00,GMT+08:00,GMT+08:00","America/Coyhaique=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00"]
+intl.zones	418
+intl.numberFormat	["$1,234.50","1.234.567,891","1.2M","12,34,567.891","١٢٣","1 234,50 €"]
+intl.plural,list,relative	["one","a, b, and c","yesterday","Tuesday, November 10, 2026 at 12:34:56 PM UTC"]
+temporal	object
+error.messages	["TypeError: Cannot read properties of undefined (reading 'x')","TypeError: Cannot read properties of null (reading 'f')","TypeError: {}.f is not a function","SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)","SyntaxError: Unexpected end of JSON input","RangeError: Invalid array length","ReferenceError: x is not defined","RangeError: The number 1.5 cannot be converted to a BigInt because it is not an integer","RangeError: Invalid count value: -1","DOMException: () => 1 could not be cloned.","TypeError: Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'o' closes the circle","URIError: URI malformed","RangeError: Invalid language tag: xx-invalid-locale-tag-zzzz","RangeError: toFixed() digits argument must be between 0 and 100"]
+builtins	["Iterator:function","Float16Array:function","Promise.try:function","Promise.withResolvers:function","Array.fromAsync:function","Set.prototype.union:function","Object.groupBy:function","Map.groupBy:function","Array.prototype.toSorted:function","Uint8Array.fromBase64:function","Uint8Array.prototype.toHex:function","Error.isError:function","Atomics.pause:function","JSON.rawJSON:function","Math.sumPrecise:undefined","RegExp.escape:function","Intl.DurationFormat:function","Temporal:object","WebSocket:function","navigator:object","Array.prototype.group:undefined","Symbol.dispose:symbol","DisposableStack:function","Iterator.concat:function","Map.prototype.getOrInsert:function","Error.captureStackTrace:function"]
+structuredClone	[0,"/x/gi",[[1,2]],false,true,"m",true]
+text.encode	[[239,191,189,120],3,"efbfbd",4,"hi","6be6ff"]
+hash.string	1302335171
+float.sum	["401df11f45f4e618","401df11f45f4e615","3fe3333333333334","3fd3333333333334","0000000000000000"]

@@ -1,0 +1,478 @@
+[
+ {
+  "situation": "update deep; under object > string; leaf none; writes number || dc65b8f: taken | 2b8b780: taken",
+  "roots": 1315,
+  "example": {
+   "index": 26,
+   "record": "{\"type\":n0.0,\"key\":[\"k9417\",\"s\",\"10\"],\"value\":n407e6000.0}",
+   "before": "{\"10\":n406bbc00.0,\"n\":n40777000.0,\"s\":\"null\",\"tags\":[],\"a\":N}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"10\":n406bbc00.0,\"n\":n40777000.0,\"s\":{\"0\":\"n\",\"1\":\"u\",\"2\":\"l\",\"3\":\"l\",\"10\":n407e6000.0},\"tags\":[],\"a\":N}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"10\":n406bbc00.0,\"n\":n40777000.0,\"s\":{\"10\":n407e6000.0},\"tags\":[],\"a\":N}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes string || dc65b8f: taken | 2b8b780: taken",
+  "roots": 752,
+  "example": {
+   "index": 206,
+   "record": "{\"type\":n0.0,\"key\":[\"k14656\",\"s\",\"c\"],\"value\":\"日本語\"}",
+   "before": "{\"s\":\"42\",\"tags\":[\"日本語\",{\"b\":n40178000.0,\"x.y\":U},n4083f000.0,{\"x.y\":n444b1ae4.d6e2ef50}],\"meta\":{\"b\":{\"meta\":[{},[U,n40654000.0],n41e00000.0,n40832000.0]},\"c\":n40874000.0,\"a\":{\"1\":\"日本語\",\"é\":\"😀 ok\",\"meta\":{\"a\":nc0671c00.0,\"é\":N}}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"0\":\"4\",\"1\":\"2\",\"c\":\"日本語\"},\"tags\":[\"日本語\",{\"b\":n40178000.0,\"x.y\":U},n4083f000.0,{\"x.y\":n444b1ae4.d6e2ef50}],\"meta\":{\"b\":{\"meta\":[{},[U,n40654000.0],n41e00000.0,n40832000.0]},\"c\":n40874000.0,\"a\":{\"1\":\"日本語\",\"é\":\"😀 ok\",\"meta\":{\"a\":nc0671c00.0,\"é\":N}}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"c\":\"日本語\"},\"tags\":[\"日本語\",{\"b\":n40178000.0,\"x.y\":U},n4083f000.0,{\"x.y\":n444b1ae4.d6e2ef50}],\"meta\":{\"b\":{\"meta\":[{},[U,n40654000.0],n41e00000.0,n40832000.0]},\"c\":n40874000.0,\"a\":{\"1\":\"日本語\",\"é\":\"😀 ok\",\"meta\":{\"a\":nc0671c00.0,\"é\":N}}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes boolean || dc65b8f: taken | 2b8b780: taken",
+  "roots": 230,
+  "example": {
+   "index": 216,
+   "record": "{\"type\":n0.0,\"key\":[\"k3531\",\"s\",\"tags\"],\"value\":F}",
+   "before": "{\"s\":\"42\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"0\":\"4\",\"1\":\"2\",\"tags\":F}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"tags\":F}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes null || dc65b8f: taken | 2b8b780: taken",
+  "roots": 124,
+  "example": {
+   "index": 86,
+   "record": "{\"type\":n0.0,\"key\":[\"k6062\",\"s\",\"0\"],\"value\":N}",
+   "before": "{\"n\":n40807000.0,\"s\":\"null\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40807000.0,\"s\":{\"0\":N,\"1\":\"u\",\"2\":\"l\",\"3\":\"l\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40807000.0,\"s\":{\"0\":N}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes object || dc65b8f: taken | 2b8b780: taken",
+  "roots": 109,
+  "example": {
+   "index": 56,
+   "record": "{\"type\":n0.0,\"key\":[\"k17987\",\"tags\",\"0\",\"a\"],\"value\":{\"0\":n4061c000.0,\"tags\":n408a5800.0,\"meta\":n407ff000.0,\"s\":{}}}",
+   "before": "{\"n\":n407ca000.0,\"s\":\"42\",\"tags\":[\"u95360\",\"true\"],\"meta\":{\"10\":n40533800.0,\"tags\":n40717000.0,\"b\":{\"b\":n408a9800.0}},\"m0\":{\"a\":\"a\\u0000b\"}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n407ca000.0,\"s\":\"42\",\"tags\":[{\"0\":\"u\",\"1\":\"9\",\"2\":\"5\",\"3\":\"3\",\"4\":\"6\",\"5\":\"0\",\"a\":{\"0\":n4061c000.0,\"tags\":n408a5800.0,\"meta\":n407ff000.0,\"s\":{}}},\"true\"],\"meta\":{\"10\":n40533800.0,\"tags\":n40717000.0,\"b\":{\"b\":n408a9800.0}},\"m0\":{\"a\":\"a\\u0000b\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n407ca000.0,\"s\":\"42\",\"tags\":[{\"a\":{\"0\":n4061c000.0,\"tags\":n408a5800.0,\"meta\":n407ff000.0,\"s\":{}}},\"true\"],\"meta\":{\"10\":n40533800.0,\"tags\":n40717000.0,\"b\":{\"b\":n408a9800.0}},\"m0\":{\"a\":\"a\\u0000b\"}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes bytes || dc65b8f: taken | 2b8b780: taken",
+  "roots": 76,
+  "example": {
+   "index": 2758,
+   "record": "{\"type\":n0.0,\"key\":[\"k3937\",\"s\",\"c\"],\"value\":b3e39f594}",
+   "before": "{\"s\":\"42\",\"meta\":{\"10\":{\"2\":n40868000.0,\"a\":n40726000.0,\"s\":n3fd33333.33333334},\"s\":n40420000.0,\"é\":{\"1\":[nc05cd800.0,\"u85310\",b75,n4070c000.0],\"tags\":\"str\",\"c\":n40558800.0}},\"b\":U}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"0\":\"4\",\"1\":\"2\",\"c\":b3e39f594},\"meta\":{\"10\":{\"2\":n40868000.0,\"a\":n40726000.0,\"s\":n3fd33333.33333334},\"s\":n40420000.0,\"é\":{\"1\":[nc05cd800.0,\"u85310\",b75,n4070c000.0],\"tags\":\"str\",\"c\":n40558800.0}},\"b\":U}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"s\":{\"c\":b3e39f594},\"meta\":{\"10\":{\"2\":n40868000.0,\"a\":n40726000.0,\"s\":n3fd33333.33333334},\"s\":n40420000.0,\"é\":{\"1\":[nc05cd800.0,\"u85310\",b75,n4070c000.0],\"tags\":\"str\",\"c\":n40558800.0}},\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes object || dc65b8f: taken | 2b8b780: taken",
+  "roots": 74,
+  "example": {
+   "index": 2844,
+   "record": "{\"type\":n0.0,\"key\":[\"k6502\",\"meta\",\"b\",\"10\"],\"value\":{\"x.y\":{\"0\":\"0\",\"a\":n444b1ae4.d6e2ef50},\"tags\":U}}",
+   "before": "{\"10\":n4085f800.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"10\":U,\"b\":\"日本語\",\"meta\":{\"2\":n4084c000.0}},\"a\":N,\"b\":U}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"10\":n4085f800.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"10\":U,\"b\":{\"0\":\"日\",\"1\":\"本\",\"2\":\"語\",\"10\":{\"x.y\":{\"0\":\"0\",\"a\":n444b1ae4.d6e2ef50},\"tags\":U}},\"meta\":{\"2\":n4084c000.0}},\"a\":N,\"b\":U}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"10\":n4085f800.0,\"s\":\"0\",\"tags\":[],\"meta\":{\"10\":U,\"b\":{\"10\":{\"x.y\":{\"0\":\"0\",\"a\":n444b1ae4.d6e2ef50},\"tags\":U}},\"meta\":{\"2\":n4084c000.0}},\"a\":N,\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes object || dc65b8f: taken | 2b8b780: taken",
+  "roots": 55,
+  "example": {
+   "index": 312,
+   "record": "{\"type\":n0.0,\"key\":[\"k2137\",\"tags\",\"2\"],\"value\":{\"meta\":n444b1ae4.d6e2ef50}}",
+   "before": "{\"n\":n40860000.0,\"s\":\"null\",\"tags\":\"hello world\",\"é\":n7ff00000.0}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40860000.0,\"s\":\"null\",\"tags\":{\"0\":\"h\",\"1\":\"e\",\"2\":{\"meta\":n444b1ae4.d6e2ef50},\"3\":\"l\",\"4\":\"o\",\"5\":\" \",\"6\":\"w\",\"7\":\"o\",\"8\":\"r\",\"9\":\"l\",\"10\":\"d\"},\"é\":n7ff00000.0}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40860000.0,\"s\":\"null\",\"tags\":{\"2\":{\"meta\":n444b1ae4.d6e2ef50}},\"é\":n7ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes array || dc65b8f: taken | 2b8b780: taken",
+  "roots": 46,
+  "example": {
+   "index": 154,
+   "record": "{\"type\":n0.0,\"key\":[\"k3531\",\"tags\",\"2\",\"x.y\"],\"value\":[[n40858000.0,n40570000.0,n40520000.0],\"0\",{\"1\":\"42\",\"s\":T},nc05c6800.0]}",
+   "before": "{\"n\":n40796000.0,\"s\":\"0\",\"tags\":[n407b0000.0,{\"1\":nfff00000.0,\"é\":n40470000.0,\"c\":n4084a800.0,\"s\":b199b51},\"0\",\"hello world\"],\"meta\":{\"2\":{\"1\":{\"tags\":n40881800.0,\"b\":F},\"b\":[n40538800.0,T,U,n4081d800.0]},\"tags\":n40896000.0,\"é\":n408e8800.0},\"é\":{\"meta\":n40531800.0,\"c\":{\"meta\":{\"1\":bf39547ee},\"b\":\"u47107\"}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40796000.0,\"s\":\"0\",\"tags\":[n407b0000.0,{\"1\":nfff00000.0,\"é\":n40470000.0,\"c\":n4084a800.0,\"s\":b199b51},{\"0\":\"0\",\"x.y\":[[n40858000.0,n40570000.0,n40520000.0],\"0\",{\"1\":\"42\",\"s\":T},nc05c6800.0]},\"hello world\"],\"meta\":{\"2\":{\"1\":{\"tags\":n40881800.0,\"b\":F},\"b\":[n40538800.0,T,U,n4081d800.0]},\"tags\":n40896000.0,\"é\":n408e8800.0},\"é\":{\"meta\":n40531800.0,\"c\":{\"meta\":{\"1\":bf39547ee},\"b\":\"u47107\"}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40796000.0,\"s\":\"0\",\"tags\":[n407b0000.0,{\"1\":nfff00000.0,\"é\":n40470000.0,\"c\":n4084a800.0,\"s\":b199b51},{\"x.y\":[[n40858000.0,n40570000.0,n40520000.0],\"0\",{\"1\":\"42\",\"s\":T},nc05c6800.0]},\"hello world\"],\"meta\":{\"2\":{\"1\":{\"tags\":n40881800.0,\"b\":F},\"b\":[n40538800.0,T,U,n4081d800.0]},\"tags\":n40896000.0,\"é\":n408e8800.0},\"é\":{\"meta\":n40531800.0,\"c\":{\"meta\":{\"1\":bf39547ee},\"b\":\"u47107\"}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes number || dc65b8f: taken | 2b8b780: taken",
+  "roots": 34,
+  "example": {
+   "index": 1361,
+   "record": "{\"type\":n0.0,\"key\":[\"k6641\",\"tags\",\"1\",\"2\"],\"value\":nc05b1000.0}",
+   "before": "{\"n\":n4077b000.0,\"s\":\"é\",\"tags\":[\"\",\"0\"]}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n4077b000.0,\"s\":\"é\",\"tags\":[\"\",{\"0\":\"0\",\"2\":nc05b1000.0}]}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n4077b000.0,\"s\":\"é\",\"tags\":[\"\",{\"2\":nc05b1000.0}]}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes array || dc65b8f: taken | 2b8b780: taken",
+  "roots": 24,
+  "example": {
+   "index": 230,
+   "record": "{\"type\":n0.0,\"key\":[\"k13259\",\"s\",\"10\"],\"value\":[T]}",
+   "before": "{\"n\":n40891000.0,\"s\":\"u85419\",\"tags\":[],\"meta\":{\"0\":n40708000.0,\"2\":n4051d000.0}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40891000.0,\"s\":{\"0\":\"u\",\"1\":\"8\",\"2\":\"5\",\"3\":\"4\",\"4\":\"1\",\"5\":\"9\",\"10\":[T]},\"tags\":[],\"meta\":{\"0\":n40708000.0,\"2\":n4051d000.0}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40891000.0,\"s\":{\"10\":[T]},\"tags\":[],\"meta\":{\"0\":n40708000.0,\"2\":n4051d000.0}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes array || dc65b8f: taken | 2b8b780: taken",
+  "roots": 24,
+  "example": {
+   "index": 304,
+   "record": "{\"type\":n0.0,\"key\":[\"k10853\",\"meta\",\"tags\",\"a\"],\"value\":[]}",
+   "before": "{\"n\":n408bd000.0,\"s\":\"é\",\"tags\":[],\"meta\":{\"tags\":\"u2671\",\"x.y\":n40772000.0,\"a\":b},\"a\":N}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n408bd000.0,\"s\":\"é\",\"tags\":[],\"meta\":{\"tags\":{\"0\":\"u\",\"1\":\"2\",\"2\":\"6\",\"3\":\"7\",\"4\":\"1\",\"a\":[]},\"x.y\":n40772000.0,\"a\":b},\"a\":N}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n408bd000.0,\"s\":\"é\",\"tags\":[],\"meta\":{\"tags\":{\"a\":[]},\"x.y\":n40772000.0,\"a\":b},\"a\":N}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes number || dc65b8f: taken | 2b8b780: taken",
+  "roots": 22,
+  "example": {
+   "index": 12278,
+   "record": "{\"type\":n0.0,\"key\":[\"k11065\",\"meta\",\"b\",\"10\"],\"value\":nc0678800.0}",
+   "before": "{\"n\":n40778000.0,\"s\":\"null\",\"meta\":{\"b\":\"str\"}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40778000.0,\"s\":\"null\",\"meta\":{\"b\":{\"0\":\"s\",\"1\":\"t\",\"2\":\"r\",\"10\":nc0678800.0}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40778000.0,\"s\":\"null\",\"meta\":{\"b\":{\"10\":nc0678800.0}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string > absent; leaf none; writes object || dc65b8f: taken | 2b8b780: taken",
+  "roots": 21,
+  "example": {
+   "index": 7274,
+   "record": "{\"type\":n0.0,\"key\":[\"k7216\",\"tags\",\"0\",\"a\"],\"value\":{\"2\":nc0658c00.0,\"meta\":{},\"a\":n4073d000.0}}",
+   "before": "{\"n\":n404f8000.0,\"s\":\"42\",\"tags\":\"a\\u0000b\",\"meta\":{\"2\":[{\"2\":n408df000.0,\"s\":U,\"n\":n433fffff.ffffffff,\"é\":T},{\"s\":n40608000.0}],\"10\":n408df000.0,\"é\":{\"0\":{\"0\":\"true\",\"x.y\":n40838000.0,\"tags\":\"a\\u0000b\"},\"2\":{\"s\":\"é\"},\"x.y\":[U,F],\"é\":[n7ff00000.0,n4060c000.0]}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n404f8000.0,\"s\":\"42\",\"tags\":{\"0\":{\"0\":\"a\",\"a\":{\"2\":nc0658c00.0,\"meta\":{},\"a\":n4073d000.0}},\"1\":\"\\u0000\",\"2\":\"b\"},\"meta\":{\"2\":[{\"2\":n408df000.0,\"s\":U,\"n\":n433fffff.ffffffff,\"é\":T},{\"s\":n40608000.0}],\"10\":n408df000.0,\"é\":{\"0\":{\"0\":\"true\",\"x.y\":n40838000.0,\"tags\":\"a\\u0000b\"},\"2\":{\"s\":\"é\"},\"x.y\":[U,F],\"é\":[n7ff00000.0,n4060c000.0]}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n404f8000.0,\"s\":\"42\",\"tags\":{\"0\":{\"a\":{\"2\":nc0658c00.0,\"meta\":{},\"a\":n4073d000.0}}},\"meta\":{\"2\":[{\"2\":n408df000.0,\"s\":U,\"n\":n433fffff.ffffffff,\"é\":T},{\"s\":n40608000.0}],\"10\":n408df000.0,\"é\":{\"0\":{\"0\":\"true\",\"x.y\":n40838000.0,\"tags\":\"a\\u0000b\"},\"2\":{\"s\":\"é\"},\"x.y\":[U,F],\"é\":[n7ff00000.0,n4060c000.0]}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string; leaf none; writes undefined || dc65b8f: taken | 2b8b780: taken",
+  "roots": 19,
+  "example": {
+   "index": 10765,
+   "record": "{\"type\":n0.0,\"key\":[\"k18207\",\"s\",\"1\"],\"value\":U}",
+   "before": "{\"n\":n40899000.0,\"s\":\"a\\u0000b\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40899000.0,\"s\":{\"0\":\"a\",\"1\":U,\"2\":\"b\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40899000.0,\"s\":{\"1\":U}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes string || dc65b8f: taken | 2b8b780: taken",
+  "roots": 13,
+  "example": {
+   "index": 15480,
+   "record": "{\"type\":n0.0,\"key\":[\"k14938\",\"meta\",\"tags\",\"é\"],\"value\":\"0\"}",
+   "before": "{\"n\":n408ae000.0,\"s\":\"\",\"meta\":{\"tags\":\"😀 ok\",\"s\":\"hello world\",\"a\":{\"2\":n406f8000.0,\"10\":{\"2\":\"u22162\",\"10\":F,\"b\":n444b1ae4.d6e2ef50},\"s\":{\"meta\":n4058c000.0,\"é\":T,\"s\":b0f2f5930f1}},\"meta\":{}},\"m2\":{\"a\":{\"10\":n407f0000.0}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n408ae000.0,\"s\":\"\",\"meta\":{\"tags\":{\"0\":\"\\ud83d\",\"1\":\"\\ude00\",\"2\":\" \",\"3\":\"o\",\"4\":\"k\",\"é\":\"0\"},\"s\":\"hello world\",\"a\":{\"2\":n406f8000.0,\"10\":{\"2\":\"u22162\",\"10\":F,\"b\":n444b1ae4.d6e2ef50},\"s\":{\"meta\":n4058c000.0,\"é\":T,\"s\":b0f2f5930f1}},\"meta\":{}},\"m2\":{\"a\":{\"10\":n407f0000.0}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n408ae000.0,\"s\":\"\",\"meta\":{\"tags\":{\"é\":\"0\"},\"s\":\"hello world\",\"a\":{\"2\":n406f8000.0,\"10\":{\"2\":\"u22162\",\"10\":F,\"b\":n444b1ae4.d6e2ef50},\"s\":{\"meta\":n4058c000.0,\"é\":T,\"s\":b0f2f5930f1}},\"meta\":{}},\"m2\":{\"a\":{\"10\":n407f0000.0}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string > absent; leaf none; writes array || dc65b8f: taken | 2b8b780: taken",
+  "roots": 12,
+  "example": {
+   "index": 6844,
+   "record": "{\"type\":n0.0,\"key\":[\"k9191\",\"meta\",\"1\",\"é\"],\"value\":[n4081c000.0,{\"é\":F,\"c\":n407b1000.0,\"meta\":F},n40628000.0,b48]}",
+   "before": "{\"s\":\"u4776\",\"tags\":[nc04a4000.0,n40570000.0,{\"2\":nc0560000.0,\"tags\":nfff00000.0},n4060a000.0,H*3,nfff00000.0],\"meta\":\"hello world\",\"b\":\"true\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"s\":\"u4776\",\"tags\":[nc04a4000.0,n40570000.0,{\"2\":nc0560000.0,\"tags\":nfff00000.0},n4060a000.0,H*3,nfff00000.0],\"meta\":{\"0\":\"h\",\"1\":{\"0\":\"e\",\"é\":[n4081c000.0,{\"é\":F,\"c\":n407b1000.0,\"meta\":F},n40628000.0,b48]},\"2\":\"l\",\"3\":\"l\",\"4\":\"o\",\"5\":\" \",\"6\":\"w\",\"7\":\"o\",\"8\":\"r\",\"9\":\"l\",\"10\":\"d\"},\"b\":\"true\"}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"s\":\"u4776\",\"tags\":[nc04a4000.0,n40570000.0,{\"2\":nc0560000.0,\"tags\":nfff00000.0},n4060a000.0,H*3,nfff00000.0],\"meta\":{\"1\":{\"é\":[n4081c000.0,{\"é\":F,\"c\":n407b1000.0,\"meta\":F},n40628000.0,b48]}},\"b\":\"true\"}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes string || dc65b8f: taken | 2b8b780: taken",
+  "roots": 12,
+  "example": {
+   "index": 8283,
+   "record": "{\"type\":n0.0,\"key\":[\"k14341\",\"tags\",\"0\",\"10\"],\"value\":\"0\"}",
+   "before": "{\"s\":\"é\",\"tags\":[\"42\"],\"meta\":{\"0\":\"u25893\",\"é\":n403ce000.0}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"s\":\"é\",\"tags\":[{\"0\":\"4\",\"1\":\"2\",\"10\":\"0\"}],\"meta\":{\"0\":\"u25893\",\"é\":n403ce000.0}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"s\":\"é\",\"tags\":[{\"10\":\"0\"}],\"meta\":{\"0\":\"u25893\",\"é\":n403ce000.0}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string > absent; leaf none; writes number || dc65b8f: taken | 2b8b780: taken",
+  "roots": 10,
+  "example": {
+   "index": 1756,
+   "record": "{\"type\":n0.0,\"key\":[\"k12652\",\"meta\",\"2\",\"c\"],\"value\":n40827000.0}",
+   "before": "{\"n\":{\"s\":bfe303d332d},\"s\":\"null\",\"tags\":[n40544000.0],\"meta\":\"true\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":{\"s\":bfe303d332d},\"s\":\"null\",\"tags\":[n40544000.0],\"meta\":{\"0\":\"t\",\"1\":\"r\",\"2\":{\"0\":\"u\",\"c\":n40827000.0},\"3\":\"e\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":{\"s\":bfe303d332d},\"s\":\"null\",\"tags\":[n40544000.0],\"meta\":{\"2\":{\"c\":n40827000.0}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes boolean || dc65b8f: taken | 2b8b780: taken",
+  "roots": 5,
+  "example": {
+   "index": 600,
+   "record": "{\"type\":n0.0,\"key\":[\"k13058\",\"tags\",\"1\",\"b\"],\"value\":T}",
+   "before": "{\"n\":n40858800.0,\"s\":\"é\",\"tags\":[n4068e000.0,\"😀 ok\",\"é\"],\"meta\":{},\"a\":N,\"m2\":{\"x.y\":{\"c\":T}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40858800.0,\"s\":\"é\",\"tags\":[n4068e000.0,{\"0\":\"\\ud83d\",\"1\":\"\\ude00\",\"2\":\" \",\"3\":\"o\",\"4\":\"k\",\"b\":T},\"é\"],\"meta\":{},\"a\":N,\"m2\":{\"x.y\":{\"c\":T}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40858800.0,\"s\":\"é\",\"tags\":[n4068e000.0,{\"b\":T},\"é\"],\"meta\":{},\"a\":N,\"m2\":{\"x.y\":{\"c\":T}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes null || dc65b8f: taken | 2b8b780: taken",
+  "roots": 5,
+  "example": {
+   "index": 12124,
+   "record": "{\"type\":n0.0,\"key\":[\"k10912\",\"tags\",\"1\",\"10\"],\"value\":N}",
+   "before": "{\"n\":{\"1\":n4064a400.0},\"s\":n405fc000.0,\"tags\":[nc01c0000.0,\"é\",n41e00000.0,{\"10\":n406d0000.0,\"b\":n408b5800.0}],\"meta\":{\"meta\":{\"é\":{\"s\":b64848cd0ff,\"é\":n404b8000.0}},\"é\":{\"2\":n4082c800.0,\"b\":{\"meta\":T}}}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":{\"1\":n4064a400.0},\"s\":n405fc000.0,\"tags\":[nc01c0000.0,{\"0\":\"é\",\"10\":N},n41e00000.0,{\"10\":n406d0000.0,\"b\":n408b5800.0}],\"meta\":{\"meta\":{\"é\":{\"s\":b64848cd0ff,\"é\":n404b8000.0}},\"é\":{\"2\":n4082c800.0,\"b\":{\"meta\":T}}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":{\"1\":n4064a400.0},\"s\":n405fc000.0,\"tags\":[nc01c0000.0,{\"10\":N},n41e00000.0,{\"10\":n406d0000.0,\"b\":n408b5800.0}],\"meta\":{\"meta\":{\"é\":{\"s\":b64848cd0ff,\"é\":n404b8000.0}},\"é\":{\"2\":n4082c800.0,\"b\":{\"meta\":T}}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string > absent; leaf none; writes string || dc65b8f: taken | 2b8b780: taken",
+  "roots": 5,
+  "example": {
+   "index": 125252,
+   "record": "{\"type\":n0.0,\"key\":[\"k15266\",\"meta\",\"x.y\",\"c\"],\"value\":\"a\\u0000b\"}",
+   "before": "{\"n\":n40891000.0,\"s\":\"null\",\"meta\":\"u74408\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40891000.0,\"s\":\"null\",\"meta\":{\"0\":\"u\",\"1\":\"7\",\"2\":\"4\",\"3\":\"4\",\"4\":\"0\",\"5\":\"8\",\"x.y\":{\"c\":\"a\\u0000b\"}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40891000.0,\"s\":\"null\",\"meta\":{\"x.y\":{\"c\":\"a\\u0000b\"}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes bytes || dc65b8f: taken | 2b8b780: taken",
+  "roots": 4,
+  "example": {
+   "index": 95323,
+   "record": "{\"type\":n0.0,\"key\":[\"k8289\",\"meta\",\"x.y\",\"c\"],\"value\":b6e883e8f15}",
+   "before": "{\"n\":n408e7800.0,\"s\":\"42\",\"meta\":{\"x.y\":\"42\"}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n408e7800.0,\"s\":\"42\",\"meta\":{\"x.y\":{\"0\":\"4\",\"1\":\"2\",\"c\":b6e883e8f15}}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n408e7800.0,\"s\":\"42\",\"meta\":{\"x.y\":{\"c\":b6e883e8f15}}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes boolean || dc65b8f: taken | 2b8b780: taken",
+  "roots": 3,
+  "example": {
+   "index": 93558,
+   "record": "{\"type\":n0.0,\"key\":[\"k5289\",\"meta\",\"b\",\"meta\"],\"value\":F}",
+   "before": "{\"n\":n406e6000.0,\"s\":\"hello world\",\"meta\":{\"1\":n403e0000.0,\"2\":n43400000.0,\"b\":\"é\"},\"tags\":{\"é\":n4064e000.0,\"n\":F,\"b\":n43400000.0}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n406e6000.0,\"s\":\"hello world\",\"meta\":{\"1\":n403e0000.0,\"2\":n43400000.0,\"b\":{\"0\":\"é\",\"meta\":F}},\"tags\":{\"é\":n4064e000.0,\"n\":F,\"b\":n43400000.0}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n406e6000.0,\"s\":\"hello world\",\"meta\":{\"1\":n403e0000.0,\"2\":n43400000.0,\"b\":{\"meta\":F}},\"tags\":{\"é\":n4064e000.0,\"n\":F,\"b\":n43400000.0}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes bytes || dc65b8f: taken | 2b8b780: taken",
+  "roots": 2,
+  "example": {
+   "index": 37129,
+   "record": "{\"type\":n0.0,\"key\":[\"k6302\",\"tags\",\"2\",\"c\"],\"value\":b}",
+   "before": "{\"n\":n40672000.0,\"s\":\"null\",\"tags\":[{\"é\":\"str\"},n3e7ad7f2.9abcaf48,\"hello world\",nc05b2000.0],\"m1\":{\"10\":\"a\\u0000b\"}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n40672000.0,\"s\":\"null\",\"tags\":[{\"é\":\"str\"},n3e7ad7f2.9abcaf48,{\"0\":\"h\",\"1\":\"e\",\"2\":\"l\",\"3\":\"l\",\"4\":\"o\",\"5\":\" \",\"6\":\"w\",\"7\":\"o\",\"8\":\"r\",\"9\":\"l\",\"10\":\"d\",\"c\":b},nc05b2000.0],\"m1\":{\"10\":\"a\\u0000b\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n40672000.0,\"s\":\"null\",\"tags\":[{\"é\":\"str\"},n3e7ad7f2.9abcaf48,{\"c\":b},nc05b2000.0],\"m1\":{\"10\":\"a\\u0000b\"}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > object > string; leaf none; writes null || dc65b8f: taken | 2b8b780: taken",
+  "roots": 2,
+  "example": {
+   "index": 101892,
+   "record": "{\"type\":n0.0,\"key\":[\"k6613\",\"meta\",\"meta\",\"é\"],\"value\":N}",
+   "before": "{\"10\":[\"😀 ok\",\"u25118\",\"é\"],\"n\":n40730000.0,\"s\":\"é\",\"meta\":{\"2\":U,\"b\":U,\"c\":n4043a000.0,\"meta\":\"hello world\"},\"a\":\"é\"}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"10\":[\"😀 ok\",\"u25118\",\"é\"],\"n\":n40730000.0,\"s\":\"é\",\"meta\":{\"2\":U,\"b\":U,\"c\":n4043a000.0,\"meta\":{\"0\":\"h\",\"1\":\"e\",\"2\":\"l\",\"3\":\"l\",\"4\":\"o\",\"5\":\" \",\"6\":\"w\",\"7\":\"o\",\"8\":\"r\",\"9\":\"l\",\"10\":\"d\",\"é\":N}},\"a\":\"é\"}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"10\":[\"😀 ok\",\"u25118\",\"é\"],\"n\":n40730000.0,\"s\":\"é\",\"meta\":{\"2\":U,\"b\":U,\"c\":n4043a000.0,\"meta\":{\"é\":N}},\"a\":\"é\"}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > string > absent; leaf none; writes boolean || dc65b8f: taken | 2b8b780: taken",
+  "roots": 1,
+  "example": {
+   "index": 146287,
+   "record": "{\"type\":n0.0,\"key\":[\"k8846\",\"meta\",\"2\",\"x.y\"],\"value\":F}",
+   "before": "{\"0\":n4088a000.0,\"s\":\"42\",\"tags\":n40777000.0,\"meta\":\"str\",\"b\":N,\"m1\":{\"2\":\"u19504\"}}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"0\":n4088a000.0,\"s\":\"42\",\"tags\":n40777000.0,\"meta\":{\"0\":\"s\",\"1\":\"t\",\"2\":{\"0\":\"r\",\"x.y\":F}},\"b\":N,\"m1\":{\"2\":\"u19504\"}}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"0\":n4088a000.0,\"s\":\"42\",\"tags\":n40777000.0,\"meta\":{\"2\":{\"x.y\":F}},\"b\":N,\"m1\":{\"2\":\"u19504\"}}"
+   }
+  }
+ },
+ {
+  "situation": "update deep; under object > array > string; leaf none; writes undefined || dc65b8f: taken | 2b8b780: taken",
+  "roots": 1,
+  "example": {
+   "index": 151636,
+   "record": "{\"type\":n0.0,\"key\":[\"k1631\",\"tags\",\"0\",\"0\"],\"value\":U}",
+   "before": "{\"n\":n4087d800.0,\"s\":\"a\\u0000b\",\"tags\":[\"42\"]+{\"-1\":n7ff00000.0,},\"é\":n3fd33333.33333334}",
+   "dc65b8f": {
+    "outcome": "applied",
+    "after": "{\"n\":n4087d800.0,\"s\":\"a\\u0000b\",\"tags\":[{\"0\":U,\"1\":\"2\"}],\"é\":n3fd33333.33333334}"
+   },
+   "2b8b780": {
+    "outcome": "applied",
+    "after": "{\"n\":n4087d800.0,\"s\":\"a\\u0000b\",\"tags\":[{\"0\":U}],\"é\":n3fd33333.33333334}"
+   }
+  }
+ }
+]

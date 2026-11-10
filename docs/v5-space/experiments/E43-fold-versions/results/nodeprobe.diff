@@ -1,0 +1,40 @@
+1,6c1,6
+< version.node	22.22.0
+< version.v8	12.4.254.21-node.33
+< version.icu	77.1
+< version.unicode	16.0
+< version.cldr	47.0
+< version.tz	2025b
+---
+> version.node	26.13.0
+> version.v8	14.6.202.34-node.40
+> version.icu	78.3
+> version.unicode	17.0
+> version.cldr	48.0
+> version.tz	2026e
+33c33
+< math.pow	3ff6a09e667f3bcd 3ee4f8b588e368f0 40caea4e6126bb96 3fdb8d809c615f41 424dd7a73d040917 4023ffffffffffff
+---
+> math.pow	3ff6a09e667f3bcd 3ee4f8b588e368f1 40caea4e6126bb95 3fdb8d809c615f41 424dd7a73d040917 4023ffffffffffff
+35c35
+< math.new	["undefined","undefined"]
+---
+> math.new	["undefined","function"]
+47,48c47,48
+< regexp.props	["011","001","001","011","101","101","000","000","101"]
+< regexp.flags	["v","d","s","y","undefined"]
+---
+> regexp.props	["011","001","001","011","101","101","011","001","101"]
+> regexp.flags	["v","d","s","y","function"]
+57c57
+< date.zoneOffsets2027	["Europe/Kyiv=GMT+02:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Nuuk=GMT-02:00,GMT-01:00,GMT-01:00,GMT-01:00","Asia/Almaty=GMT+05:00,GMT+05:00,GMT+05:00,GMT+05:00","Africa/Casablanca=GMT+01:00,GMT+01:00,GMT+01:00,GMT+01:00","America/Mexico_City=GMT-06:00,GMT-06:00,GMT-06:00,GMT-06:00","Asia/Amman=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","Europe/Moscow=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Sao_Paulo=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Tehran=GMT+03:30,GMT+03:30,GMT+03:30,GMT+03:30","Pacific/Fiji=GMT+12:00,GMT+12:00,GMT+12:00,GMT+12:00","Africa/Cairo=GMT+02:00,GMT+02:00,GMT+03:00,GMT+03:00","America/Asuncion=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Manila=GMT+08:00,GMT+08:00,GMT+08:00,GMT+08:00","America/Coyhaique=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00"]
+---
+> date.zoneOffsets2027	["Europe/Kyiv=GMT+02:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Nuuk=GMT-02:00,GMT-01:00,GMT-01:00,GMT-01:00","Asia/Almaty=GMT+05:00,GMT+05:00,GMT+05:00,GMT+05:00","Africa/Casablanca=GMT+00:00,GMT+00:00,GMT+00:00,GMT+00:00","America/Mexico_City=GMT-06:00,GMT-06:00,GMT-06:00,GMT-06:00","Asia/Amman=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","Europe/Moscow=GMT+03:00,GMT+03:00,GMT+03:00,GMT+03:00","America/Sao_Paulo=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Tehran=GMT+03:30,GMT+03:30,GMT+03:30,GMT+03:30","Pacific/Fiji=GMT+12:00,GMT+12:00,GMT+12:00,GMT+12:00","Africa/Cairo=GMT+02:00,GMT+02:00,GMT+03:00,GMT+03:00","America/Asuncion=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00","Asia/Manila=GMT+08:00,GMT+08:00,GMT+08:00,GMT+08:00","America/Coyhaique=GMT-03:00,GMT-03:00,GMT-03:00,GMT-03:00"]
+61,63c61,63
+< temporal	undefined
+< error.messages	["TypeError: Cannot read properties of undefined (reading 'x')","TypeError: Cannot read properties of null (reading 'f')","TypeError: {}.f is not a function","SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)","SyntaxError: Unexpected end of JSON input","RangeError: Invalid array length","ReferenceError: x is not defined","RangeError: The number 1.5 cannot be converted to a BigInt because it is not an integer","RangeError: Invalid count value: -1","DOMException: () => 1 could not be cloned.","TypeError: Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'o' closes the circle","URIError: URI malformed","RangeError: Incorrect locale information provided","RangeError: toFixed() digits argument must be between 0 and 100"]
+< builtins	["Iterator:function","Float16Array:undefined","Promise.try:undefined","Promise.withResolvers:function","Array.fromAsync:function","Set.prototype.union:function","Object.groupBy:function","Map.groupBy:function","Array.prototype.toSorted:function","Uint8Array.fromBase64:undefined","Uint8Array.prototype.toHex:undefined","Error.isError:undefined","Atomics.pause:undefined","JSON.rawJSON:function","Math.sumPrecise:undefined","RegExp.escape:undefined","Intl.DurationFormat:undefined","Temporal:undefined","WebSocket:function","navigator:object","Array.prototype.group:undefined","Symbol.dispose:symbol","DisposableStack:undefined","Iterator.concat:undefined","Map.prototype.getOrInsert:undefined","Error.captureStackTrace:function"]
+---
+> temporal	object
+> error.messages	["TypeError: Cannot read properties of undefined (reading 'x')","TypeError: Cannot read properties of null (reading 'f')","TypeError: {}.f is not a function","SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)","SyntaxError: Unexpected end of JSON input","RangeError: Invalid array length","ReferenceError: x is not defined","RangeError: The number 1.5 cannot be converted to a BigInt because it is not an integer","RangeError: Invalid count value: -1","DOMException: () => 1 could not be cloned.","TypeError: Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'o' closes the circle","URIError: URI malformed","RangeError: Invalid language tag: xx-invalid-locale-tag-zzzz","RangeError: toFixed() digits argument must be between 0 and 100"]
+> builtins	["Iterator:function","Float16Array:function","Promise.try:function","Promise.withResolvers:function","Array.fromAsync:function","Set.prototype.union:function","Object.groupBy:function","Map.groupBy:function","Array.prototype.toSorted:function","Uint8Array.fromBase64:function","Uint8Array.prototype.toHex:function","Error.isError:function","Atomics.pause:function","JSON.rawJSON:function","Math.sumPrecise:undefined","RegExp.escape:function","Intl.DurationFormat:function","Temporal:object","WebSocket:function","navigator:object","Array.prototype.group:undefined","Symbol.dispose:symbol","DisposableStack:function","Iterator.concat:function","Map.prototype.getOrInsert:function","Error.captureStackTrace:function"]

@@ -1,0 +1,206 @@
+[
+ {
+  "situation": "update deep; row absent || lane-rec: refused | seam: taken",
+  "roots": 2646,
+  "example": {
+   "index": 0,
+   "record": "{\"type\":n0.0,\"key\":[\"k3768\",\"n\"],\"value\":n3ff00000.0}",
+   "before": "(no row)",
+   "lane-rec": {
+    "outcome": "reject: data: deep write at [..] — key .. is not live",
+    "after": "(no row)"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n3ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf absent || lane-rec: refused | seam: taken",
+  "roots": 164,
+  "example": {
+   "index": 102,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k16498\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"n\":n407b5000.0,\"s\":\"null\"}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"n\":n407b5000.0,\"s\":\"null\"}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n407b5000.0,\"s\":\"null\",\"tags\":n3ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own array || lane-rec: refused | seam: taken",
+  "roots": 159,
+  "example": {
+   "index": 315,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k19602\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"n\":n4089d000.0,\"s\":\"0\",\"tags\":[n4071c000.0,{\"1\":{\"0\":{\"1\":n40532000.0,\"2\":\"u868\"},\"é\":b2a,\"c\":n40664000.0}},n3fb99999.9999999a],\"meta\":{\"1\":[{\"0\":n40632c00.0,\"b\":n40816000.0,\"s\":n408de800.0},n408de000.0,n404c9000.0,n408dd800.0],\"n\":\"u39783\",\"é\":{\"meta\":{}}},\"a\":N,\"b\":U}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"n\":n4089d000.0,\"s\":\"0\",\"tags\":[n4071c000.0,{\"1\":{\"0\":{\"1\":n40532000.0,\"2\":\"u868\"},\"é\":b2a,\"c\":n40664000.0}},n3fb99999.9999999a],\"meta\":{\"1\":[{\"0\":n40632c00.0,\"b\":n40816000.0,\"s\":n408de800.0},n408de000.0,n404c9000.0,n408dd800.0],\"n\":\"u39783\",\"é\":{\"meta\":{}}},\"a\":N,\"b\":U}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n4089d000.0,\"s\":\"0\",\"tags\":n3ff00000.0,\"meta\":{\"1\":[{\"0\":n40632c00.0,\"b\":n40816000.0,\"s\":n408de800.0},n408de000.0,n404c9000.0,n408dd800.0],\"n\":\"u39783\",\"é\":{\"meta\":{}}},\"a\":N,\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own object || lane-rec: refused | seam: taken",
+  "roots": 8,
+  "example": {
+   "index": 6098,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k7003\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"n\":n40420000.0,\"s\":\"\",\"tags\":{\"x.y\":\"u79734\",\"b\":n40240000.0},\"meta\":{\"1\":{\"1\":[\"😀 ok\",n433fffff.ffffffff]},\"2\":{},\"s\":n40848800.0},\"b\":U}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"n\":n40420000.0,\"s\":\"\",\"tags\":{\"x.y\":\"u79734\",\"b\":n40240000.0},\"meta\":{\"1\":{\"1\":[\"😀 ok\",n433fffff.ffffffff]},\"2\":{},\"s\":n40848800.0},\"b\":U}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n40420000.0,\"s\":\"\",\"tags\":n3ff00000.0,\"meta\":{\"1\":{\"1\":[\"😀 ok\",n433fffff.ffffffff]},\"2\":{},\"s\":n40848800.0},\"b\":U}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own string || lane-rec: refused | seam: taken",
+  "roots": 8,
+  "example": {
+   "index": 44728,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k7066\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"10\":\"é\",\"n\":n40870800.0,\"s\":\"日本語\",\"tags\":\"0\",\"meta\":nc0632c00.0}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"10\":\"é\",\"n\":n40870800.0,\"s\":\"日本語\",\"tags\":\"0\",\"meta\":nc0632c00.0}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"10\":\"é\",\"n\":n40870800.0,\"s\":\"日本語\",\"tags\":n3ff00000.0,\"meta\":nc0632c00.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own number || lane-rec: refused | seam: taken",
+  "roots": 5,
+  "example": {
+   "index": 31113,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k4312\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"1\":[{\"1\":\"42\",\"b\":n408e1000.0,\"c\":n4076d000.0},n406be000.0],\"2\":\"str\",\"s\":\"日本語\",\"tags\":n40758000.0}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"1\":[{\"1\":\"42\",\"b\":n408e1000.0,\"c\":n4076d000.0},n406be000.0],\"2\":\"str\",\"s\":\"日本語\",\"tags\":n40758000.0}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"1\":[{\"1\":\"42\",\"b\":n408e1000.0,\"c\":n4076d000.0},n406be000.0],\"2\":\"str\",\"s\":\"日本語\",\"tags\":n3ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under number; leaf none || lane-rec: refused | seam: taken",
+  "roots": 4,
+  "example": {
+   "index": 60250,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k11452\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "n40200000.0",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "n40200000.0"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"tags\":n3ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under array; leaf absent, a name, not an index || lane-rec: refused | seam: taken",
+  "roots": 2,
+  "example": {
+   "index": 5283,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k6570\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "[]",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "[]"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "[]+{\"tags\":n3ff00000.0,}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own bytes || lane-rec: refused | seam: taken",
+  "roots": 1,
+  "example": {
+   "index": 41555,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k829\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":bc81c362e66,\"a\":{\"s\":n3e7ad7f2.9abcaf48}}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":bc81c362e66,\"a\":{\"s\":n3e7ad7f2.9abcaf48}}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n407f1000.0,\"s\":\"null\",\"tags\":n3ff00000.0,\"a\":{\"s\":n3e7ad7f2.9abcaf48}}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under undefined; leaf none || lane-rec: refused | seam: taken",
+  "roots": 1,
+  "example": {
+   "index": 108286,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k18511\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "U",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "U"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"tags\":n3ff00000.0}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own null || lane-rec: refused | seam: taken",
+  "roots": 1,
+  "example": {
+   "index": 115496,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k15061\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"1\":\"true\",\"10\":\"é\",\"n\":n4087f800.0,\"s\":\"hello world\",\"tags\":N,\"m2\":{\"é\":N}}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"1\":\"true\",\"10\":\"é\",\"n\":n4087f800.0,\"s\":\"hello world\",\"tags\":N,\"m2\":{\"é\":N}}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"1\":\"true\",\"10\":\"é\",\"n\":n4087f800.0,\"s\":\"hello world\",\"tags\":n3ff00000.0,\"m2\":{\"é\":N}}"
+   }
+  }
+ },
+ {
+  "situation": "insert deep; under object; leaf own boolean || lane-rec: refused | seam: taken",
+  "roots": 1,
+  "example": {
+   "index": 115499,
+   "record": "{\"type\":n3ff00000.0,\"key\":[\"k4857\",\"tags\"],\"value\":n3ff00000.0}",
+   "before": "{\"n\":n408a7800.0,\"s\":\"é\",\"tags\":T,\"meta\":{}}",
+   "lane-rec": {
+    "outcome": "reject: data: lane() nested insert — write the containing array/object instead",
+    "after": "{\"n\":n408a7800.0,\"s\":\"é\",\"tags\":T,\"meta\":{}}"
+   },
+   "seam": {
+    "outcome": "applied",
+    "after": "{\"n\":n408a7800.0,\"s\":\"é\",\"tags\":n3ff00000.0,\"meta\":{}}"
+   }
+  }
+ }
+]
