@@ -42,6 +42,50 @@ def dump(p, o):
         json.dump(o, f, indent=1, ensure_ascii=False)
         f.write('\n')
 
+RERULE_CELLS = J + '/closure/rerulings.cells.json'
+RERULE_MECH = J + '/closure/rerulings.mech.json'
+
+def settled_cells(g):
+    """A group's settled cells with the referee's later re-rulings applied (judging/closure/rerulings.cells.json).
+    The settled file stays the record of the two judges and the first referee; a re-ruled cell names its ruling."""
+    cells = [dict(c) for c in load('%s/%s.settled.json' % (J, g))['cells']]
+    if os.path.exists(RERULE_CELLS):
+        idx = {(c['req'], c['part'], c['row']): c for c in cells}
+        for x in load(RERULE_CELLS).get('cells', []):
+            if x.get('ruling') != 'accept' or x.get('group') != g:
+                continue
+            for row in x['rows']:
+                c = idx[(x['req'], x['part'], row)]
+                for k, v in x['to'].items():
+                    if k == 'basis' or k not in ('v', 'alt', 'depends_on', 'gap', 'proof'):
+                        if k == 'basis': c['basis'] = v
+                        continue
+                    if v is None: c.pop(k, None)
+                    else: c[k] = v
+                c['reruled'] = x['id']
+                c['why'] = '%s (Re-ruled %s: %s)' % (c.get('why', ''), x['id'], x.get('why', '').split('\n')[0][:600])
+    return cells
+
+def mech_settled():
+    """judging/mechanisms.json with the referee's later re-rulings applied (judging/closure/rerulings.mech.json)."""
+    d = load(J + '/mechanisms.json')
+    ms = [dict(m) for m in d['mechanisms']]
+    if os.path.exists(RERULE_MECH):
+        by = {m['key']: m for m in ms}
+        rr = load(RERULE_MECH)
+        for x in rr.get('mechanisms', []):
+            if x.get('ruling') != 'accept': continue
+            m = by[x['key']]
+            m['rows'] = [r for r in m['rows'] if r not in x.get('drop_rows', [])] + [r for r in x.get('add_rows', []) if r not in m['rows']]
+            if 'novel' in x and x['novel'] is not None: m['novel'] = x['novel']
+            m['reruled'] = x['id']
+        for x in rr.get('new', []) or []:
+            ms.append(dict(x, reruled=x.get('id', 'new')))
+    return ms
+
+def novel_counts(ms):
+    return {r: sum(1 for m in ms if r in m['rows'] and m['novel']) for r in ROWS}
+
 def requirements():
     parts = []
     for l in open('REQUIREMENTS.md').read().splitlines():
@@ -242,8 +286,7 @@ def mechanisms():
 
 def pairs():
     """DEV-02: two mechanisms interact when both touch one piece of state and at least one of them writes it."""
-    d = load(J + '/mechanisms.json')
-    ms = d['mechanisms']
+    ms = mech_settled()
     def shared(a, b):
         ta, tb = set(a['reads']) | set(a['writes']), set(b['reads']) | set(b['writes'])
         return sorted((set(a['writes']) & tb) | (set(b['writes']) & ta))
@@ -257,7 +300,7 @@ def pairs():
         for r in rows: per[r].append([a['key'], b['key'], sh])
     dump(J + '/pairs.json', {'pairs': {r: len(per[r]) for r in ROWS}, 'detail': per, 'distinct': list(distinct.values())})
     o = ['# Interacting pairs of mechanisms (DEV-02)', '',
-         'Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json). Two mechanisms interact when both touch one piece of state and at least one of them writes it.', '',
+         'Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json), with the referee\'s later re-rulings of [closure/rerulings.mech.json](closure/rerulings.mech.json) applied. Two mechanisms interact when both touch one piece of state and at least one of them writes it.', '',
          '| Row | Mechanisms carried | Interacting pairs |', '|---|---|---|']
     for r in ROWS:
         o.append('| %s | %d | %d |' % (r, sum(r in m['rows'] for m in ms), len(per[r])))
@@ -421,12 +464,14 @@ def verdict():
         if not os.path.exists(p):
             print('missing', p); sys.exit(1)
         s = load(p)
-        cells += s['cells']
+        cells += settled_cells(g)
         agree[g] = {k: s[k] for k in ('cells_total', 'same', 'decisive', 'minor')}
         agree[g]['referee_against_both'] = sum(c['by'].startswith('referee,') for c in s['cells'])
-    mech = load(J + '/mechanisms.json') if os.path.exists(J + '/mechanisms.json') else {}
-    dev01 = (mech.get('counts') or {}).get('settled', {})
+    orig = load(J + '/mechanisms.json').get('counts') or {}
+    mech = {'mechanisms': mech_settled(), 'counts': {k: orig[k] for k in ('a', 'b') if k in orig}}
+    dev01 = novel_counts(mech['mechanisms'])
     pairs = load(J + '/pairs.json').get('pairs', {}) if os.path.exists(J + '/pairs.json') else {}
+    rerul = sum(1 for c in cells if c.get('reruled'))
     has_restated = any(c.get('depends_on') == 'restated' for c in cells)
     worded = outcome(cells, dev01, pairs, mech)
     rest = outcome(view(cells, 'restated'), dev01, pairs, mech) if has_restated else None
@@ -440,6 +485,8 @@ def verdict():
         o.append('| %s | %d | %d (%.1f%%) | %d | %d | %d |' % (g, a['cells_total'], a['same'], 100.0 * a['same'] / a['cells_total'], a['decisive'], a['minor'], a['referee_against_both']))
     o.append('| **All** | %d | %d (%.1f%%) | %d | %d | %d |' % (tot['cells_total'], tot['same'], 100.0 * tot['same'] / tot['cells_total'], tot['decisive'], tot['minor'], tot['referee_against_both']))
     o += ['', 'A cell is one requirement part for one row. A decisive difference could change the ranking: a MUST that one judge failed and the other did not, or a SHOULD that one counted as met and the other did not. A referee ruled on every difference in writing.']
+    if rerul:
+        o += ['', 'After the VERDICT review a referee re-ruled %d cells and the mechanism count ([closure/rerulings.cells.json](closure/rerulings.cells.json), [closure/rerulings.mech.json](closure/rerulings.mech.json)). The arithmetic below applies those rulings; the table above counts the first settlement.' % rerul]
     if has_restated:
         n = sum(c.get('depends_on') == 'restated' for c in cells)
         o += ['', 'Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists requirement clauses that the evidence shows no row can meet as worded, and what each experiment asks instead. %d cells carry two verdicts for that reason: one as the requirement is worded, one as restated. Part A uses the first, part B the second.' % n,
@@ -464,8 +511,9 @@ def rows():
     for g in GROUPS:
         p = '%s/%s.settled.json' % (J, g)
         if os.path.exists(p):
-            cells += [dict(c, group=g) for c in load(p)['cells']]
-    mech = load(J + '/mechanisms.json') if os.path.exists(J + '/mechanisms.json') else {}
+            cells += [dict(c, group=g) for c in settled_cells(g)]
+    mech = {'mechanisms': mech_settled()}
+    mech['counts'] = {'settled': novel_counts(mech['mechanisms'])}
     pairs = load(J + '/pairs.json').get('pairs', {}) if os.path.exists(J + '/pairs.json') else {}
     os.makedirs(J + '/rows', exist_ok=True)
     esc = lambda x: str(x or '').replace('|', '/').replace('\n', ' ')
