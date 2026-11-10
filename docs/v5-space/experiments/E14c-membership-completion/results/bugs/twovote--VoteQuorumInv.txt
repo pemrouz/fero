@@ -1,0 +1,25 @@
+# run twovote--VoteQuorumInv: scenario three, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 1, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "all", "ReconfigurationLimit": 1}
+# invariants: VoteQuorumInv
+# patched files: etcdraft.tla
+# spec CSpec (MCferoc.tla), CommunityModules-deps.jar, 1 segment(s), [148] s wall, TLC -workers 2 -fp 7
+# done: True
+
+## segment 1
+# load at start: 8.99 7.69 5.29 7/158 26396
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -4761365946668732815 with 2 workers on 4 cores with 2731MB heap and 64MB offheap memory [pid: 26401] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-09 22:08:10)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-09 22:08:11.
+Progress(15) at 2026-11-09 22:08:14: 4,340 states generated (4,340 s/min), 1,924 distinct states found (1,924 ds/min), 395 states left on queue.
+Progress(57) at 2026-11-09 22:09:14: 589,943 states generated (585,603 s/min), 241,722 distinct states found (239,798 ds/min), 14,654 states left on queue.
+Progress(84) at 2026-11-09 22:10:14: 1,464,438 states generated (874,495 s/min), 596,780 distinct states found (355,058 ds/min), 7,777 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 3.9E-8
+  based on the actual fingerprints:  val = 1.2E-7
+1727920 states generated, 708862 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 126.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 3).
+Finished in 02min 27s at (2026-11-09 22:10:36)

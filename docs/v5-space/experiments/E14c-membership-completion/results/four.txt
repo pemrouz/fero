@@ -1,0 +1,52 @@
+# run four: scenario four, {"AllowDrop": false, "AllowStepDown": false, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "swap"}
+# invariants: LogInv, MoreThanOneLeaderInv, ElectionSafetyInv, LogMatchingInv, VoteQuorumInv, CommittedQuorumInv, MoreUpToDateCorrectInv, LeaderCompletenessRaftInv, CommittedIsDurableInv, CommittedNeverLostInv
+# spec CSpec (MCferoc.tla), CommunityModules-deps.jar, 2 segment(s), [1504, 121] s wall, TLC -workers 1 -fp 7
+# done: True
+
+## segment 1
+# load at start: 6.23 7.76 7.60 8/152 29574
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -1214123050496858023 with 1 worker on 4 cores with 4551MB heap and 64MB offheap memory [pid: 29579] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-09 22:51:00)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-09 22:51:01.
+Progress(10) at 2026-11-09 22:51:04: 1,681 states generated (1,681 s/min), 850 distinct states found (850 ds/min), 251 states left on queue.
+Progress(27) at 2026-11-09 22:52:04: 90,278 states generated (88,597 s/min), 34,767 distinct states found (33,917 ds/min), 5,948 states left on queue.
+... (21 progress lines)
+Progress(45) at 2026-11-09 23:14:05: 2,026,596 states generated (141,213 s/min), 730,346 distinct states found (46,202 ds/min), 87,850 states left on queue.
+Progress(45) at 2026-11-09 23:15:05: 2,163,325 states generated (136,729 s/min), 779,843 distinct states found (49,497 ds/min), 92,116 states left on queue.
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 22:55:04)
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 22:59:05)
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 23:03:05)
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 23:07:05)
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 23:11:05)
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 23:15:05)
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 6.5E-8
+  based on the actual fingerprints:  val = 2.4E-8
+2290042 states generated, 823997 distinct states found, 96159 states left on queue.
+The depth of the complete state graph search is 46.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 12 and the 95th percentile is 3).
+Checkpointing of run st/26-11-09-22-50-58.998
+Checkpointing completed at (2026-11-09 23:16:01)
+Finished in 25min 02s at (2026-11-09 23:16:01)
+
+## segment 2
+# load at start: 6.47 6.94 7.68 8/151 31652
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -7510000815050387976 with 1 worker on 4 cores with 4551MB heap and 64MB offheap memory [pid: 31657] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-09 23:16:04)
+Starting recovery from checkpoint st/26-11-09-22-50-58.998/
+Recovery completed. 823997 states examined. 96159 states on queue.
+Progress(46) at 2026-11-09 23:16:09: 825,604 states generated (825,604 s/min), 824,403 distinct states found (824,403 ds/min), 96,138 states left on queue.
+Progress(46) at 2026-11-09 23:17:09: 962,156 states generated (136,552 s/min), 868,667 distinct states found (44,264 ds/min), 99,358 states left on queue.
+Error: when reading pool file 95 (StatePoolReader.run):
+st/26-11-09-22-50-58.998/95 (No such file or directory)

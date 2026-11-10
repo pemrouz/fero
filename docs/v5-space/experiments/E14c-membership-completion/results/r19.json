@@ -1,0 +1,56 @@
+{
+ "design-m2p-t5": {
+  "agef_judge": 3,
+  "agef_judged": 572,
+  "agef_plan_result": "PASS",
+  "agef_plan_stuck": 0,
+  "agef_result": "PASS",
+  "agef_stuck_live": 0,
+  "complete": true,
+  "depth": 35,
+  "distinct": 572,
+  "secs": 5,
+  "violated": null
+ },
+ "design-m3-t5": {
+  "agef_judge": 3,
+  "agef_judged": 12098,
+  "agef_plan_result": "FAIL",
+  "agef_plan_stuck": 812,
+  "agef_result": "FAIL",
+  "agef_stuck_live": 812,
+  "complete": true,
+  "depth": 80,
+  "distinct": 12098,
+  "secs": 21,
+  "violated": null
+ },
+ "mutant_line": "/\\ TRUE      \\* mutant: guard dropped",
+ "r19-m2p-t5": {
+  "agef_judge": 3,
+  "agef_judged": 572,
+  "agef_plan_result": "PASS",
+  "agef_plan_stuck": 0,
+  "agef_result": "PASS",
+  "agef_stuck_live": 0,
+  "complete": true,
+  "depth": 35,
+  "distinct": 572,
+  "secs": 7,
+  "violated": null
+ },
+ "r19-m3-t5": {
+  "agef_judge": 3,
+  "agef_judged": 24302,
+  "agef_plan_result": "FAIL",
+  "agef_plan_stuck": 6340,
+  "agef_result": "FAIL",
+  "agef_stuck_live": 6340,
+  "complete": true,
+  "depth": 115,
+  "distinct": 87779,
+  "secs": 88,
+  "violated": null
+ },
+ "rule": "/\\ i \\in GetConfig(i)      \\* [g]"
+}

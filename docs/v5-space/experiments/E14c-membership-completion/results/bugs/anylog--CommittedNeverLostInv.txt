@@ -1,0 +1,26 @@
+# run anylog--CommittedNeverLostInv: scenario three, {"AllowDrop": false, "AllowStepDown": false, "FaultLimit": 1, "LeaderLease": true, "MaxTermLimit": 4, "Plan": "all", "ReconfigurationLimit": 1}
+# invariants: CommittedNeverLostInv
+# patched files: etcdraft.tla
+# spec CSpec (MCferoc.tla), CommunityModules-deps.jar, 1 segment(s), [214] s wall, TLC -workers 2 -fp 7
+# done: True
+
+## segment 1
+# load at start: 8.99 6.56 4.21 8/160 25991
+TLC2 Version 2026.11.06.005304 (rev: 3ec1cc4)
+Running breadth-first search Model-Checking with fp 7 and seed -4440406617568005488 with 2 workers on 4 cores with 2731MB heap and 64MB offheap memory [pid: 25996] (Linux 6.18.44-fc-v310 amd64, Ubuntu 21.0.12.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Starting... (2026-11-09 22:03:32)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-09 22:03:33.
+Progress(16) at 2026-11-09 22:03:36: 3,457 states generated (3,457 s/min), 1,562 distinct states found (1,562 ds/min), 327 states left on queue.
+Progress(54) at 2026-11-09 22:04:36: 566,979 states generated (563,522 s/min), 233,626 distinct states found (232,064 ds/min), 14,217 states left on queue.
+Progress(67) at 2026-11-09 22:05:36: 1,068,304 states generated (501,325 s/min), 434,068 distinct states found (200,442 ds/min), 12,768 states left on queue.
+Progress(89) at 2026-11-09 22:06:36: 1,561,035 states generated (492,731 s/min), 637,701 distinct states found (203,633 ds/min), 8,408 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 4.2E-8
+  based on the actual fingerprints:  val = 6.4E-8
+1795555 states generated, 737138 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 126.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 11 and the 95th percentile is 2).
+Finished in 03min 32s at (2026-11-09 22:07:04)

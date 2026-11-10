@@ -1,0 +1,306 @@
+{
+ "anylog--CommittedNeverLostInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 737138,
+  "error": null,
+  "secs": 214,
+  "trace_states": null,
+  "violated": null
+ },
+ "anylog--CommittedQuorumInv": {
+  "complete": false,
+  "depth": 36,
+  "distinct": 54081,
+  "error": null,
+  "secs": 21,
+  "trace_states": 36,
+  "violated": "CommittedQuorumInv"
+ },
+ "anylog--LeaderCompletenessRaftInv": {
+  "complete": false,
+  "depth": 29,
+  "distinct": 18501,
+  "error": null,
+  "secs": 13,
+  "trace_states": 27,
+  "violated": "LeaderCompletenessRaftInv"
+ },
+ "anylog--LogInv": {
+  "complete": false,
+  "depth": 39,
+  "distinct": 70583,
+  "error": null,
+  "secs": 27,
+  "trace_states": 39,
+  "violated": "LogInv"
+ },
+ "anylog--VoteQuorumInv": {
+  "complete": false,
+  "depth": 27,
+  "distinct": 18326,
+  "error": null,
+  "secs": 16,
+  "trace_states": 27,
+  "violated": "VoteQuorumInv"
+ },
+ "anylog--new": {
+  "complete": false,
+  "depth": 30,
+  "distinct": 17693,
+  "error": null,
+  "secs": 15,
+  "trace_states": 27,
+  "violated": "VoteQuorumInv"
+ },
+ "anylog--shipped": {
+  "complete": false,
+  "depth": 28,
+  "distinct": 17763,
+  "error": null,
+  "secs": 16,
+  "trace_states": 27,
+  "violated": "MoreUpToDateCorrectInv"
+ },
+ "design--m2": {
+  "agef": "PASS",
+  "complete": true,
+  "depth": 99,
+  "distinct": 100736,
+  "error": null,
+  "mutant": "design (no mutant)",
+  "plan": "PASS",
+  "secs": 101,
+  "stuck_live": 0,
+  "violated": null
+ },
+ "ghost--CommittedNeverLostInv": {
+  "complete": false,
+  "depth": 41,
+  "distinct": 106102,
+  "error": null,
+  "secs": 24,
+  "trace_states": 41,
+  "violated": "CommittedNeverLostInv"
+ },
+ "ghost--CommittedQuorumInv": {
+  "complete": false,
+  "depth": 16,
+  "distinct": 4282,
+  "error": null,
+  "secs": 7,
+  "trace_states": 15,
+  "violated": "CommittedQuorumInv"
+ },
+ "ghost--LeaderCompletenessRaftInv": {
+  "complete": false,
+  "depth": 32,
+  "distinct": 46976,
+  "error": null,
+  "secs": 13,
+  "trace_states": 32,
+  "violated": "LeaderCompletenessRaftInv"
+ },
+ "ghost--LogInv": {
+  "complete": false,
+  "depth": 44,
+  "distinct": 125223,
+  "error": null,
+  "secs": 26,
+  "trace_states": 44,
+  "violated": "LogInv"
+ },
+ "ghost--VoteQuorumInv": {
+  "complete": false,
+  "depth": 17,
+  "distinct": 4342,
+  "error": null,
+  "secs": 7,
+  "trace_states": 15,
+  "violated": "VoteQuorumInv"
+ },
+ "ghost--new": {
+  "complete": false,
+  "depth": 16,
+  "distinct": 4095,
+  "error": null,
+  "secs": 6,
+  "trace_states": 15,
+  "violated": "VoteQuorumInv"
+ },
+ "ghost--shipped": {
+  "complete": false,
+  "depth": 17,
+  "distinct": 4374,
+  "error": null,
+  "secs": 6,
+  "trace_states": 15,
+  "violated": "QuorumLogInvLive"
+ },
+ "minority--CommittedNeverLostInv": {
+  "complete": true,
+  "depth": 118,
+  "distinct": 1033203,
+  "error": null,
+  "secs": 221,
+  "trace_states": null,
+  "violated": null
+ },
+ "minority--CommittedQuorumInv": {
+  "complete": false,
+  "depth": 9,
+  "distinct": 319,
+  "error": null,
+  "secs": 3,
+  "trace_states": 7,
+  "violated": "CommittedQuorumInv"
+ },
+ "minority--LeaderCompletenessRaftInv": {
+  "complete": false,
+  "depth": 22,
+  "distinct": 11564,
+  "error": null,
+  "secs": 8,
+  "trace_states": 20,
+  "violated": "LeaderCompletenessRaftInv"
+ },
+ "minority--LogInv": {
+  "complete": false,
+  "depth": 27,
+  "distinct": 27242,
+  "error": null,
+  "secs": 17,
+  "trace_states": 25,
+  "violated": "LogInv"
+ },
+ "minority--VoteQuorumInv": {
+  "complete": false,
+  "depth": 10,
+  "distinct": 335,
+  "error": null,
+  "secs": 4,
+  "trace_states": 7,
+  "violated": "VoteQuorumInv"
+ },
+ "minority--new": {
+  "complete": false,
+  "depth": 8,
+  "distinct": 323,
+  "error": null,
+  "secs": 5,
+  "trace_states": 7,
+  "violated": "VoteQuorumInv"
+ },
+ "minority--shipped": {
+  "complete": false,
+  "depth": 9,
+  "distinct": 334,
+  "error": null,
+  "secs": 6,
+  "trace_states": 7,
+  "violated": "QuorumLogInvLive"
+ },
+ "mut-r02--m2": {
+  "complete": false,
+  "depth": 56,
+  "distinct": 44440,
+  "error": null,
+  "mutant": "FeroBecomeLeader:drop-update-pendingConfChangeIndex:r02",
+  "secs": 47,
+  "trace_states": 56,
+  "violated": "CommittedQuorumInv"
+ },
+ "mut-r05--m2": {
+  "complete": false,
+  "depth": 22,
+  "distinct": 12201,
+  "error": null,
+  "mutant": "ProposeConf:drop-guard:r05",
+  "secs": 18,
+  "trace_states": 20,
+  "violated": "CommittedQuorumInv"
+ },
+ "mut-r06--m2": {
+  "complete": false,
+  "depth": 24,
+  "distinct": 2652,
+  "error": null,
+  "mutant": "ProposeConf:drop-guard:r06",
+  "secs": 9,
+  "trace_states": 23,
+  "violated": "CommittedQuorumInv"
+ },
+ "mut-r09--m2": {
+  "complete": false,
+  "depth": 21,
+  "distinct": 12424,
+  "error": null,
+  "mutant": "ProposeConf:drop-update-pendingConfChangeIndex:r09",
+  "secs": 18,
+  "trace_states": 20,
+  "violated": "CommittedQuorumInv"
+ },
+ "twovote--CommittedNeverLostInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 708862,
+  "error": null,
+  "secs": 134,
+  "trace_states": null,
+  "violated": null
+ },
+ "twovote--CommittedQuorumInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 708862,
+  "error": null,
+  "secs": 164,
+  "trace_states": null,
+  "violated": null
+ },
+ "twovote--LeaderCompletenessRaftInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 708862,
+  "error": null,
+  "secs": 131,
+  "trace_states": null,
+  "violated": null
+ },
+ "twovote--LogInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 708862,
+  "error": null,
+  "secs": 134,
+  "trace_states": null,
+  "violated": null
+ },
+ "twovote--VoteQuorumInv": {
+  "complete": true,
+  "depth": 126,
+  "distinct": 708862,
+  "error": null,
+  "secs": 148,
+  "trace_states": null,
+  "violated": null
+ },
+ "twovote--new": {
+  "complete": false,
+  "depth": 41,
+  "distinct": 75494,
+  "error": null,
+  "secs": 33,
+  "trace_states": 40,
+  "violated": "MoreThanOneLeaderInv"
+ },
+ "twovote--shipped": {
+  "complete": false,
+  "depth": 41,
+  "distinct": 75999,
+  "error": null,
+  "secs": 23,
+  "trace_states": 40,
+  "violated": "MoreThanOneLeaderInv"
+ }
+}
