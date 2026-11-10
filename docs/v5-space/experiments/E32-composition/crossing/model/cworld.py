@@ -51,6 +51,12 @@ PROPERTIES ADDED (E-14's and E-16's, at this level of abstraction).
   HR  E-16's P2: a removal never lowers the answering voters that hold the
       commit offset below three.
   P8  E-30's ONCE: derived outputs apply once each, in source order.
+  DP  E-30's DONE, on the bounds remit-* only: an output answered "already
+      applied" has its source record's output applied. Those bounds also
+      turn on E-30's `dup` answer (a world rule there, pinned here too): an
+      output at or below the slot's mark, re-emitted under a new id, is
+      answered "already applied" by a group whose committed log holds the
+      slot open. With `remit` off (every other bound) nothing changes.
   LH  E-16's P8 (AG EF): healing finishes.
 Liveness (L4, L5, L5b, L5g, L7, LH) is asked from every state where every
 group has a live majority of its committed voters; calm steps are commit,
@@ -77,6 +83,8 @@ PROPS_ADDED = {
     'HV': 'E-16 P3: a healing group keeps three voters, or four inside a swap',
     'HR': 'E-16 P2: a removal never lowers the answering voters that hold the commit offset below three',
     'P8': 'E-30 ONCE: derived outputs apply once each, in source order',
+    'DP': 'E-30 DONE (bounds remit-*): an output answered "already applied" (dup) has its source '
+          "record's output applied",
     'LH': 'E-16 P8 (AG EF): healing finishes',
 }
 CALM = ('commit', 'deliver', 'read')
@@ -144,6 +152,7 @@ class CWorld(World):
         self.sess = dict(b.get('sess', {}))            # attempt id -> session sequence
         self.derived = dict(b.get('derived', {}))      # attempt id -> source sequence
         self.sess_aids = tuple(a for a in self.aids if a in self.sess)
+        self.remit = bool(b.get('remit'))              # E-30's `dup` answer (bounds remit-*)
         self.opt.bind(self)
         self._fst, self._facts = None, None
 
@@ -279,6 +288,22 @@ class CWorld(World):
                     done = {x[0] for h in hist for x in h} | refused
                 if a in done:
                     out.append((('ack', a), 'deliver', (groups, hist, refused, reader, mem, acked | {a}, used, gcfg)))
+        # E-30's `dup` (bounds remit-* only): an output at or below the slot's mark, under an id the
+        # outcomes do not hold, is answered "already applied". A world rule, pinned as in E-30.
+        if self.remit:
+            applied = None
+            for a in self.derived:
+                if ('dup', a) in refused:
+                    continue
+                if applied is None:
+                    applied = {x[0] for h in hist for x in h}
+                if a in applied:
+                    continue
+                for g in range(self.K):
+                    if self.leads(st, g) and self.opt.dup_ok(self, st, g, a):
+                        out.append((('dup', a, names[g]), 'deliver',
+                                    (groups, hist, refused | {('dup', a)}, reader, mem, acked, used, gcfg)))
+                        break
         for a, gs, us in self.compiled:
             kind = self.opt.KIND.get(a.name, a.kind)
             for b in a.params(self, st):
@@ -377,6 +402,10 @@ class CWorld(World):
                 if any(b <= a for a, b in zip(src, src[1:])):
                     bad.append('P8')
                     break
+        if self.remit:
+            done_src = {self.derived[x[0]] for h in hist for x in h if x[0] in self.derived}
+            if any(isinstance(r, tuple) and self.derived[r[1]] not in done_src for r in refused):
+                bad.append('DP')
         if self.rep:
             for g in range(self.K):
                 com, tail, lost, cr, ldr, held = groups[g]
@@ -436,6 +465,8 @@ class CWorld(World):
     def goals(self, st):
         settled = self.opt.settled(self, st)
         done = {x[0] for h in st[1] for x in h} | st[2]
+        if self.remit:
+            done |= {r[1] for r in st[2] if isinstance(r, tuple)}
         answered = all(a in done for a in self.aids)
         reader = st[3]
         caught = reader is None or reader[1] == self.hist_aids(st, 'p')

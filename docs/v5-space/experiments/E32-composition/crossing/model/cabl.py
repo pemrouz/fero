@@ -23,8 +23,22 @@ Two stages.
           current counterexample; latest dropped first) until every bound
           holds. Then the final pass.
 
-    python3 model/cabl.py --out CK.json --stage added [--budget 1500] [--jobs 2]
+    python3 model/cabl.py --out CK.json --stage added [--budget 1500] [--jobs 2] [--seed MUTANTS.json]
     python3 model/cabl.py --out CK.json --stage union --added-from CK-added.json
+
+PINNED (written, never dropped, not counted; E-20's convention).
+`write.floor` (a write's entry records the floor its copy carried) is E-20's
+memory bound: without it the floor never rises, outcomes are kept for ever,
+and every floor rule becomes spare. `snap.cut` (the log below the offset is
+dropped) is the log drop itself: without it no log is ever dropped, which is
+safe and leaves nothing to ablate (E-20 pins the append of the write itself
+in the same way).
+
+--seed. Dropping one rule alone is exactly cmut.py's G or U mutant of it,
+run with the same search, limit and bounds. So pass 1 reuses those runs: on
+a bound where the mutant was run, its result; on a bound where the
+differential pass found it takes the model's own steps in every reachable
+state, the model's result (every property holds).
 """
 
 import argparse
@@ -51,6 +65,7 @@ from dsl import Mutation, rules                      # noqa: E402
 LIMIT = 1_500_000
 ERRS = (TypeError, IndexError, KeyError, ValueError, AttributeError)
 EXP = os.path.normpath(os.path.join(HERE, '..', '..', '..'))
+PINNED = ('write.floor', 'snap.cut')
 
 
 def rule_ids():
@@ -113,6 +128,41 @@ class Work:
             self.extra = {k: v for k, v in old.items() if k != 'cache'}
         self.pool = mp.Pool(jobs)
 
+    def seed(self, path):
+        """Pass 1 from cmut.py's checkpoint (see --seed above). Returns how
+        many (rule, bound) results were taken."""
+        ck = json.load(open(path))
+        if ck.get('base_drop'):
+            return 0
+        n = 0
+        kinds = {}
+        for a in Crossing(BOUNDS[SWEEP[0]]).actions():
+            kinds.update({g.id: 'G' for g in a.guards})
+            kinds.update({u.id: 'U' for u in a.updates})
+        for rid in rule_ids():
+            k = f'{kinds[rid]} {rid}'
+            run = ck['runs'].get(k)
+            for b in self.sweep:
+                key = self.key([rid], b)
+                if key in self.cache or b not in ck['diff']:
+                    continue
+                if k not in ck['diff'][b]['differs']:
+                    self.cache[key] = {'states': ck['diff'][b]['states'], 'secs': 0, 'complete': True,
+                                       'seeded': 'equivalent on this bound (differential pass)'}
+                    n += 1
+                elif run and b in run['per']:
+                    x = dict(run['per'][b])
+                    if 'error' in x:
+                        x['fail'] = ['ERR', 0, ['ERR']]
+                        x['complete'] = False
+                    elif 'fail' not in x and not x.get('complete'):
+                        x['fail'] = ['LIMIT', x['states'], ['LIMIT']]
+                    x['seeded'] = 'mutant run'
+                    self.cache[key] = x
+                    n += 1
+        self.save()
+        return n
+
     def save(self, extra=None):
         if extra is None:
             extra = self.extra
@@ -160,7 +210,7 @@ class Work:
                 if ff is not None or not missing:
                     out[k] = ff
                 else:
-                    tasks.append((list(d), missing, True))
+                    tasks.append((list(d), missing[:1], True))     # one bound a task: saved as it ends
             if not tasks:
                 return out
             self._need(tasks)
@@ -187,8 +237,8 @@ def short(ff):
 
 
 def stage_added(wk, log, reverse=False):
-    ids = [i for i in rule_ids() if i in ADDED]
-    out = {'stage': 'added', 'candidates': ids, 'order': 'reverse' if reverse else 'text'}
+    ids = [i for i in rule_ids() if i in ADDED and i not in PINNED]
+    out = {'stage': 'added', 'candidates': ids, 'pinned': list(PINNED), 'order': 'reverse' if reverse else 'text'}
     assert wk.par([]) is None, 'the model as designed fails'
     res1 = wk.seq_many([[i] for i in ids])
     alone = {i: res1[(i,)] for i in ids}
@@ -226,7 +276,7 @@ def final_pass(wk, ids, removed, greedy, log):
 
 
 def stage_union(wk, log, added_removed):
-    ids = rule_ids()
+    ids = [i for i in rule_ids() if i not in PINNED]
     drop17, drop16 = single_smallest()
     removed = list(drop17) + list(drop16) + [i for i in added_removed if i not in drop17 + drop16]
     out = {'stage': 'union', 'e17_dropped': drop17, 'e16_dropped': drop16, 'added_dropped': list(added_removed),
@@ -278,10 +328,13 @@ def main():
     ap.add_argument('--budget', type=float, default=1500)
     ap.add_argument('--jobs', type=int, default=2)
     ap.add_argument('--sweep', default='')
+    ap.add_argument('--seed', help="cmut.py's checkpoint: pass 1 from the single-rule mutant runs")
     a = ap.parse_args()
     sweep = tuple(a.sweep.split(',')) if a.sweep else SWEEP
     wk = Work(a.out, a.jobs, a.budget, sweep)
     log = lambda s: print(s, flush=True)     # noqa: E731
+    if a.seed:
+        log(f'  seeded {wk.seed(a.seed)} single-rule results from {os.path.basename(a.seed)}')
     try:
         if a.stage == 'added':
             res = stage_added(wk, log, a.reverse)

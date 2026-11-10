@@ -109,6 +109,19 @@ BOUNDS = {
     # w3 on the slot that stays (one write at a time)
     'slots-src': side('src', attempts=[('w1', 'p', 1), ('w3', 'q', 1)], sess={'w1': 1, 'w3': 2}, serial=True),
     'slots-dst': side('dst', attempts=[('w1', 'p', 1), ('w3', 'q', 1)], sess={'w1': 1, 'w3': 2}, serial=True),
+    # --- added on resuming, because two pieces of the carried set were never the only guard above:
+    # the floor alone: two session writes with EQUAL lock tokens (above, each later write had a higher
+    # token, so the token fence stopped every late copy before the floor had to)
+    'floore-src': side('src', attempts=[('w1', 'p', 1), ('w2', 'p', 1)], sess=S2, serial=True),
+    'floore-dst': side('dst', attempts=[('w1', 'p', 1), ('w2', 'p', 1)], sess=S2, serial=True),
+    # the mark alone: one source record's output emitted twice under two ids (E-30: the consumer restarted
+    # past the dedup horizon), so the outcomes never catch the second; E-30's `dup` answer is on
+    'remit-src': side('src', attempts=[('o1', 'p', 1), ('o1r', 'p', 1)], derived={'o1': 1, 'o1r': 1}, remit=True),
+    'remit-dst': side('dst', attempts=[('o1', 'p', 1), ('o1r', 'p', 1)], derived={'o1': 1, 'o1r': 1}, remit=True),
+    # the lock token alone: two lock holders with no session (E-17's two writes): w2 holds the newer lock
+    # (token 2), w1 the older (token 1); after w2, only the token stops w1
+    'lock-src': side('src', attempts=[('w1', 'p', 1), ('w2', 'p', 2)]),
+    'lock-dst': side('dst', attempts=[('w1', 'p', 1), ('w2', 'p', 2)]),
     # --- one lost member, and BOTH groups heal at once (each lost a voter)
     'heal2-src': B(attempts=W1, sess=S1, fail=(0,), never=(0,), heal=(0, 1), dropg=(0,), **LOSE),
     'heal2-dst': B(attempts=W1, sess=S1, fail=(1,), never=(1,), heal=(0, 1), dropg=(1,), **LOSE),
@@ -120,6 +133,10 @@ BOUNDS = {
              crashes=1, faults=1),
 }
 
-# The bounds the mutants and the ablation run on, cheapest first.
-SWEEP = ('src', 'dst', 'read-src', 'read-dst', 'mark-src', 'mark-dst', 'giveup-src', 'giveup-dst',
-         'crash-src', 'crash-dst', 'floors-src', 'floors-dst')
+# The bounds the mutants and the ablation run on, cheapest first. The six marked * joined on resuming
+# (the mutant run had finished its differential pass on the other twelve; cmut.py runs every mutant not
+# yet caught on them too).
+SWEEP = ('src', 'dst', 'read-src', 'read-dst', 'mark-src', 'mark-dst', 'remit-src', 'remit-dst',     # remit-* *
+         'lock-src', 'lock-dst',                                                                    # *
+         'giveup-src', 'giveup-dst', 'crash-src', 'crash-dst', 'floors-src', 'floors-dst',
+         'floore-src', 'floore-dst')                                                                # *

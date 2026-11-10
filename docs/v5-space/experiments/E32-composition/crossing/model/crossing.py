@@ -345,6 +345,16 @@ class Crossing(Option):
     def done_all(self, w, st):
         return sum(1 for g in range(w.K) for _, e in self.EC(st, g) if e[0] == 'open') >= len(self.moves)
 
+    def dup_ok(self, w, st, g, aid):
+        """E-30's `dup` answer (a world rule there, pinned, not counted): g's
+        committed log holds the output's slot open, the output's source
+        sequence is at or below the slot's mark there, and the output's own
+        id is not among the slot's outcomes (a re-emission under a new id)."""
+        s = SLOT[w.part[aid]]
+        com = w.com(st, g)
+        return (held(com, g, s, self.holder0) and self.derived[aid] <= mark(com, s)
+                and aid not in outs(com, s, self.seq))
+
     def show(self, e):
         if e[0] == 'cp':
             x = ('cp', e[1], e[2], f'upto={e[3]}', [a for a, p in e[4]],
