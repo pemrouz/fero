@@ -2,12 +2,18 @@
 # E-31: the subscribe protocol (DESIGN-V5 4.4, L3) across a leader crash, a
 # follower's snapshot reload, a slot move and a relay. One exhaustive model on
 # E-16's engine (E-17's rule language, unchanged).
-#   ./run.sh check    every option on every bound (traces of what breaks)
+#   ./run.sh check    every option on every bound (traces of what breaks), and the
+#                     targeted check of the move's carried segment names (segs_check.py)
+#   ./run.sh big      the move and the relay together in state mode, in full: 7,590,751
+#                     states, about 12 minutes and 6 GB (limit 8,000,000); then the same
+#                     bound by safety_reach.py (safety only, hashed states), as a cross-check
+#   ./run.sh partial  the bounds a 3,000,000-state run does not finish: that one, and every
+#                     feature with two faults (state and log)
 #   ./run.sh ablate   DEV-10: ablation and mutants of the option whose design holds
 #   ./run.sh report   results/summary.md
-#   ./run.sh          all three
+#   ./run.sh          all five
 # Every model step runs under $SP/bin/heavy, one hold per step, each under 25 minutes;
-# the ablation takes several holds.
+# the ablation takes several holds (about 5.6 CPU hours in all; it resumes from its .cache).
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SP="${SP:-/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad}"
@@ -15,7 +21,7 @@ HEAVY="${HEAVY-$SP/bin/heavy}"
 CLI="$HERE/../E16-controller-loop/engine/cli.py"
 REPORT="$HERE/../E16-controller-loop/engine/report.py"
 R="$HERE/results"
-STEPS="${*:-check ablate report}"
+STEPS="${*:-check big partial ablate report}"
 mkdir -p "$R"
 cd "$HERE"
 want() { for s in $STEPS; do [ "$s" = "$1" ] && return 0; done; return 1; }
@@ -24,12 +30,24 @@ hdr() { echo "# $1, $(date -u +%FT%TZ), $(python3 --version), $(nproc) vCPU, loa
 if want check; then
   hdr 'subscribe: every option on every bound' > $R/design.txt
   $HEAVY timeout 1500 sh -c "for o in draft fixed off; do python3 $CLI models/subscribe.py \$o --limit 3000000; done" >> $R/design.txt 2>&1
+  hdr 'subscribe: the move carries the segment names (P7s, a stronger P7), option fixed' > $R/segs-check.txt
+  $HEAVY timeout 600 python3 segs_check.py >> $R/segs-check.txt 2>&1
+fi
+if want big; then
+  hdr 'subscribe: the move and the relay together in state mode, option fixed, in full (limit 8,000,000 states; about 6 GB)' > $R/design-mvrl-state.txt
+  $HEAVY timeout 1500 python3 $CLI models/subscribe.py fixed --bound mvrl-state --limit 8000000 >> $R/design-mvrl-state.txt 2>&1
+  hdr 'subscribe: safety only, every reachable state, hashed (safety_reach.py), option fixed' > $R/safety-reach.txt
+  $HEAVY timeout 1500 python3 safety_reach.py fixed mvrl-state --secs 1300 >> $R/safety-reach.txt 2>&1
+fi
+if want partial; then
+  hdr 'subscribe: the bounds that do not finish, option fixed, each stopped at 3,000,000 states' > $R/design-partial.txt
+  $HEAVY timeout 1500 sh -c "for b in mvrl-state all-state all-log; do python3 $CLI models/subscribe.py fixed --bound \$b --limit 3000000; done" >> $R/design-partial.txt 2>&1
 fi
 if want ablate; then
   # the ablation resumes from its .cache file: hold after hold (each <= 25 min) until it ends
   n=0
   until [ -f $R/fixed-ablation.json ]; do
-    n=$((n + 1)); [ $n -le 10 ] || { echo "ablation did not end in 10 holds" >&2; exit 1; }
+    n=$((n + 1)); [ $n -le 20 ] || { echo "ablation did not end in 20 holds" >&2; exit 1; }
     # E-16's engine on the sweep bounds, then the snapshot and expired paths put back
     # as groups for the verify bounds (ablate_groups.py says why), then mutants
     $HEAVY timeout 1500 python3 ablate_groups.py models/subscribe.py fixed $R/fixed-ablation.json \

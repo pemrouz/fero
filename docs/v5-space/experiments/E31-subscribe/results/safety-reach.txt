@@ -1,0 +1,9 @@
+# subscribe: safety only, every reachable state, hashed (safety_reach.py), option fixed, 2026-11-10T01:37:06Z, Python 3.13.17, 4 vCPU, load 2.98 3.09 3.09
+  1,000,001 states, frontier 333,812, 63s
+  2,000,002 states, frontier 559,190, 133s
+  3,000,000 states, frontier 717,840, 207s
+  4,000,001 states, frontier 786,279, 286s
+  5,000,001 states, frontier 775,867, 370s
+  6,000,000 states, frontier 663,163, 461s
+  7,000,000 states, frontier 387,368, 561s
+fixed mvrl-state: 7,590,751 states, 37,623,123 steps, 633.6s: every safety property (P1 to P4, P6, P7) holds in every reachable state (complete; hashed states; peak frontier 800,221)

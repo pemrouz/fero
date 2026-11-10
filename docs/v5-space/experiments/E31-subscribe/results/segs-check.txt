@@ -1,0 +1,23 @@
+# subscribe: the move carries the segment names (P7s, a stronger P7), option fixed, 2026-11-10T01:11:07Z, Python 3.13.17, 4 vCPU, load 3.63 3.36 2.34
+fixed + P7s, the design, mv-log: 18,646 states, 1.1s: all hold
+fixed + P7s, the design, fo2-log: 96,177 states, 6.2s: all hold
+fixed + P7s, without bopen.segs, mv-log: 1,065 states, 0.0s: P7s (8 steps) (STOPPED AT THE STATE LIMIT)
+  P7s: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. fence 1
+     5. connect (('who', 'cl'), ('x', 2))
+     6. bopen ()
+     7. expire (('who', 'cl'), ('x', 2))
+     8. gotexp (('who', 'cl'), ('x', 2))
+fixed + P7s, without bopen.segs, fo2-log: 2,243 states, 0.1s: P7s (8 steps) (STOPPED AT THE STATE LIMIT)
+  P7s: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. fence 1
+     5. connect (('who', 'cl'), ('x', 2))
+     6. bopen ()
+     7. expire (('who', 'cl'), ('x', 2))
+     8. gotexp (('who', 'cl'), ('x', 2))

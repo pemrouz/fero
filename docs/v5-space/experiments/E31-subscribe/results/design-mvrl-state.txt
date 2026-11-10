@@ -1,0 +1,3 @@
+# subscribe: the move and the relay together in state mode, option fixed, in full (limit 8,000,000 states; about 6 GB), 2026-11-10T01:49:55Z, Python 3.13.17, 4 vCPU, load 1.15 2.48 3.01
+fixed mvrl-state: 7,590,751 states, 669.7s: all hold
+    P5: 7,590,751 judged states, 0 cannot reach the goal
