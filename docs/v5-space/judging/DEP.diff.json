@@ -1,0 +1,1007 @@
+{
+ "group": "DEP",
+ "cells": 460,
+ "same": 417,
+ "decisive": 5,
+ "minor": 38,
+ "disagreements": [
+  {
+   "req": "DEP-02",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: v4 has no caught-up signal. Step 2: STATUS.md records that a member back inside the eviction window says writable about 100 ms before it holds its peers' rows. Step 3: that run is this requirement's own regression test, so v4 as it is fails it; the per-peer tails that could fix it sit unused in kernel/confirm.ts.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [],
+    "why": "v4 has the fault today: a member back inside the eviction window says writable about 100 ms before it holds its peers' rows (STATUS.md). The per-peer tails the signal needs are already in kernel/confirm.ts, so it is a missing report, not a limit of the design.",
+    "closes": "a public caught-up signal in v4, with the regression test"
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "DRAFT",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "MIN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "RUST",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "SRV",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "LEAN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "CELL",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "LANE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "SPLIT",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "PD",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "ISR",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "OBJ",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: v4 collects a deleted row's tombstone within a heartbeat. Step 2: a fresh member applies every seed key its empty fold lacks ('fresh keys ride in'). Step 3: it cannot tell a deleted key from one the cluster never had, so the seed row comes back and LWW spreads it. STATUS.md: 2 runs of 2 on v4 63e0679, and every scale-out of a seeded resource hits it.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [],
+    "why": "v4 fails the regression today: a fresh member's seed brings back a row the cluster deleted, in 2 runs of 2 (STATUS.md), because LWW with collected tombstones cannot tell 'never had' from 'deleted'. J's fix, a joining copy skips its seed, fits v4's join by ballot and is not built.",
+    "closes": "the skip-seed-on-join fix in v4, with the regression test"
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "MIN-P",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "MIN-TS",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "RLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "EMB-V8",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "row": "COMP",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "DRAFT",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "MIN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "RUST",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "SRV",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "LEAN",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "CELL",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "LANE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "SPLIT",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "PD",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "ISR",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "OBJ",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "MIN-P",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "MIN-TS",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "RLOG",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "EMB-V8",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "SIDE",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "row": "COMP",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   },
+   "j2": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   }
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "row": "SLOG",
+   "decisive": false,
+   "j1": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-02",
+     "E-12",
+     "E-11"
+    ],
+    "why": "Measured on prototypes of the same shape: E-02's pipeline commits many appends per fsync in TS, Rust and Go (about 2.8 M 100 B appends a second per process in TS, against v4's 250), and one shared journal keeps 740 to 890 fdatasyncs a second for 16 to 2,000 groups (E-12), the form E-11 runs under the Raft ports. The pin itself is written with the build."
+   },
+   "j2": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-02"
+    ],
+    "why": "Its commit is a write quorum of log nodes, and the map does not say how a log node stores many loglets (S `tier + obj`, not `jrnl`). E-02's followers show a log node can share one fdatasync per batch; no log-tier prototype ran.",
+    "closes": "a pin on the log tier's journal, in the phase that builds it"
+   }
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: v4's shell calls one fsync per write step. Step 2: so n single-row writes need n fsyncs, and none is shared. Step 3: STATUS.md measured about 250 persisted writes a second per member, and 10,000 single-row writes not all on disk in 20 s, against PERF-09's 50,000 a second.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [],
+    "why": "v4's shell syncs the disk once per write step: about 250 persisted single-row writes a second per member, and 10,000 were not all persisted in 20 s (STATUS.md, 'Group commit'). Many appends per fsync is a shell change inside S `walg`; it is not built.",
+    "closes": "group commit in v4's shell, with its pin"
+   }
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "row": "BUY",
+   "decisive": true,
+   "j1": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-09b",
+     "E-09d"
+    ],
+    "why": "It turns on the base. On JetStream, the row's first base, `persisted` means one fsync per message whatever the batching: 3,668 msgs/s (E-09b), 93 % under PERF-09's 50,000. On Redpanda, which the row also allows, one majority fsync covers a batch: 175,420 records a second (E-09d).",
+    "closes": "name BUY's base; on JetStream the measured ceiling stands and the row fails"
+   },
+   "j2": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-09b",
+     "E-09d"
+    ],
+    "why": "On JetStream the `persisted` rung is `sync_interval: always`, and the file store then fsyncs each message alone, whatever the batching: 3,668 messages a second from one async publisher and 3,275 from 16 clients (E-09b), against PERF-09's 50,000. The Redpanda form of the row would pass (175,420 a second, E-09d), but the row was built and priced on JetStream.",
+    "proof": "ceiling",
+    "gap": 0.93
+   }
+  },
+  {
+   "req": "DEP-15",
+   "part": "S",
+   "row": "BUY",
+   "decisive": false,
+   "j1": {
+    "v": "open",
+    "basis": "construction",
+    "ev": [
+     "E-44"
+    ],
+    "why": "Its two app copies are clients of an outside log of three servers, so either copy's crash takes no vote away (by construction; E-44 lost none of 900 writes through a kill of the log's own leader). But a NATS cluster used as the platform's shared tier was never examined against OPS-14, and no crash test of a copy ran."
+   },
+   "j2": {
+    "v": "not",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The row has no log-only voter and no log tier (V `+lrn` or `full`; N `proc` or `pool`): a group needs three full copies to survive a crash, and with two voters either crash stops writes. AMENDMENTS counts DEP-15 as lost for the MIN family, SRV, EMB-V8, SIDE, PD and COMP; v4 refuses two copies today, and JetStream needs three servers for a majority."
+   }
+  },
+  {
+   "req": "DEP-18",
+   "part": "M",
+   "row": "V4",
+   "decisive": true,
+   "j1": {
+    "v": "fails",
+    "basis": "cited",
+    "ev": [],
+    "why": "Step 1: v4's box directory hands each server every other server registered under its name. Step 2: nothing in a dir or a HELLO names the project. Step 3: so two apps with the same resource name and contract merge. STATUS.md: two `todos` servers showed each other's rows within seconds (2026-10-21), and 'same name, same object' is v4's design.",
+    "proof": "structural"
+   },
+   "j2": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [],
+    "why": "v4 fails the regression today: two servers named `todos` in two unrelated folders merged within seconds (STATUS.md, 2026-10-21), because the box directory joins by name. A secret keeps strangers out; scoping the registration to the project is the fix, and it is not built.",
+    "closes": "a project scope in v4's box directory, with the regression test"
+   }
+  }
+ ]
+}

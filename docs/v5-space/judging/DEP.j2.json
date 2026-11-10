@@ -1,0 +1,966 @@
+{
+ "group": "DEP",
+ "judge": "j2",
+ "cells": [
+  {
+   "req": "DEP-01",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-13"
+    ],
+    "why": "A roll is one planned handover per copy, then a restart and a catch-up. E-13 measured etcd's handover pause at 9.7 to 9.8 ms (worst 31 ms) and reasons about 1 s for three copies on this box, with A-02's rule that a write caught in the transfer is refused at once, never dropped. No roll ran on a v5 kernel, and a real machine restart was not timed.",
+    "closes": "J's four-roll test on the phase-2 kernel (handover, refuse at once, caught-up gate), then on real hosting"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 ran J's test: four rolls of three durable members with no failed call and no lost or doubled write, 3.6 to 5.0 s each, longest client pause 108 ms (STATUS.md, 'The hosted platform'; REQUIREMENTS DEP-01). It covers a code-only deploy; a contract change is DEP-10's."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Rolling the NATS servers moves each stream's leader. E-44 timed only an unplanned kill (5.2 to 7.2 s to a new leader, on JetStream's own timer); a planned step-down and a roll were not run.",
+     "closes": "a four-roll test on the JetStream prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The number is how far a copy's log and its fold are behind the leader's commit offset (DESIGN-V5 §6.1, need 4). In a row with one writer per group a restarted copy cannot take a write on its own, so v4's fault cannot come back in the same form. No experiment built the report, or the gate that keeps clients and the next roll step away until the gap closes.",
+    "closes": "phase 2: the caught-up number in L1 and L4, with v4's 'writable about 100 ms before it holds the rows' as a regression test"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 has the fault today: a member back inside the eviction window says writable about 100 ms before it holds its peers' rows (STATUS.md). The per-peer tails the signal needs are already in kernel/confirm.ts, so it is a missing report, not a limit of the design.",
+     "closes": "a public caught-up signal in v4, with the regression test"
+    }
+   }
+  },
+  {
+   "req": "DEP-03",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-26",
+     "E-13"
+    ],
+    "why": "After every copy restarts no group has a leader. A member that waits its election timer (2 to 2.5 s in TS by A-02) is writable too late for the 2 s bar; E-26 measured three cold TS Raft processes writable in 20 groups after 265 to 318 ms when the first one campaigns at once. No row states who campaigns at boot, and no restart-all with rows ran.",
+    "closes": "J's restart-all run on the phase-2 kernel, with a stated rule for who campaigns at boot"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 measured 0.7 to 1.9 s to writable with every row kept on J's restart-all run (REQUIREMENTS DEP-03, from J). The slow end is 5 % under the 2 s bar."
+    },
+    "RUST": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-13",
+      "E-26"
+     ],
+     "why": "After every copy restarts each group must elect. A native row's election timer is under 1 s with A-02's jitter, so the first leader stands inside about 1.25 s plus the boot even with no boot rule (reasoned from E-13's failover times). No restart-all with rows ran on any native kernel.",
+     "closes": "J's restart-all run on the native kernel"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-13",
+      "E-26"
+     ],
+     "why": "After every copy restarts each group must elect. A native row's election timer is under 1 s with A-02's jitter, so the first leader stands inside about 1.25 s plus the boot even with no boot rule (reasoned from E-13's failover times). No restart-all with rows ran on any native kernel.",
+     "closes": "J's restart-all run on the native kernel"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-13",
+      "E-26"
+     ],
+     "why": "After every copy restarts each group must elect. A native row's election timer is under 1 s with A-02's jitter, so the first leader stands inside about 1.25 s plus the boot even with no boot rule (reasoned from E-13's failover times). No restart-all with rows ran on any native kernel.",
+     "closes": "J's restart-all run on the native kernel"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-13",
+      "E-26"
+     ],
+     "why": "After every copy restarts each group must elect. A native row's election timer is under 1 s with A-02's jitter, so the first leader stands inside about 1.25 s plus the boot even with no boot rule (reasoned from E-13's failover times). No restart-all with rows ran on any native kernel.",
+     "closes": "J's restart-all run on the native kernel"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-13",
+      "E-26"
+     ],
+     "why": "After every copy restarts each group must elect. A native row's election timer is under 1 s with A-02's jitter, so the first leader stands inside about 1.25 s plus the boot even with no boot rule (reasoned from E-13's failover times). No restart-all with rows ran on any native kernel.",
+     "closes": "J's restart-all run on the native kernel"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16",
+      "E-26"
+     ],
+     "why": "The log members stay up while the servers restart, so no election stands before the first write: the writer comes back, folds to the log's end and goes on (reasoned from A-14's rules). Nobody ran it.",
+     "closes": "a restart-all run on an RLOG prototype"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-26"
+     ],
+     "why": "The log tier stays up while the servers restart, so the writer only reloads and takes its loglets again. That seal and re-take path was not modelled or run here.",
+     "closes": "a restart-all run on a log-tier prototype"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-28"
+     ],
+     "why": "There is no election: the first server back takes the lease by a conditional PUT (1.37 ms p50 on MinIO; about 30 ms on S3, cited) and loads the manifest. A restart-all was not run, and how long it waits for the old lease is not stated.",
+     "closes": "a restart-all run on the object-store prototype"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "After all three NATS servers restart, each stream elects on JetStream's own timer, which fero cannot set: E-44 measured 5.2 to 7.2 s to a new leader after a kill. That points over the 2 s bar, but a restart-all was not run.",
+     "closes": "a restart-all run on the JetStream prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-04",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-26",
+     "E-28"
+    ],
+    "why": "On this box three cold TS Raft processes with 20 groups are writable in 265 to 318 ms when the first one campaigns at once, and 20 dormant groups in a live process in 10 to 16 ms (E-26). The real machine start was not timed: v4's whole wake took 1.4 s against the 1.5 s bar, so the bar is tight wherever the project's own server must start, which is every row but the pooled one.",
+    "closes": "a wake test on real hosting with the phase-2 kernel and the object-store tier (deploy phase)"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 measured 1.4 s to writable for a project of 312 rows (J's record, quoted in REQUIREMENTS DEP-04 and in E-26), against 1.5 s. The margin is 7 %."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-26"
+     ],
+     "why": "A pooled server is already running, so a wake loads the project's dormant groups (3.3 to 3.5 ms each in TS, E-26) and starts its isolate. No pooled Rust server was built, so the isolate start and the fold were not timed.",
+     "closes": "a wake test on a pooled-server prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "A resource is made by one committed catalog entry, and its seed is written once through the group's log, with 'seed applied' kept in the catalog row (DESIGN-V5 §4.2). A joining copy folds the log or a snapshot and never writes a seed of its own, and one log per group means a removed row cannot come back from another copy. E-33 shows a project founds one cluster with A-08."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 fails the regression today: a fresh member's seed brings back a row the cluster deleted, in 2 runs of 2 (STATUS.md), because LWW with collected tombstones cannot tell 'never had' from 'deleted'. J's fix, a joining copy skips its seed, fits v4's join by ballot and is not built.",
+     "closes": "the skip-seed-on-join fix in v4, with the regression test"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "On JetStream the seed is a publish by whichever process creates the stream, so two creators both seed unless the publish carries an expected-sequence check. E-44 ran no seed.",
+     "closes": "a seed test on the JetStream prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Members are named by id in each group's configuration, and the member record holds a listen and an advertised address, so a changed address keeps membership by design (DESIGN-V5 §6.1, need 7). No experiment tested addresses, IPv6 or a moved machine, and no axis of the map separates the rows here.",
+    "closes": "address tests in phase 2 (L0 transport and member records)"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 parses bracketed IPv6 everywhere since V4-61, but it has no bind address apart from the advertised name, and on Fly the private IPv6 changes when a machine moves (STATUS.md).",
+     "closes": "a listen and advertise split in v4, with the address tests"
+    }
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-40",
+     "E-27"
+    ],
+    "why": "Any server takes a client's write and forwards it to the group's leader (Y `fwd`; the `smart` rows keep `fwd` for browsers), and reads come from any ready replica or are passed on, so one public address in front of the copies reaches every resource. E-40 measured a client on one wss address reaching its first committed write in 13 to 17 ms. A TS edge takes a TLS terminator in front (A-11; E-27: 538 MB for 10,000 TLS links without one)."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 forwards from any member, but the link is cleartext after the handshake and a client redials members at their own addresses; STATUS.md lists TLS for clients and a one-address client mode as needs.",
+     "closes": "TLS at the shell and a one-address client mode in v4, with the client test"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A NATS client reaches any stream through any server of its cluster, over TLS or WebSocket (NATS's docs, cited, not run here). E-44's clients dialed the servers directly, not one proxy address.",
+     "closes": "E-44's checks run again through one TLS address"
+    }
+   }
+  },
+  {
+   "req": "DEP-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-38c",
+     "E-13"
+    ],
+    "why": "A-02 adds the rule: a member that cannot forward a write refuses it at once with a redirect, and a handover refuses the writes caught in it; rows with `smart` clients route around the server instead. E-38c and E-13 measured why it is needed (on etcd a cut-off member stalled its clients for the whole fault, and a dropped write cost a 100 ms or 2 s timeout). The rule was not built or modelled.",
+    "closes": "a failover test with the redirect rule on the phase-2 kernel and client"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A v4 client knows `writable` and its pending writes, but it does not yet leave a server whose writes are shut; J lists that as need 9 (STATUS.md).",
+     "closes": "the client move in v4, with a failover test"
+    }
+   }
+  },
+  {
+   "req": "DEP-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "It is one more layer in the config cascade, above the code's own call, for secret, address and dir (DESIGN-V5 §6.1, need 10). No axis of the map touches it and no experiment built it, so every row stands the same.",
+    "closes": "a config test when L4's config layer is built (phase 1)"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "In v4 the call beats `FERO_SECRET`, and a secret never rides the command line (api/config.ts, LEAVES: layers 'cep'), so the platform cannot set the secret over the code's own call today.",
+     "closes": "a supervisor layer in v4's config cascade, with the config test"
+    }
+   }
+  },
+  {
+   "req": "DEP-10",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-43"
+    ],
+    "why": "The catalog row holds the allowed code hashes, so a deploy can add the new hash and report the new contract before any copy stops, and offer restart-all when the copies would fold differently (DESIGN-V5 §6.1, need 11). E-43 shows the check must name `data`'s exact build: two builds that both say SCHEDULE_VERSION 4 differ after 47,994 records. No deploy test ran.",
+    "closes": "a deploy test with a changed rule, once L4's contract and A-10's fold-version entry exist"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 refuses a peer whose contract differs, and says so, but only when the restarted copy tries to join; nothing reports the new contract before a copy stops (STATUS.md).",
+     "closes": "a contract report before the roll in v4, with the deploy test"
+    }
+   }
+  },
+  {
+   "req": "DEP-10",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-43"
+    ],
+    "why": "Allowed code hashes over normalised source are in the draft's catalog row, marked 'later' (DESIGN-V5 §6.1); rows that are silent take the draft's choice. No roll across two hashes was built or modelled, and E-43 adds five pins such a roll must keep."
+   },
+   "except": {
+    "V4": {
+     "v": "not",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 refuses a contract change by design: a peer whose methods, validation text or ring differs is refused, so such a deploy stops and starts every member (STATUS.md; DESIGN-DOOR §4)."
+    }
+   }
+  },
+  {
+   "req": "DEP-11",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-29"
+    ],
+    "why": "The gate is a field the writer checks before it takes a write (in the draft, the resource's catalog row: open, or read-only with a reason), plus a memory bound on a server; reads do not pass the writer, so they go on. Only the disk-full form ran: E-29's journal refuses data first and keeps its reserve for removes and votes. The unpaid and memory gates were not built.",
+    "closes": "a gate test in the phase that builds L2's refusals and the catalog row"
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no project or copy gate: it can refuse one write with a reason (a rule, `methods-only`), not all writes while reads go on. J lists it as need 13.",
+     "closes": "a write gate in v4, with the gate test"
+    }
+   }
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-02",
+     "E-12"
+    ],
+    "why": "E-02's pipeline, in TS, Rust and Go, writes every queued record with one writev and one fdatasync on a journal per process: 2.8 million 100 B appends a second on this disk, and 5.5 µs of CPU per append at 50,000 a second in TS. E-12 shows the shared journal needs 8 to 30 times fewer fdatasyncs than a file per group."
+   },
+   "except": {
+    "ISR": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-12",
+      "E-09c"
+     ],
+     "why": "A log per partition still batches: E-12's per-group files kept up with 50,000 appends a second per process at 2,000 groups (ceiling 0.59 million in Node), with an fsync shared only inside one group and a p99 of 189 to 460 ms. Kafka itself, flushing every batch, took 86,344 records a second here (E-09c)."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-02"
+     ],
+     "why": "Its commit is a write quorum of log nodes, and the map does not say how a log node stores many loglets (S `tier + obj`, not `jrnl`). E-02's followers show a log node can share one fdatasync per batch; no log-tier prototype ran.",
+     "closes": "a pin on the log tier's journal, in the phase that builds it"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-28"
+     ],
+     "why": "A commit is one PUT for every write in a commit window, which is group commit by design, with a PUT in place of an fsync. E-28 timed single 1 KB PUTs only (1.37 ms p50 on MinIO); no batched pipeline ran.",
+     "closes": "a pin with batched PUTs on the object-store log"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4's shell syncs the disk once per write step: about 250 persisted single-row writes a second per member, and 10,000 were not all persisted in 20 s (STATUS.md, 'Group commit'). Many appends per fsync is a shell change inside S `walg`; it is not built.",
+     "closes": "group commit in v4's shell, with its pin"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "S `lsm`: a write group shares one WAL sync in RocksDB and in TiKV's raft engine (cited from memory; nothing of this shape ran here).",
+     "closes": "a pin on the row's own store"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-09b",
+      "E-09d"
+     ],
+     "why": "On JetStream the `persisted` rung is `sync_interval: always`, and the file store then fsyncs each message alone, whatever the batching: 3,668 messages a second from one async publisher and 3,275 from 16 clients (E-09b), against PERF-09's 50,000. The Redpanda form of the row would pass (175,420 a second, E-09d), but the row was built and priced on JetStream.",
+     "proof": "ceiling",
+     "gap": 0.93
+    }
+   }
+  },
+  {
+   "req": "DEP-13",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-05",
+     "E-26"
+    ],
+    "why": "Rows are small: 315 to 338 B of heap per small row, and 510 to 528 B with the kernel on a worker (E-05), a quarter of the 2 KB bar at most. The empty copy is not shown: E-26's bare TS Raft host is already 95.9 MB RSS with no `data`, API or kernel worker, against 100 MB, and no native row's process was sized.",
+    "closes": "memory pins on the phase-1 build: an empty copy, and 10,000 small rows in 256 MB"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 measured 70 to 100 MB for an empty copy and about 2 KB a small row (REQUIREMENTS DEP-13, from J). Both sit at the bar, which was set from them."
+    }
+   }
+  },
+  {
+   "req": "DEP-14",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-27"
+    ],
+    "why": "Every copy takes client links and serves reads and subscriptions from the replicas it holds, or forwards or redirects the rest, so each added copy adds links and fan-out. E-27 measured one Node server holding 10,000 idle links, and 1,000 active subscribers on 9 to 17 % of a core. The autoscaler sim itself was not run; the claim holds from the shape."
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "Any v4 member takes clients, so added copies add client room, up to J's cap of five copies, since each one applies every write. Lifting the cap is the S half."
+    }
+   }
+  },
+  {
+   "req": "DEP-14",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-18"
+    ],
+    "why": "A group has `copies` voters, not every member, so a copy applies only its own groups' writes and the cap of five has no cause; added copies take groups by placement, and by slot moves or splits where the row has them. E-18 simulated the move policy up to 64 groups (max/mean at most 1.25 on seven of eight loads). No run had 8 copies with partial replication, and there is no autoscaler sim."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "As deployed, each v4 copy applies every write, which is J's cap of five. v4's way out is scoped replication (a ring of holders per partition): stages 0 to 3 of six have landed, and STATUS.md lists open bugs on scoped clusters."
+    }
+   }
+  },
+  {
+   "req": "DEP-15",
+   "part": "S",
+   "default": {
+    "v": "not",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The row has no log-only voter and no log tier (V `+lrn` or `full`; N `proc` or `pool`): a group needs three full copies to survive a crash, and with two voters either crash stops writes. AMENDMENTS counts DEP-15 as lost for the MIN family, SRV, EMB-V8, SIDE, PD and COMP; v4 refuses two copies today, and JetStream needs three servers for a majority."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "The design has it: with two copies the platform's log tier adds a log replica as the third voter (V `+wit`, N `tier`). No experiment modelled the log replica or its 'lead only to repair' rule (G-25), and the shared tier's budget per tenant, which OPS-14 needs, was not built (E-35: a neighbour's p99 rose 1.40 to 1.59 times without it)."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "The design has it: with two copies the platform's log tier adds a log replica as the third voter (V `+wit`, N `tier`). No experiment modelled the log replica or its 'lead only to repair' rule (G-25), and the shared tier's budget per tenant, which OPS-14 needs, was not built (E-35: a neighbour's p99 rose 1.40 to 1.59 times without it)."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "The design has it: with two copies the platform's log tier adds a log replica as the third voter (V `+wit`, N `tier`). No experiment modelled the log replica or its 'lead only to repair' rule (G-25), and the shared tier's budget per tenant, which OPS-14 needs, was not built (E-35: a neighbour's p99 rose 1.40 to 1.59 times without it)."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "The design has it: with two copies the platform's log tier adds a log replica as the third voter (V `+wit`, N `tier`). No experiment modelled the log replica or its 'lead only to repair' rule (G-25), and the shared tier's budget per tenant, which OPS-14 needs, was not built (E-35: a neighbour's p99 rose 1.40 to 1.59 times without it)."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "Durability sits on the log tier, so either of two servers can crash. The seal and metadata step that hands the log to the other server was not modelled here, and the shared tier's budget for OPS-14 was not built (E-35)."
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-35"
+     ],
+     "why": "The crash half is model-checked: two servers, the log members as voters, and a writer handover by a committed writer epoch that is safe and live with 9 rules (E-16). The shared tier must also meet OPS-14, and its budget per tenant was not built (E-35). With a log tier per project that clause falls away.",
+     "depends_on": "shared tier",
+     "alt": "met"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28"
+     ],
+     "why": "The object store holds every commit, so either of two servers can crash and the other takes the lease by a conditional PUT (1.37 ms p50 on MinIO, E-28). The lease takeover was not modelled, and the store is a shared tier under OPS-14."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Two copies stay writable after either one's crash when the controller shrinks the in-sync set (SPACE §4.2). The controller's own three voters must sit somewhere, which the row does not say, and nothing here ran it."
+    }
+   }
+  },
+  {
+   "req": "DEP-16",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14c",
+     "E-29"
+    ],
+    "why": "With three voters on three hosts a majority has every acknowledged write on disk, so one lost host loses nothing: E-14c model-checked the lost-disk replacement (0 stuck states of 340,671, no invariant broken) and E-29 lost 0 of 10,020 acknowledged batches in 2,640 power cuts. Not shown: a host-loss test with the object store, and the stated loss window of a one-disk free copy, which E-41 only assumes as one upload a minute.",
+    "closes": "a host-loss test in the phase that builds the object-store tier, and the free copy's window written into the design"
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "A free project's one copy has log replicas on the platform's tier beside it, so a lost host loses nothing by design. The log replica and its repair path were never modelled (G-25), and the shared tier's budget for OPS-14 was not built (E-35).",
+     "closes": "a model of the log replica's repair, and a host-loss test with the tier and the object store"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "A free project's one copy has log replicas on the platform's tier beside it, so a lost host loses nothing by design. The log replica and its repair path were never modelled (G-25), and the shared tier's budget for OPS-14 was not built (E-35).",
+     "closes": "a model of the log replica's repair, and a host-loss test with the tier and the object store"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "A free project's one copy has log replicas on the platform's tier beside it, so a lost host loses nothing by design. The log replica and its repair path were never modelled (G-25), and the shared tier's budget for OPS-14 was not built (E-35).",
+     "closes": "a model of the log replica's repair, and a host-loss test with the tier and the object store"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "A free project's one copy has log replicas on the platform's tier beside it, so a lost host loses nothing by design. The log replica and its repair path were never modelled (G-25), and the shared tier's budget for OPS-14 was not built (E-35).",
+     "closes": "a model of the log replica's repair, and a host-loss test with the tier and the object store"
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "Every commit is on a write quorum of log nodes before the answer, so a lost server host loses nothing by design. The seal and re-take path was not modelled here, and the shared tier's budget for OPS-14 was not built (E-35).",
+     "closes": "a host-loss test on a log-tier prototype"
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-35"
+     ],
+     "why": "Every commit is on a majority of log members before the answer, and the writer handover after a lost server is model-checked (E-16, 9 rules). The shared tier's budget for OPS-14 was not built (E-35), and no host-loss test ran.",
+     "closes": "a host-loss test on an RLOG prototype, with the tier's budget built"
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28"
+     ],
+     "why": "A commit is a PUT to the object store before the answer, so a lost host loses nothing by construction and a free copy has no window. The lease takeover after the loss was not modelled, and no host-loss test ran.",
+     "closes": "a host-loss test on the object-store prototype"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A write is on every in-sync replica before the answer, so a lost host loses nothing while the set has two members or more. Once the set has shrunk to the leader alone an acknowledged write is on one disk, and the row must state that window.",
+     "closes": "a host-loss test, and the stated window for a shrunk in-sync set"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no log tier and no object store (S `walg`), so the first clause never applies to it. With three copies a write confirmed `persisted` is on a quorum's disks; a one-disk copy loses its whole dir with its host, and that window is not stated.",
+     "closes": "the stated window, and a host-loss test on v4"
+    }
+   }
+  },
+  {
+   "req": "DEP-17",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-16"
+    ],
+    "why": "A platform hint ends as a change in a group's own log. For the controller's commands A-20's re-checks at the group's leader (the config epoch, 'gone' and 'alive' on its own links, a timeout) are model-checked: without them a stale command left a stuck state in 8 steps (E-16). The model has no drain, retirement, leave or hint that arrives stale, duplicated or out of order (G-09).",
+    "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The hint path is the planner of `self+p`: a hint names the config it read and a group refuses a stale one (DESIGN-V5 §4.2). It was never modelled (G-09), and E-16 reasons that a hint which can change membership needs the controller's re-checks too.",
+     "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The hint path is the planner of `self+p`: a hint names the config it read and a group refuses a stale one (DESIGN-V5 §4.2). It was never modelled (G-09), and E-16 reasons that a hint which can change membership needs the controller's re-checks too.",
+     "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The hint path is the planner of `self+p`: a hint names the config it read and a group refuses a stale one (DESIGN-V5 §4.2). It was never modelled (G-09), and E-16 reasons that a hint which can change membership needs the controller's re-checks too.",
+     "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "Hints are admin calls to a cell's leader, served by the kernel's `change()` and `lead()` (V5-PRIMITIVE). Nothing modelled them stale, duplicated or reordered; E-16 has no hint, drain or leave.",
+     "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+    },
+    "COMP": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "COMP owes the hint path (AMENDMENTS section 4: the `+p` of `self+p`, checked at the group's leader). It was not modelled, and E-16 expects A-20's epoch check, two re-checks and timeout if a hint may change membership.",
+     "closes": "a model and a sim with platform hints stale, duplicated and out of order (K-08), in phase 2"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no planner: a drain is a clean leave by ballot, and a dead member waits out the eviction window. No `gone` report or placement hint comes from outside.",
+     "closes": "a hint path in v4, with its sim"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream has its own peer removal, leader step-down and placement tags (cited, not run). Nothing here drove them with stale or repeated requests.",
+     "closes": "a hint test on the JetStream prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-18",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-33"
+    ],
+    "why": "Genesis mints one cluster id per project (a conditional create in the object store, or `fero init`; on one box an exclusive create of the `cluster-id` file in the run folder). The id rides every HELLO and sits in the dir, and processes with different ids never link, whatever their resource names. E-33 model-checked that a project founds exactly one cluster with A-08; the draft's rule founded two in 10 steps."
+   },
+   "except": {
+    "PD": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The cluster is founded by an explicit step that mints a cluster id, and a store that carries another id is refused (TiKV with PD, cited; E-33 leaves the row unchanged for this reason)."
+    },
+    "ISR": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-33"
+     ],
+     "why": "The metadata group is founded by an explicit step that mints a cluster id, as Kafka's `kafka-storage format --cluster-id`, and a broker with another id is refused (cited; E-33 leaves the row unchanged)."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [],
+     "why": "v4 fails the regression today: two servers named `todos` in two unrelated folders merged within seconds (STATUS.md, 2026-10-21), because the box directory joins by name. A secret keeps strangers out; scoping the registration to the project is the fix, and it is not built.",
+     "closes": "a project scope in v4's box directory, with the regression test"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-44"
+     ],
+     "why": "NATS servers join only by configured routes and a cluster name, so two projects' servers do not meet by a resource name (cited, not run). fero's own box directory on top was not part of E-44.",
+     "closes": "the regression test on the JetStream prototype"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-26"
+     ],
+     "why": "Projects share one pooled server process (N `pool`). Each keeps its own `#meta` and id inside it (E-26 counts one per project), but E-33 modelled one project per run folder, and nothing tested two projects with the same resource names inside one pool.",
+     "closes": "a cross-project test in the pooled server, with OPS-14's tests"
+    }
+   }
+  },
+  {
+   "req": "DEP-19",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "`fero migrate` reads a v4 dir's WAL and snapshot and writes one v5 snapshot per group (DESIGN-V5 §6.1); rows that are silent take the draft's choice. Nothing built or tested it for any row."
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "If v4 stays, a v4 dir is already the state. There is nothing to migrate."
+    }
+   }
+  },
+  {
+   "req": "DEP-20",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [],
+    "why": "A TypeScript build packs the way v4 does: a 192-line build strips the types and copies `data` inside the package, and example 02 ran from a 451 KB tarball on Node 22 and 26 (STATUS.md, 'fero on npm'). These rows start in TypeScript with no native part, so the same pack applies. A later native kernel must ship as a prebuilt addon or as WASM."
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-03"
+     ],
+     "why": "The core is a napi addon from day one, so `npm install` must bring a prebuilt binary for the platform. A napi-rs addon loaded on Node 22 and 26 here (experiments/TOOLS.md), but no fero tarball with prebuilt addons was packed or run.",
+     "closes": "a tarball test with the prebuilt addon on Node 22 and 26, in phase 1"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The server is a Rust or Go binary. DEP-20 holds only if the npm package ships it and `fero(name)` spawns it, as esbuild ships its binary (SPACE §4.2); nobody packed or ran that.",
+     "closes": "a tarball test that ships and spawns the native binary, on Node 22 and 26"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The server is a Rust binary with V8 inside (about 30 MB). It runs under `node app.ts` only if the npm package ships it and `fero(name)` spawns it (SPACE §4.2); nobody packed or ran that.",
+     "closes": "a tarball test that ships and spawns the native binary, on Node 22 and 26"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A native daemon runs beside the app's Node process on every host, so the npm package must ship it and `fero(name)` must start it. Nobody packed or ran that.",
+     "closes": "a tarball test that ships and spawns the native binary, on Node 22 and 26"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The row is a Rust server with a separate controller. `node app.ts` runs only if the npm package ships and spawns both on one box; nobody packed or ran that.",
+     "closes": "a tarball test that ships and spawns the native binary, on Node 22 and 26"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "construction",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: BUY's log is an outside program (nats-server). Step 2: `npm install fero` brings fero's client and libraries, not that program. Step 3: so `node app.ts` has no log to write to until someone installs and starts it. SPACE §4.2 states this by construction and E-44 confirms it in writing (its table, row 10); to ship and spawn the binary would make the row SRV with someone else's code.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "DEP-21",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [
+     "E-41"
+    ],
+    "why": "AMENDMENTS 1.3, DEP-21's $10 bar: the bar does not say where the 100 subscribers run. On Fly these rows cost $0.00 to $0.19 asleep (bar $2.19) and $4.94 to $7.26 at 10 writes/s with the subscribers inside, but $57.50 to $59.82 if each of 100 outside subscribers gets every write; the low end needs a shared tier or pool (J changed). Restated with the subscribers inside they sit 1.4 to 2 times under $10, on prices E-41 read from search summaries, which is not wide enough to call met.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "every price read again on the vendor's page (E-41's results/inputs.md), and the bar restated with the subscribers placed"
+   },
+   "except": {
+    "OBJ": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [
+      "E-41",
+      "E-28"
+     ],
+     "why": "Q `put`: a commit is one PUT. At 10 writes/s, 100 ms apart, every write is its own commit: 26.3 million PUTs a month, $131 at $0.005 per 1,000, so $135.80 against $10 with the subscribers inside. That is 13.6 times the bar, too wide for a price read from a search summary to flip, and it is the same under AMENDMENTS 1.3's restated bar; fewer PUTs would mean a commit that waits over 2 s.",
+     "proof": "structural",
+     "gap": 12.58,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3's DEP-21 line applies. Three servers and the app on two machines of its own cost $11.64 at 10 writes/s with the subscribers inside, 1.16 times the bar, on prices read from search summaries. With one app machine it would be $9.45, so this is not a failure by design.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "every price read again on the vendor's page (E-41's results/inputs.md), and the bar restated with the subscribers placed"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3's DEP-21 line applies. Three servers, three controller machines and two app machines cost $18.21 at 10 writes/s with the subscribers inside, 1.8 times the bar. It leans to a failure, but the margin is under two times and rests on prices read from search summaries and on assumed machine counts.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "every price read again on the vendor's page (E-41's results/inputs.md), and the bar restated with the subscribers placed"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3's DEP-21 line applies. Three NATS servers at 512 MB ($11.07) and two app machines cost $15.90 at 10 writes/s with the subscribers inside, 1.6 times the bar, on prices read from search summaries and an assumed server size.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "every price read again on the vendor's page (E-41's results/inputs.md), and the bar restated with the subscribers placed"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3's DEP-21 line applies. v4 costs $0.19 asleep and $7.02 at 10 writes/s with the subscribers inside, on prices read from search summaries. At 5,000 writes/s E-41 has no number for it: v4 measured about 250 persisted writes a second per member.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "every price read again on the vendor's page (E-41's results/inputs.md), and the bar restated with the subscribers placed"
+    }
+   }
+  }
+ ]
+}

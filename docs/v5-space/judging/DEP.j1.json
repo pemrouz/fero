@@ -1,0 +1,645 @@
+{
+ "group": "DEP",
+ "judge": "j1",
+ "cells": [
+  {
+   "req": "DEP-01",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-13",
+     "E-38",
+     "E-38c"
+    ],
+    "why": "No row ran J's four-roll test. The parts are measured on etcd, not on fero: a handover pauses the group 9.7 to 9.8 ms at the median, and etcd drops the writes caught in it, so A-02 adds 'refuse at once, never drop' (E-13). Three copies in about 1 s is a sum of measured parts with no real machine restart, and the other shapes' handovers (a writer epoch, a seal, a lease, an in-sync set, the outside log) were not run at all.",
+    "closes": "J's four-roll test on the phase-2 build, on real hosts, with A-02's refuse-at-once rule in the handover"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md records the test on v4 itself: four rolls of three durable members, no failed call, no lost or doubled write, 3.6 to 5.0 s each, against 10 s. REQUIREMENTS gives the longest client pause as 108 ms."
+    }
+   }
+  },
+  {
+   "req": "DEP-02",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-13",
+     "E-46"
+    ],
+    "why": "Every log-based row can work the number out (the writer's commit offset minus the copy's own log end and fold position), and API.md names `cluster.me.caughtUp`. But no experiment built the report, or the gate that keeps clients and the roll waiting; with the kernel on a worker the fold's position also sits on another thread (K-20).",
+    "closes": "v4's early-writable case as a regression test on the phase-2 build (the lag report, the client gate, the roll gate)"
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4 has no caught-up signal. Step 2: STATUS.md records that a member back inside the eviction window says writable about 100 ms before it holds its peers' rows. Step 3: that run is this requirement's own regression test, so v4 as it is fails it; the per-peer tails that could fix it sit unused in kernel/confirm.ts.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "DEP-03",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-13",
+     "E-29"
+    ],
+    "why": "No row ran a restart of every copy. E-26's cold start of three TS processes reaches a first write in 20 groups in 265 to 318 ms, but only because one named process campaigns at once; with A-02's E = 2 s in TS a plain first election after a full stop takes 2.0 to 2.5 s, over the 2 s bar (reasoned; a native row's E under 1 s leaves room on paper). A real machine restart was not measured, and the non-Raft shapes were not run.",
+    "closes": "J's restart-all run on the phase-2 build, with a stated rule for who campaigns first after a full stop"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "REQUIREMENTS records J's run on v4 itself: writable again in 0.7 to 1.9 s, under the 2 s bar."
+    }
+   }
+  },
+  {
+   "req": "DEP-04",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-26",
+     "E-28",
+     "E-05"
+    ],
+    "why": "No row ran the wake test on real hosting. On this warm box a cold start of three TS processes with 20 groups takes 265 to 318 ms, and a project of 20 dormant groups wakes in 10 to 16 ms inside a live tier process (E-26). v4's 1.4 s on real machines shows that the machine start, not fero, uses up the 1.5 s, and every row but a pooled one still starts the project's own machine.",
+    "closes": "the wake test on the hosted platform with the phase-2 build: a real machine start, and writes held during the wake"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "REQUIREMENTS records the wake test on v4 itself: 1.4 s for 312 rows, 0.1 s under the 1.5 s bar. It is one figure with no spread."
+    }
+   }
+  },
+  {
+   "req": "DEP-05",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "The design applies a seed once, at create, and marks it in the catalog (`#meta`'s resource record), so a joining copy takes its state from the log and never runs its own seed. No experiment modelled the create with its seed: a crash between the catalog record and the seed rows, or two servers that create at once.",
+    "closes": "v4's revived-seed-row case as a regression test in the phase-1 sim, with a crash between create and seed and two creators at once"
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4 collects a deleted row's tombstone within a heartbeat. Step 2: a fresh member applies every seed key its empty fold lacks ('fresh keys ride in'). Step 3: it cannot tell a deleted key from one the cluster never had, so the seed row comes back and LWW spreads it. STATUS.md: 2 runs of 2 on v4 63e0679, and every scale-out of a seeded resource hits it.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "DEP-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "No address test ran on any row. In the v5 rows the member record holds a listen and an advertised address and membership goes by member id, so a changed private address is a changed record, not a new member (DESIGN-V5 6.1, API.md `advertise`); that is a design line, not a run. v4 reads bracketed IPv6 since V4-61 but has no bind address apart from the advertised one.",
+    "closes": "the address tests (IPv6 in brackets everywhere, listen apart from advertise, a changed private address) on the phase-1 build"
+   }
+  },
+  {
+   "req": "DEP-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-40",
+     "E-27",
+     "E-20"
+    ],
+    "why": "Parts are measured: a prototype client reaches its first committed write over one wss address in 13 to 17 ms (E-40), and a TLS terminator stands in front of a TS edge because 10,000 TLS links cost 538 MB in Node (E-27, A-11). No test sent clients through one proxy address to several copies, where a write must be forwarded to its leader; a `smart` row needs a proxy that routes by a hint, which nobody examined (G-25).",
+    "closes": "the client test through one proxy address on the phase-3 build (TLS terminator, forward to the leader)"
+   }
+  },
+  {
+   "req": "DEP-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-38c",
+     "E-13"
+    ],
+    "why": "E-38c measured the failure this guards against: a real etcd member cut from its leader stalled its own clients for the whole fault. A-02 adds 'refuse at once with a redirect', and `smart` clients would route around it, but neither was built, and no test moved a client off a shut server behind one public address.",
+    "closes": "the failover test on the phase-2 build: a member that cannot forward refuses at once, and the client moves in one retry"
+   }
+  },
+  {
+   "req": "DEP-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "Flags already beat the call for `dir`, `listen` and `advertise` (v4's cascade, kept in API.md section 6). But `secret` never rides a flag and the call beats the environment, so the supervisor layer above the call that DESIGN-V5 6.1 names is still to be built. It is one config layer, the same for every row, and no config test ran.",
+    "closes": "the config test in phase 1: a supervisor layer above the call for secret, address and dir"
+   }
+  },
+  {
+   "req": "DEP-10",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-43"
+    ],
+    "why": "No deploy test ran on any row. The v5 rows report a new contract by adding its code hash to the resource's allowed list before any copy stops (DESIGN-V5 6.1, API.md). E-43 shows what that check must pin first: `data`'s exact build, not SCHEDULE_VERSION, since two commits that both say version 4 fold differently after 47,994 records.",
+    "closes": "the deploy test with a changed rule on the phase-3 build, with A-10's five pins in the fold-version entry"
+   }
+  },
+  {
+   "req": "DEP-10",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-43"
+    ],
+    "why": "The design names it (allowed code hashes in the resource record; a roll adds the new hash first), but no experiment rolled a contract change. E-43 found 8 of 61 JavaScript behaviours differ between Node 22 and 26, so user functions must run at the writer only, or be fenced, before two hashes can run side by side."
+   },
+   "except": {
+    "V4": {
+     "v": "not",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4 refuses a peer whose contract differs, by design (DESIGN-DOOR section 4), so a contract change stops and starts every member together (STATUS.md)."
+    }
+   }
+  },
+  {
+   "req": "DEP-11",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-22",
+     "E-29"
+    ],
+    "why": "Half is shown in a simulator: E-22's prototype refuses a write with `read-only` and the gate's reason (one check), and A-04 sends that refusal only after the log end it was judged on has committed. The copy's own gate (memory near full) was not built on any row, and no test showed reads going on while the gate is shut; E-29 covers a full disk, not memory.",
+    "closes": "the gate test on the phase-2 build: the project gate and the memory bound, with reads served meanwhile"
+   }
+  },
+  {
+   "req": "DEP-12",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-02",
+     "E-12",
+     "E-11"
+    ],
+    "why": "Measured on prototypes of the same shape: E-02's pipeline commits many appends per fsync in TS, Rust and Go (about 2.8 M 100 B appends a second per process in TS, against v4's 250), and one shared journal keeps 740 to 890 fdatasyncs a second for 16 to 2,000 groups (E-12), the form E-11 runs under the Raft ports. The pin itself is written with the build."
+   },
+   "except": {
+    "ISR": {
+     "v": "met",
+     "basis": "measured",
+     "ev": [
+      "E-12",
+      "E-09c"
+     ],
+     "why": "A log file per group still commits each group's queue with one fdatasync: 1.39 to 2.25 M appends a second in Node at 16 to 256 groups (E-12, mode b), far over PERF-09's 50,000. Its weak point is the tail, 14 to 20 times the journal's p99 from 256 groups, which is PERF-08's, not this requirement's."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28",
+      "E-41"
+     ],
+     "why": "In OBJ a commit is a PUT, and many writes share one PUT inside a commit window by design (E-41 assumes 10 ms). No experiment measured appends per PUT: E-28 timed single 1 KB PUTs (1.37 ms p50 on MinIO).",
+     "closes": "a pin of appends per PUT against a real object store"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "S `lsm` was not run in this study. RocksDB shares one WAL sync among a write group (published, cited from memory), but no pipeline of this shape was measured here.",
+     "closes": "PERF-09's pin on a PD-shaped build"
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's shell calls one fsync per write step. Step 2: so n single-row writes need n fsyncs, and none is shared. Step 3: STATUS.md measured about 250 persisted writes a second per member, and 10,000 single-row writes not all on disk in 20 s, against PERF-09's 50,000 a second.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09b",
+      "E-09d"
+     ],
+     "why": "It turns on the base. On JetStream, the row's first base, `persisted` means one fsync per message whatever the batching: 3,668 msgs/s (E-09b), 93 % under PERF-09's 50,000. On Redpanda, which the row also allows, one majority fsync covers a batch: 175,420 records a second (E-09d).",
+     "closes": "name BUY's base; on JetStream the measured ceiling stands and the row fails"
+    }
+   }
+  },
+  {
+   "req": "DEP-13",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-05",
+     "E-26",
+     "E-07",
+     "E-11"
+    ],
+    "why": "The row clause holds with room: 315 to 338 B of heap a small row, 510 to 528 B with the kernel on a worker, against 2 KB (E-05). The empty-copy clause sits at its bar: E-26's bare TS Raft host is already about 95 MB of RSS (95.5 to 95.9 MB with 16 awake groups) before `data`, L2 to L4 and the worker are added, against 100 MB, and the native and server rows have no whole-process figure at all.",
+    "closes": "memory pins on the phase-1 build: an empty process, and 10,000 small rows in 256 MB"
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "cited",
+     "ev": [],
+     "why": "REQUIREMENTS records v4's own figures: 70 to 100 MB empty and about 2 KB a row. The bars are those figures."
+    }
+   }
+  },
+  {
+   "req": "DEP-14",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-31",
+     "E-27",
+     "E-08"
+    ],
+    "why": "Every copy and every relay holds its own client links and serves reads and subscriptions from what it folds. Followers and relays keep every subscribe property with A-06 (E-31, model-checked on ten bounds), and one Node server holds 10,000 idle links and 1,000 active subscribers on under a fifth of a core (E-27). So each added copy adds that room; the autoscaler sim itself was not run."
+   }
+  },
+  {
+   "req": "DEP-14",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-16",
+     "E-17c",
+     "E-18"
+    ],
+    "why": "The design gives it: a group has `copies` voters out of n members, so a copy applies only the groups it holds, and the row's own way of spreading groups (slot moves, cells, lanes, splits, partitions) adds writers and row room. No autoscaler sim and no 8-copy run with partial replication exists: E-16 healed one group of three voters on four members, and E-18 balanced slots in a simulation of load, not of copies."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's scoped replication (holders per partition) runs in its own sim tier at about 100 members, but J's 5-copy cap is today's unscoped cluster, STATUS.md lists open bugs on scoped clusters, and DESIGN-SCALE's later stages are not built."
+    }
+   }
+  },
+  {
+   "req": "DEP-15",
+   "part": "S",
+   "default": {
+    "v": "not",
+    "basis": "reasoned",
+    "ev": [
+     "E-41"
+    ],
+    "why": "The row has no log-only third voter. Two copies are two voters, so a crash of either stops writes, and F-11's third voter must be a third full copy (E-41 prices three machines). AMENDMENTS sections 3 and 4 say DEP-15 is lost for MIN's family and for COMP; v4 refuses two copies today."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The row has it by design: a log-only voter on the platform's tier is the third voter. But V `+wit` and its 'lead only to repair' rule were never modelled (E-16 starts every group at three full voters), no crash test ran, and the shared tier's budget for OPS-14 (A-29) is not built."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The row has it by design: a log-only voter on the platform's tier is the third voter. But V `+wit` and its 'lead only to repair' rule were never modelled (E-16 starts every group at three full voters), no crash test ran, and the shared tier's budget for OPS-14 (A-29) is not built."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The row has it by design: a log-only voter on the platform's tier is the third voter. But V `+wit` and its 'lead only to repair' rule were never modelled (E-16 starts every group at three full voters), no crash test ran, and the shared tier's budget for OPS-14 (A-29) is not built."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The row has it by design: a log-only voter on the platform's tier is the third voter. But V `+wit` and its 'lead only to repair' rule were never modelled (E-16 starts every group at three full voters), no crash test ran, and the shared tier's budget for OPS-14 (A-29) is not built."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "SPACE says two copies plus the controller survive either crash, by shrinking the in-sync set. No experiment ran or modelled it, and the controller's own third voter is not the platform's log tier."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Durability sits in a log tier of three, so two servers can lose either one by design. But the writer change (a seal and a metadata CAS) was never modelled in this study, and the shared tier's budget for OPS-14 (A-29) is not built."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28"
+     ],
+     "why": "The object store holds every commit, so either copy's crash takes no vote away. But the lease takeover by CAS on the manifest was never modelled, and no crash test ran."
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16"
+     ],
+     "why": "The mechanism is model-checked: with two servers and crashes, one writer, no stale judgement, and a write can always commit while `#meta` and one server are up (E-16, 9 rules, all needed). With a tier shared between projects it is still open, because the tier's budget for OPS-14 (A-29) is not built; with a log tier per project it is met.",
+     "depends_on": "shared tier",
+     "alt": "met"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "construction",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Its two app copies are clients of an outside log of three servers, so either copy's crash takes no vote away (by construction; E-44 lost none of 900 writes through a kill of the log's own leader). But a NATS cluster used as the platform's shared tier was never examined against OPS-14, and no crash test of a copy ran."
+    }
+   }
+  },
+  {
+   "req": "DEP-16",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-14c",
+     "E-37",
+     "E-29",
+     "E-41"
+    ],
+    "why": "No row ran the host-loss test. Rows with three voters keep a majority, and a wiped replica never returns under its old id (A-01, A-28: model-checked on etcd's spec); rows that lean on a witness, a log tier or the object store for the free copy were never modelled there (V `+wit`, SLOG's seal, OBJ's takeover), and a shared tier's budget for OPS-14 (A-29) is not built. No row states the one-disk free copy's window, which is the upload lag to the object store (E-41 assumes a minute) or, with no store, the whole disk.",
+    "closes": "the host-loss test on the phase-2 build, and a stated loss window for the one-disk free copy"
+   }
+  },
+  {
+   "req": "DEP-17",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-16"
+    ],
+    "why": "No experiment modelled a hint: E-16 left out hints, leaves and drains for both `self` and `cent-co`, and `self+p` was never run (G-09, K-08). E-16 reasons that a hint that can change membership needs the controller's re-checks at the group's leader (the config epoch, 'gone' and 'alive' on its own links); those did make a stale command safe in its `cent-co` model. v5-spec's healing.py ran two `retire` hints on the draft's text, before A-01 and A-19.",
+    "closes": "a model or sim with hints stale, duplicated and out of order (K-08), before phase 2"
+   }
+  },
+  {
+   "req": "DEP-18",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-33"
+    ],
+    "why": "E-33 model-checks that genesis mints one cluster id per project, on one box (an exclusive create in the run folder) and across boxes with A-08's fix (`fero init` or a conditional create); PD and ISR found by an explicit step of `init`'s shape. The id rides every HELLO and every dir's boot record, so two projects with the same resource names hold different ids and refuse each other: that last step holds by construction."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's box directory hands each server every other server registered under its name. Step 2: nothing in a dir or a HELLO names the project. Step 3: so two apps with the same resource name and contract merge. STATUS.md: two `todos` servers showed each other's rows within seconds (2026-10-21), and 'same name, same object' is v4's design.",
+     "proof": "structural"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "On a dev box its spawned server would found by a run folder like the others. But N `pool` puts many projects in one process and one dir, and how each keeps its own id, `#meta` and boot record there was never examined (G-25).",
+     "closes": "the two-apps regression test inside one pooled process"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "fero on JetStream would have to put a project id in front of its stream names, or run a server per project. E-44 ran one project only, so nothing shows two projects with the same resource names staying apart on one NATS server.",
+     "closes": "the two-apps regression test on a BUY prototype"
+    }
+   }
+  },
+  {
+   "req": "DEP-19",
+   "part": "S",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [],
+    "why": "`fero migrate` is named as an L5 library (v4's WAL and snapshot become one v5 snapshot per group; DESIGN-V5 6.1), and E-22's notes list it as not built. No migration test ran on any row."
+   },
+   "except": {
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "A v4 dir is already this row's own state, so there is nothing to migrate: it holds by construction."
+    }
+   }
+  },
+  {
+   "req": "DEP-20",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "cited",
+    "ev": [],
+    "why": "The row ships plain TypeScript and `data`, and that shape has passed the test: STATUS.md records a 192-line build that strips types file by file, copies `data` inside the package and ran example 02 on Node 22 and 26 from a 451 KB tarball of v4. A worker thread and the journal need nothing beyond plain `node`; a later native kernel repeats the test as WASM (E-04) or as a prebuilt addon."
+   },
+   "except": {
+    "RUST": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-03"
+     ],
+     "why": "Its Rust core is a napi addon from day one. An addon built here with napi-rs loads on Node 22 and 26 with plain `node` (TOOLS.md, E-03; Linux x86-64 only), but no tarball with a prebuilt addon per platform was made.",
+     "closes": "the tarball test on Node 22 and 26 with prebuilt addons for each platform"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-03"
+     ],
+     "why": "The server is a Rust or Go binary beside Node. SPACE 4.2 says DEP-20 holds only if npm ships that binary for each platform and `fero(name)` spawns it, as esbuild does; no such package was built or run.",
+     "closes": "the tarball test on Node 22 and 26 with the binary shipped per platform and spawned by `fero(name)`"
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-03"
+     ],
+     "why": "The server is a Rust binary with V8 inside (about 30 MB). SPACE 4.2 says DEP-20 holds only if npm ships that binary for each platform and `fero(name)` spawns it, as esbuild does; no such package was built or run.",
+     "closes": "the tarball test on Node 22 and 26 with the binary shipped per platform and spawned by `fero(name)`"
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-03"
+     ],
+     "why": "The kernel is a native daemon per host, reached over a shared-memory ring with a small mmap addon. SPACE 4.2 says DEP-20 holds only if npm ships that binary for each platform and `fero(name)` spawns it, as esbuild does; no such package was built or run.",
+     "closes": "the tarball test on Node 22 and 26 with the binary shipped per platform and spawned by `fero(name)`"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-03"
+     ],
+     "why": "The servers and the controller are native binaries with an LSM store. SPACE 4.2 says DEP-20 holds only if npm ships that binary for each platform and `fero(name)` spawns it, as esbuild does; no such package was built or run.",
+     "closes": "the tarball test on Node 22 and 26 with the binary shipped per platform and spawned by `fero(name)`"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "construction",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Step 1: BUY's log is an outside server program (nats-server first), not code in fero's package. Step 2: `npm install fero` brings fero's JavaScript and `data` only. Step 3: so plain `node app.ts` has nothing to commit to until a second program is installed and started (E-44, gap 10; SPACE 4.2 says the same). Shipping and spawning that binary is SRV's route, which the row as defined does not take.",
+     "proof": "structural"
+    }
+   }
+  },
+  {
+   "req": "DEP-21",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "cited",
+    "ev": [
+     "E-41"
+    ],
+    "why": "AMENDMENTS 1.3, DEP-21 line: as worded the bar does not say where the 100 subscribers run; outside, with every write each, fan-out alone is $52.56 a month on Fly for every row, 5.3 times the bar, and inside E-41 gives $4.94 to $7.26 (COMP has MIN-P's shape). Restated with the subscribers inside it stays open: the margin is 1.4 to 2 times, not several, and E-41 read its prices from search summaries, though $6.57 of MIN's $7.26 is three machines at J's own $2.19. Asleep every row costs $0.00 to $0.60 against $2.19, a wide margin.",
+    "closes": "the user says where the 100 subscribers run; every price is re-read on the vendor's page and E-41's cost.py is run again",
+    "depends_on": "restated",
+    "alt": "open"
+   },
+   "except": {
+    "OBJ": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [
+      "E-41",
+      "E-28"
+     ],
+     "why": "Step 1: in OBJ a commit is a PUT. Step 2: 10 writes a second, 100 ms apart, cannot share a PUT unless the commit window is over 2 s, so about 26.3 million PUTs a month. Step 3: at $0.005 per 1,000 that is $131, and $135.80 in all, against $10: 13.6 times the bar with the subscribers inside, so neither the restated bar (AMENDMENTS 1.3) nor a likely price error flips it.",
+     "proof": "ceiling",
+     "gap": 12.58,
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3, DEP-21 line: as worded the bar does not place the subscribers. With them inside, E-41 puts SRV at $11.64 for 10 writes a second, 1.16 times the $10 bar, and at $4.53 for a free project awake all month (its shape adds the app's own machines to the servers). That is over, but not by several times, and it rests on an assumed shape and on prices read from search summaries; asleep it is under $2.19.",
+     "closes": "the user says where the 100 subscribers run; every price is re-read on the vendor's page and E-41's cost.py is run again",
+     "depends_on": "restated",
+     "alt": "open"
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3, DEP-21 line: as worded the bar does not place the subscribers. With them inside, E-41 puts PD at $18.21 for 10 writes a second, 1.8 times the $10 bar, and at $6.72 for a free project awake all month (its shape adds the app's own machines to the servers). That is over, but not by several times, and it rests on an assumed shape and on prices read from search summaries; asleep it is under $2.19.",
+     "closes": "the user says where the 100 subscribers run; every price is re-read on the vendor's page and E-41's cost.py is run again",
+     "depends_on": "restated",
+     "alt": "open"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3, DEP-21 line: as worded the bar does not place the subscribers. With them inside, E-41 puts BUY at $15.90 for 10 writes a second, 1.6 times the $10 bar, and at $8.91 for a free project awake all month (its shape adds the app's own machines to the servers). That is over, but not by several times, and it rests on an assumed shape and on prices read from search summaries; asleep it is under $2.19.",
+     "closes": "the user says where the 100 subscribers run; every price is re-read on the vendor's page and E-41's cost.py is run again",
+     "depends_on": "restated",
+     "alt": "open"
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-41"
+     ],
+     "why": "AMENDMENTS 1.3, DEP-21 line: as worded the bar does not place the subscribers. With them inside, E-41 puts V4 at $7.02 for 10 writes a second and $0.19 asleep, on prices read from search summaries. It has no cost at the third load: v4 measured 250 writes a second per member, so it cannot carry 5,000.",
+     "closes": "the user says where the 100 subscribers run; every price is re-read on the vendor's page and E-41's cost.py is run again",
+     "depends_on": "restated",
+     "alt": "open"
+    }
+   }
+  }
+ ]
+}
