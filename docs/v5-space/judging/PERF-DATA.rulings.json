@@ -1,0 +1,1146 @@
+[
+ {
+  "req": "PERF-08",
+  "part": "M",
+  "row": "OBJ",
+  "v": "fails",
+  "proof": "ceiling",
+  "gap": 1.17,
+  "basis": "measured",
+  "ev": [
+   "E-28",
+   "E-01"
+  ],
+  "why": "Judge 2 was right, on the native bar. OBJ's commit is one conditional PUT, and with the store on this box's loopback and one disk a 1 KB PUT takes p50 1.37 ms and p99 2.67 ms (E-28): over C + 0.5 ms = 1.23 ms at any load, and a real store only adds to it. OBJ names `ts→rs`, so its native step carries the verdict, as both judges hold for DATA-09; if only its TS phase is judged the cell is open, because the PUT is inside 5.73 ms here and the real-store figures over it are cited, not measured (judge 1's point).",
+  "depends_on": "other",
+  "alt": "open"
+ },
+ {
+  "req": "PERF-08",
+  "part": "M",
+  "row": "V4",
+  "v": "open",
+  "basis": "cited",
+  "ev": [],
+  "why": "Judge 1 was right as PERF-08 is worded: it names no load for the pin, and no p99 commit was ever measured on v4. v4 syncs once per write step and tops out near 250 persisted writes a second per member (STATUS), so a lone write may sit inside 5.73 ms, while any pin with writes in line fails by queueing, which is judge 2's point (10,000 writes were not all persisted in 20 s). Both judges left ISR open on the same ground: the pin names no group count.",
+  "closes": "The pin's load is stated (one write in flight, half of the row's own maximum, or PERF-09's 50,000 a second), then a v4 pin at that load; none is planned.",
+  "depends_on": "other",
+  "alt": "fails"
+ },
+ {
+  "req": "PERF-08",
+  "part": "M",
+  "row": "BUY",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-09b"
+  ],
+  "why": "Judge 1 was right as PERF-08 is worded: it names no load for the pin. JetStream with a sync before each ack answers one publisher at p99 1.31 ms, inside 5.73 ms, and 16 publishers at 9.2 ms, over it, because it syncs each message alone (E-09b). So BUY fails only under a pin with writers in line, which is judge 2's reading; both judges left ISR open on the same ground (the pin names no group count).",
+  "closes": "The pin's load is stated; E-09b's two numbers then decide (inside at one publisher, over at 16).",
+  "depends_on": "other",
+  "alt": "fails"
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times the TS bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline. The one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11), and the native bars this row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on the real kernel: phase 2 for the TS bars (50,000 a second per process and per writer through the real Raft core, L2 and the fold), the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. Only the TS bars apply to this row. E-02's TS pipeline commits 2.8 M appends a second (1.53 M with a client front, E-39), 30 to 56 times those bars, but it is a ceiling with no Raft core, no L2 and no fold, which is why both judges left PERF-08 open on the same pipeline; the one run on the real TS Raft port was at 10,000 writes a second and took 0.6 to 0.7 of a core per process with one group (E-11).",
+  "closes": "Phase 2 pins on the real kernel: 50,000 a second per process and per writer through the real Raft core, L2 and the fold."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "ISR",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-12",
+   "E-11"
+  ],
+  "why": "Judge 2 was right. E-02's 2.8 M appends a second in TS is a ceiling for a majority-commit pipeline on one journal, with no protocol work, L2 or fold; ISR commits at its in-sync set into a log file per group, and no pipeline of that shape ran. A log file per group reaches 0.53 to 1.27 times the journal's rate at 256 groups and 0.29 to 0.93 times at 2,000 (E-12), and the native bars the row owes at its native step are open too.",
+  "closes": "Pins on an ISR-shaped kernel: phase 2 for the TS bars, at one busy partition and at many, then the native build for the native bars."
+ },
+ {
+  "req": "PERF-09",
+  "part": "S",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-02",
+   "E-11",
+   "E-39"
+  ],
+  "why": "Judge 2 was right. E-02's 2.8 M appends a second in TS (1.53 M with a client front, E-39) is a ceiling for a bare leader-and-two-followers pipeline with no protocol work, no L2 and no fold, which is why both judges left PERF-08 open on it; no writer appending to loglets through a write quorum of log nodes was run. The native bars the row owes at its native step are open too (Rust tops out at 2.2 to 4.1 M on this disk against 2 M per writer).",
+  "closes": "Pins on a SLOG-shaped kernel: phase 2 for the TS bars, the native build for the native bars."
+ },
+ {
+  "req": "PERF-11",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "reasoned",
+  "ev": [
+   "E-08"
+  ],
+  "why": "Judge 2 was right. PD's row holds W `lease ridx` and no subscription option, and its log carries kernel commands and two-phase-commit intents, so a change stream must first be cut from the store's commits; no relay of that shape was measured, and 'each record encoded once' is not shown for it. If PD ran fero's own relay on such a stream, E-08's Rust number (11.9 to 13.4 M a second against 3 M) would carry, but that is judge 1's reasoning, not a measurement.",
+  "closes": "A stated subscribe path for PD (how a change stream is cut from its store's commits), then the relay pin on it."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43",
+   "E-05"
+  ],
+  "why": "Judge 2 was right, though the monitor it calls unbuilt did run in E-22's prototype: every caught-up replica's rows equalled a fresh fold of the log on every seed. That was one thread, and rows by value only. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and the rows the kernel's own thread keeps off the V8 heap (A-27) were checked against data's fold only by E-05's digest over insert records.",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on the real kernel, the kernel thread's rows included."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43"
+  ],
+  "why": "Judge 2 was right. data's own code folds in this row, and E-22's monitor found replicas' rows equal to a fresh fold of the log on every seed, but that prototype was one TypeScript thread, not a native kernel that hands bytes to data's fold. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01).",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on this row's kernel."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43"
+  ],
+  "why": "Judge 2 was right. data's own code folds in this row, and E-22's monitor found replicas' rows equal to a fresh fold of the log on every seed, but that prototype was one TypeScript thread, not a native kernel that hands bytes to data's fold. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01).",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on this row's kernel."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-23",
+   "E-43"
+  ],
+  "why": "Judge 2 was right. data's own code folds in this row, and E-22's monitor found replicas' rows equal to a fresh fold of the log on every seed, but that prototype was one TypeScript thread, not a native kernel that hands bytes to data's fold. Views over the same rows (a float `sum`, tie order) still differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01).",
+  "closes": "data's merge contract (A-10, a SCHEDULE_VERSION bump), then the phase 1 sim monitor that compares folds on this row's kernel."
+ },
+ {
+  "req": "DATA-01",
+  "part": "M",
+  "row": "BUY",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-44",
+   "E-23",
+   "E-43"
+  ],
+  "why": "Judge 2 was right. E-44 found four clients on JetStream holding the same 50 rows after a leader kill, one of them folding from the start, so rows fold alike in stream order. But views over those rows differ as in every row until data takes the merge contract (E-23 run B, E-43; A-10 and E-23 both name DATA-01), and no monitor compares folds on BUY, whose server no sim can run.",
+  "closes": "data's merge contract (A-10), and a fold monitor over fero's clients on real JetStream runs."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "MIN",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "RUST",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "LEAN",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "CELL",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "LANE",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "ISR",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "SLOG",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "OBJ",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "RLOG",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "SIDE",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "COMP",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule that no option of the row breaks: fero's TypeScript api layer holds the one seam, and any native part imports no data. Checked here by search: in E-22's prototype only proto/seam.ts loads data's entry, and all 22 patterns run through that one file. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "SRV",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule the row cannot break: its native server imports no data at all, and its TypeScript client holds the one seam. Checked here by search: in E-22's prototype of the same api only proto/seam.ts loads data's entry. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "PD",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 1 was right. This is a layering rule the row cannot break: its native server imports no data at all, and its TypeScript client holds the one seam. Checked here by search: in E-22's prototype of the same api only proto/seam.ts loads data's entry. The guard test itself is phase 1 work, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-02",
+  "part": "M",
+  "row": "BUY",
+  "v": "met",
+  "basis": "construction",
+  "ev": [
+   "E-44",
+   "E-22"
+  ],
+  "why": "Judge 1 was right. fero's side of BUY is a TypeScript client, and the outside server imports no data. Checked here by search: in E-44's prototype only buy.mjs loads data's entry, as only proto/seam.ts does in E-22's. The guard test itself is still to write, as judge 2 says, but it guards a fact the prototype already shows."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-07"
+  ],
+  "why": "Judge 2 was right. No check in E-22 has user code that throws, and a probe run here shows its prototype does not hold the rule: a tap that throws at a commit lets data's AggregateError out of the seam's batch into the replica's apply step, and the run stops. A kernel on its own worker, native core or process cannot be reached by a user throw (E-07), but the Fault path on the thread that folds is not built or tested for v5.",
+  "closes": "Phase 1 and 2: V4-47's tests re-run on the v5 composer, at each place data closes a commit (the main-thread projection, replays, forks, a JS call from a native core)."
+ },
+ {
+  "req": "DATA-06",
+  "part": "M",
+  "row": "BUY",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-44"
+  ],
+  "why": "Judge 2 was right. In BUY fero's client folds on the app's thread. E-44's client has no Fault path (a throw inside its fold loop stops the fold) and ran no test with user code that throws, and a probe run here on E-22's prototype let a throwing tap's AggregateError out of the seam into the apply step. So the rule is not shown.",
+  "closes": "V4-47's tests re-run on BUY's client, at each place data closes a commit."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "DRAFT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "MIN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "RUST",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "SRV",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "LEAN",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "CELL",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "LANE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "SPLIT",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "PD",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "ISR",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "SLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "OBJ",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "MIN-P",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "MIN-TS",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "RLOG",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "EMB-V8",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "SIDE",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "COMP",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22"
+  ],
+  "why": "Judge 2 was right. A mutation probe run here on E-22's prototype broke the rule: after a field-level write, a row read through a `filter` view was not frozen, and writing to it changed what that server held (999 against 5 on the others), which the prototype's own fold monitor then reported. The seam freezes rows on `get` and `snapshot`, not rows read through data's views, so a frozen row on every hand-out path, and its cost against the 100 ns read, is not shown.",
+  "closes": "Phase 2: the mutation test over every hand-out path (snapshot, get, views, tap records, method views), with the held-row read pin beside it."
+ },
+ {
+  "req": "DATA-07",
+  "part": "M",
+  "row": "BUY",
+  "v": "open",
+  "basis": "measured",
+  "ev": [
+   "E-22",
+   "E-44"
+  ],
+  "why": "Judge 2 was right. E-44's client hands rows out through data's handle with no freeze and ran no mutation test. A probe run here on E-22's prototype broke the rule on one path: a row read through a `filter` view after a field-level write was not frozen, and writing to it changed what that process held. So immutable rows on every hand-out path are not shown.",
+  "closes": "The mutation test on BUY's client over every hand-out path, with the held-row read pin beside it."
+ }
+]
