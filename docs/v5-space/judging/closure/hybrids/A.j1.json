@@ -1,0 +1,455 @@
+{
+ "family": "A",
+ "judge": "j1",
+ "rows": {
+  "A1": {
+   "changes": "card 'C=cent-co' COMP (MIN-P with the memory rung)",
+   "cells": [],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Kept as listed: MIN-P's 48 units plus memory-rung, 49 in all; COMP's healing-self, slow-leader-self and planner-hints give way to controller-commands and slow-leader-controller. Every unit holds state the row writes, with rules the row needs, and no unit reads state that nothing in the row writes beyond what COMP and MIN-P already leave unwritten (member.session and other rows' state named in shared records; checked against each record's reads and writes). planner-hints is rightly gone: with cent-co, DEP-17's drain and retire marks live in meta-members and the config check is controller-commands' epoch check, as in MIN-P. Novel: 3 (slot-move, restore-mark, dir-lease), as COMP and MIN-P. The one new meeting, memory-rung with controller-commands, joins through disk-incarnation (an unclean memory stop brings a replica back as new, and the controller then heals it), so the pair rule sees it; K-09 is the owed model. No pairs change: 264."
+   }
+  },
+  "A2": {
+   "changes": "card 'C=cent-co,Z=par' COMP (COMP2)",
+   "cells": [
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. This row keeps learners: they do not vote, so elections are as modelled, and as extra good copies they can only help repair (reasoned). Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "par-repair is the one added unit; it is rightly carried and not novel (PAR, Alagappan et al., FAST'18; TigerBeetle's repair in production; RM-03 stands). disk-incarnation rightly stays: a lost disk, the memory rung's unclean stop and damage wider than one entry still bring a replica back as new. Two fixes to the records, not to the list. (1) par-repair's rules say the replica 'keeps its vote'; E-37's 7 checked rules make it refuse votes, appends and standing until repaired (the vote mutant broke MoreUpToDateCorrectInv in 32 states). The record should state E-37's form, or name the 'possibly committed' query PAR's form rests on (G-15). (2) par-repair should read group.config (the peers it may repair from, and the majority its 'possibly committed' rule asks), and raft-prevote-checkquorum should read entry.badmark (E-37's ZTimeout guard: a damaged replica does not stand). With both, the pair rule also counts par-repair with raft-config, controller-commands and raft-prevote-checkquorum. Those three pairs are the 'par with a voter change' crossing that VERDICT section 0 line 7 names as an owed model; today the count misses them. Effect, computed on an in-memory copy of the records (no file changed): 277 pairs instead of 274; novel stays 3."
+   }
+  },
+  "A3": {
+   "changes": "card 'C=cent-co,Z=par,V=full' COMP",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "V full only changes which copies vote. Waking does not use learners: every voter wakes from its kept disk or from the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cell is open both ways. As worded: AMENDMENTS 1.3, 'SC-05 at 10 GB': one Node process wakes 10 GB of 2 KB rows in 86 to 122 s against 60 s (E-34). That is v4's codec, not a ceiling of the design, and A-13's faster wake is not built, so it is open, not failed. Restated per storage form it is still open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "The operator command (DESIGN-V5 4.2: list what may be lost, refuse while a voter it would drop answers, bump the slot epochs, refuse stale cursors) was not built or modelled for any Raft row. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states) and E-33 refuses a cursor a restore does not hold, as the settled cells of COMP, MIN-P and SRV say. Learners play no part in the command, so V full changes nothing; who issues it (a loop on #meta's leader or a separate controller) does not either. Nothing proves a failure, so it is open. One note for par rows: par adds a case the worded command does not cover. A committed entry can have no good copy left while the damaged voters still answer (E-37 par2: its 4 stuck states). There the command must clear the bad marks and accept the loss, not drop voters. That is design work owed, not a proof of failure."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. With V full the model's shape, three voters and no learners, is the row's own. Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "learners",
+      "name": "Learners (non-voting replicas), as a catch-up stage",
+      "state": "The group's non-voting replicas while they catch up: here only the new replicas the healer adds, before it promotes them.",
+      "rules": "A new replica joins as a learner and is promoted only once it has caught up. A learner grants a vote when asked and never stands (A-01).",
+      "reads": [
+       "group.commit",
+       "group.config",
+       "group.log",
+       "group.snapshot"
+      ],
+      "writes": [
+       "group.learners"
+      ],
+      "novel": false,
+      "precedent": "Ongaro's thesis, section 4.2.1 (a new server catches up as a non-voting member first); etcd's learners; CockroachDB's non-voting replicas (judging/mechanisms.json, both counters)."
+     }
+    ],
+    "drop": [],
+    "why": "V full drops learners, but the row's healer still needs them. controller-commands' own record writes group.learners, and the healing E-16 modelled adds a new replica as a learner, lets it catch up, then promotes it ('promote only a learner'; the exec.live check). With no learner stage the healer has two choices, both worse. It can add an empty voter: 3 voters with one gone become 4, a commit needs 3 acks and only 2 old voters answer, so writes stop until the new one catches up (5.2 to 6.9 s per GB, E-13). Or it can shrink first, which A-01 rule 5 forbids (E-14c: 112 and 692 stuck states without grow-first). Ongaro's thesis 4.2.1, the learners' own precedent, makes the same point. So learners stay, as a catch-up stage only; V full can only mean no standing non-voting copies (no read replicas, no warm spares). Not novel. With it A3 carries A2's 50 units: 274 pairs (277 with A2's read fixes), novel 3. So A3 saves nothing over A2 on DEV-02. A2's two record fixes apply here too. The same learners gap holds for A6 and A8 (V full with cent-co healing), which this review was not asked to cover."
+   }
+  },
+  "A4": {
+   "changes": "card 'C=cent,Z=par,V=full' COMP",
+   "cells": [
+    {
+     "req": "SC-03",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "ceiling",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "As worded: under Zipf 0.99 the hottest partition holds 5.5 to 9.8 % of the load and nothing splits it, so every design reaches 12 to 22 effective writers, below F_w = 64 (E-18, simulated; AMENDMENTS 1.3): gap (64 - 22) / 64 = 0.66. Restated with the app split, a slot row at 4,096 slots states 135, above 64, under A-18's one-move policy. E-18 ran that policy as one loop with exact loads; where the loop runs (on #meta's leader in MIN-P, in a separate controller here) does not change the count, so C cent changes nothing in this cell. It stays open restated: growth of 0.7 x n never ran on real processes, and many resources in shared groups were never balanced (K-04). It also depends on F_w: above 135 the restated cell fails too."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "V full only changes which copies vote. Waking does not use learners: every voter wakes from its kept disk or from the store tier (S jrnl +tier(store)), as in COMP and MIN-P, whose settled cell is open both ways. As worded: AMENDMENTS 1.3, 'SC-05 at 10 GB': one Node process wakes 10 GB of 2 KB rows in 86 to 122 s against 60 s (E-34). That is v4's codec, not a ceiling of the design, and A-13's faster wake is not built, so it is open, not failed. Restated per storage form it is still open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost."
+    },
+    {
+     "req": "SC-10",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "ceiling",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-11",
+      "E-12",
+      "E-25"
+     ],
+     "why": "As worded the effective writer number, 12 to 22 under Zipf 0.99, is below its floor F_w = 64 (E-18), and a ceiling below its floor fails: gap 0.66. Restated with the app split: 135 writers at 4,096 slots, 2,000 quiet groups a process (E-11, E-12) and 100 members (E-25), but nothing is pinned and the price of 4,096 slots is reasoned only (G-06). A separate controller adds ceilings of its own (the groups it tracks, the member sessions it keeps); they are neither listed nor measured, which keeps the restated cell open, not failed. It also depends on F_w and N_res."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "The operator command (DESIGN-V5 4.2: list what may be lost, refuse while a voter it would drop answers, bump the slot epochs, refuse stale cursors) was not built or modelled for any Raft row. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states) and E-33 refuses a cursor a restore does not hold, as the settled cells of COMP, MIN-P and SRV say. Learners play no part in the command, so V full changes nothing; who issues it (a loop on #meta's leader or a separate controller) does not either. Nothing proves a failure, so it is open. One note for par rows: par adds a case the worded command does not cover. A committed entry can have no good copy left while the damaged voters still answer (E-37 par2: its 4 stuck states). There the command must clear the bad marks and accept the loss, not drop voters. That is design work owed, not a proof of failure."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. With V full the model's shape, three voters and no learners, is the row's own. Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "learners",
+      "name": "Learners (non-voting replicas), as a catch-up stage",
+      "state": "The group's non-voting replicas while they catch up: here only the new replicas the healer adds, before it promotes them.",
+      "rules": "A new replica joins as a learner and is promoted only once it has caught up. A learner grants a vote when asked and never stands (A-01).",
+      "reads": [
+       "group.commit",
+       "group.config",
+       "group.log",
+       "group.snapshot"
+      ],
+      "writes": [
+       "group.learners"
+      ],
+      "novel": false,
+      "precedent": "Ongaro's thesis, section 4.2.1 (a new server catches up as a non-voting member first); etcd's learners; CockroachDB's non-voting replicas (judging/mechanisms.json, both counters)."
+     },
+     {
+      "key": "link-pings",
+      "name": "Link pings (one ping per member pair)",
+      "state": "Per pair of members that share a group: whether the link is up and when it last answered, as each side sees it; the pings also carry each side's clock.",
+      "rules": "Two members that share a group ping every ping.ms when no other frame went their way; a peer silent past evict.after is gone to this member (A-12).",
+      "reads": [
+       "cluster.id",
+       "group.config",
+       "group.learners",
+       "meta.members"
+      ],
+      "writes": [
+       "link.clocks",
+       "link.ping"
+      ],
+      "novel": false,
+      "precedent": "CockroachDB's store liveness and RPC heartbeat: one heartbeat per pair of stores, shared by every range they share, carrying the sender's clock (judging/mechanisms.json, both counters)."
+     }
+    ],
+    "drop": [],
+    "why": "Two units are missing. (1) learners, as for A3: V full drops learners, but the row's healer still needs them. controller-commands' own record writes group.learners, and the healing E-16 modelled adds a new replica as a learner, lets it catch up, then promotes it ('promote only a learner'; the exec.live check). With no learner stage the healer has two choices, both worse. It can add an empty voter: 3 voters with one gone become 4, a commit needs 3 acks and only 2 old voters answer, so writes stop until the new one catches up (5.2 to 6.9 s per GB, E-13). Or it can shrink first, which A-01 rule 5 forbids (E-14c: 112 and 692 stuck states without grow-first). Ongaro's thesis 4.2.1, the learners' own precedent, makes the same point. So learners stay, as a catch-up stage only; V full can only mean no standing non-voting copies (no read replicas, no warm spares). Not novel. (2) link-pings. C cent swaps it for controller-sessions, but five carried units read link.ping and nothing in the row then writes it: controller-commands, quiet-groups, raft-prevote-checkquorum, slow-leader-controller and meta-members. E-16 found that the group's leader must re-check 'gone' and 'alive' on its own links before it runs a command (exec.gone: without it an up voter is removed, P2 in 14 steps; exec.live: without it a stuck state, P8); a session view held by the controller is exactly the stale view those checks guard against. A-12's quiet groups stop their own heartbeats and rely on one ping per member pair. Keep controller-sessions as well: a separate controller shares no group with the members, so it hears from them by sessions (KRaft's broker heartbeats). Its rule 'fenced until it registers again' should not take leadership from a Raft leader that still holds its majority; Raft's terms already fence leaders (reasoned; otherwise a member cut off from the controller alone loses its leaders, F-17's kind of case). C cent is read as #meta's group run on dedicated controller processes (KRaft's isolated mode), so no further unit is needed. With both added: 51 units, 279 pairs (282 with A2's read fixes), novel 3. The same link-pings gap holds for A7."
+   }
+  },
+  "A5": {
+   "changes": "card 'Z=par' MIN-P",
+   "cells": [
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. This row keeps learners: they do not vote, so elections are as modelled, and as extra good copies they can only help repair (reasoned). Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not in the mechanism review (A1 to A4 only). A2's two record fixes for par-repair apply here the same way."
+   }
+  },
+  "A6": {
+   "changes": "card 'Z=par,V=full' MIN-P",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "V full only changes which copies vote. Waking does not use learners: every voter wakes from its kept disk or from the store tier (S jrnl +tier(store)), as in MIN-P, whose settled cell is open both ways. As worded: AMENDMENTS 1.3, 'SC-05 at 10 GB': one Node process wakes 10 GB of 2 KB rows in 86 to 122 s against 60 s (E-34). That is v4's codec, not a ceiling of the design, and A-13's faster wake is not built, so it is open, not failed. Restated per storage form it is still open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "The operator command (DESIGN-V5 4.2: list what may be lost, refuse while a voter it would drop answers, bump the slot epochs, refuse stale cursors) was not built or modelled for any Raft row. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states) and E-33 refuses a cursor a restore does not hold, as the settled cells of COMP, MIN-P and SRV say. Learners play no part in the command, so V full changes nothing; who issues it (a loop on #meta's leader or a separate controller) does not either. Nothing proves a failure, so it is open. One note for par rows: par adds a case the worded command does not cover. A committed entry can have no good copy left while the damaged voters still answer (E-37 par2: its 4 stuck states). There the command must clear the bad marks and accept the loss, not drop voters. That is design work owed, not a proof of failure."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. With V full the model's shape, three voters and no learners, is the row's own. Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not in the mechanism review (A1 to A4 only). The learners gap found for A3 holds here by the same reasoning (cent-co healing with V full), and A2's par-repair record fixes apply."
+   }
+  },
+  "A7": {
+   "changes": "card 'Z=par,V=full,C=cent' MIN-P",
+   "cells": [
+    {
+     "req": "SC-03",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "ceiling",
+     "basis": "measured",
+     "ev": [
+      "E-18"
+     ],
+     "why": "As worded: under Zipf 0.99 the hottest partition holds 5.5 to 9.8 % of the load and nothing splits it, so every design reaches 12 to 22 effective writers, below F_w = 64 (E-18, simulated; AMENDMENTS 1.3): gap (64 - 22) / 64 = 0.66. Restated with the app split, a slot row at 4,096 slots states 135, above 64, under A-18's one-move policy. E-18 ran that policy as one loop with exact loads; where the loop runs (on #meta's leader in MIN-P, in a separate controller here) does not change the count, so C cent changes nothing in this cell. It stays open restated: growth of 0.7 x n never ran on real processes, and many resources in shared groups were never balanced (K-04). It also depends on F_w: above 135 the restated cell fails too."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "alt": "open",
+     "depends_on": "restated",
+     "basis": "measured",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26"
+     ],
+     "why": "V full only changes which copies vote. Waking does not use learners: every voter wakes from its kept disk or from the store tier (S jrnl +tier(store)), as in MIN-P, whose settled cell is open both ways. As worded: AMENDMENTS 1.3, 'SC-05 at 10 GB': one Node process wakes 10 GB of 2 KB rows in 86 to 122 s against 60 s (E-34). That is v4's codec, not a ceiling of the design, and A-13's faster wake is not built, so it is open, not failed. Restated per storage form it is still open: no sleep-and-wake run against an S3-compatible store, with disks kept or lost."
+    },
+    {
+     "req": "SC-10",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "restated",
+     "gap": 0.66,
+     "proof": "ceiling",
+     "basis": "measured",
+     "ev": [
+      "E-18",
+      "E-11",
+      "E-12",
+      "E-25"
+     ],
+     "why": "As worded the effective writer number, 12 to 22 under Zipf 0.99, is below its floor F_w = 64 (E-18), and a ceiling below its floor fails: gap 0.66. Restated with the app split: 135 writers at 4,096 slots, 2,000 quiet groups a process (E-11, E-12) and 100 members (E-25), but nothing is pinned and the price of 4,096 slots is reasoned only (G-06). A separate controller adds ceilings of its own (the groups it tracks, the member sessions it keeps); they are neither listed nor measured, which keeps the restated cell open, not failed. It also depends on F_w and N_res."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "The operator command (DESIGN-V5 4.2: list what may be lost, refuse while a voter it would drop answers, bump the slot epochs, refuse stale cursors) was not built or modelled for any Raft row. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states) and E-33 refuses a cursor a restore does not hold, as the settled cells of COMP, MIN-P and SRV say. Learners play no part in the command, so V full changes nothing; who issues it (a loop on #meta's leader or a separate controller) does not either. Nothing proves a failure, so it is open. One note for par rows: par adds a case the worded command does not cover. A committed entry can have no good copy left while the damaged voters still answer (E-37 par2: its 4 stuck states). There the command must clear the bad marks and accept the loss, not drop voters. That is design work owed, not a proof of failure."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "E-37 checked par on etcd's own spec: one bad entry (par1, 62,743 states; par1r2, 455,856) and two (par2d, 565,222; par2, 1,362,748). All 10 invariants hold in every run, NoLostCommit included, so no committed write is lost. The checked form meets each clause: a checksum marks the entry bad (ParDetect); the replica grants no vote and does not stand while the mark is set (each shown needed by a mutant); and the model as written also takes no append while marked (ZNormal's second guard: not needed for safety, kept so the replica never acknowledges on the bad entry). That form refuses its vote until repaired. The row text and par-repair's record say it 'keeps its vote'; E-37's mutant that lets a damaged replica vote broke MoreUpToDateCorrectInv in 32 states. So the row is met in E-37's form, or in PAR's full form only with the term kept apart from the damaged bytes and the 'possibly committed' query (G-15, not modelled). Limits, the same as the rejoin rows' met cells: three voters, no membership change, damage found at a restart, damage to the term or vote record not modelled."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Two replicas with one bad entry each at different offsets: in par2d all 276 judged two-damage states reach a working leader, 0 stuck, with no operator step (E-37). par2 adds same-offset damage; its only 4 stuck states of 1,388 have no good copy of a committed entry anywhere, which is F-12's case and the right answer. Repair must come from any good peer: leader-only repair leaves 4 to 9 % stuck. With V full the model's shape, three voters and no learners, is the row's own. Not modelled with a voter change by the healer (VERDICT section 0 line 7; G-15). By reasoning the healer cannot interfere in the two-damage state: both damaged voters refuse votes, so no leader exists and no command can run until a repair is done."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not in the mechanism review (A1 to A4 only). The learners and link-pings gaps found for A4 hold here by the same reasoning, and A2's par-repair record fixes apply."
+   }
+  },
+  "A8": {
+   "changes": "card 'V=full,Y=fwd' SRV",
+   "cells": [
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-15",
+      "E-33",
+      "E-37"
+     ],
+     "why": "The operator command (DESIGN-V5 4.2: list what may be lost, refuse while a voter it would drop answers, bump the slot epochs, refuse stale cursors) was not built or modelled for any Raft row. E-15 keeps the slot move safe through one unclean recovery (up to 7.5 million states) and E-33 refuses a cursor a restore does not hold, as the settled cells of COMP, MIN-P and SRV say. Learners play no part in the command, so V full changes nothing; who issues it (a loop on #meta's leader or a separate controller) does not either. Nothing proves a failure, so it is open."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34"
+     ],
+     "why": "SRV's server folds rows in Rust, off the V8 heap, so E-34's Node figure (86 to 122 s for 10 GB) and AMENDMENTS 1.3's line do not apply (SRV's settled cell). A native wake of 10 GB was not measured, and no sleep-and-wake test ran against a store. V full and Y fwd change who votes and who forwards a write, not how a server wakes. (The card finds this cell supported by SRV itself; it is judged here because the task lists it.)"
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [],
+    "drop": [],
+    "why": "Not in the mechanism review (A1 to A4 only). The learners gap found for A3 holds here by the same reasoning (SRV heals with cent-co, and V full drops learners)."
+   }
+  }
+ }
+}

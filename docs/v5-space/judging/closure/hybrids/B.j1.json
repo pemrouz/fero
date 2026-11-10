@@ -1,0 +1,560 @@
+{
+ "family": "B",
+ "judge": "j1",
+ "rows": {
+  "B3": {
+   "changes": "'' on PD+fix (= PD with Z=rejoin, S=lsm +tier, Q=mix)",
+   "cells": [
+    {
+     "req": "P-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-02",
+      "E-01",
+      "E-44"
+     ],
+     "why": "Open, as PD's cell. The memory rung and the tier do not change a `persisted` write. E-22 showed the pattern on fero's library shape, not on PD's kernel commands, 2PC and oracle. The native bar is C + 0.5 ms = 1.23 ms: E-02's Rust pipeline reads p99 0.67 ms with separate disks emulated and 1.58 ms on this one shared disk, so this box cannot settle it. A 2PC write also asks the oracle for a timestamp, one more round trip (58 us p99 in Rust on loopback, E-01): it fits the bar but was not run. The LSM write path was never timed. A held row reads in 81 ns on the client (E-44)."
+    },
+    {
+     "req": "PERF-07",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09e",
+      "E-01",
+      "E-02",
+      "E-45"
+     ],
+     "why": "Open. etcd here: 1,118 puts a second at one client (p99 1.73 ms) and 22,800 at 1,000 clients (E-09e). etcd always fsyncs, so its default row is its matched row and the memory rung is not the matching rung here. The best a `persisted` commit can do on this box is about 0.42 ms p99 with the client's hop (RR-04's sum from E-01), and the oracle's round trip adds about 0.06 to 0.1 ms: both stay under 1.73 ms, so no ceiling stops the row. W `lease` gives a one-hop linearizable range. But no PD-shaped kernel ran behind the etcd gateway, which has only driven a simulator (E-45)."
+    },
+    {
+     "req": "PERF-08",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-02"
+     ],
+     "why": "Open, as PD's cell. Native bar 1.23 ms. E-02's Rust pipeline reads p99 0.67 ms with separate disks emulated and 1.58 ms on this one disk, so the box shows the bar neither met nor missed. The LSM write path (Raft log plus applied state) was never timed, and background compaction and the tier's uploads add disk work beside the commit fsync (A-09 asks that bulk writes not starve it). The memory rung does not change a `persisted` commit."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26",
+      "E-33"
+     ],
+     "why": "Open. PD failed only because a full disk loss left no copy anywhere (no tier). With the tier a copy exists, so that structural fail goes. Not shown: no sleep and wake ran against an object store, with disks kept or lost; how fast 10 GB comes back from the store into an LSM was never measured (E-28 timed single PUTs only); and the controller's own state (the region table, the oracle's high-water) must come back from the store too. An LSM opens without folding every row, so E-34's Node figure (86 to 122 s for 10 GB) does not bind this native server, as for SRV (reasoned). Both readings of the 1.3 line give open."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-28"
+     ],
+     "why": "Met, as PD's cell (both judges). An LSM holds state larger than memory by construction, and regions spread a resource over servers' disks (TiKV and CockroachDB in production, cited). The tier does not take the LSM away; it adds a copy in the store. A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28); if old files live only in the store, a cold read is one get. Not measured here. The prediction (open) falls to the draft's 'snapshot layers, by design only' because no judged row holds `lsm +tier`; the option that decides this SHOULD is the LSM, which this row keeps."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "Open, as PD's cell. E-35 ran a shared journal, not an LSM. Here a 1 MB record ten times a second is 10 MB a second into the LSM, then flushes, compactions and the tier's uploads, all beside other partitions' commits on the same disk. None of it was measured, and the 1 MB, 64 MB and `too-large` limits were not built."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "Open, as PD's referee ruled: a synced write must also come back after a power cut, and this LSM was never power-cut here (E-29 ran its own journal, which still lost a batch in 2 of 1,200 rounds through a recovery bug before its fix). Raft keeps synced entries (E-14c, E-37; by reasoning for raft-rs). The memory rung does not touch F-01, which is about `persisted` writes, as long as a memory group's 'rejoin as new' wipes only that group's replica and not the whole store after an unclean stop (K-09, K-24). The tier adds no path for acknowledged writes."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "Open in both readings. PD's write, failover and new-replica paths use no object store (PD's cell: met by construction), and the tier only uploads behind them, as KIP-405 does for ISR's segments. Two things could still put the store in a path F-15 does not allow. (1) The oracle's high-water: to keep timestamps and fence tokens rising across a full disk loss it must live where a restore can read it (the mechanism review below adds it). If it is written to the store before each window is used, a store outage longer than the window (PD's default is about 3 s) stops timestamps and so writes; a longer window or a clock rule avoids that. Neither form was modelled. (2) Uploads wait while the store is down and the local disk grows (F-20). No run had the store down (E-33's store is always reachable). The 1.3 restatement adds slot moves to F-15's list; this row has none, so it does not change the verdict."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "Open, as PD's cell. E-29(b) filled its own journal, not an LSM. In an LSM a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (TiKV keeps a reserve file, cited from memory by PD's judge). With the tier a disk can also fill while uploads wait on a down store, and retention that frees space only after an upload waits with them. Not run."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-02",
+      "E-12"
+     ],
+     "why": "Open, as PD's cell. Nothing of the LSM shape ran here. RocksDB and TiKV's raft engine share one WAL sync among a write group (cited from memory by both PD judges). E-02 and E-12 show group commit on a journal, not on this store. The tier and the memory rung do not change it."
+    },
+    {
+     "req": "TEST-07",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-06"
+     ],
+     "why": "Open, as PD's cell. The server's state is in an LSM with many versions per row, not in data. E-06 timed data's undo only (0.03 to 0.05 ms a rerun). MVCC makes reading an earlier state natural (reasoned), but no rerun of a server input was timed. The tier and the memory rung do not change it."
+    },
+    {
+     "req": "TEST-10",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04",
+      "E-10"
+     ],
+     "why": "Open, as PD's cell. A Rust server holding the LSM, the oracle and 2PC: nothing of it ran in a sim, and its native fold needs A-30's guard against data (reasoned). The tier adds object-store completions as kernel inputs the sim must model."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "Open, as PD's cell. E-42 costed its recorder on a journal it can point into (1.1 to 1.7 % of a core). Here bulk bytes sit in an LSM that rewrites its own files, and the tier adds object-store completions as inputs, which E-42 never recorded."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Open. PD met it only because nothing held two projects: no object store. The tier puts every project's old data in the hosted object store, which OPS-14 names. Like COMP, SRV and MIN-P (N `proc` with a store): a key per project at rest and no read path across projects are owed (OPS-13), not designed or tested. Servers stay one set per project, so no log-tier budget applies."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "tso-store-mark",
+      "name": "The oracle's high-water kept in the store's manifest (a restore starts above it)",
+      "state": "In the object store's manifest: the top of the oracle's current timestamp window (and the id allocator's top), written before the oracle hands out a timestamp of that window; after a restore, the restore's first timestamp, kept as a floor.",
+      "rules": "(1) Before the oracle uses a new window it records the window's top in the store (a conditional write). (2) A restore starts the oracle above that top and above wall time, and records its first timestamp as the floor. (3) A transaction whose start timestamp is below the floor is refused, so a retry from before the restore is refused, not re-run (OPS-07, F-02).",
+      "reads": [
+       "tso.high",
+       "store.objects"
+      ],
+      "writes": [
+       "restore.mark",
+       "tso.high"
+      ],
+      "novel": false,
+      "precedent": "PD's own oracle saves its window's top before use (the settled `timestamp-oracle` unit, not novel by both counters); this is the same state and rule with the store as its home, where A-08 and E-33 put a restore's high-water mark. If the referee reads it as the settled `restore-mark` unit instead (novel: PostgreSQL timelines are the nearest, not the same), the row's novel count is 1 and its pairs rise by 6, not 5."
+     }
+    ],
+    "drop": [],
+    "why": "Missing: the oracle's high-water outside the restored data. The settled count leaves PD out of `restore-mark` because 'the oracle saves its high-water before use, outside the data a restore brings back' (MECHANISMS section 4, `restore-mark`). The tier changes that premise. This row now restores from the store (SC-05 wakes servers that lost their disks; OPS-07 restores a project to a past position), and the cheap shape under DEP-21's bar puts the controller inside the stores (RR-06), so the controller's disks, and the oracle's saved window with them, can be lost together with the data. Then a restore that reads the oracle's state from the store's last upload can hand out a timestamp twice: a version or a fence token repeats, which is E-33's R1 and R2 counterexample (5 and 6 steps) in timestamp form. Fence tokens are seen by outside systems, so a new cluster id does not save them. So the row needs either this state (added here: 238 -> 243 pairs, +5: with closed-timestamps, mvcc, tier, timestamp-oracle, two-phase-commit) or a stated clock rule (after a restore the oracle waits out wall time plus the window plus the largest clock skew; no new state, but a reliance on bounded skew that PD's own window save exists to avoid). Not added for a clean sleep alone: there the last upload carries the exact high-water. Checked and not missing: (a) the memory rung on an LSM is the settled `memory-rung` (a clean-stop mark per replica) with RocksDB-style unsynced writes; its 'rejoin as new' must be per group (a new Raft member id, `raft-config`), not per dir (`disk-incarnation`), or one unclean stop wipes the store's `persisted` groups too (K-09, K-24): a rule, no new state. (b) The tier on an LSM uploads sorted files and a per-store manifest, not per-group segments named by a log entry: the same role as `tier` (precedent rocksdb-cloud's files in S3 and TiKV's backup to S3, both from memory, not checked); `tier` should also read `lsm.files`, which adds no pair (it already pairs with `lsm-store` through `durable.log`). (c) `rejoin` on an LSM: `disk-incarnation` per dir means one bad block wipes every region on that store (K-24): safe, costly, no new state. One interaction the pair rule does not see: `memory-rung` and `two-phase-commit` share no listed variable, yet a Percolator unit whose primary or secondary sits in a memory-rung group can be half lost when that group's majority stops uncleanly. It needs one rule (a unit's records commit at `persisted`, or a unit inherits its weakest resource's loss contract). The same holds for COMP's sagas (K-09); the settled P-15 cells of the saga rows with Q `mix` are met, so P-15 is left as predicted here. Novel: none. `memory-rung`, `tier`, `disk-incarnation` and `lsm-store` are settled not novel; the added unit has PD's own oracle as its precedent. So the row stays at 0 novel (1 if the referee counts the added unit as `restore-mark`). Nothing listed is unneeded. Row-specific: `learners`, `route-smart` and `worker-map` (V +lrn, Y smart, M kwN) are PD's and needed. With `rejoin` it carries no `par-repair`, as listed."
+   }
+  },
+  "B1": {
+   "changes": "V=full,L=ts→rs,I=port,Y=fwd,M=kw,Z=par on PD+fix (= PD with Z=par, S=lsm +tier, Q=mix, V=full, L=ts→rs, I=port, Y=fwd, M=kw)",
+   "cells": [
+    {
+     "req": "P-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-02",
+      "E-11",
+      "E-01",
+      "E-44"
+     ],
+     "why": "Open. TS bar C + 5 ms = 5.7 ms. E-02's bare TS pipeline reads p99 4.3 ms with no protocol work, and E-11's real TS Raft on a simple host read 10 to 11 ms at 10,000 writes a second; neither is a ceiling for this row. On top come the oracle's round trip (96 us p99 in Node, E-01) and a native LSM behind the TS kernel, never timed. E-22 ran fero's library shape, not this kernel's commands and 2PC. The memory rung does not change a `persisted` write. A held row reads in 81 ns on the client (E-44)."
+    },
+    {
+     "req": "PERF-07",
+     "part": "M",
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-09e",
+      "E-01",
+      "E-02",
+      "E-45"
+     ],
+     "why": "Open. etcd here: 1,118 puts a second at one client (p99 1.73 ms) and 22,800 at 1,000 clients (E-09e). etcd always fsyncs, so its default row is its matched row and the memory rung is not the matching rung here. The best a `persisted` commit can do on this box is about 0.42 ms p99 with the client's hop (RR-04's sum from E-01), and the oracle's round trip adds about 0.06 to 0.1 ms: both stay under 1.73 ms, so no ceiling stops the row. W `lease` gives a one-hop linearizable range. But no PD-shaped kernel ran behind the etcd gateway, which has only driven a simulator (E-45). In TS, E-02's tail (2.4 to 4.3 ms) is above etcd's one-client p99, but it was read at 10,000 to 50,000 writes a second, never with one write in flight, so it is no ceiling either."
+    },
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26",
+      "E-33"
+     ],
+     "why": "Open. PD failed only because a full disk loss left no copy anywhere (no tier). With the tier a copy exists, so that structural fail goes. Not shown: no sleep and wake ran against an object store, with disks kept or lost; how fast 10 GB comes back from the store into an LSM was never measured (E-28 timed single PUTs only); and the controller's state (region table, oracle high-water) must come back too. Its TS phase keeps rows in a native LSM, not on the V8 heap, so E-34's Node fold (86 to 122 s) is not its wake time either; A-13's per-form statement is owed. Both readings of the 1.3 line give open."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-28"
+     ],
+     "why": "Met, as PD's cell (both judges). An LSM holds state larger than memory by construction, and regions spread a resource over servers' disks (TiKV and CockroachDB in production, cited). The tier does not take the LSM away; it adds a copy in the store. A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28); if old files live only in the store, a cold read is one get. Not measured here. The prediction (open) falls to the draft's 'snapshot layers, by design only' because no judged row holds `lsm +tier`; the option that decides this SHOULD is the LSM, which this row keeps. This holds while the TS phase uses a real LSM library through a binding, as the row's S says; rows held on the V8 heap would make it open."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "Open, as PD's cell. E-35 ran a shared journal, not an LSM. Here a 1 MB record ten times a second is 10 MB a second into the LSM, then flushes, compactions and the tier's uploads, all beside other partitions' commits on the same disk. None of it was measured, and the 1 MB, 64 MB and `too-large` limits were not built."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "Open, as PD's referee ruled: a synced write must also come back after a power cut, and this LSM was never power-cut here (E-29 ran its own journal, which still lost a batch in 2 of 1,200 rounds through a recovery bug before its fix). Raft keeps synced entries (E-14c, E-37; by reasoning for raft-rs). The memory rung does not touch F-01, which is about `persisted` writes, as long as a memory group's 'rejoin as new' wipes only that group's replica and not the whole store after an unclean stop (K-09, K-24). The tier adds no path for acknowledged writes."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37",
+      "E-15"
+     ],
+     "why": "Open, as every row with voters. The operator command was not built or modelled: listing what may be lost, refusing while a voter it would drop answers, refusing stale cursors. TiKV's unsafe-recover is the published command for this shape (cited by PD's judge, not checked). A split or merge under unclean recovery was not modelled (E-15 did slot moves only). Dropping learners (V `full`) changes nothing here; `par` keeps two single-entry faults off this path (E-37), but a majority loss still needs the command."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "Open in both readings. PD's write, failover and new-replica paths use no object store (PD's cell: met by construction), and the tier only uploads behind them, as KIP-405 does for ISR's segments. Two things could still put the store in a path F-15 does not allow. (1) The oracle's high-water: to keep timestamps and fence tokens rising across a full disk loss it must live where a restore can read it (the mechanism review below adds it). If it is written to the store before each window is used, a store outage longer than the window (PD's default is about 3 s) stops timestamps and so writes; a longer window or a clock rule avoids that. Neither form was modelled. (2) Uploads wait while the store is down and the local disk grows (F-20). No run had the store down (E-33's store is always reachable). The 1.3 restatement adds slot moves to F-15's list; this row has none, so it does not change the verdict."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "Open, as PD's cell. E-29(b) filled its own journal, not an LSM. In an LSM a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (TiKV keeps a reserve file, cited from memory by PD's judge). With the tier a disk can also fill while uploads wait on a down store, and retention that frees space only after an upload waits with them. Not run."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Met, by model. Z `par`: a checksum per entry finds the bad entry, and the damaged voter refuses to vote or stand until it copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's spec (`par1`): 62,743 states, all 10 invariants hold, no committed write lost; each of par's 7 rules shown needed by a mutant (E-37). The model also keeps 'takes no append while damaged' as a guard (not needed for safety), so the voter acknowledges nothing on the bad entry. Limits: three voters, no membership change (G-15). E-37's entry is a log entry. In an LSM, entries below the applied index are compacted into sorted files; damage there is found by the store's own block checksums and repaired by a snapshot from a peer, which E-37 did not model. The port runs etcd's raft, which E-37's spec is (E-10)."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Met, by model. `par2d`: one bad entry on each of two replicas at different offsets, 565,222 states, 276 judged two-damage states, 0 stuck (E-37); with the same offset it stays writable whenever a good copy is left (`par2`, the 4 stuck states have no good copy). Repair must come from any peer, not only the leader (`par2d-leader`: 9 % stuck). This is the cell the VERDICT gives COMP2. Same limits as the MUST part: three voters, no membership change, log entries only."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-02",
+      "E-12"
+     ],
+     "why": "Open, as PD's cell. Nothing of the LSM shape ran here. RocksDB and TiKV's raft engine share one WAL sync among a write group (cited from memory by both PD judges). E-02 and E-12 show group commit on a journal, not on this store. The tier and the memory rung do not change it."
+    },
+    {
+     "req": "TEST-10",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-04",
+      "E-10",
+      "E-42",
+      "E-46"
+     ],
+     "why": "Open. Its TS phase runs the ported Raft in the sim by construction (E-10: 4,000 of 4,000 scripts match Go; E-46). But its store is a native LSM that flushes and compacts on its own threads: the sim can run only a stand-in for it unless the LSM is driven by the sim's clock and disk, which nobody showed. The 2PC and oracle state machine was never run in a sim. The native step's second kernel is not built (G-24), as for COMP."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "Open, as PD's cell. E-42 costed its recorder on a journal it can point into (1.1 to 1.7 % of a core). Here bulk bytes sit in an LSM that rewrites its own files, and the tier adds object-store completions as inputs, which E-42 never recorded."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Open. PD met it only because nothing held two projects: no object store. The tier puts every project's old data in the hosted object store, which OPS-14 names. Like COMP, SRV and MIN-P (N `proc` with a store): a key per project at rest and no read path across projects are owed (OPS-13), not designed or tested. Servers stay one set per project, so no log-tier budget applies."
+    }
+   ],
+   "crossings": [
+    {
+     "req": "DEP-20",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "The prediction comes from the TypeScript rows (L `ts`/`ts→rs`), whose met cell says 'these rows start in TypeScript with no native part, so the same pack applies' (STATUS: v4's 451 KB tarball ran on Node 22 and 26). This row meets L `ts→rs` with S `lsm`: its TS phase keeps its log and rows in an LSM, and no LSM in plain JavaScript is in production, so `npm install fero` must ship a native LSM build per platform (a prebuilt addon), plus a server process that `fero(name)` spawns (H `srv`). That is the premise on which PD's and SRV's DEP-20 stay open: nobody packed or ran it (SPACE 4.2). Not a fail: prebuilt addons are a known route (reasoned)."
+    },
+    {
+     "req": "TEST-07",
+     "part": "M",
+     "predicted": "met",
+     "v": "open",
+     "why": "The prediction comes from rows whose judging state sits in data, where E-06 timed a rerun's undo at 0.03 to 0.05 ms. This row meets L `ts→rs` with K `kern`, X `2pc` and S `lsm`: its kernel judges writes against MVCC versions, intents and oracle timestamps kept in the LSM, not in data. That is the ground on which PD, SRV and BUY are open ('state held outside data'). Going TypeScript first does not move that state into data, so E-06 does not cover it; no rerun of a server input on this state was timed."
+    }
+   ],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "tso-store-mark",
+      "name": "The oracle's high-water kept in the store's manifest (a restore starts above it)",
+      "state": "In the object store's manifest: the top of the oracle's current timestamp window (and the id allocator's top), written before the oracle hands out a timestamp of that window; after a restore, the restore's first timestamp, kept as a floor.",
+      "rules": "(1) Before the oracle uses a new window it records the window's top in the store (a conditional write). (2) A restore starts the oracle above that top and above wall time, and records its first timestamp as the floor. (3) A transaction whose start timestamp is below the floor is refused, so a retry from before the restore is refused, not re-run (OPS-07, F-02).",
+      "reads": [
+       "tso.high",
+       "store.objects"
+      ],
+      "writes": [
+       "restore.mark",
+       "tso.high"
+      ],
+      "novel": false,
+      "precedent": "PD's own oracle saves its window's top before use (the settled `timestamp-oracle` unit, not novel by both counters); this is the same state and rule with the store as its home, where A-08 and E-33 put a restore's high-water mark. If the referee reads it as the settled `restore-mark` unit instead (novel: PostgreSQL timelines are the nearest, not the same), the row's novel count is 1 and its pairs rise by 6, not 5."
+     }
+    ],
+    "drop": [],
+    "why": "Missing: the oracle's high-water outside the restored data. The settled count leaves PD out of `restore-mark` because 'the oracle saves its high-water before use, outside the data a restore brings back' (MECHANISMS section 4, `restore-mark`). The tier changes that premise. This row now restores from the store (SC-05 wakes servers that lost their disks; OPS-07 restores a project to a past position), and the cheap shape under DEP-21's bar puts the controller inside the stores (RR-06), so the controller's disks, and the oracle's saved window with them, can be lost together with the data. Then a restore that reads the oracle's state from the store's last upload can hand out a timestamp twice: a version or a fence token repeats, which is E-33's R1 and R2 counterexample (5 and 6 steps) in timestamp form. Fence tokens are seen by outside systems, so a new cluster id does not save them. So the row needs either this state (added here: 225 -> 230 pairs, +5: with closed-timestamps, mvcc, tier, timestamp-oracle, two-phase-commit) or a stated clock rule (after a restore the oracle waits out wall time plus the window plus the largest clock skew; no new state, but a reliance on bounded skew that PD's own window save exists to avoid). Not added for a clean sleep alone: there the last upload carries the exact high-water. Checked and not missing: (a) the memory rung on an LSM is the settled `memory-rung` (a clean-stop mark per replica) with RocksDB-style unsynced writes; its 'rejoin as new' must be per group (a new Raft member id, `raft-config`), not per dir (`disk-incarnation`), or one unclean stop wipes the store's `persisted` groups too (K-09, K-24): a rule, no new state. (b) The tier on an LSM uploads sorted files and a per-store manifest, not per-group segments named by a log entry: the same role as `tier` (precedent rocksdb-cloud's files in S3 and TiKV's backup to S3, both from memory, not checked); `tier` should also read `lsm.files`, which adds no pair (it already pairs with `lsm-store` through `durable.log`). (c) `rejoin` on an LSM: `disk-incarnation` per dir means one bad block wipes every region on that store (K-24): safe, costly, no new state. One interaction the pair rule does not see: `memory-rung` and `two-phase-commit` share no listed variable, yet a Percolator unit whose primary or secondary sits in a memory-rung group can be half lost when that group's majority stops uncleanly. It needs one rule (a unit's records commit at `persisted`, or a unit inherits its weakest resource's loss contract). The same holds for COMP's sagas (K-09); the settled P-15 cells of the saga rows with Q `mix` are met, so P-15 is left as predicted here. Novel: none. `memory-rung`, `tier`, `disk-incarnation` and `lsm-store` are settled not novel; the added unit has PD's own oracle as its precedent. So the row stays at 0 novel (1 if the referee counts the added unit as `restore-mark`). Nothing listed is unneeded. Row-specific: (d) `par` on an LSM: `par-repair` (a bad mark per entry, repair from a peer) covers the Raft log; entries below the applied index are compacted into sorted files, where damage is found by the store's block checksums (inside `lsm-store`) and repaired by a region snapshot from a peer (`raft-snapshot`) or a rejoin of that region (`disk-incarnation`): no new state, but E-37 modelled log entries only. If no peer still holds entry k in its log (log GC), the repair is a snapshot install, Raft's own path. par's rules go inside the ported core. (e) The TS phase calls a native LSM from the kernel's worker (M `kw`): a binding, not a mechanism. Dropping `learners`, `route-smart` and `worker-map` (V full, Y fwd, M kw) is right. `disk-incarnation` stays with `par`: a wiped disk must still never return under its old id (A-01 rule 4), and the memory rung's rejoin uses it."
+   }
+  },
+  "B2": {
+   "changes": "V=full,S=lsm +tier,F=all(srv),L=rs-srv or go-srv,I=raft-rs or etcd raft,Y=fwd,M=kw,Z=par on PD",
+   "cells": [
+    {
+     "req": "SC-05",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-34",
+      "E-28",
+      "E-26",
+      "E-33"
+     ],
+     "why": "Open. PD failed only because a full disk loss left no copy anywhere (no tier). With the tier a copy exists, so that structural fail goes. Not shown: no sleep and wake ran against an object store, with disks kept or lost; how fast 10 GB comes back from the store into an LSM was never measured (E-28 timed single PUTs only); and the controller's own state (the region table, the oracle's high-water) must come back from the store too. An LSM opens without folding every row, so E-34's Node figure (86 to 122 s for 10 GB) does not bind this native server, as for SRV (reasoned). Both readings of the 1.3 line give open."
+    },
+    {
+     "req": "SC-06",
+     "part": "S",
+     "v": "met",
+     "basis": "cited",
+     "ev": [
+      "E-28"
+     ],
+     "why": "Met, as PD's cell (both judges). An LSM holds state larger than memory by construction, and regions spread a resource over servers' disks (TiKV and CockroachDB in production, cited). The tier does not take the LSM away; it adds a copy in the store. A cold read is a local disk read, under one object-store get (about 30 ms on S3, cited in E-28); if old files live only in the store, a cold read is one get. Not measured here. The prediction (open) falls to the draft's 'snapshot layers, by design only' because no judged row holds `lsm +tier`; the option that decides this SHOULD is the LSM, which this row keeps."
+    },
+    {
+     "req": "SC-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35"
+     ],
+     "why": "Open, as PD's cell. E-35 ran a shared journal, not an LSM. Here a 1 MB record ten times a second is 10 MB a second into the LSM, then flushes, compactions and the tier's uploads, all beside other partitions' commits on the same disk. None of it was measured, and the 1 MB, 64 MB and `too-large` limits were not built."
+    },
+    {
+     "req": "F-01",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-14c",
+      "E-37"
+     ],
+     "why": "Open, as PD's referee ruled: a synced write must also come back after a power cut, and this LSM was never power-cut here (E-29 ran its own journal, which still lost a batch in 2 of 1,200 rounds through a recovery bug before its fix). Raft keeps synced entries (E-14c, E-37; by reasoning for raft-rs and Go's etcd raft). The tier adds no path for acknowledged writes."
+    },
+    {
+     "req": "F-12",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37",
+      "E-15"
+     ],
+     "why": "Open, as every row with voters. The operator command was not built or modelled: listing what may be lost, refusing while a voter it would drop answers, refusing stale cursors. TiKV's unsafe-recover is the published command for this shape (cited by PD's judge, not checked). A split or merge under unclean recovery was not modelled (E-15 did slot moves only). Dropping learners (V `full`) changes nothing here; `par` keeps two single-entry faults off this path (E-37), but a majority loss still needs the command."
+    },
+    {
+     "req": "F-15",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33",
+      "E-28"
+     ],
+     "why": "Open in both readings. PD's write, failover and new-replica paths use no object store (PD's cell: met by construction), and the tier only uploads behind them, as KIP-405 does for ISR's segments. Two things could still put the store in a path F-15 does not allow. (1) The oracle's high-water: to keep timestamps and fence tokens rising across a full disk loss it must live where a restore can read it (the mechanism review below adds it). If it is written to the store before each window is used, a store outage longer than the window (PD's default is about 3 s) stops timestamps and so writes; a longer window or a clock rule avoids that. Neither form was modelled. (2) Uploads wait while the store is down and the local disk grows (F-20). No run had the store down (E-33's store is always reachable). The 1.3 restatement adds slot moves to F-15's list; this row has none, so it does not change the verdict."
+    },
+    {
+     "req": "F-20",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "Open, as PD's cell. E-29(b) filled its own journal, not an LSM. In an LSM a remove adds a tombstone and compaction needs free space, so the reserve is a different problem (TiKV keeps a reserve file, cited from memory by PD's judge). With the tier a disk can also fill while uploads wait on a down store, and retention that frees space only after an upload waits with them. Not run."
+    },
+    {
+     "req": "F-22",
+     "part": "M",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37",
+      "E-10"
+     ],
+     "why": "Met, by model. Z `par`: a checksum per entry finds the bad entry, and the damaged voter refuses to vote or stand until it copies the entry from a peer that knows it is committed and whose own copy is good. TLC on etcd's spec (`par1`): 62,743 states, all 10 invariants hold, no committed write lost; each of par's 7 rules shown needed by a mutant (E-37). The model also keeps 'takes no append while damaged' as a guard (not needed for safety), so the voter acknowledges nothing on the bad entry. Limits: three voters, no membership change (G-15). E-37's entry is a log entry. In an LSM, entries below the applied index are compacted into sorted files; damage there is found by the store's own block checksums and repaired by a snapshot from a peer, which E-37 did not model. Carried to raft-rs by reasoning, as the RUST and SRV cells carry E-37; Go's etcd raft is the spec's own code. Either core needs par's vote and repair rules added inside it."
+    },
+    {
+     "req": "F-22",
+     "part": "S",
+     "v": "met",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Met, by model. `par2d`: one bad entry on each of two replicas at different offsets, 565,222 states, 276 judged two-damage states, 0 stuck (E-37); with the same offset it stays writable whenever a good copy is left (`par2`, the 4 stuck states have no good copy). Repair must come from any peer, not only the leader (`par2d-leader`: 9 % stuck). This is the cell the VERDICT gives COMP2. Same limits as the MUST part: three voters, no membership change, log entries only."
+    },
+    {
+     "req": "DEP-12",
+     "part": "M",
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-02",
+      "E-12"
+     ],
+     "why": "Open, as PD's cell. Nothing of the LSM shape ran here. RocksDB and TiKV's raft engine share one WAL sync among a write group (cited from memory by both PD judges). E-02 and E-12 show group commit on a journal, not on this store. The tier and the memory rung do not change it."
+    },
+    {
+     "req": "OPS-11",
+     "part": "S",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-42"
+     ],
+     "why": "Open, as PD's cell. E-42 costed its recorder on a journal it can point into (1.1 to 1.7 % of a core). Here bulk bytes sit in an LSM that rewrites its own files, and the tier adds object-store completions as inputs, which E-42 never recorded."
+    },
+    {
+     "req": "OPS-14",
+     "part": "M",
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-35",
+      "E-41"
+     ],
+     "why": "Open. PD met it only because nothing held two projects: no object store. The tier puts every project's old data in the hosted object store, which OPS-14 names. Like COMP, SRV and MIN-P (N `proc` with a store): a key per project at rest and no read path across projects are owed (OPS-13), not designed or tested. Servers stay one set per project, so no log-tier budget applies."
+    }
+   ],
+   "crossings": [],
+   "mechanisms": {
+    "add": [
+     {
+      "key": "tso-store-mark",
+      "name": "The oracle's high-water kept in the store's manifest (a restore starts above it)",
+      "state": "In the object store's manifest: the top of the oracle's current timestamp window (and the id allocator's top), written before the oracle hands out a timestamp of that window; after a restore, the restore's first timestamp, kept as a floor.",
+      "rules": "(1) Before the oracle uses a new window it records the window's top in the store (a conditional write). (2) A restore starts the oracle above that top and above wall time, and records its first timestamp as the floor. (3) A transaction whose start timestamp is below the floor is refused, so a retry from before the restore is refused, not re-run (OPS-07, F-02).",
+      "reads": [
+       "tso.high",
+       "store.objects"
+      ],
+      "writes": [
+       "restore.mark",
+       "tso.high"
+      ],
+      "novel": false,
+      "precedent": "PD's own oracle saves its window's top before use (the settled `timestamp-oracle` unit, not novel by both counters); this is the same state and rule with the store as its home, where A-08 and E-33 put a restore's high-water mark. If the referee reads it as the settled `restore-mark` unit instead (novel: PostgreSQL timelines are the nearest, not the same), the row's novel count is 1 and its pairs rise by 6, not 5."
+     }
+    ],
+    "drop": [],
+    "why": "Missing: the oracle's high-water outside the restored data. The settled count leaves PD out of `restore-mark` because 'the oracle saves its high-water before use, outside the data a restore brings back' (MECHANISMS section 4, `restore-mark`). The tier changes that premise. This row now restores from the store (SC-05 wakes servers that lost their disks; OPS-07 restores a project to a past position), and the cheap shape under DEP-21's bar puts the controller inside the stores (RR-06), so the controller's disks, and the oracle's saved window with them, can be lost together with the data. Then a restore that reads the oracle's state from the store's last upload can hand out a timestamp twice: a version or a fence token repeats, which is E-33's R1 and R2 counterexample (5 and 6 steps) in timestamp form. Fence tokens are seen by outside systems, so a new cluster id does not save them. So the row needs either this state (added here: 214 -> 219 pairs, +5: with closed-timestamps, mvcc, tier, timestamp-oracle, two-phase-commit) or a stated clock rule (after a restore the oracle waits out wall time plus the window plus the largest clock skew; no new state, but a reliance on bounded skew that PD's own window save exists to avoid). Not added for a clean sleep alone: there the last upload carries the exact high-water. Checked and not missing: (a) the memory rung on an LSM is the settled `memory-rung` (a clean-stop mark per replica) with RocksDB-style unsynced writes; its 'rejoin as new' must be per group (a new Raft member id, `raft-config`), not per dir (`disk-incarnation`), or one unclean stop wipes the store's `persisted` groups too (K-09, K-24): a rule, no new state. (b) The tier on an LSM uploads sorted files and a per-store manifest, not per-group segments named by a log entry: the same role as `tier` (precedent rocksdb-cloud's files in S3 and TiKV's backup to S3, both from memory, not checked); `tier` should also read `lsm.files`, which adds no pair (it already pairs with `lsm-store` through `durable.log`). (c) `rejoin` on an LSM: `disk-incarnation` per dir means one bad block wipes every region on that store (K-24): safe, costly, no new state. One interaction the pair rule does not see: `memory-rung` and `two-phase-commit` share no listed variable, yet a Percolator unit whose primary or secondary sits in a memory-rung group can be half lost when that group's majority stops uncleanly. It needs one rule (a unit's records commit at `persisted`, or a unit inherits its weakest resource's loss contract). The same holds for COMP's sagas (K-09); the settled P-15 cells of the saga rows with Q `mix` are met, so P-15 is left as predicted here. Novel: none. `memory-rung`, `tier`, `disk-incarnation` and `lsm-store` are settled not novel; the added unit has PD's own oracle as its precedent. So the row stays at 0 novel (1 if the referee counts the added unit as `restore-mark`). Nothing listed is unneeded. Row-specific: no memory rung here, so the 2PC interaction and K-09 do not apply. `par` on an LSM as for B1: `par-repair` covers the Raft log, sorted-file damage falls to the store's block checksums and a snapshot from a peer; par's vote and repair rules must be added inside raft-rs or Go's etcd raft (a fork of either). `disk-incarnation` stays (A-01 rule 4)."
+   }
+  }
+ }
+}

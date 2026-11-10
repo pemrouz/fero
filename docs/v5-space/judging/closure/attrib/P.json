@@ -1484,6 +1484,18 @@
    "rules": [
     {
      "when": {
+      "Q": [
+       "mix"
+      ],
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): a two-phase-commit unit that touches a memory-rung resource can be half lost when that group's majority stops uncleanly. One stated rule would close it (units that touch a memory partition commit at persisted, or are refused); no row states it and nothing modelled it, so the cell is open, not a fail."
+    },
+    {
+     "when": {
       "X": [
        "none"
       ]
@@ -1628,6 +1640,18 @@
    "req": "P-15",
    "part": "S",
    "rules": [
+    {
+     "when": {
+      "Q": [
+       "mix"
+      ],
+      "X": [
+       "2pc"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): a two-phase-commit unit that touches a memory-rung resource can be half lost when that group's majority stops uncleanly. One stated rule would close it (units that touch a memory partition commit at persisted, or are refused); no row states it and nothing modelled it, so the cell is open, not a fail."
+    },
     {
      "when": {
       "X": [

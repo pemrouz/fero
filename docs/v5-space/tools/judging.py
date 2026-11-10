@@ -31,7 +31,7 @@ GROUPS = {'P': ['P'], 'PERF-DATA': ['PERF', 'DATA'], 'SC': ['SC'], 'F': ['F'], '
 VM, VS = ('met', 'open', 'fails'), ('met', 'not', 'open')
 PROOFS = ('counterexample', 'ceiling', 'structural')
 BASES = ('measured', 'model', 'cited', 'reasoned', 'construction')
-CHOICES = ('restated', 'F_w', 'N_res', 'PERF-01 losses', 'region scope', 'shared tier', 'fsync figure', 'F-06 reading', 'other')
+CHOICES = ('restated', 'F_w', 'N_res', 'PERF-01 losses', 'region scope', 'shared tier', 'fsync figure', 'F-06 reading', 'DATA-01 reading', 'other')
 
 def load(p):
     with open(p) as f:
@@ -81,6 +81,13 @@ def mech_settled():
             m['reruled'] = x['id']
         for x in rr.get('new', []) or []:
             ms.append(dict(x, reruled=x.get('id', 'new')))
+        by = {m['key']: m for m in ms}
+        for x in rr.get('record_fixes', []) or []:
+            if x.get('ruling') != 'accept': continue
+            m = by[x['key']]
+            if x.get('reads_add'): m['reads'] = m['reads'] + [r for r in x['reads_add'] if r not in m['reads']]
+            if x.get('writes_add'): m['writes'] = m['writes'] + [r for r in x['writes_add'] if r not in m['writes']]
+            if x.get('field') and x.get('to'): m[x['field']] = x['to']
     return ms
 
 def novel_counts(ms):

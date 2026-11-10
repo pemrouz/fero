@@ -278,5 +278,42 @@
    }
   },
   "outcome B, judged rows": "COMP, before and after. In B's sweep the lines 'SPLIT with -2 novel -> SPLIT' and 'COMP with +2 novel -> SPLIT' go, and 'every open SHOULD counted as met -> SPLIT' comes in. RM-02 alone (without RM-01) would make SPLIT the winner."
- }
+ },
+ "record_fixes": [
+  {
+   "key": "par-repair",
+   "field": "rules",
+   "ruling": "accept",
+   "by": "both",
+   "to": "A replica that finds a damaged entry by its checksum marks it bad. It keeps its id and its place as a voter, but while an entry is marked it grants no vote, takes no append and does not stand, and it neither serves nor folds past the bad entry (a reader asking for that position gets END, A-06). It copies the entry from any peer whose own copy is not marked and whose commit index covers it, then clears the mark. A damaged entry above the replica's own commit point needs PAR's 'possibly committed' query, which was not modelled (G-15).",
+   "pairs": 0,
+   "why": "E-37's 7 checked rules, each shown needed. 'Keeps its vote' as written loses a committed write (the vote mutant broke MoreUpToDateCorrectInv in 32 states), and F-22 (M) asks that the replica never votes or acknowledges on the bad entry. The read-path sentence is j2's: a damaged replica must not hand its zeroed record to a reader, relay or fold.",
+   "id": "RF-01",
+   "source": "judging/closure/hybrids/A.settled.json (row A2)"
+  },
+  {
+   "key": "raft-prevote-checkquorum",
+   "reads_add": [
+    "entry.badmark"
+   ],
+   "ruling": "accept",
+   "by": "both",
+   "pairs": 1,
+   "why": "E-37's ZTimeout guard: a damaged replica does not stand. Dropping it broke LogMatchingInv on par2d in 56 states. Standing is this unit's rule (the election timer and the pre-vote), so it reads the mark. +1 pair, with par-repair.",
+   "id": "RF-02",
+   "source": "judging/closure/hybrids/A.settled.json (row A2)"
+  },
+  {
+   "key": "par-repair",
+   "reads_add": [
+    "group.config"
+   ],
+   "ruling": "accept",
+   "by": "referee, for j1 (j2 did not raise it)",
+   "pairs": 2,
+   "why": "The settled records give a group.config read to every Raft unit whose rule picks peers or counts a majority (raft-log, raft-term-vote, raft-commit, raft-leader-transfer, raft-readindex). par-repair's rule picks a peer to copy from, and its 'possibly committed' rule counts a majority, so by the same convention it reads the config. It also lets the pair rule see the interaction VERDICT section 0 line 7 names as an owed model, par with a voter change (G-15): par-repair now pairs with raft-config and with whatever else writes group.config (controller-commands here; healing-self in a self row). +2 pairs.",
+   "id": "RF-03",
+   "source": "judging/closure/hybrids/A.settled.json (row A2)"
+  }
+ ]
 }

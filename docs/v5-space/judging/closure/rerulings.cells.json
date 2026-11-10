@@ -375,6 +375,33 @@
     "judging/DEP.settled.json (DEP-21 cells, both judges)",
     "VERDICT.review.json: recheck V-05"
    ]
+  },
+  {
+   "id": "RR-10",
+   "item": 6,
+   "group": "PERF-DATA",
+   "req": "DATA-01",
+   "part": "M",
+   "rows": [
+    "SRV",
+    "PD"
+   ],
+   "from": {
+    "v": "open"
+   },
+   "to": {
+    "v": "open",
+    "depends_on": "DATA-01 reading",
+    "alt": "fails",
+    "proof": "structural"
+   },
+   "ruling": "accept",
+   "by": "the coordinating session, encoding the cell referee's own user choice for item 6 (user_choices[1] of this file)",
+   "why": "The referee kept DATA-01 open for SRV and PD on DATA-09's path (a native fold proven equal to data's by a differential test), and named the other reading as the user's: if data's own code must fold on writers and followers, SRV and PD both fail by structure, never PD alone. This entry only records that choice in the cells (depends_on \"DATA-01 reading\", alt fails), so the arithmetic shows its effect. No verdict as the cells stand changes.",
+   "evidence": [
+    "REQUIREMENTS DATA-01, DATA-09",
+    "BRIEF item 6: data stays the state engine"
+   ]
   }
  ],
  "user_choices": [

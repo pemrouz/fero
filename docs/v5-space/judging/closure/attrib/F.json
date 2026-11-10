@@ -881,6 +881,15 @@
    "rules": [
     {
      "when": {
+      "S": [
+       "lsm +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): the row now has an object store, so PD's met reason (no store on any path) is gone; it has no restore mark (T tso, D txn), so AMENDMENTS 1.3's F-15 line, which covers rows that restore by A-08, does not apply. No run had the store down."
+    },
+    {
+     "when": {
       "R": [
        "obj"
       ]

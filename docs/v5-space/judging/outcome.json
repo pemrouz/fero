@@ -1029,6 +1029,18 @@
     "same_as_base": true
    },
    {
+    "case": "the user chooses the other way on: DATA-01 reading",
+    "sweep": "",
+    "winner": "level: DRAFT, SPLIT, ISR",
+    "in": [],
+    "top3": [
+     "DRAFT",
+     "SPLIT",
+     "ISR"
+    ],
+    "same_as_base": true
+   },
+   {
     "case": "the user chooses the other way on: other",
     "sweep": "",
     "winner": "level: DRAFT, SPLIT, ISR",
@@ -2731,6 +2743,22 @@
    },
    {
     "case": "the user chooses the other way on: fsync figure",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: DATA-01 reading",
     "sweep": "",
     "winner": "COMP",
     "in": [

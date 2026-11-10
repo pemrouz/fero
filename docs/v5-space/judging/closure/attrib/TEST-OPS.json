@@ -373,6 +373,19 @@
    "rules": [
     {
      "when": {
+      "K": [
+       "kern"
+      ],
+      "S": [
+       "lsm",
+       "lsm +tier"
+      ]
+     },
+     "v": "open",
+     "basis": "Closure referee B (judging/closure/hybrids/B.settled.json): the kernel judges writes against MVCC rows kept in the LSM, not in data, so E-06's timing of data's undo does not cover it; PD is open on the same ground."
+    },
+    {
+     "when": {
       "R": [
        "outside"
       ]
