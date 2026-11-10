@@ -1,0 +1,3478 @@
+{
+ "state_vars": [
+  {
+   "var": "group.log",
+   "meaning": "One group's ordered log on each replica: the committed part and the uncommitted tail. A group is whatever unit holds one log and one writer (a Raft group; an ISR partition; a loglet chain; a log of objects)."
+  },
+  {
+   "var": "group.term-vote",
+   "meaning": "Each Raft replica's current term and the vote it gave in that term."
+  },
+  {
+   "var": "group.commit",
+   "meaning": "The point up to which a group's log is committed (Raft's commit index; ISR's high watermark; a loglet's quorum-acked end; the last answered PUT)."
+  },
+  {
+   "var": "group.config",
+   "meaning": "A Raft group's voters, its one pending change (or joint configuration) and its config epoch, the count of committed changes."
+  },
+  {
+   "var": "group.learners",
+   "meaning": "A group's non-voting replicas (learners, standbys)."
+  },
+  {
+   "var": "group.leader",
+   "meaning": "Who leads a group now (the Raft leader; an ISR partition's leader; elsewhere the server that holds the writer role)."
+  },
+  {
+   "var": "group.transfer",
+   "meaning": "Not durable: a leader hand-over asked for or in flight in a group: its target, and the old leader's stop on new writes."
+  },
+  {
+   "var": "group.contact",
+   "meaning": "Not durable: each replica's election timer, and the leader's record of which voters it heard from within the election timeout."
+  },
+  {
+   "var": "group.read",
+   "meaning": "Not durable: the leader's pending ReadIndex requests and the acks that confirm them."
+  },
+  {
+   "var": "group.snapshot",
+   "meaning": "Each replica's snapshot of a group's state at one index, and the log prefix dropped below it."
+  },
+  {
+   "var": "group.rows",
+   "meaning": "The rows of the partitions a group holds, as folded on each replica that folds."
+  },
+  {
+   "var": "group.quiet",
+   "meaning": "Per group: whether it is quiet (it sends nothing while idle), and the offset it went quiet at."
+  },
+  {
+   "var": "group.dormant",
+   "meaning": "Per group: whether it is dormant (its state is on disk only, a small record, loaded on wake)."
+  },
+  {
+   "var": "group.placement",
+   "meaning": "Per group: a placement target and a preferred leader stored in its log by a planner hint."
+  },
+  {
+   "var": "group.witness",
+   "meaning": "Per group: which of its voters are log replicas (they vote and keep the log, never fold or serve)."
+  },
+  {
+   "var": "group.unclean",
+   "meaning": "Per replica: whether it stopped cleanly; under the memory rung an acknowledged tail may not be on its disk."
+  },
+  {
+   "var": "group.class",
+   "meaning": "Per project-owned group: the settings class (copies, durability) it serves."
+  },
+  {
+   "var": "writer.logend",
+   "meaning": "Not durable: the writer's log-end state, the fold of its committed state plus its uncommitted tail, against which writes are judged."
+  },
+  {
+   "var": "writer.epoch",
+   "meaning": "Per group, where the writer is not simply the Raft leader: which server holds the writer role, and the epoch of that role (RLOG, SLOG, OBJ)."
+  },
+  {
+   "var": "time.writer",
+   "meaning": "Per group: the writer time t stamped on each batch; it never goes back."
+  },
+  {
+   "var": "slot.table",
+   "meaning": "In the metadata group, per slot of a resource: the group that holds it open or is about to, with the version of that write."
+  },
+  {
+   "var": "slot.seq",
+   "meaning": "Per slot: the last sequence number stamped."
+  },
+  {
+   "var": "slot.epoch",
+   "meaning": "Per slot: its epoch; it rises when records of the slot may have been lost (an unfence after an abort, a recovery, a restore)."
+  },
+  {
+   "var": "move.record",
+   "meaning": "The entries of one slot move in the source's and the target's logs: exporting, importing, fenced(N), the copy and END(N), open, cancel, abort, unfenced."
+  },
+  {
+   "var": "move.lease",
+   "meaning": "The promise of one move at a time: a lease row in #meta, or the mover's one pending proposal."
+  },
+  {
+   "var": "load.report",
+   "meaning": "Not durable: write load and size per slot, range and group, as the mover or splitter sees them."
+  },
+  {
+   "var": "rekey.record",
+   "meaning": "The entries of one re-key (rk, cut, frz, cp, flip) in the old and the new groups' logs."
+  },
+  {
+   "var": "lane.map",
+   "meaning": "A project's fixed lane count and the hash that maps every (resource, partition) onto a lane."
+  },
+  {
+   "var": "split.record",
+   "meaning": "The entries of one split (spl, init) in the parent's and the child's logs."
+  },
+  {
+   "var": "merge.record",
+   "meaning": "The entries of one merge (mrg, sub, mgd) in the two groups' logs."
+  },
+  {
+   "var": "range.table",
+   "meaning": "Per group: the key or hash range it holds, and a generation that rises on every split or merge."
+  },
+  {
+   "var": "lineage.bases",
+   "meaning": "Kept for ever: for each group made by a split, its parent and the offset base at which it took over."
+  },
+  {
+   "var": "session.registry",
+   "meaning": "The session registry (#sessions): per client life, a session and the lease that keeps it."
+  },
+  {
+   "var": "session.table",
+   "meaning": "Per group, tagged by slot: per session the outcomes at or above the client's floor, and that floor."
+  },
+  {
+   "var": "session.generation",
+   "meaning": "The session generation; a restore raises it, so retries from before the restore are refused."
+  },
+  {
+   "var": "issuer.table",
+   "meaning": "Per group, tagged by slot: per issuer the highest call id seen and the committed outcomes above the floor (the dedup window)."
+  },
+  {
+   "var": "producer.table",
+   "meaning": "Per (producer, partition): the producer's epoch, its last sequence and its last cached batches; and the producer ids handed out."
+  },
+  {
+   "var": "key.table",
+   "meaning": "Per caller key, for its ttl: a claim with a lease, and the first result."
+  },
+  {
+   "var": "srchi.marks",
+   "meaning": "Per (consumer, source slot, output slot): the highest source sequence applied."
+  },
+  {
+   "var": "lock.rows",
+   "meaning": "Per lock (#locks): its holder, its lease end and its version, which is the fence token."
+  },
+  {
+   "var": "fence.table",
+   "meaning": "Per group, carried with a moving slot: the highest token seen per lock."
+  },
+  {
+   "var": "saga.intents",
+   "meaning": "Per unit (#sagas): its steps and its direction (run, undo, done, undone)."
+  },
+  {
+   "var": "meta.members",
+   "meaning": "Member records in the metadata group: id, life, disk incarnation, roles, addresses, code hashes, and the state mark (live, draining, retiring, gone)."
+  },
+  {
+   "var": "meta.catalog",
+   "meaning": "Resource records in the metadata group: name, config (slots, copies, durability, history, rules), allowed code hashes, the write gate, the generation pointer."
+  },
+  {
+   "var": "meta.directory",
+   "meaning": "Per group in the metadata group: its resource, its incarnation, and its last known replicas and leader (a routing hint)."
+  },
+  {
+   "var": "meta.commands",
+   "meaning": "The controller's list of live commands, each naming the config epoch it was decided at."
+  },
+  {
+   "var": "cluster.id",
+   "meaning": "The cluster id: in every dir's boot record, in #meta's first entry, and (where genesis is a conditional create) in the object store."
+  },
+  {
+   "var": "link.ping",
+   "meaning": "Per pair of members: whether the link is up and when it last answered, as each side sees it (the gone timer)."
+  },
+  {
+   "var": "link.clocks",
+   "meaning": "Each member's view of its peers' clocks, carried on pings or session heartbeats."
+  },
+  {
+   "var": "link.score",
+   "meaning": "Not durable: a latency score per member, for the slow-leader rule."
+  },
+  {
+   "var": "member.session",
+   "meaning": "Per member: its session with the controller and that session's epoch."
+  },
+  {
+   "var": "durable.log",
+   "meaning": "What a member has made durable of each group's entries, terms and votes (the journal, a WAL per group, an LSM tree, or log objects)."
+  },
+  {
+   "var": "journal.segments",
+   "meaning": "Per-group segment files cut from the journal, their indexes by offset, slot and partition, and the cut records."
+  },
+  {
+   "var": "disk.incarnation",
+   "meaning": "Per dir: a random incarnation id written when the dir is made; a new or wiped disk gets a new one."
+  },
+  {
+   "var": "store.objects",
+   "meaning": "In the object store: uploaded old segments, snapshot layers and merged bases."
+  },
+  {
+   "var": "store.manifest",
+   "meaning": "OBJ only: the manifest object that names a group's log head, snapshots and writer lease; changed by compare-and-swap."
+  },
+  {
+   "var": "restore.mark",
+   "meaning": "The highest epoch ever used, recorded outside the restored data (the store's manifest)."
+  },
+  {
+   "var": "lsm.files",
+   "meaning": "PD only: the LSM tree's memtables, sorted files and compaction state."
+  },
+  {
+   "var": "tenant.budget",
+   "meaning": "Not durable: a byte budget per tenant per second in a process that pools tenants."
+  },
+  {
+   "var": "sub.cursor",
+   "meaning": "Held by a subscriber (a row only for a consumer): per slot the epoch and the last sequence seen, with the cluster id and the resource's incarnation."
+  },
+  {
+   "var": "sub.index",
+   "meaning": "Not durable, on a server: which subscribers follow which partitions, and their read credits."
+  },
+  {
+   "var": "pubsub.path",
+   "meaning": "Not durable: messages of the none rung on their way to current subscribers; they never enter the log."
+  },
+  {
+   "var": "client.credit",
+   "meaning": "Not durable: how many writes a client or link may have outstanding, and the edge's handshake budget per tick."
+  },
+  {
+   "var": "route.inflight",
+   "meaning": "Not durable: writes a non-leader server holds in flight for a leader, each copy forwarded once."
+  },
+  {
+   "var": "route.cache",
+   "meaning": "In a smart client: its cached table of slot (or range, or partition) to leader."
+  },
+  {
+   "var": "fold.version",
+   "meaning": "A committed entry in each group's log that names the fold version in force from that offset."
+  },
+  {
+   "var": "worker.map",
+   "meaning": "Per process: which kernel worker (and so which journal) each group is pinned to."
+  },
+  {
+   "var": "side.ring",
+   "meaning": "Not durable: the shared-memory ring between a host's daemon and the app's Node process."
+  },
+  {
+   "var": "call.inflight",
+   "meaning": "Not durable: calls in flight at a partition leader's host."
+  },
+  {
+   "var": "mvcc.versions",
+   "meaning": "PD only: per key, its versions by commit timestamp, and the safe point below which old versions are collected."
+  },
+  {
+   "var": "tso.high",
+   "meaning": "PD only: the last timestamp the oracle handed out, and the window it saved before use."
+  },
+  {
+   "var": "txn.intents",
+   "meaning": "PD only: per transaction, its primary and secondary locks on the keys it writes, and its commit record."
+  },
+  {
+   "var": "closed.ts",
+   "meaning": "PD only: per group, the closed timestamp below which no new write will commit."
+  },
+  {
+   "var": "read.lease",
+   "meaning": "Not durable: the leader's read lease, a time promise that no other leader exists until it ends."
+  },
+  {
+   "var": "isr.set",
+   "meaning": "ISR only: per partition, the in-sync replica set."
+  },
+  {
+   "var": "isr.leader-epoch",
+   "meaning": "ISR only: per partition, the leader epoch, and each replica's start offset of every epoch."
+  },
+  {
+   "var": "isr.elr",
+   "meaning": "ISR only: per partition, the eligible leader replicas."
+  },
+  {
+   "var": "txn.log",
+   "meaning": "ISR only: per transactional id, its producer id and epoch, the transaction's state and the partitions it wrote."
+  },
+  {
+   "var": "txn.markers",
+   "meaning": "ISR only: per partition, commit and abort markers and the last stable offset."
+  },
+  {
+   "var": "loglet.seal",
+   "meaning": "SLOG only: per loglet and log node, a sealed flag; and the recovered end of a sealed loglet."
+  },
+  {
+   "var": "loglet.chain",
+   "meaning": "SLOG only: per data group, the chain of its loglets with their log nodes, starts and ends."
+  },
+  {
+   "var": "v4.lanes",
+   "meaning": "V4 only: per author (a member's life), its own numbered log of the changes it stamped."
+  },
+  {
+   "var": "v4.stamps",
+   "meaning": "V4 only: per cell, the stamp of the change that holds it now (member-list version, ticket, author)."
+  },
+  {
+   "var": "v4.digests",
+   "meaning": "V4 only: per link, a list of the highest ticket held for each author."
+  },
+  {
+   "var": "v4.tombstones",
+   "meaning": "V4 only: per removed cell, a deleted-at marker with its stamp."
+  },
+  {
+   "var": "v4.frontiers",
+   "meaning": "V4 only: per (author, row), the point below which a replica has compacted its log."
+  },
+  {
+   "var": "v4.orphans",
+   "meaning": "V4 only: per slice, an orphan mark on a copy this replica may no longer serve."
+  },
+  {
+   "var": "v4.sheds",
+   "meaning": "V4 only: that a former keeper deleted its copy of a slice, or that a paused link's queue was thrown away."
+  },
+  {
+   "var": "v4.latches",
+   "meaning": "V4 only: per slice being copied, the one chosen teacher and the changes held aside; per store, a latch set by a failed fsync."
+  },
+  {
+   "var": "v4.teachers",
+   "meaning": "V4 only: per slice copy, the staged data from the teacher and its end marker."
+  },
+  {
+   "var": "v4.floors",
+   "meaning": "V4 only: per (author, row) and holder, a possession floor and a durable floor."
+  },
+  {
+   "var": "v4.feed",
+   "meaning": "V4 only: per feeder and spoke, the words the feeder owes the spoke about sheds and re-latches."
+  },
+  {
+   "var": "v4.insync",
+   "meaning": "V4 only: per slice, the holders that have proved they hold everything up to the crash-stable frontier."
+  },
+  {
+   "var": "v4.eligible",
+   "meaning": "V4 only: per row, the members that may take over stamping it."
+  },
+  {
+   "var": "v4.views",
+   "meaning": "V4 only: the member list and its version, the ballots and votes for the next view, and held members."
+  },
+  {
+   "var": "v4.owner",
+   "meaning": "V4 only: for each row, the one member the ring picks to stamp its changes."
+  },
+  {
+   "var": "v4.confirm",
+   "meaning": "V4 only: per pending write, which holders have attested that they hold it."
+  },
+  {
+   "var": "outside.log",
+   "meaning": "BUY only: everything the bought log keeps (streams and sequences, its own consensus and metadata, its dedup window, consumers, buckets)."
+  }
+ ],
+ "mechanisms": [
+  {
+   "key": "raft-log",
+   "name": "Raft log",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "Each replica's ordered entries of one group (index, term, payload): a committed part and an uncommitted tail.",
+   "rules": "Only the leader appends. A follower takes entries only when the entry before them matches, and cuts a tail that conflicts (log matching).",
+   "reads": [
+    "group.config",
+    "group.leader",
+    "group.learners",
+    "group.snapshot",
+    "group.term-vote"
+   ],
+   "writes": [
+    "group.log"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 R `raft`; DESIGN-V5 4.2 'A shard is a Raft group'; Ongaro and Ousterhout 2014; etcd's raft and its port (E-10, E-46 measured)",
+   "model": "E-14, E-14b, E-14c: TLC on etcd's own TLA+ spec; no rule count by ablation"
+  },
+  {
+   "key": "raft-term-vote",
+   "name": "Term and vote",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "Each replica's current term and the vote it gave in that term, on disk before any reply that depends on them.",
+   "rules": "A replica votes once a term, only for a candidate whose log is at least as up to date. A candidate with a majority of its own configuration's voters leads the term; no member campaigns while a committed change is unapplied (A-01).",
+   "reads": [
+    "disk.incarnation",
+    "durable.log",
+    "group.commit",
+    "group.config",
+    "group.contact",
+    "group.learners",
+    "group.log",
+    "group.transfer",
+    "group.witness"
+   ],
+   "writes": [
+    "group.leader",
+    "group.term-vote"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 R `raft`; DESIGN-V5 4.2 'Who stands for election'; AMENDMENTS A-01 (the campaign guard), A-02 (jitter 0.25 E)",
+   "model": "E-14, E-14b, E-14c: TLC on etcd's spec; the campaign guard is 1 of the 16 membership rules"
+  },
+  {
+   "key": "raft-commit",
+   "name": "Commit index",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "The highest index a majority of the group's voters hold (on disk, under `persisted`); the leader stamps it on later messages and followers learn it.",
+   "rules": "The leader advances it when a majority of voters, itself once its own fsync lands, hold an entry of its own term. A new leader first commits an entry of its own term.",
+   "reads": [
+    "durable.log",
+    "group.config",
+    "group.leader",
+    "group.log",
+    "group.term-vote"
+   ],
+   "writes": [
+    "group.commit"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 R `raft`, Q `maj-d`; DESIGN-V5 4.2 'The commit'",
+   "model": "E-14, E-14b, E-14c: TLC on etcd's spec; no rule count by ablation"
+  },
+  {
+   "key": "raft-config",
+   "name": "Configurations and joint consensus (membership on commit)",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "The group's voters, the one change that may be pending (or the joint configuration), and the config epoch: the count of committed changes.",
+   "rules": "One change at a time, as a log entry that takes effect when it commits. Only a voter of its own applied configuration stands; a removed leader steps down; a lost disk never returns under its old id (A-01).",
+   "reads": [
+    "disk.incarnation",
+    "group.commit",
+    "group.leader",
+    "group.learners",
+    "group.log"
+   ],
+   "writes": [
+    "group.config"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 R `raft`; DESIGN-V5 4.2 and decision 22; AMENDMENTS A-01 (reasoned for the raft-rs rows)",
+   "model": "E-14, E-14b, E-14c (TLC on etcd's spec): 16 rules for membership in all (E-14b's 14 plus E-14c's 2); 12 of 13 non-equivalent mutants caught"
+  },
+  {
+   "key": "learners",
+   "name": "Learners (non-voting replicas)",
+   "axis": "V",
+   "option": "+lrn",
+   "layer": "L1",
+   "state": "The group's non-voting replicas: they copy the log, and fold where the row folds on replicas (in SLOG and RLOG they are the servers).",
+   "rules": "A new replica joins as a learner and is promoted only once it has caught up. A learner grants a vote when asked and never stands (A-01).",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.log",
+    "group.snapshot"
+   ],
+   "writes": [
+    "group.learners"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 V `+lrn`, SPACE 3 R1.L; DESIGN-V5 4.2; etcd learners; AMENDMENTS A-01 (2)",
+   "model": "E-14b (TLC): 'learners grant votes' is 1 of the 16 membership rules"
+  },
+  {
+   "key": "raft-snapshot",
+   "name": "Snapshots",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "Each replica's snapshot of the folded state at one index, and the log prefix it has dropped below it.",
+   "rules": "A replica cuts a snapshot at a committed index and may then drop its log below it. The leader sends a snapshot to a replica that is behind its log start (InstallSnapshot).",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.learners",
+    "group.rows",
+    "store.objects"
+   ],
+   "writes": [
+    "group.log",
+    "group.snapshot"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 1 B0 (snapshots on local disk); DESIGN-V5 3.4 and 4.1; Raft's InstallSnapshot; E-46 (snapshots measured under Maelstrom)",
+   "model": ""
+  },
+  {
+   "key": "raft-prevote-checkquorum",
+   "name": "PreVote and CheckQuorum",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "Not durable: each replica's election timer, and the leader's record of which voters it heard from within the election timeout.",
+   "rules": "A replica asks for pre-votes before it raises its term. A leader that has not heard from a majority steps down; the check runs every E/4, and on a quiet group it reads the link pings (A-02).",
+   "reads": [
+    "group.config",
+    "group.log",
+    "group.quiet",
+    "group.term-vote",
+    "link.ping"
+   ],
+   "writes": [
+    "group.contact",
+    "group.leader"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2; AMENDMENTS A-02; E-38 (simulated on etcd's raft), E-38c and E-13 (measured on etcd 3.5.17)",
+   "model": ""
+  },
+  {
+   "key": "raft-leader-transfer",
+   "name": "Leader transfer",
+   "axis": "R",
+   "option": "raft, rlog (and the metadata group of isr and slog)",
+   "layer": "L1",
+   "state": "Not durable: a transfer in flight (its target, and the leader's stop on new writes).",
+   "rules": "The leader stops taking writes, brings the target up to its log end and sends TimeoutNow, so the target stands at once. Writes caught in the transfer are refused, never dropped (A-02).",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.leader",
+    "group.log"
+   ],
+   "writes": [
+    "group.transfer"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2 'A planned handover'; AMENDMENTS A-02; E-13 (measured), E-38 (simulated)",
+   "model": ""
+  },
+  {
+   "key": "raft-readindex",
+   "name": "ReadIndex",
+   "axis": "W",
+   "option": "ridx",
+   "layer": "L1",
+   "state": "Not durable: the leader's pending read requests, each with the commit index it had and the acks that confirm it still leads.",
+   "rules": "The leader confirms with a majority that it still leads (one round, no fsync), then answers once its fold reaches that commit index. The request is the group's own message and wakes a quiet group.",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.leader",
+    "group.rows",
+    "group.term-vote"
+   ],
+   "writes": [
+    "group.read"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 W `ridx`; DESIGN-V5 4.2 'Reads'; Raft thesis 6.4; E-46 (measured: linearizable in every Maelstrom run)",
+   "model": ""
+  },
+  {
+   "key": "link-pings",
+   "name": "Link pings (one ping per member pair)",
+   "axis": "C",
+   "option": "failure detector: one ping per member pair",
+   "layer": "L1",
+   "state": "Per pair of members that share a group: whether the link is up and when it last answered, as each side sees it; the pings also carry each side's clock.",
+   "rules": "Two members of one cluster that share a group ping every ping.ms when no other frame went their way; a peer silent past evict.after is gone to this member. Past 100 members a bound on linked peers per member is needed (A-12, a placement rule).",
+   "reads": [
+    "cluster.id",
+    "group.config",
+    "group.learners",
+    "meta.members"
+   ],
+   "writes": [
+    "link.clocks",
+    "link.ping"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 C (the failure detector sub-choice); DESIGN-V5 4.2 'Failure detection'; CockroachDB's store liveness; AMENDMENTS A-12 (E-25, E-11 measured)",
+   "model": ""
+  },
+  {
+   "key": "quiet-groups",
+   "name": "Quiet groups",
+   "axis": "R",
+   "option": "raft, rlog (multi-Raft)",
+   "layer": "L1",
+   "state": "Per group: whether it is quiet, and the offset it went quiet at ('quiet at i').",
+   "rules": "A leader with no writes for two ticks, whose live voters all hold its commit offset, tells them 'quiet at i' and stops sending. Any write or read index wakes it; a follower below i asks to wake; a returning link reports log ends.",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.leader",
+    "group.log",
+    "group.read",
+    "link.ping"
+   ],
+   "writes": [
+    "group.quiet"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2 'Quiet shards'; SPACE 3 R1; AMENDMENTS A-12 (needed from phase 2); CockroachDB's quiesced ranges; for PD, TiKV's hibernate regions; E-11, E-25 (measured, no failure injected)",
+   "model": ""
+  },
+  {
+   "key": "dormant-groups",
+   "name": "Dormant groups",
+   "axis": "G",
+   "option": "shard (A-15)",
+   "layer": "",
+   "state": "Per group: a dormant mark. A dormant group is on disk only (a 24-byte record of term, vote, commit and log end; 57 B in memory) and is loaded on wake.",
+   "rules": "A quiet, fully committed group is written to the dormant store and dropped from memory; the first message, write or open for it wakes it.",
+   "reads": [
+    "durable.log",
+    "group.commit",
+    "group.quiet",
+    "group.snapshot",
+    "link.ping",
+    "meta.directory"
+   ],
+   "writes": [
+    "group.dormant"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "SPLIT",
+    "SLOG",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "source": "AMENDMENTS A-15 (E-36, E-26 measured; reasoned for SPLIT and SLOG); precedent on offer: TiKV's hibernate regions (cited from memory)",
+   "model": ""
+  },
+  {
+   "key": "slow-leader-controller",
+   "name": "Slow-leader rule, the controller's form",
+   "axis": "R",
+   "option": "raft, rlog with C cent or cent-co (A-03)",
+   "layer": "",
+   "state": "No durable or replicated state is named (A-03 leaves open whether this is a mechanism): a latency score per member, kept by the controller.",
+   "rules": "The controller moves leadership away from a member that is much slower than its followers. The rule was named, not built or modelled.",
+   "reads": [
+    "client.credit",
+    "group.leader",
+    "group.quiet",
+    "link.ping",
+    "member.session",
+    "meta.members"
+   ],
+   "writes": [
+    "group.transfer",
+    "link.score"
+   ],
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "PD",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "source": "AMENDMENTS A-03 (E-38 simulated, E-38c measured); precedent on offer: TiKV PD's evict-slow-store scheduler (cited from memory)",
+   "model": ""
+  },
+  {
+   "key": "slow-leader-self",
+   "name": "Slow-leader rule, the leader's own form",
+   "axis": "R",
+   "option": "raft with C self or self+p (A-03)",
+   "layer": "",
+   "state": "No durable or replicated state is named (A-03 leaves open whether this is a mechanism): a latency score per member, kept by each leader.",
+   "rules": "A leader that is much slower than its followers hands leadership over by itself. The rule was named, not built or modelled; no precedent is on offer for this form.",
+   "reads": [
+    "client.credit",
+    "group.commit",
+    "group.leader",
+    "group.quiet",
+    "link.ping"
+   ],
+   "writes": [
+    "group.transfer",
+    "link.score"
+   ],
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-03 (E-38 simulated, E-38c measured); AMENDMENTS section 4 (COMP can use only this form)",
+   "model": ""
+  },
+  {
+   "key": "meta-members",
+   "name": "Member records in #meta",
+   "axis": "R",
+   "option": "every row with a metadata group",
+   "layer": "L1",
+   "state": "Per member in the metadata group: id, life, disk incarnation, roles, addresses, code hashes, and its state mark (live, draining, retiring, gone).",
+   "rules": "A joiner writes its own record. The metadata group's leader (or a hint) marks a member gone when its links have not reached it for evict.after, and clears the mark when that life returns. A leave marks itself retiring first.",
+   "reads": [
+    "cluster.id",
+    "disk.incarnation",
+    "link.ping",
+    "member.session"
+   ],
+   "writes": [
+    "meta.members"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2 '#meta, the cluster's own shard', 'Healing: Members', 'Leaving'; SPACE 3 R1; for PD, ISR, SLOG and OBJ the same records in their own metadata store",
+   "model": ""
+  },
+  {
+   "key": "meta-catalog",
+   "name": "Resource catalog in #meta",
+   "axis": "R",
+   "option": "every row with a metadata group",
+   "layer": "L1",
+   "state": "Per resource in the metadata group: name, config (slots, copies, standbys, durability, history, rules), allowed code hashes, seed applied, write gate.",
+   "rules": "The first fero(name, opts) that creates a resource writes its record, with its first group and that group's slots. A later open that differs is refused; alter changes it online.",
+   "reads": [
+    "meta.members"
+   ],
+   "writes": [
+    "meta.catalog",
+    "meta.directory",
+    "slot.table"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2 '#meta' and 4.5 'Defining and changing a resource'; AMENDMENTS section 4 (COMP's table: 0 in SPACE, inside R1)",
+   "model": ""
+  },
+  {
+   "key": "meta-directory",
+   "name": "Group directory in #meta",
+   "axis": "R",
+   "option": "every row with a metadata group",
+   "layer": "L1",
+   "state": "Per group in the metadata group: its resource, its incarnation, and its last known replicas and leader. It is a routing hint; the group's own log is the truth.",
+   "rules": "A group's leader refreshes its record after each change, the newest config winning. A recovery raises the incarnation. A group's record is deleted once the slot table has shown none of its slots for settle.ms and its history is safe.",
+   "reads": [
+    "group.config",
+    "group.leader",
+    "group.learners",
+    "slot.table",
+    "store.objects"
+   ],
+   "writes": [
+    "meta.directory"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 4.2 '#meta' (the shard record), 'A shard is deleted', 'Operator recovery'",
+   "model": ""
+  },
+  {
+   "key": "healing-self",
+   "name": "Healing by each group's leader",
+   "axis": "C",
+   "option": "self, self+p",
+   "layer": "L1",
+   "state": "Its steps are config entries in the group's own log. It keeps no other state: the target is computed from the ring over the members in #meta, or read from a stored placement.",
+   "rules": "From its own links the leader adds a learner when a voter is gone, promotes it once caught up, then removes the gone or surplus voter once the voters left answer and hold the commit offset; it grows before it shrinks (A-01, A-19). It hands leadership back to the preferred leader after settle.ms.",
+   "reads": [
+    "disk.incarnation",
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.placement",
+    "link.ping",
+    "meta.catalog",
+    "meta.members"
+   ],
+   "writes": [
+    "group.config",
+    "group.learners",
+    "group.transfer"
+   ],
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "source": "SPACE 2 C `self`, SPACE 3 R1.H; DESIGN-V5 4.2 'Healing'; AMENDMENTS A-19, A-01 (5)",
+   "model": "E-16: 14 rules by ablation (16 of 17 mutants caught); v5-spec/healing.py checked the draft's text before A-01 and A-19"
+  },
+  {
+   "key": "controller-commands",
+   "name": "Controller loop with commands checked by config epoch",
+   "axis": "C",
+   "option": "cent, cent-co",
+   "layer": "",
+   "state": "The controller's list of live commands in the metadata group, each naming the group's config epoch it was decided at.",
+   "rules": "The loop on #meta's leader (or a separate controller) decides each change from its own links and the reported config, and writes a command. The group's leader runs it only if the epoch still matches and its own links agree (gone for a removal, alive for a promotion); a command the group refuses times out (A-20).",
+   "reads": [
+    "disk.incarnation",
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "link.ping",
+    "member.session",
+    "meta.catalog",
+    "meta.directory",
+    "meta.members"
+   ],
+   "writes": [
+    "group.config",
+    "group.learners",
+    "meta.commands"
+   ],
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "source": "SPACE 2 C `cent`, `cent-co`, SPACE 3 R1.C; AMENDMENTS A-20, A-19 (reasoned for PD, ISR, SLOG, OBJ); TiKV PD's region epoch and operator timeout",
+   "model": "E-16: 18 rules by ablation (16 with a counterexample; 12 of 21 mutants caught, 9 undecided)"
+  },
+  {
+   "key": "planner-hints",
+   "name": "Planner hints, checked against the config they name",
+   "axis": "C",
+   "option": "self+p (and owed by COMP for DEP-17)",
+   "layer": "L1",
+   "state": "Hints written to #meta (drain, retire and gone marks on members; the planner's lease row), and a placement target and preferred leader stored in the group's log.",
+   "rules": "Anything holding the admin key sends a hint that names the group config it read. The group applies it only if its config is still that one, else refuses stale-plan; a leader whose link to a member is up ignores a gone hint. A lease row keeps two planners apart.",
+   "reads": [
+    "group.config",
+    "group.leader",
+    "link.ping"
+   ],
+   "writes": [
+    "group.placement",
+    "group.transfer",
+    "meta.members",
+    "move.lease"
+   ],
+   "rows": [
+    "DRAFT",
+    "LANE",
+    "SPLIT",
+    "COMP"
+   ],
+   "source": "SPACE 2 C `self+p`, SPACE 3 R1.H.P; DESIGN-V5 4.2 'The planner'; AMENDMENTS section 4 (COMP's table lists it as owed; not modelled; K-08); v5-spec/healing.py had the draft's hints",
+   "model": ""
+  },
+  {
+   "key": "log-replicas",
+   "name": "Log replicas (the witness): lead only to repair",
+   "axis": "V",
+   "option": "+wit",
+   "layer": "L1",
+   "state": "Which voters of a group are log replicas: they vote and keep the log tail, but never fold rows or serve clients.",
+   "rules": "A log replica stands only when no full voter has won an election for twice election.ms. When it leads it commits an entry of its own term, brings a full voter up to date (or adds one from the object store's snapshot and its own tail), hands it leadership, and takes no client write.",
+   "reads": [
+    "group.commit",
+    "group.contact",
+    "group.leader",
+    "group.log",
+    "group.term-vote",
+    "meta.members",
+    "store.objects"
+   ],
+   "writes": [
+    "group.config",
+    "group.learners",
+    "group.transfer",
+    "group.witness"
+   ],
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT"
+   ],
+   "source": "SPACE 2 V `+wit`, SPACE 3 R1.W; DESIGN-V5 4.2 'Log replicas'; Spanner's witness replicas; never modelled in this study (AMENDMENTS section 2 V, G-25)",
+   "model": ""
+  },
+  {
+   "key": "project-groups",
+   "name": "Groups owned by the project (pslot)",
+   "axis": "G",
+   "option": "pslot",
+   "layer": "",
+   "state": "Per project group: its settings class (copies, durability) and the (resource, slot set) pairs it holds.",
+   "rules": "A new resource's slots start inside an existing group of its class; a different copies or durability forces a group boundary; slot moves split slots off under load, and each move entry names (resource, slot).",
+   "reads": [
+    "meta.catalog",
+    "meta.directory"
+   ],
+   "writes": [
+    "group.class",
+    "slot.table"
+   ],
+   "rows": [
+    "MIN-P",
+    "COMP"
+   ],
+   "source": "SPACE 2 G `pslot`, SPACE 3 R1.P; AMENDMENTS section 2 G and D4; E-36 (measured, with one slot map shared by the project)",
+   "model": "E-17b, E-17c: the move needs 28 rules, the same as `slot` on the same footing (0 more); about 2 placement rules are reasoned, not modelled"
+  },
+  {
+   "key": "lanes",
+   "name": "Project lanes",
+   "axis": "G",
+   "option": "lane (P fixN)",
+   "layer": "",
+   "state": "A fixed number of groups per project (64) and the hash that maps every (resource, partition) onto one of them; copies and durability are project-wide.",
+   "rules": "The lane count is fixed when the project is founded; every write hashes to its lane; a lane never moves, splits or goes away.",
+   "reads": [
+    "meta.catalog"
+   ],
+   "writes": [
+    "lane.map"
+   ],
+   "rows": [
+    "LANE"
+   ],
+   "source": "SPACE 2 G `lane`, SPACE 3 R0.N64; V5-UNITS; Redis Cluster, Pulsar bundles",
+   "model": "E-17b: lanes with a range move need 28 rules (30 in a real log); the LANE row holds no range move, so its count is fixN's 13"
+  },
+  {
+   "key": "slot-table",
+   "name": "Slot table",
+   "axis": "P",
+   "option": "slot",
+   "layer": "L1",
+   "state": "In #meta, per slot of a resource: the group that holds it open, or is about to. Each write carries a version (slot epoch, move name, writer incarnation, step) and #meta keeps the highest.",
+   "rules": "The target writes s to B before it opens; after an abort it writes s to A back before A reopens; a recovery writes the row at the slot's new epoch. So the table is never behind an open.",
+   "reads": [
+    "meta.directory",
+    "move.record",
+    "slot.epoch"
+   ],
+   "writes": [
+    "slot.table"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 P `slot`; DESIGN-V5 4.2 'The slot table'; AMENDMENTS A-16 (4,096 slots, a run-length table)",
+   "model": "E-15 (TLC and slot_move.py): inside the move's 31 rules ('whenever a group holds s open, the table names it')"
+  },
+  {
+   "key": "slot-move",
+   "name": "Slot move (the move record: export, import, fence, copy, open)",
+   "axis": "P",
+   "option": "slot",
+   "layer": "L1",
+   "state": "The entries of one move in the source's and the target's logs: exporting, importing, fenced(N), the copy and END(N), open, and cancel, abort or unfenced; and the carried set.",
+   "rules": "The source fences the slot once, on the target's ready report, and takes no write to it from then. The target opens it once, only after the fence, the delta and the carried set are committed in its own log; one decider gives a move up (A-17). The carried set is the slot's sequence and epoch, dedup outcomes and floors, the lock fence table, the srchi marks and the segment names; a new epoch is recorded in the restore mark before use (A-08).",
+   "reads": [
+    "group.commit",
+    "group.config",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "journal.segments",
+    "meta.directory",
+    "move.lease",
+    "store.objects",
+    "time.writer"
+   ],
+   "writes": [
+    "fence.table",
+    "issuer.table",
+    "move.record",
+    "restore.mark",
+    "session.table",
+    "slot.epoch",
+    "slot.seq",
+    "slot.table",
+    "srchi.marks"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 P `slot`, SPACE 3 R1.S.M; DESIGN-V5 4.2 'Moving a slot'; AMENDMENTS A-17, A-16, A-08; E-13 (window measured)",
+   "model": "E-15: TLC agrees with slot_move.py on 74 runs, 31 rules with unclean recovery, cancel and abort; E-17c: 28 rules by ablation, crash-only, no give-up (26 on the shared bounds; 33 to 34 with one give-up decider), counting the 13 rules of a plain write path (fixN)"
+  },
+  {
+   "key": "move-policy",
+   "name": "Move policy (who decides the moves)",
+   "axis": "P",
+   "option": "slot (A-18); slot + rule in DRAFT",
+   "layer": "L1",
+   "state": "No durable state beyond the promise of one move at a time (a lease row in #meta in DRAFT; the mover's one pending proposal elsewhere); load per slot and group is kept in memory.",
+   "rules": "One slot at a time, from the busiest group to the least loaded, and only when the move wins by a margin (A-18); a grow makes a new group and a shrink deletes one. Run by the controller, by one loop on #meta's leader that only proposes moves (COMP), or by each group's leader (DRAFT).",
+   "reads": [
+    "group.config",
+    "group.leader",
+    "meta.catalog",
+    "slot.table"
+   ],
+   "writes": [
+    "load.report",
+    "meta.directory",
+    "move.lease"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-18 and section 2 P (E-18 simulated as one loop with exact loads); SPACE 3 R1.S.M.A; DESIGN-V5 4.2 'The shard rule'",
+   "model": ""
+  },
+  {
+   "key": "rekey",
+   "name": "Re-key into a new generation",
+   "axis": "P",
+   "option": "fixN + rekey",
+   "layer": "L5",
+   "state": "The entries of one re-key (rk, cut, frz, cp, flip) in the old and the new groups' logs, and the catalog's generation pointer.",
+   "rules": "Copy every partition into a new generation with more groups, freeze the old one, then flip the catalog pointer once the copies are committed; one re-key at a time. A cursor of another generation is refused and restarts from a snapshot.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "sub.cursor"
+   ],
+   "writes": [
+    "fence.table",
+    "meta.catalog",
+    "meta.directory",
+    "rekey.record",
+    "session.table",
+    "srchi.marks"
+   ],
+   "rows": [
+    "CELL"
+   ],
+   "source": "SPACE 2 P `rekey`, SPACE 3 R1.F16.K; V5-PRIMITIVE; Vitess resharding; AMENDMENTS section 2 P (fails SC-08 b and f, model-checked)",
+   "model": "E-17, E-17c: 35 rules by ablation as written, 29 with positions carried (36 to 38 and 30 to 32 in a real log), counting fixN's 13"
+  },
+  {
+   "key": "split-record",
+   "name": "Split (the split record)",
+   "axis": "P",
+   "option": "split; split + merge",
+   "layer": "",
+   "state": "The entries of one split in the parent's and the child's logs (spl, and init with the carried dedup and fence state).",
+   "rules": "A group splits only a range it holds. The parent takes no write to the split-off range once the split entry is in its log; the child starts once, from a committed split, carrying dedup and fence state. A split copies no rows.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "load.report"
+   ],
+   "writes": [
+    "fence.table",
+    "issuer.table",
+    "range.table",
+    "split.record",
+    "srchi.marks"
+   ],
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "source": "SPACE 2 P `split`, SPACE 3 R1.X; DESIGN-V5 decision 20a; CockroachDB, TiKV",
+   "model": "E-17b, E-17c: split + merge needs 33 rules by ablation (37 in a real log): a 9-rule split, an 11-rule merge and lineage, counting fixN's 13"
+  },
+  {
+   "key": "merge-record",
+   "name": "Merge (the merge record)",
+   "axis": "P",
+   "option": "split + merge",
+   "layer": "",
+   "state": "The entries of one merge (mrg, sub, mgd) in the two groups' logs.",
+   "rules": "The group to be removed freezes only for a committed merge; the survivor takes its rows and carried state once and gives the merged range a new generation.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "meta.commands"
+   ],
+   "writes": [
+    "merge.record",
+    "meta.directory",
+    "range.table"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 2 P `split` (and later merges), SPACE 3 R1.X.M; TiKV region merge",
+   "model": "E-17b, E-17c: an 11-rule merge inside split + merge's 33 rules (37 in a real log)"
+  },
+  {
+   "key": "range-table",
+   "name": "Range table (which group holds which range)",
+   "axis": "P",
+   "option": "split; split + merge",
+   "layer": "",
+   "state": "Per group: the key or hash range it holds and a generation that rises on every split or merge (CockroachDB's range descriptors; the version half of TiKV's region epoch).",
+   "rules": "A split or a merge writes the new ranges with a higher generation; a route or a command made on an older generation is refused and refreshed.",
+   "reads": [
+    "merge.record",
+    "split.record"
+   ],
+   "writes": [
+    "range.table"
+   ],
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "source": "SPACE 2 P `split` and O `off+lin` (precedent: CockroachDB range descriptors); SPACE 2 C `cent` (PD's region epoch)",
+   "model": ""
+  },
+  {
+   "key": "split-policy",
+   "name": "Split policy (who decides the splits and merges)",
+   "axis": "P",
+   "option": "split; split + merge",
+   "layer": "",
+   "state": "No durable state: size and load per group, kept in memory.",
+   "rules": "A group splits when it passes a size or load limit: each leader decides in SPLIT; in PD the controller's schedulers also decide merges. It is listed so that splits are counted as A-18 counts slot moves.",
+   "reads": [
+    "group.leader",
+    "meta.catalog",
+    "range.table"
+   ],
+   "writes": [
+    "load.report"
+   ],
+   "rows": [
+    "SPLIT",
+    "PD"
+   ],
+   "source": "DESIGN-V5 decision 20a (SPACE 4.2 SPLIT: 'split by size and load, with no controller'); AMENDMENTS A-18 (a load policy is counted the same wherever it lives)",
+   "model": ""
+  },
+  {
+   "key": "slot-sequence",
+   "name": "Slot sequence",
+   "axis": "O",
+   "option": "slot",
+   "layer": "L2",
+   "state": "Per slot: the last sequence number stamped, read with the slot's epoch. A position is (epoch, sequence); versions, cursors and fence tokens are positions.",
+   "rules": "The slot's writer stamps each record with the slot's next sequence. The sequence never goes back and travels with the slot.",
+   "reads": [
+    "group.leader",
+    "move.record",
+    "slot.epoch",
+    "writer.epoch"
+   ],
+   "writes": [
+    "slot.seq"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "REQUIREMENTS DEV-10 (a)'s own example; SPACE 2 O `slot`, SPACE 3 R1.S; DESIGN-V5 4.3 'The record'; AMENDMENTS A-16; E-19 (cost measured)",
+   "model": "E-15, E-17c: inside the move's rules (1 rule carries the sequence; 'no sequence is stamped by two groups'); E-31: cursors must be per-slot sequences (group offsets break in 5 steps)"
+  },
+  {
+   "key": "lineage",
+   "name": "Lineage",
+   "axis": "O",
+   "option": "off+lin",
+   "layer": "",
+   "state": "Kept for ever: for each group made by a split, its parent and the offset base at which it took over.",
+   "rules": "A base is written once, when the child starts. A reader's cursor of (generation, group, offset) is resolved through the lineage from the parent to the child.",
+   "reads": [
+    "range.table",
+    "split.record",
+    "sub.cursor"
+   ],
+   "writes": [
+    "lineage.bases"
+   ],
+   "rows": [
+    "SPLIT"
+   ],
+   "source": "SPACE 2 O `off+lin` (1: lineage resolution, kept forever); V5-UNITS",
+   "model": "E-17b, E-17c: 2 lineage rules on the shared bounds, 3 with a reader across a merge"
+  },
+  {
+   "key": "closed-timestamps",
+   "name": "Timestamp positions with closed timestamps",
+   "axis": "O",
+   "option": "hlc",
+   "layer": "",
+   "state": "Per group: a closed timestamp below which no new write will commit; positions are commit timestamps.",
+   "rules": "The leader advances the closed timestamp as the locks below it resolve; replicas serve reads and change feeds at or below it.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "tso.high",
+    "txn.intents"
+   ],
+   "writes": [
+    "closed.ts"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 2 O `hlc` (1: closed timestamps); CockroachDB's closed timestamps, TiKV's resolved timestamp",
+   "model": ""
+  },
+  {
+   "key": "writer-judging",
+   "name": "Judging at the one writer (conditions, ops, claim, batch)",
+   "axis": "K",
+   "option": "lib, kern, hyb",
+   "layer": "L2",
+   "state": "Not durable: the writer's log-end state, the fold of its committed state plus its uncommitted tail. Only results are appended.",
+   "rules": "Dedup, shape checks, rules, conditions and ops are judged against the log-end state, in that order, and only for a slot this group holds open. Every answer, a refusal and an empty claim included, is sent only once the log end it was judged on has committed (A-04); a deposed writer answers unknown.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "group.transfer",
+    "group.witness",
+    "move.record",
+    "v4.owner",
+    "writer.epoch"
+   ],
+   "writes": [
+    "writer.logend"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 K; DESIGN-V5 4.3 'At the writer' and 'Two states on the writer'; AMENDMENTS A-04 (2 rules; every row but BUY); E-22, E-22b (measured in a simulation with Porcupine, Knossos and Elle)",
+   "model": ""
+  },
+  {
+   "key": "dedup-window",
+   "name": "Dedup window (issuer window, floor, outcomes by id, per-hop time budgets)",
+   "axis": "D",
+   "option": "win",
+   "layer": "L2",
+   "state": "Per group, tagged by slot: per issuer the highest call id seen and every committed outcome above the floor; an issuer silent for the retry horizon is forgotten.",
+   "rules": "An attempt among the outcomes gets its first answer; one at or below the floor (highest id minus the window) is refused stale-attempt; a resent attempt's refusal is appended. Each copy carries a time budget that every hop cuts, and a relay forwards a copy once.",
+   "reads": [
+    "group.commit",
+    "move.record",
+    "route.inflight",
+    "time.writer",
+    "v4.owner",
+    "writer.logend"
+   ],
+   "writes": [
+    "issuer.table"
+   ],
+   "rows": [
+    "DRAFT",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "V4"
+   ],
+   "source": "SPACE 2 D `win`; DESIGN-V5 4.3 'Dedup'; AMENDMENTS section 2 D; E-44 (measured: a window alone fails past its horizon)",
+   "model": "E-20: 17 rules by ablation (19 under `fwd`)"
+  },
+  {
+   "key": "client-sessions",
+   "name": "Client sessions",
+   "axis": "D",
+   "option": "sess",
+   "layer": "L2",
+   "state": "A session registry (#sessions: per client life, a lease it renews), and per group, tagged by slot: per session the outcomes at or above the client's floor (its lowest unacknowledged id), and that floor.",
+   "rules": "Apply an attempt only when it is not among the session's outcomes, above its floor, and while the session lives; a copy at or below the floor is answered stale. A session expires by the registry's writer time, and unknown is answered only once that expiry has committed; a restarted process takes a new session. Under `fwd` a relay forwards a copy once (A-21).",
+   "reads": [
+    "group.commit",
+    "move.record",
+    "route.inflight",
+    "session.generation",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "session.registry",
+    "session.table"
+   ],
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 D `sess`; Raft thesis 6.3, LogCabin; AMENDMENTS A-21, A-04 (a session-bound write waits for its session's record)",
+   "model": "E-20: 13 rules by ablation (14 under `fwd`, the hop rule partly reasoned)"
+  },
+  {
+   "key": "producer-state",
+   "name": "Producer id, epoch and sequence",
+   "axis": "D",
+   "option": "pid",
+   "layer": "",
+   "state": "Per (producer, partition): the producer's epoch and last sequence, with its last cached batches; producer ids are handed out by the controller.",
+   "rules": "Accept the next sequence, absorb a duplicate, refuse a gap. A give-up bumps the epoch and restarts the sequence (KIP-360); 'unknown producer' is answered only once the forget has committed (A-22).",
+   "reads": [
+    "group.commit",
+    "route.inflight",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "producer.table"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 D `pid`; Kafka KIP-98, KIP-360; AMENDMENTS A-22",
+   "model": "E-20: 16 rules by ablation (17 under `fwd`)"
+  },
+  {
+   "key": "caller-keys",
+   "name": "Caller keys (idempotency keys for calls)",
+   "axis": "D",
+   "option": "every option (A-10: caller keys beside it)",
+   "layer": "L4",
+   "state": "Per caller key, for its ttl: a claim with a lease, and the first result (a row in #calls, or a session per call).",
+   "rules": "A call with a key claims its row before its handler runs and stores the result; a retry gets the first result. A re-run after the lease lapses issues the same attempt ids, under a fence on the key.",
+   "reads": [
+    "fence.table",
+    "issuer.table",
+    "outside.log",
+    "session.table",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "key.table"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-10 (five API changes; TEST-03) and section 4 (COMP's table); DESIGN-V5 4.5 'Call keys'; Stripe, SQS dedup ids; for V4 it would apply only if v4 were built on",
+   "model": "E-20 modelled the `keys` option alone (12 rules by ablation); a caller key beside `sess` or `win` was not modelled"
+  },
+  {
+   "key": "srchi-marks",
+   "name": "Cursor mark beside the outputs (srchi-slot)",
+   "axis": "D",
+   "option": "every option (A-05)",
+   "layer": "L2",
+   "state": "Per consumer, source slot and output slot: the highest source sequence applied, written in the output's own entry. Where a row has no slots the key is the output's own moving unit; that carry was not modelled.",
+   "rules": "Apply an output only above the mark and write the source sequence into its entry; commit the consumer's cursor only after every output of the record is answered; carry the slot's marks out with the fence and in with the open.",
+   "reads": [
+    "move.record",
+    "outside.log",
+    "slot.epoch",
+    "slot.seq",
+    "writer.logend"
+   ],
+   "writes": [
+    "srchi.marks",
+    "sub.cursor"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-05 (all rows; replaces SPACE 4.2's retention-length table); precedent on offer: storing consumer offsets beside the outputs (KafkaConsumer javadoc); for V4 it would apply only if v4 were built on",
+   "model": "E-30: 5 rules by ablation (6 of 6 mutants); real Elle agrees on 2,800 histories"
+  },
+  {
+   "key": "writer-time",
+   "name": "Writer time (the median of the members' clocks)",
+   "axis": "T",
+   "option": "clamp (window 0, A-23)",
+   "layer": "L2",
+   "state": "Per group: the last time stamp t in its log; and each member's view of its peers' clocks, carried forward by its own monotonic clock.",
+   "rules": "The writer stamps each batch with max(last t, the median of the members' clocks); t never goes back, across a handover too. TTL expiry and lease lapse are judged by t on the writer's tick and written as log entries (A-23).",
+   "reads": [
+    "group.config",
+    "group.leader",
+    "group.quiet",
+    "group.rows",
+    "link.clocks",
+    "writer.epoch"
+   ],
+   "writes": [
+    "time.writer"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 T `clamp`; DESIGN-V5 4.2 'The writer's time'; AMENDMENTS A-23 and D1; precedent on offer: CometBFT's BFT time",
+   "model": "E-21: 7 rules by ablation, on a seeded simulation (30 seeds in each of nine families), not exhaustive"
+  },
+  {
+   "key": "timestamp-oracle",
+   "name": "Timestamp oracle",
+   "axis": "T",
+   "option": "tso",
+   "layer": "",
+   "state": "In the controller: the last timestamp handed out, and a high-water window saved before it is used.",
+   "rules": "Every transaction takes its start and commit timestamps from the oracle's leader; timestamps strictly rise, across a controller failover too. It is also the time by which TTLs and leases are judged.",
+   "reads": [
+    "group.leader"
+   ],
+   "writes": [
+    "time.writer",
+    "tso.high"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 2 T `tso`; TiKV PD, Percolator; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "lock-rows",
+   "name": "Lock rows (#locks)",
+   "axis": "X",
+   "option": "saga (the saga's locks; P-10's locks in every row that can judge a condition)",
+   "layer": "L5",
+   "state": "Per lock: its holder, its lease end and its version; the version is the fence token.",
+   "rules": "A lock is claimed only when its row is absent or its lease has lapsed by writer time; the claim's new version is the token. A saga's locks belong to the unit (A-24); a lock name has one lease (A-10).",
+   "reads": [
+    "outside.log",
+    "slot.epoch",
+    "slot.seq",
+    "time.writer",
+    "writer.logend"
+   ],
+   "writes": [
+    "lock.rows"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "SPACE 2 X `saga`; DESIGN-V5 5.3 'Locks'; AMENDMENTS A-24, A-10; REQUIREMENTS P-10",
+   "model": "E-24: inside the saga's 38 rules by ablation; E-21 (simulated) for leases under clock faults"
+  },
+  {
+   "key": "fence-tokens",
+   "name": "Fence tokens (the fence table)",
+   "axis": "X",
+   "option": "saga (and K hyb in ISR)",
+   "layer": "L2",
+   "state": "Per group, carried with a moving slot: the highest token seen per lock.",
+   "rules": "A protected write carries its lock's token; the writer refuses a token below the highest it has seen for that lock, and raises the table on a write it takes. A slot move carries the table, merged by max. Writers do not follow #locks (A-24).",
+   "reads": [
+    "move.record",
+    "outside.log",
+    "writer.logend"
+   ],
+   "writes": [
+    "fence.table"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "DESIGN-V5 5.3 'Locks' and 10.2 (fences); SPACE 2 O (fence tokens are positions) and K `hyb`; AMENDMENTS A-24, A-17 (carried); E-44 (on BUY fencing is by convention)",
+   "model": "E-24: inside the saga's 38 rules; E-17: 1 fence-transfer rule in every move; E-21 (simulated): the fence refused every late write under every time rule"
+  },
+  {
+   "key": "saga-intents",
+   "name": "Saga intent rows (#sagas)",
+   "axis": "X",
+   "option": "saga",
+   "layer": "L5",
+   "state": "Per unit: its steps and its direction (run, undo, then done or undone).",
+   "rules": "Take the unit's locks in key order, write the intent, apply each step under its fence, record done. A holder first resolves another unit's unfinished intent on its partitions; a failed run undoes every step, the failed one and those after it too (A-24).",
+   "reads": [
+    "fence.table",
+    "issuer.table",
+    "lock.rows",
+    "outside.log",
+    "session.table"
+   ],
+   "writes": [
+    "saga.intents"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "SPACE 2 X `saga`; DESIGN-V5 5.3; AMENDMENTS A-24 and D5 (BUY takes it in fero's L5 library)",
+   "model": "E-24: 38 rules by ablation with 'undo every step' (41 of 44 mutants; 1 novel rule as E-24 counts it); E-22, E-22b (simulated, real Elle)"
+  },
+  {
+   "key": "two-phase-commit",
+   "name": "Two-phase commit (transaction records and intents)",
+   "axis": "X",
+   "option": "2pc (and D txn)",
+   "layer": "",
+   "state": "Per transaction: a primary lock and secondary locks (intents) on the keys it writes, and its commit record at the primary.",
+   "rules": "Prewrite every key with a lock that names the primary; commit the primary at a commit timestamp, then the secondaries; a reader that meets a lock resolves it from the primary. A retried commit finds its record: the transaction id is the dedup key.",
+   "reads": [
+    "group.leader",
+    "range.table",
+    "tso.high",
+    "writer.logend"
+   ],
+   "writes": [
+    "mvcc.versions",
+    "txn.intents"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 2 X `2pc`, D `txn`; Percolator, TiKV; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "mvcc",
+   "name": "Multi-version rows (MVCC)",
+   "axis": "X",
+   "option": "2pc (forces multi-version state)",
+   "layer": "",
+   "state": "Per key: its versions by commit timestamp, and a safe point below which old versions are collected.",
+   "rules": "A committed write adds a version at its commit timestamp; a read at timestamp t sees the newest version at or below t; versions below the safe point are collected.",
+   "reads": [
+    "closed.ts",
+    "group.commit",
+    "tso.high",
+    "txn.intents"
+   ],
+   "writes": [
+    "mvcc.versions"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 5 (X `2pc` forces O `hlc` or T `tso` and a multi-version S); SPACE 4.2 PD; TiKV; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "ktxn-coordinator",
+   "name": "Transaction coordinator log",
+   "axis": "X",
+   "option": "ktxn",
+   "layer": "",
+   "state": "Per transactional id, in the coordinator's own log: its producer id and epoch, the transaction's state and the partitions it wrote.",
+   "rules": "The coordinator records begin, then prepare-commit or prepare-abort, writes a marker to every partition and records the end. A new producer with the same id bumps the epoch and fences the old one.",
+   "reads": [
+    "group.commit",
+    "meta.directory"
+   ],
+   "writes": [
+    "producer.table",
+    "txn.log"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 X `ktxn`; Kafka transactions (KIP-98); not modelled here",
+   "model": ""
+  },
+  {
+   "key": "ktxn-markers",
+   "name": "Commit markers and the last stable offset",
+   "axis": "X",
+   "option": "ktxn",
+   "layer": "",
+   "state": "Per partition: commit and abort markers in its log, and the last stable offset, below which no transaction is open.",
+   "rules": "The coordinator writes a marker for each partition of an ended transaction; a read_committed reader stops at the last stable offset and skips aborted records.",
+   "reads": [
+    "group.commit",
+    "group.log",
+    "txn.log"
+   ],
+   "writes": [
+    "txn.markers"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 X `ktxn`; Kafka transactions (KIP-98); not modelled here",
+   "model": ""
+  },
+  {
+   "key": "memory-rung",
+   "name": "Memory rung (a replica that stops uncleanly rejoins as new)",
+   "axis": "Q",
+   "option": "maj-m (inside mix)",
+   "layer": "L0",
+   "state": "Per replica: whether it stopped cleanly. Under `memory` an acknowledged tail may not be on its disk.",
+   "rules": "A commit under `memory` waits for a majority to hold the entry in memory, with disks within about a second. A replica that stopped uncleanly cannot vouch for its log: it comes back as a new replica and never votes under its old identity.",
+   "reads": [
+    "group.class",
+    "group.commit",
+    "group.log",
+    "meta.catalog"
+   ],
+   "writes": [
+    "disk.incarnation",
+    "durable.log",
+    "group.unclean"
+   ],
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "source": "SPACE 2 Q `maj-m`, `mix`; DESIGN-V5 4.1 and decision 4b; Kafka's default, Redpanda write caching; AMENDMENTS section 2 Q (its safety was never modelled: G-05, K-09); E-02 (speed measured)",
+   "model": ""
+  },
+  {
+   "key": "none-rung",
+   "name": "None rung (a second delivery path)",
+   "axis": "Q",
+   "option": "none (P-06 asks for it in every row)",
+   "layer": "L3",
+   "state": "Not durable: messages published with durability none go straight to the current subscribers and never enter the log.",
+   "rules": "Publish, then deliver in order per subject to every current subscriber, best effort. It has a failover rule of its own, which nobody has written (K-10).",
+   "reads": [
+    "meta.catalog",
+    "outside.log",
+    "sub.index"
+   ],
+   "writes": [
+    "pubsub.path"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "REQUIREMENTS P-06; SPACE 2 Q `none`, SPACE 4.2 (every row counts it); AMENDMENTS 1.2 (not a fix; no experiment modelled its failover rule); E-02, E-08, E-09b (speed measured)",
+   "model": ""
+  },
+  {
+   "key": "journal",
+   "name": "Shared journal (group commit, cuts, segment indexes)",
+   "axis": "S",
+   "option": "jrnl",
+   "layer": "L0",
+   "state": "One journal per process holding every group's entries, terms and votes, chained and checksummed; cut records; then per-group segment files with indexes by offset, slot and partition; one reserve segment.",
+   "rules": "One fdatasync covers a batch, and `persisted` waits for it. A follower writes a cut record before entries that replace its tail; the journal is truncated only once the segments that cover it are fsynced (A-09, A-25).",
+   "reads": [
+    "group.log",
+    "group.snapshot",
+    "group.term-vote"
+   ],
+   "writes": [
+    "durable.log",
+    "journal.segments"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 S `jrnl` (1 small: cuts, segment indexes); DESIGN-V5 4.1; AMENDMENTS A-09, A-25; E-12, E-29, E-35 (measured)",
+   "model": ""
+  },
+  {
+   "key": "wal-per-group",
+   "name": "A write-ahead log per group",
+   "axis": "S",
+   "option": "walg",
+   "layer": "",
+   "state": "One log file per group (per partition in ISR, per resource in V4).",
+   "rules": "Each group's appends are synced to its own file, so fsyncs grow with groups.",
+   "reads": [
+    "group.log",
+    "v4.lanes"
+   ],
+   "writes": [
+    "durable.log"
+   ],
+   "rows": [
+    "ISR",
+    "V4"
+   ],
+   "source": "SPACE 2 S `walg`; etcd, Kafka; v4's WAL (CLAUDE.md); E-12 (measured: loses to a shared journal from 256 groups)",
+   "model": ""
+  },
+  {
+   "key": "lsm-store",
+   "name": "LSM store (log and state)",
+   "axis": "S",
+   "option": "lsm",
+   "layer": "",
+   "state": "One LSM tree per member that holds the Raft log and the multi-version rows: memtables, sorted files and their compaction state.",
+   "rules": "Writes go to a write-ahead log and a memtable, then to sorted files; compaction merges files and drops versions below the safe point.",
+   "reads": [
+    "group.log",
+    "group.term-vote",
+    "mvcc.versions"
+   ],
+   "writes": [
+    "durable.log",
+    "lsm.files"
+   ],
+   "rows": [
+    "PD"
+   ],
+   "source": "SPACE 2 S `lsm`; TiKV on RocksDB; no experiment",
+   "model": ""
+  },
+  {
+   "key": "tier",
+   "name": "Object-store tier (old segments and snapshot layers)",
+   "axis": "S",
+   "option": "+tier",
+   "layer": "L0",
+   "state": "In the object store: uploaded old segments with their indexes, and snapshot layers with removal markers and merged bases, each named by an entry in the group's log.",
+   "rules": "The leader uploads a segment or a snapshot (put-if-absent) and names it in the log only after the put is confirmed. A replica may drop its log below i only when a reachable snapshot covers i, the segment is uploaded or history allows it, and no slot move or fork still reads it.",
+   "reads": [
+    "durable.log",
+    "group.leader",
+    "group.log",
+    "group.snapshot",
+    "journal.segments",
+    "meta.catalog",
+    "move.record"
+   ],
+   "writes": [
+    "store.objects"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 S `+tier` (1: snapshot layers against retention), SPACE 3 B0.O; DESIGN-V5 3.4 and 4.1 'The object store'; E-28 (measured)",
+   "model": ""
+  },
+  {
+   "key": "restore-mark",
+   "name": "Restore mark in the store's manifest (an epoch high-water mark, and a session generation)",
+   "axis": "all",
+   "option": "every row with a metadata group (A-08)",
+   "layer": "",
+   "state": "In the store's manifest (the home is open for rows that need no store): the highest epoch ever used (a slot's epoch; in a row with no slots, its unit's generation or the resource's incarnation); and a session generation that a restore raises.",
+   "rules": "Every new epoch is recorded in the mark before it is used, so a slot move writes it. A restore takes an epoch above the mark and starts a new session generation; a retry from an older generation is refused, and a cursor the history does not hold is refused.",
+   "reads": [
+    "move.record",
+    "session.table",
+    "store.objects",
+    "sub.cursor"
+   ],
+   "writes": [
+    "restore.mark",
+    "session.generation",
+    "slot.epoch"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-08 (whether the mark is a mechanism is left to the counters; no precedent named) and section 4 (COMP's table); REQUIREMENTS OPS-07",
+   "model": "E-33: 8 rules by ablation (8 of 8 mutants); the store is always reachable in the model"
+  },
+  {
+   "key": "fold-all",
+   "name": "Fold on every full replica",
+   "axis": "F",
+   "option": "all",
+   "layer": "L2",
+   "state": "On each full replica: the rows of the partitions its groups hold, folded by `data` from committed records in log order.",
+   "rules": "Apply each committed record once, in offset order, through data's hot lane; never re-run a condition or an op. A new leader folds its whole log before it answers; a moved slot's rows are taken from exactly one group.",
+   "reads": [
+    "fold.version",
+    "group.commit",
+    "group.log",
+    "group.snapshot",
+    "move.record",
+    "outside.log",
+    "v4.stamps"
+   ],
+   "writes": [
+    "group.rows"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "BUY",
+    "COMP"
+   ],
+   "source": "SPACE 2 F `all`, SPACE 1 B0; DESIGN-V5 4.3 'The fold'; E-05, E-34, E-43 (measured)",
+   "model": ""
+  },
+  {
+   "key": "fold-leader",
+   "name": "Fold on the leader only, with one warm standby",
+   "axis": "F",
+   "option": "ldr",
+   "layer": "L2",
+   "state": "On the leader and on one warm standby: the rows of the group's partitions; the other followers keep the log only.",
+   "rules": "Only the leader and the standby apply committed records. A failover to the standby is warm; to any other replica it is a cold rebuild from a snapshot and the tail, so the standby is required (A-26).",
+   "reads": [
+    "fold.version",
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.snapshot",
+    "move.record"
+   ],
+   "writes": [
+    "group.rows"
+   ],
+   "rows": [
+    "LEAN",
+    "OBJ",
+    "SIDE"
+   ],
+   "source": "SPACE 2 F `ldr`, SPACE 3 R1.LF; AMENDMENTS A-26 (E-05 measured; reasoned for SIDE and OBJ)",
+   "model": ""
+  },
+  {
+   "key": "fold-lazy",
+   "name": "Lazy fold on followers",
+   "axis": "F",
+   "option": "lazy",
+   "layer": "L2",
+   "state": "On a follower: rows folded behind the log, or on first read.",
+   "rules": "A follower folds when it is asked or idle, and serves a read only once its fold has reached the position asked for.",
+   "reads": [
+    "fold.version",
+    "group.commit",
+    "group.log",
+    "group.snapshot"
+   ],
+   "writes": [
+    "group.rows"
+   ],
+   "rows": [
+    "OBJ"
+   ],
+   "source": "SPACE 2 F `lazy` (1 novel); Kafka Streams standbys; no experiment",
+   "model": ""
+  },
+  {
+   "key": "fold-version",
+   "name": "Fold-version entry",
+   "axis": "all",
+   "option": "every row (A-10, OPS-12)",
+   "layer": "",
+   "state": "A committed entry in each group's log that names the fold version in force from that offset (data's build and fero's L2 library).",
+   "rules": "A replica never folds an entry under another version than the one in force at its offset, and refuses to serve until it runs that version. A roll raises the version only after every replica has said it can run it.",
+   "reads": [
+    "group.config",
+    "meta.members",
+    "outside.log"
+   ],
+   "writes": [
+    "fold.version"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "REQUIREMENTS OPS-12; AMENDMENTS A-10 (five pins for the fold version) and section 4 (COMP's table); precedent on offer: CockroachDB's cluster versions; E-43 (measured); for V4 it would apply only if v4 were built on",
+   "model": ""
+  },
+  {
+   "key": "subscribe",
+   "name": "Subscribe (cursors, snapshot then deltas, END and expired)",
+   "axis": "W",
+   "option": "any (and every row that serves subscriptions, A-06)",
+   "layer": "L3",
+   "state": "Held by the subscriber: a cursor of the cluster id, the resource's incarnation and, per slot, its epoch and the last sequence seen (a durable row only for a consumer). On the server, not durable: the index of partitions to subscribers. AMENDMENTS section 4 lists this piece as no mechanism by DEV-10 (a)'s letter.",
+   "rules": "A ready replica serves up to the commit offset, and never before its fold has reached the cursor. A replica that lacks the reader's next record answers END, and only the leader of the group that holds the slot says expired (A-06). A snapshot replaces; a cursor of an older epoch is refused unknown-log.",
+   "reads": [
+    "cluster.id",
+    "group.commit",
+    "group.log",
+    "group.rows",
+    "group.snapshot",
+    "journal.segments",
+    "meta.directory",
+    "move.record",
+    "slot.epoch",
+    "slot.seq",
+    "slot.table",
+    "store.objects"
+   ],
+   "writes": [
+    "sub.cursor",
+    "sub.index"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 W `any`; DESIGN-V5 4.4; AMENDMENTS A-06 (a changed answer) and section 4 (COMP's table); PD has no `any` but must serve subscriptions (P-03, P-05, P-07)",
+   "model": "E-31: 26 rules by ablation, 27 with the move's carried segment names (31 of 32 mutants)"
+  },
+  {
+   "key": "read-lease",
+   "name": "Lease reads",
+   "axis": "W",
+   "option": "lease",
+   "layer": "",
+   "state": "Not durable: the leader's read lease, a time promise that no other leader exists until it ends.",
+   "rules": "A leader that holds an unexpired lease answers a read from its own state, with no round to the majority. It needs bounded clock drift.",
+   "reads": [
+    "group.commit",
+    "group.contact",
+    "group.leader",
+    "group.rows",
+    "group.term-vote",
+    "writer.epoch"
+   ],
+   "writes": [
+    "read.lease"
+   ],
+   "rows": [
+    "PD",
+    "OBJ"
+   ],
+   "source": "SPACE 2 W `lease`; CockroachDB, Spanner, TiKV's leader lease; no experiment (G-25)",
+   "model": ""
+  },
+  {
+   "key": "route-forward",
+   "name": "Forwarding (any server takes a write and forwards it to the leader)",
+   "axis": "Y",
+   "option": "fwd (the base in every row: browsers need it)",
+   "layer": "L1",
+   "state": "Not durable: a server's route view (from the #meta copy every member follows) and the writes it holds in flight for a leader.",
+   "rules": "A server forwards a write only over the link to the leader it had when it took the write, and each copy only once. A stale route costs one moved; a member that cannot forward refuses at once with a redirect, and never drops or holds the write (A-02, A-21).",
+   "reads": [
+    "group.leader",
+    "group.transfer",
+    "lane.map",
+    "meta.directory",
+    "range.table",
+    "slot.table",
+    "v4.owner",
+    "writer.epoch"
+   ],
+   "writes": [
+    "route.inflight"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 Y `fwd`; DESIGN-V5 4.2 'Routing' and 4.3 'No late arrivals'; AMENDMENTS A-02, A-21 and section 2 Y; E-01 (hop cost measured)",
+   "model": "E-20: the hop rule `forward.once` is counted inside each dedup option (1 rule under `sess`, 2 under `win`)"
+  },
+  {
+   "key": "route-smart",
+   "name": "Smart clients (the client caches slot to leader)",
+   "axis": "Y",
+   "option": "smart",
+   "layer": "",
+   "state": "In each client: a cached table of slot (or range, or partition) to leader, at most one entry per slot of a resource.",
+   "rules": "The client sends a write straight to the cached leader and follows MOVED or ASK during a move, refreshing its table.",
+   "reads": [
+    "group.leader",
+    "meta.directory",
+    "move.record",
+    "range.table",
+    "slot.table"
+   ],
+   "writes": [
+    "route.cache"
+   ],
+   "rows": [
+    "SRV",
+    "PD",
+    "ISR",
+    "EMB-V8"
+   ],
+   "source": "SPACE 2 Y `smart`; Redis Cluster, Kafka clients, the TiKV client; its MOVED and ASK path was never examined (G-25)",
+   "model": ""
+  },
+  {
+   "key": "worker-map",
+   "name": "Group-to-worker map (N kernel workers)",
+   "axis": "M",
+   "option": "kwN",
+   "layer": "",
+   "state": "Per process: which kernel worker each group is pinned to, with one journal per worker.",
+   "rules": "The main thread routes each message to its group's worker; a group stays on its worker; messages between workers are recorded as inputs.",
+   "reads": [
+    "durable.log",
+    "meta.directory"
+   ],
+   "writes": [
+    "worker.map"
+   ],
+   "rows": [
+    "SRV",
+    "PD",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "source": "SPACE 2 M `kwN` (0-1: a group-to-worker map) and SPACE 5 (kwN: a journal per worker); TiKV's raftstore pool; not measured in a native build (G-25)",
+   "model": ""
+  },
+  {
+   "key": "side-seam",
+   "name": "Local seam between the daemon and the app (a shared-memory ring)",
+   "axis": "H",
+   "option": "side",
+   "layer": "",
+   "state": "Not durable: a shared-memory ring between the host's daemon and the app's Node process, holding batches on their way to the app's L2 and fold, and results on their way back.",
+   "rules": "The daemon holds L0, L1 and fan-out. It hands the app the batches of the groups this host leads and appends only what the app returns (A-30: a ring, not a socket).",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log"
+   ],
+   "writes": [
+    "side.ring"
+   ],
+   "rows": [
+    "SIDE"
+   ],
+   "source": "SPACE 2 H `side` (novel 1: the local seam); AMENDMENTS A-30; E-03 (measured)",
+   "model": ""
+  },
+  {
+   "key": "leader-calls",
+   "name": "Calls routed to the partition's leader",
+   "axis": "U",
+   "option": "ldr",
+   "layer": "L4",
+   "state": "Not durable: calls in flight at a partition leader's host.",
+   "rules": "A call goes to its partition's leader and runs there; a call in flight across a handover is refused or re-run at the new leader.",
+   "reads": [
+    "group.leader",
+    "group.transfer",
+    "key.table",
+    "meta.directory",
+    "slot.table"
+   ],
+   "writes": [
+    "call.inflight"
+   ],
+   "rows": [
+    "SIDE"
+   ],
+   "source": "SPACE 2 U `ldr` (1: in-flight calls across a handover); AMENDMENTS section 2 U (E-22: it buys no safety)",
+   "model": ""
+  },
+  {
+   "key": "admission-credits",
+   "name": "Admission credits (a credit window on the client wire)",
+   "axis": "all",
+   "option": "every row (A-07)",
+   "layer": "L3",
+   "state": "No durable or replicated state is named (A-07 leaves open whether this is a mechanism): how many writes each client or link may have outstanding, and a budget of TLS handshakes per tick at the edge.",
+   "rules": "A client holds at most its granted number of writes outstanding; the rest wait in the client and fail at their deadline. The server hands out the grant; that part was not built.",
+   "reads": [
+    "group.leader",
+    "route.inflight"
+   ],
+   "writes": [
+    "client.credit"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "V4",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "BUY",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-07 (E-39 measured with a fixed client-side window; no precedent named; AMQP link credit and HTTP/2 windows cited from memory); REQUIREMENTS F-19; for V4 it would apply only if v4 were built on",
+   "model": ""
+  },
+  {
+   "key": "tenant-budget",
+   "name": "Tenant byte budget on a shared tier or pool",
+   "axis": "N",
+   "option": "tier, pool (A-29)",
+   "layer": "",
+   "state": "No durable or replicated state is named (A-29 leaves open whether this is a mechanism): a byte budget per tenant per second in a process that pools tenants.",
+   "rules": "The tier or pool holds a tenant's bytes back past its budget (about 1 MiB/s of big-record bytes on this disk), so one tenant at its quota does not raise another's p99. A volume per tenant needs no such rule.",
+   "reads": [
+    "durable.log"
+   ],
+   "writes": [
+    "tenant.budget"
+   ],
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "OBJ",
+    "RLOG",
+    "EMB-V8"
+   ],
+   "source": "AMENDMENTS A-29 (E-35 measured the ratios; the budget was not built; no precedent named); REQUIREMENTS OPS-14, SC-11",
+   "model": ""
+  },
+  {
+   "key": "disk-incarnation",
+   "name": "Disk incarnation and checksum (a damaged replica rejoins as new)",
+   "axis": "Z",
+   "option": "rejoin",
+   "layer": "L0",
+   "state": "Per dir: a random 128-bit incarnation written when the dir is made; per record a checksum and its predecessor's offset.",
+   "rules": "A checksum per entry turns damage into a wipe, and a wiped or new disk takes a new incarnation that never votes as the replica it replaced (A-28). Only a tail that the checksum shows was never acknowledged is cut.",
+   "reads": [
+    "journal.segments"
+   ],
+   "writes": [
+    "disk.incarnation",
+    "durable.log"
+   ],
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "SPACE 2 Z `rejoin` (1 small); DESIGN-V5 4.1; AMENDMENTS A-28 (reasoned for SLOG)",
+   "model": "E-37 (TLC on etcd's spec, three voters): 2 rules, both needed"
+  },
+  {
+   "key": "genesis-conditional-create",
+   "name": "Founding by a conditional create of the cluster id",
+   "axis": "all",
+   "option": "A-08: rows that require an object store across boxes",
+   "layer": "L1",
+   "state": "The cluster id, created once in the object store (If-None-Match), then held in every dir's boot record and in #meta's first entry.",
+   "rules": "The create succeeds only while no id is stored; the seed whose create succeeds is #meta's only voter; every other seed adopts only the stored id and is added by healing. `seeds` never runs beside a dir that holds an id. On one box the same rule uses an exclusive create of the cluster-id file.",
+   "reads": [],
+   "writes": [
+    "cluster.id"
+   ],
+   "rows": [
+    "MIN",
+    "RUST",
+    "LEAN",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "SIDE",
+    "COMP"
+   ],
+   "source": "AMENDMENTS A-08 (E-33 calls it 'new here'; S3 conditional writes are the cited base); SPACE 4.1 footnote 1; DESIGN-V5 4.2 'Clusters, genesis and discovery'",
+   "model": "E-33: 4 rules by ablation (4 of 4 mutants); one box 4 rules, 5 with the exclusive create (reasoned)"
+  },
+  {
+   "key": "genesis-init",
+   "name": "Founding by one fero init",
+   "axis": "all",
+   "option": "A-08: rows that require no object store across boxes",
+   "layer": "L1",
+   "state": "The cluster id, minted by one operator step, then held in every dir's boot record and in #meta's first entry.",
+   "rules": "Init runs once and mints the id; a seed never founds by itself and adopts only an id it finds at a seed it reaches. `seeds` never runs beside a dir that holds an id. On one box an exclusive create of the cluster-id file founds.",
+   "reads": [],
+   "writes": [
+    "cluster.id"
+   ],
+   "rows": [
+    "DRAFT",
+    "SRV",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "PD",
+    "ISR",
+    "RLOG",
+    "EMB-V8"
+   ],
+   "source": "AMENDMENTS A-08; CockroachDB's init; PD's initial cluster and KRaft's storage format for PD and ISR",
+   "model": "E-33: 3 rules by ablation (3 of 3 mutants); one box 4 rules, 5 with the exclusive create (reasoned)"
+  },
+  {
+   "key": "writer-epoch-rlog",
+   "name": "Writer epoch on log members (rlog)",
+   "axis": "R",
+   "option": "rlog",
+   "layer": "",
+   "state": "In the log group's log: writer entries, each naming the server that is the group's writer and its epoch; every append carries the writer's epoch.",
+   "rules": "The controller hands the role over only when the writer is gone to it and only to a linked server, by committing a writer entry with the next epoch. The new writer folds to the log's end before it writes, and the log group's leader takes an append only with the latest committed writer epoch (A-14).",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "group.rows",
+    "link.ping",
+    "meta.members"
+   ],
+   "writes": [
+    "writer.epoch"
+   ],
+   "rows": [
+    "RLOG"
+   ],
+   "source": "SPACE 2 R `rlog` (about 1: the writer-epoch check), SPACE 3 RL1; AMENDMENTS A-14; Kafka producer epochs, BookKeeper fencing, Neon's safekeepers",
+   "model": "E-16: 9 rules by ablation, all needed (9 of 9 non-equivalent mutants)"
+  },
+  {
+   "key": "loglet",
+   "name": "Loglets on log nodes",
+   "axis": "R",
+   "option": "slog",
+   "layer": "",
+   "state": "Per loglet: its entries on a set of log nodes, and the last entry a write quorum of them holds.",
+   "rules": "The group's writer appends each batch to the loglet's log nodes; a batch is committed when a write quorum holds it on disk.",
+   "reads": [
+    "loglet.chain",
+    "loglet.seal",
+    "writer.epoch"
+   ],
+   "writes": [
+    "durable.log",
+    "group.commit",
+    "group.log"
+   ],
+   "rows": [
+    "SLOG"
+   ],
+   "source": "SPACE 2 R `slog`, SPACE 3 SL1; V5-REPLICATION, V5-LOG-FIRST-REVIEW; Delos, BookKeeper; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "loglet-seal",
+   "name": "Seal and recovery",
+   "axis": "R",
+   "option": "slog",
+   "layer": "",
+   "state": "Per loglet and log node: a sealed flag; and the recovered end of a sealed loglet.",
+   "rules": "A sealed log node takes no more appends to that loglet. A new writer seals enough nodes to block a write quorum, reads forward to find the end, and writes the tail again to a quorum before the chain is closed.",
+   "reads": [
+    "loglet.chain",
+    "member.session",
+    "writer.epoch"
+   ],
+   "writes": [
+    "group.log",
+    "loglet.seal"
+   ],
+   "rows": [
+    "SLOG"
+   ],
+   "source": "SPACE 2 R `slog` (seal + metadata CAS); V5-LOG-FIRST-REVIEW F1, F2, F4; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "loglet-chain",
+   "name": "Loglet chain (metadata compare-and-swap)",
+   "axis": "R",
+   "option": "slog",
+   "layer": "",
+   "state": "In the metadata group, per data group: the chain of its loglets, each with its log nodes, its start and, once closed, its end.",
+   "rules": "The chain changes only by compare-and-swap: one step closes the open loglet at its recovered end and opens the next on a chosen set of log nodes.",
+   "reads": [
+    "group.commit",
+    "group.log",
+    "loglet.seal",
+    "meta.members"
+   ],
+   "writes": [
+    "loglet.chain"
+   ],
+   "rows": [
+    "SLOG"
+   ],
+   "source": "SPACE 2 R `slog`, SPACE 5 (slog: C needs a CAS register); V5-LOG-FIRST-REVIEW F3, F5; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "writer-epoch-slog",
+   "name": "Writer assignment on a shared log (slog)",
+   "axis": "R",
+   "option": "slog",
+   "layer": "",
+   "state": "In the metadata group, per data group: the server that is its writer, and the epoch of that role.",
+   "rules": "The controller names a new writer when the old one's session lapses; the new writer seals the open loglet, which fences the old writer. The writer changes its own log nodes; the controller changes writers.",
+   "reads": [
+    "group.learners",
+    "loglet.chain",
+    "member.session",
+    "meta.members"
+   ],
+   "writes": [
+    "group.leader",
+    "writer.epoch"
+   ],
+   "rows": [
+    "SLOG"
+   ],
+   "source": "SPACE 4.1 footnote 5 and V5-LOG-FIRST-REVIEW F3; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "controller-sessions",
+   "name": "Sessions to the controller (the failure detector)",
+   "axis": "C",
+   "option": "failure detector: sessions to the controller",
+   "layer": "",
+   "state": "Per member: a session with the controller, kept by heartbeats, with an epoch that rises each time the member registers.",
+   "rules": "A member whose heartbeats stop for the session timeout is fenced; it must register again, with a new epoch, before it leads, writes or joins an in-sync set.",
+   "reads": [
+    "meta.members"
+   ],
+   "writes": [
+    "link.clocks",
+    "member.session"
+   ],
+   "rows": [
+    "PD",
+    "ISR",
+    "SLOG"
+   ],
+   "source": "SPACE 2 C (the failure detector sub-choice: sessions to the controller); Kafka's broker heartbeats to its controller, TiKV's store heartbeats to PD; E-25 (SLOG: 400 idle frames a second)",
+   "model": ""
+  },
+  {
+   "key": "isr-log",
+   "name": "Partition log (the leader appends, followers fetch)",
+   "axis": "R",
+   "option": "isr",
+   "layer": "",
+   "state": "Each replica's log of one partition: records with their offsets and the leader epoch they were written in.",
+   "rules": "Only the partition's leader appends; followers fetch from it and append in order.",
+   "reads": [
+    "group.leader",
+    "isr.leader-epoch"
+   ],
+   "writes": [
+    "group.log"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 R `isr`, SPACE 3 I1; Kafka; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "isr-set",
+   "name": "In-sync set",
+   "axis": "R",
+   "option": "isr",
+   "layer": "",
+   "state": "Per partition, in the controller's log: the in-sync replica set.",
+   "rules": "The leader asks the controller to drop a follower that falls behind and to add one that has caught up to the high watermark; only a registered, unfenced replica may join.",
+   "reads": [
+    "group.commit",
+    "group.leader",
+    "group.log",
+    "isr.leader-epoch",
+    "member.session"
+   ],
+   "writes": [
+    "isr.set"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 R `isr` (Kafka ISR + KRaft: KIP-841, KIP-903), SPACE 5 (isr forces cent); not modelled here",
+   "model": ""
+  },
+  {
+   "key": "high-watermark",
+   "name": "High watermark",
+   "axis": "Q",
+   "option": "isr",
+   "layer": "",
+   "state": "Per partition: the offset up to which every member of the in-sync set holds the log.",
+   "rules": "The leader advances it to the lowest log end of the in-sync set. A write with acks=all is answered when the high watermark passes it; readers see only records below it.",
+   "reads": [
+    "group.leader",
+    "group.log",
+    "isr.set"
+   ],
+   "writes": [
+    "group.commit"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 Q `isr`, R `isr`; Kafka acks=all with min.insync.replicas; not modelled here",
+   "model": ""
+  },
+  {
+   "key": "leader-epoch",
+   "name": "Leader epoch",
+   "axis": "R",
+   "option": "isr",
+   "layer": "",
+   "state": "Per partition: the leader and its epoch, set by the controller; each replica keeps the start offset of every epoch.",
+   "rules": "The controller picks a new leader from the in-sync set (or the eligible leaders) and bumps the epoch. A follower truncates its log to the end of the last epoch it shares with the leader before it fetches.",
+   "reads": [
+    "isr.elr",
+    "isr.set",
+    "member.session"
+   ],
+   "writes": [
+    "group.leader",
+    "group.log",
+    "isr.leader-epoch"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 R `isr` (KIP-101, KIP-279, KIP-320); not modelled here",
+   "model": ""
+  },
+  {
+   "key": "eligible-leaders",
+   "name": "Eligible leader replicas",
+   "axis": "R",
+   "option": "isr",
+   "layer": "",
+   "state": "Per partition, in the controller's log: replicas that left the in-sync set while holding everything up to the high watermark.",
+   "rules": "When the in-sync set falls below the minimum, the controller keeps the leavers as eligible leaders, and elects only from the in-sync set or from them.",
+   "reads": [
+    "group.commit",
+    "isr.set",
+    "member.session"
+   ],
+   "writes": [
+    "isr.elr"
+   ],
+   "rows": [
+    "ISR"
+   ],
+   "source": "SPACE 2 R `isr` (KIP-966); not modelled here",
+   "model": ""
+  },
+  {
+   "key": "obj-log",
+   "name": "Log objects (a commit is a PUT)",
+   "axis": "R",
+   "option": "obj (Q put, S obj)",
+   "layer": "",
+   "state": "Per group: its log as numbered objects in the object store.",
+   "rules": "The writer creates the next log object only if it does not exist yet (If-None-Match); a write is committed when that PUT answers.",
+   "reads": [
+    "store.manifest",
+    "writer.epoch"
+   ],
+   "writes": [
+    "durable.log",
+    "group.commit",
+    "group.log"
+   ],
+   "rows": [
+    "OBJ"
+   ],
+   "source": "SPACE 2 R `obj`, Q `put`, S `obj`, SPACE 3 B0.O.L; WarpStream, SlateDB; E-28 (PUT cost measured on MinIO), E-41 (cited prices)",
+   "model": ""
+  },
+  {
+   "key": "obj-manifest",
+   "name": "Manifest compare-and-swap",
+   "axis": "R",
+   "option": "obj (and C cent by CAS on the manifest)",
+   "layer": "",
+   "state": "Per group: a manifest object that names the log head, the snapshot objects and, with the lease, the writer.",
+   "rules": "The manifest is swapped only if nobody changed it since it was read (If-Match); every change of writer, snapshot or placement goes through it.",
+   "reads": [
+    "group.log",
+    "group.rows"
+   ],
+   "writes": [
+    "group.snapshot",
+    "store.manifest",
+    "store.objects"
+   ],
+   "rows": [
+    "OBJ"
+   ],
+   "source": "SPACE 2 R `obj` (1-2 novel: manifest CAS, lease epochs), SPACE 4.1 footnote 7; S3 conditional writes; E-28",
+   "model": ""
+  },
+  {
+   "key": "obj-writer-lease",
+   "name": "Writer lease and epoch by compare-and-swap",
+   "axis": "R",
+   "option": "obj",
+   "layer": "",
+   "state": "In the manifest: the writer's lease end and its epoch.",
+   "rules": "A server becomes the writer by swapping the manifest with a higher epoch once the old lease has lapsed. The writer renews before the lease ends and stops writing when it cannot.",
+   "reads": [],
+   "writes": [
+    "group.leader",
+    "store.manifest",
+    "writer.epoch"
+   ],
+   "rows": [
+    "OBJ"
+   ],
+   "source": "SPACE 2 R `obj` (lease epochs), SPACE 3 B0.O.L; E-25 (its leases must go quiet or cost PUTs)",
+   "model": ""
+  },
+  {
+   "key": "v4-lanes",
+   "name": "Lanes (per-origin logs)",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per author (a member's life): its own numbered log of the changes it stamped, kept by every replica that holds the rows.",
+   "rules": "An author stamps each change with its next ticket in its own lane; replicas copy lanes in ticket order; a restarted member writes under a new lane.",
+   "reads": [
+    "v4.owner",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.lanes"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); CLAUDE.md (per-origin logs); kernel/log.ts",
+   "model": ""
+  },
+  {
+   "key": "v4-stamps",
+   "name": "Stamps (per-cell last writer wins)",
+   "axis": "R",
+   "option": "lww (O lamp)",
+   "layer": "",
+   "state": "Per cell: the stamp of the change that holds it now: member-list version, ticket number, author.",
+   "rules": "A change replaces a cell's value only if its stamp is newer: version first, then ticket, then author.",
+   "reads": [
+    "v4.lanes",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.stamps"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); SPACE 2 O `lamp`; CLAUDE.md (per-cell LWW and Lamport clocks)",
+   "model": ""
+  },
+  {
+   "key": "v4-digests",
+   "name": "Digests (anti-entropy)",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per link: a short list, for each author, of the highest ticket this replica holds.",
+   "rules": "After hello, and again after a paused link drains, the two sides swap digests and send what the other lacks.",
+   "reads": [
+    "v4.floors",
+    "v4.lanes",
+    "v4.sheds"
+   ],
+   "writes": [
+    "v4.digests"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); CLAUDE.md (digest anti-entropy)",
+   "model": ""
+  },
+  {
+   "key": "v4-tombstones",
+   "name": "Tombstones",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per removed cell: a deleted-at marker with its stamp.",
+   "rules": "A removal leaves a marker so that an older late change cannot bring the value back; a marker is dropped only once every holder has shown it is past it.",
+   "reads": [
+    "v4.floors",
+    "v4.stamps"
+   ],
+   "writes": [
+    "v4.tombstones"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); kernel/log.ts; STATUS V4-31",
+   "model": ""
+  },
+  {
+   "key": "v4-frontiers",
+   "name": "Compaction frontiers",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per (author, row): the point below which a replica has compacted its log.",
+   "rules": "A replica compacts a lane only behind the frontier that every current holder has attested on crash-stable floors.",
+   "reads": [
+    "v4.floors",
+    "v4.tombstones",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.frontiers",
+    "v4.lanes"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); CLAUDE.md (log compaction behind the holders' crash-stable frontier, V4-57)",
+   "model": ""
+  },
+  {
+   "key": "v4-orphans",
+   "name": "Orphans",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per slice: an orphan mark on a copy this replica may no longer serve.",
+   "rules": "A slice is frozen when its keepers were reassigned away or a cancelled copy left partial data; it is copied again from a teacher, or held only until the new keepers prove they have everything.",
+   "reads": [
+    "v4.owner",
+    "v4.teachers",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.orphans"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); tools/debug/eli5.mjs (orphaned)",
+   "model": ""
+  },
+  {
+   "key": "v4-sheds",
+   "name": "Sheds",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per slice: that a former keeper deleted its copy; per paused link: that its whole queue was thrown away.",
+   "rules": "A former keeper sheds a slice only once every current keeper has proved it holds everything; a shed link queue is healed by a new digest exchange.",
+   "reads": [
+    "v4.floors",
+    "v4.orphans",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.sheds"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); tools/debug/eli5.mjs (shed)",
+   "model": ""
+  },
+  {
+   "key": "v4-latches",
+   "name": "Latches",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per slice being copied: the one chosen teacher, with incoming changes for the slice held to one side; per store: a latch set by a failed fsync.",
+   "rules": "A replica latches onto exactly one teacher and drops copy data from any other; a failed fsync latches the store shut.",
+   "reads": [
+    "v4.orphans",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.latches"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); DESIGN-V5 10.1 (the teacher latch); tools/debug/eli5.mjs (acquireStart, stageDrop)",
+   "model": ""
+  },
+  {
+   "key": "v4-teachers",
+   "name": "Teachers",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per slice copy: the staged data from the teacher and its end marker.",
+   "rules": "The teacher ships the part of a slice the learner lacks, then a marker for 'everything up to here'; the learner folds the staged copy in at once, never half.",
+   "reads": [
+    "v4.lanes",
+    "v4.latches",
+    "v4.tombstones"
+   ],
+   "writes": [
+    "v4.teachers"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); tools/debug/eli5.mjs (teachShip, acquire)",
+   "model": ""
+  },
+  {
+   "key": "v4-floors",
+   "name": "Floors",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per (author, row) and holder: a possession floor and a durable floor, below which that holder holds every change.",
+   "rules": "A holder raises its floors as it receives and syncs changes and attests them to its co-holders (the pp floor law); a teacher's cut sets the learner's floors.",
+   "reads": [
+    "durable.log",
+    "v4.lanes",
+    "v4.teachers"
+   ],
+   "writes": [
+    "v4.floors"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); kernel/log.ts; DESIGN-V5 10.1 (the pp floor law)",
+   "model": ""
+  },
+  {
+   "key": "v4-feed-words",
+   "name": "FEED words",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per feeder and spoke (a client and its primary server): the words the feeder owes the spoke about sheds and re-latches of the rows it feeds.",
+   "rules": "A feeder tells its spokes when it shed or re-latched rows, so a spoke resyncs and never keeps rows its feeder dropped; an owed word survives a paused link.",
+   "reads": [
+    "v4.digests",
+    "v4.latches",
+    "v4.sheds"
+   ],
+   "writes": [
+    "v4.feed"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); kernel/codec.ts (FEED, V4-62); STATUS V4-67",
+   "model": ""
+  },
+  {
+   "key": "v4-in-sync-sets",
+   "name": "In-sync sets",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per slice: the holders that have proved they hold everything up to the crash-stable frontier (named in REQUIREMENTS section 5; this reading of v4 was not checked against a model).",
+   "rules": "A holder enters the set only by attesting its floors, and leaves it when it is reassigned or falls behind.",
+   "reads": [
+    "v4.floors",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.insync"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); the state line is this list's reading of v4's holders",
+   "model": ""
+  },
+  {
+   "key": "v4-eligible-leaders",
+   "name": "Eligible leaders",
+   "axis": "R",
+   "option": "lww",
+   "layer": "",
+   "state": "Per row: the members that may take over stamping it after a view change (named in REQUIREMENTS section 5; this reading of v4 was not checked against a model).",
+   "rules": "Only a member that holds everything the old owner stamped may become the row's owner.",
+   "reads": [
+    "v4.insync",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.eligible"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "REQUIREMENTS section 5 (v4's 13 novel kernel mechanisms; DESIGN-V5 10.1, 10.2); the state line is this list's reading of v4's owner change",
+   "model": ""
+  },
+  {
+   "key": "v4-views",
+   "name": "Membership views by ballot (joint consensus)",
+   "axis": "C",
+   "option": "self (as v4 has it)",
+   "layer": "",
+   "state": "The member list and its version (the epoch in every stamp); ballots and votes for the next view; held members.",
+   "rules": "A view changes only by a ballot carried by a majority of the old and of the new view. A member that voted for a view two or more members apart from its own is held, read-only and uncounted, until that ballot settles.",
+   "reads": [],
+   "writes": [
+    "v4.views"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "SPACE 2 C `self` and SPACE 3 V4 (ballot views); CLAUDE.md (joint-consensus views, V4-6, V4-55, V4-60); not one of the thirteen",
+   "model": ""
+  },
+  {
+   "key": "v4-ring",
+   "name": "Ring ownership (one owner per row)",
+   "axis": "P",
+   "option": "ring",
+   "layer": "",
+   "state": "For each row: the one member that the ring over the current view picks to stamp its changes.",
+   "rules": "Every write to a row is forwarded to its owner, which stamps and files it; a view change moves ownership.",
+   "reads": [
+    "v4.eligible",
+    "v4.views"
+   ],
+   "writes": [
+    "v4.owner"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "SPACE 2 P `ring`; CLAUDE.md (ring-owned single-writer pipeline); not one of the thirteen",
+   "model": ""
+  },
+  {
+   "key": "v4-confirm-ladder",
+   "name": "Confirm ladder (per-write confirmations)",
+   "axis": "Q",
+   "option": "mix (v4's per-write ladder)",
+   "layer": "",
+   "state": "Per pending write: which holders have attested that they hold it, in memory or on disk.",
+   "rules": "A write is answered at the rung it asked for, once enough holders attest it.",
+   "reads": [
+    "durable.log",
+    "v4.floors",
+    "v4.lanes"
+   ],
+   "writes": [
+    "v4.confirm"
+   ],
+   "rows": [
+    "V4"
+   ],
+   "source": "SPACE 2 Q `mix` (v4's per-write ladder); kernel/confirm.ts; not one of the thirteen",
+   "model": ""
+  },
+  {
+   "key": "outside-log",
+   "name": "The outside log (NATS JetStream), bought",
+   "axis": "R",
+   "option": "outside",
+   "layer": "",
+   "state": "Everything the bought system keeps: replicated streams with their sequences, its own consensus groups and metadata, its message-id dedup window, consumers and their acks, key-value buckets.",
+   "rules": "Theirs. fero publishes with an expected sequence for a condition, reads streams to fold rows, and uses consumers for delivery; failover, dedup, placement, storage and time are the bought system's.",
+   "reads": [],
+   "writes": [
+    "outside.log"
+   ],
+   "rows": [
+    "BUY"
+   ],
+   "source": "SPACE 4.1 BUY and footnote 12, SPACE 3 BUY; E-44 (measured: four patterns in 164 fero-owned lines; ten gaps)",
+   "model": ""
+  }
+ ]
+}
