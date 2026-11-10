@@ -22,7 +22,8 @@ continue (adopt) or skip; run steps or undo them; record the end.
 Faults (budgets): a crash (the process stops for good, or a `b` restarts
 later); a lease that lapses while its holder is alive (a paused holder: it
 does not know, and acts later with its old tokens); a step whose app
-condition fails (the saga must undo). A crashed or finished holder's lease
+condition fails (the saga must undo); a top-up of a refused step's data (the
+step may then pass on a later attempt). A crashed or finished holder's lease
 lapses with time (calm). Writers may follow `#locks` with any lag (options
 that use it).
 
@@ -39,10 +40,10 @@ PROPERTIES
       lists appear in the same order in both.
   L1  AG EF: every unit can end `done` or `undone` once faults stop
       (holders act, dead holders' leases lapse, `b` restarts). A step's
-      condition is judged on the data when the write arrives, so a step
-      refused for one holder may pass for another later (a budget topped up
-      in between): a paused holder's late step is not stopped by an earlier
-      refusal.
+      condition is judged on the data when the write arrives: a refused step
+      is refused again until its data changes (`topup`, a fault with a
+      budget), and may then pass for any holder, a paused one included. Once
+      faults stop a refused step stays refused, so its unit must be undone.
 
 OPTIONS
   draft     5.3 as written: steps fenced by their partition's lock; each
@@ -70,7 +71,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
                                 'E16-controller-loop', 'engine'))
 from engine import Action, Guard, Cmp, Update   # noqa: E402
 
-FIELDS = ('locks', 'intents', 'lists', 'fence', 'follow', 'procs', 'faults', 'lapses', 'fails', 'bad')
+FIELDS = ('locks', 'intents', 'lists', 'fence', 'follow', 'procs', 'faults', 'lapses', 'fails', 'bad', 'tops')
 IX = {f: i for i, f in enumerate(FIELDS)}
 UNFIN = ('run', 'undo')
 END = ('end',)
@@ -102,7 +103,7 @@ class Saga:
         zeros = tuple(0 for _ in self.parts)
         procs = tuple((('lock', 0), tuple(0 for _ in self.units[u]), 0, True, None)
                       for _, u, _ in self.procs)
-        return (locks, intents, lists, zeros, zeros, procs, 0, 0, 0, frozenset())
+        return (locks, intents, lists, zeros, zeros, procs, 0, 0, 0, frozenset(), 0)
 
     def to_draft(self, st):
         return dict(zip(FIELDS, st))
@@ -154,7 +155,7 @@ class Saga:
     # ------------------------------------------------------------ world
     def world(self, st):
         out = []
-        locks, intents, lists, fence, follow, procs, faults, lapses, fails, bad = st
+        locks, intents, lists, fence, follow, procs, faults, lapses, fails, bad, tops = st
         for h, (name, u, kind) in enumerate(self.procs):
             pc, toks, tgt, up, res = procs[h]
             if up and pc != END and faults < self.b['crashes']:
@@ -178,6 +179,15 @@ class Saga:
                 d = self._d(st)
                 self.setp(d, h, pc=('lock', 0), toks=tuple(0 for _ in self.units[u]), tgt=0, up=True, res=None)
                 out.append((('restart', name), 'restart', self.freeze(d)))
+        # the data a refused step's condition reads changes (a budget is topped
+        # up), so that step may pass on a later attempt: a fault with a budget,
+        # so liveness must hold when a refused step stays refused for good
+        if tops < self.b['topups']:
+            for (u, i) in sorted(bad):
+                d = self._d(st)
+                d.f['bad'] = bad - {(u, i)}
+                d.f['tops'] = tops + 1
+                out.append((('topup', u, i), 'fault', self.freeze(d)))
         if self.FOLLOW:
             for i, x in enumerate(self.parts):
                 if follow[i] != locks[i][0]:
@@ -248,13 +258,12 @@ class Saga:
 
         def fails_left(w, st):
             # world semantics, not rules: a step's condition is judged against
-            # the partition's data when the write arrives, and that data can
-            # change between attempts (a budget is topped up), so a step
-            # refused once may be refused again (free) or pass later (step's
-            # `ups`); a first refusal takes the budget; and a re-run of a step
-            # that is applied answers its first outcome, "applied" (dedup by
-            # attempt id, which is the saga id and the step), so only a step
-            # not applied is refused
+            # the partition's data when the write arrives. A step refused once
+            # is refused again (free) until its data changes (`topup`, a
+            # fault in world()), and may then pass; a first refusal takes the
+            # budget; and a re-run of a step that is applied answers its first
+            # outcome, "applied" (dedup by attempt id, which is the saga id and
+            # the step), so only a step not applied is refused
             for b in ups(w, st):
                 pc_, _, tgt, _, _ = st[IX['procs']][b['h']]
                 if tgt not in O.units:
@@ -262,6 +271,14 @@ class Saga:
                 elif pc_[0] == 'step' and tgt not in st[IX['lists']][O.px[O.units[tgt][pc_[1]]]]:
                     if (tgt, pc_[1]) in st[IX['bad']] or st[IX['fails']] < O.b['fails']:
                         yield b
+
+        def can_step(w, st):
+            # world semantics: a step refused, whose data has not changed since
+            # (`bad`), is refused again; it cannot pass
+            for b in ups(w, st):
+                pc_, _, tgt, _, _ = st[IX['procs']][b['h']]
+                if not (pc_[0] == 'step' and (tgt, pc_[1]) in st[IX['bad']]):
+                    yield b
 
         P_ = lambda st, b: st[IX['procs']][b['h']]
         pc = lambda st, b: P_(st, b)[0]
@@ -476,7 +493,7 @@ class Saga:
         g_step = [Guard('seq', is_('step'), role='seq'), pfence('fence')]
         if O.FOLLOW:
             g_step.append(pfollow('follow'))
-        acts.append(Action('step', 'deliver', ups, g_step, [
+        acts.append(Action('step', 'deliver', can_step, g_step, [
             Update('data', step_data, role='data', note='push the unit id if absent'),
             raise_('raise'),
             Update('pc', step_pc, role='seq'),
@@ -556,17 +573,17 @@ PINNED = {k: ('fail.count',) for k in OPTIONS}
 A1, A2, B1, B2 = ('a1', 1, 'a'), ('a2', 2, 'a'), ('b1', 1, 'b'), ('b2', 2, 'b')
 BOUNDS = {
     # one unit over two groups: a paused holder, a crash, a failing step
-    'one': dict(units={1: ('p', 'q')}, procs=(A1, B1), crashes=1, lapses=1, fails=1),
+    'one': dict(units={1: ('p', 'q')}, procs=(A1, B1), crashes=1, lapses=1, fails=1, topups=1),
     # two units on the same two partitions: write cycles (G0)
-    'two': dict(units={1: ('p', 'q'), 2: ('p', 'q')}, procs=(A1, A2, B1), crashes=0, lapses=1, fails=0),
+    'two': dict(units={1: ('p', 'q'), 2: ('p', 'q')}, procs=(A1, A2, B1), crashes=0, lapses=1, fails=0, topups=0),
     # a unit inside another's partitions, with failures
-    'sub': dict(units={1: ('p', 'q'), 2: ('q',)}, procs=(A1, A2, B1), crashes=0, lapses=1, fails=1),
+    'sub': dict(units={1: ('p', 'q'), 2: ('q',)}, procs=(A1, A2, B1), crashes=0, lapses=1, fails=1, topups=1),
     # one unit over three groups, two paused leases
-    'three': dict(units={1: ('p', 'q', 'r')}, procs=(A1, B1), crashes=1, lapses=2, fails=1),
+    'three': dict(units={1: ('p', 'q', 'r')}, procs=(A1, B1), crashes=1, lapses=2, fails=1, topups=1),
     # verify: two units, failures and two faults of each kind
-    'two-f': dict(units={1: ('p', 'q'), 2: ('p', 'q')}, procs=(A1, A2, B1, B2), crashes=1, lapses=1, fails=1),
-    'one2': dict(units={1: ('p', 'q')}, procs=(A1, B1), crashes=2, lapses=2, fails=1),
-    'sub-f': dict(units={1: ('p', 'q'), 2: ('q',)}, procs=(A1, A2, B1, B2), crashes=1, lapses=1, fails=1),
+    'two-f': dict(units={1: ('p', 'q'), 2: ('p', 'q')}, procs=(A1, A2, B1, B2), crashes=1, lapses=1, fails=1, topups=1),
+    'one2': dict(units={1: ('p', 'q')}, procs=(A1, B1), crashes=2, lapses=2, fails=1, topups=1),
+    'sub-f': dict(units={1: ('p', 'q'), 2: ('q',)}, procs=(A1, A2, B1, B2), crashes=1, lapses=1, fails=1, topups=1),
 }
 SWEEP = ('one', 'two', 'sub', 'three')
 VERIFY = ('one2', 'two-f', 'sub-f')

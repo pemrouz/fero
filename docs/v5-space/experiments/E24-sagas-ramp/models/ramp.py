@@ -149,9 +149,16 @@ class Ramp:
                         if y in PX and fetched[PX[y]] < tx:
                             bad.append('RA')
             if s[IX['rd']][0] == 1:
-                seen = s[IX['seen']]
-                if any(fetched[i] < seen[i] for i in range(2)):
-                    bad.append('MONO')
+                # ground truth, not the protocol's own memory (`seen`): the
+                # units the earlier read returned (`shown`, a ghost); at each
+                # partition the second read returns the newest of them that
+                # wrote there, or newer
+                shown = s[IX['shown']]
+                for x in PARTS:
+                    lo = max([t for t in shown if x in self.units[t]], default=0)
+                    if fetched[PX[x]] < lo:
+                        bad.append('MONO')
+                        break
         if lab[0] == 'r2':
             # R2: round 2 fetches only what round 1 planned; any other fetch is a third round
             rd = s[IX['rd']]
