@@ -9,6 +9,7 @@ cell by cell and the verdict is arithmetic, not prose. Run from docs/v5-space.
   python3 tools/judging.py mechanisms            check judging/mechanisms.json and count novel mechanisms per row
   python3 tools/judging.py pairs                 mechanisms that share state -> judging/pairs.json and PAIRS.md
   python3 tools/judging.py verdict               every settled group -> judging/outcome.json and OUTCOME.md
+  python3 tools/judging.py rows                  one scorecard per row -> judging/rows/ROW.md
 
 A judge's file:
   { "group": "SC", "judge": "j1", "cells": [
@@ -444,6 +445,55 @@ def verdict():
             b = res['rank']
             print('%s: winner %s | all out: %s | in: %s | flips: %s' % (name, b['winner'], b['all_out'], b['in'], [x['case'] for x in res['sensitivity'] if not x['same_as_base']][:10]))
 
+def rows():
+    """One scorecard per row: every requirement part with its settled verdict, reason and what closes it."""
+    req = load(J + '/requirements.json')
+    title = {(p['req'], p['part']): p['title'] for p in req['parts']}
+    cells = []
+    for g in GROUPS:
+        p = '%s/%s.settled.json' % (J, g)
+        if os.path.exists(p):
+            cells += [dict(c, group=g) for c in load(p)['cells']]
+    mech = load(J + '/mechanisms.json') if os.path.exists(J + '/mechanisms.json') else {}
+    pairs = load(J + '/pairs.json').get('pairs', {}) if os.path.exists(J + '/pairs.json') else {}
+    os.makedirs(J + '/rows', exist_ok=True)
+    esc = lambda x: str(x or '').replace('|', '/').replace('\n', ' ')
+    for r in ROWS:
+        mine = [c for c in cells if c['row'] == r]
+        m = [c for c in mine if c['part'] == 'M']
+        sh = [c for c in mine if c['part'] == 'S']
+        rest = lambda c: c['alt'] if c.get('depends_on') == 'restated' else c['v']
+        novel = [x for x in mech.get('mechanisms', []) if r in x.get('rows', []) and x.get('novel')]
+        o = ['# %s: the scorecard' % r, '',
+             'Built by `python3 tools/judging.py rows` from the settled judging files. Each line is one requirement part of [REQUIREMENTS.md](../../REQUIREMENTS.md) as two judges scored it for this row; "by" says whether both judges agreed or a referee ruled. The report is [candidates/%s.md](../../candidates/%s.md).' % (r, r), '',
+             '| | As worded | With AMENDMENTS 1.3 restated |', '|---|---|---|',
+             '| MUSTs failed by design | %d | %d |' % (sum(c['v'] == 'fails' for c in m), sum(rest(c) == 'fails' for c in m)),
+             '| MUSTs open | %d | %d |' % (sum(c['v'] == 'open' for c in m), sum(rest(c) == 'open' for c in m)),
+             '| MUSTs met | %d | %d |' % (sum(c['v'] == 'met' for c in m), sum(rest(c) == 'met' for c in m)),
+             '| SHOULDs met | %d | %d |' % (sum(c['v'] == 'met' for c in sh), sum(rest(c) == 'met' for c in sh)),
+             '| SHOULDs not met | %d | %d |' % (sum(c['v'] == 'not' for c in sh), sum(rest(c) == 'not' for c in sh)),
+             '| SHOULDs open | %d | %d |' % (sum(c['v'] == 'open' for c in sh), sum(rest(c) == 'open' for c in sh)), '',
+             'Novel mechanisms (DEV-01): %s%s. Interacting pairs (DEV-02): %s.' % (
+                 (mech.get('counts') or {}).get('settled', {}).get(r, '?'),
+                 ' (%s)' % ', '.join(x['name'] for x in novel) if novel else '', pairs.get(r, '?'))]
+        fails = [c for c in m if c['v'] == 'fails']
+        if fails:
+            o += ['', '## MUSTs failed by design', '', '| Requirement | Proof | If restated | Why |', '|---|---|---|---|']
+            for c in fails:
+                o.append('| %s %s | %s | %s | %s |' % (c['req'], esc(title.get((c['req'], 'M'))), c.get('proof', ''), rest(c) if c.get('depends_on') == 'restated' else '', esc(c['why'])))
+        for g in GROUPS:
+            gc = [c for c in mine if c['group'] == g]
+            if not gc: continue
+            o += ['', '## %s' % g, '', '| Requirement | Part | Verdict | If restated | Basis | Evidence | Why | What closes it | By |', '|---|---|---|---|---|---|---|---|---|']
+            for c in gc:
+                dep = ''
+                if c.get('depends_on') == 'restated': dep = c['alt']
+                elif c.get('depends_on'): dep = 'if %s: %s' % (c['depends_on'], c.get('alt'))
+                o.append('| %s %s | %s | **%s** | %s | %s | %s | %s | %s | %s |' % (c['req'], esc(title.get((c['req'], c['part']))), c['part'], c['v'], dep, c.get('basis', ''),
+                         ', '.join(c.get('ev') or []), esc(c['why']), esc(c.get('closes')), c['by']))
+        open('%s/rows/%s.md' % (J, r), 'w').write('\n'.join(o) + '\n')
+    print('wrote %d scorecards from %d cells' % (len(ROWS), len(cells)))
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
     if cmd == 'requirements': requirements()
@@ -453,4 +503,5 @@ if __name__ == '__main__':
     elif cmd == 'mechanisms': mechanisms()
     elif cmd == 'pairs': pairs()
     elif cmd == 'verdict': verdict()
+    elif cmd == 'rows': rows()
     else: print(__doc__)
