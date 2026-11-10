@@ -1,0 +1,3839 @@
+{
+ "agreement": {
+  "P": {
+   "cells_total": 500,
+   "same": 409,
+   "decisive": 20,
+   "minor": 71,
+   "referee_against_both": 0
+  },
+  "PERF-DATA": {
+   "cells_total": 460,
+   "same": 371,
+   "decisive": 15,
+   "minor": 74,
+   "referee_against_both": 0
+  },
+  "SC": {
+   "cells_total": 300,
+   "same": 265,
+   "decisive": 22,
+   "minor": 13,
+   "referee_against_both": 0
+  },
+  "F": {
+   "cells_total": 460,
+   "same": 432,
+   "decisive": 7,
+   "minor": 21,
+   "referee_against_both": 0
+  },
+  "DEV": {
+   "cells_total": 220,
+   "same": 220,
+   "decisive": 0,
+   "minor": 0,
+   "referee_against_both": 0
+  },
+  "DEP": {
+   "cells_total": 460,
+   "same": 417,
+   "decisive": 5,
+   "minor": 38,
+   "referee_against_both": 0
+  },
+  "TEST-OPS": {
+   "cells_total": 560,
+   "same": 516,
+   "decisive": 4,
+   "minor": 40,
+   "referee_against_both": 0
+  }
+ },
+ "as_worded": {
+  "tally": {
+   "DRAFT": {
+    "fails": [
+     "P-05",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 93,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.21,
+    "dev01": 6,
+    "pairs": 309
+   },
+   "MIN": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 91,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "RUST": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 92,
+    "met": 33,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "SRV": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 98,
+    "met": 28,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 267
+   },
+   "LEAN": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 91,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 255
+   },
+   "CELL": {
+    "fails": [
+     "P-05",
+     "P-07",
+     "SC-03",
+     "SC-08",
+     "SC-10",
+     "F-05",
+     "F-17",
+     "OPS-01"
+    ],
+    "open": 94,
+    "met": 30,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.4299999999999997,
+    "dev01": 5,
+    "pairs": 262
+   },
+   "LANE": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-04",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 92,
+    "met": 33,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 232
+   },
+   "SPLIT": {
+    "fails": [
+     "P-05",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 95,
+    "met": 32,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.21,
+    "dev01": 5,
+    "pairs": 278
+   },
+   "PD": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-05",
+     "SC-10",
+     "F-05",
+     "F-17",
+     "F-22"
+    ],
+    "open": 112,
+    "met": 12,
+    "s_met": [
+     "P-15",
+     "SC-06",
+     "SC-12",
+     "DEV-04"
+    ],
+    "s_not": [
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 3.54,
+    "dev01": 0,
+    "pairs": 209
+   },
+   "ISR": {
+    "fails": [
+     "P-05",
+     "SC-03",
+     "SC-04",
+     "SC-10"
+    ],
+    "open": 116,
+    "met": 12,
+    "s_met": [
+     "SC-12"
+    ],
+    "s_not": [
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-15",
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "F-22",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 1.77,
+    "dev01": 2,
+    "pairs": 214
+   },
+   "SLOG": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-15"
+    ],
+    "open": 113,
+    "met": 14,
+    "s_met": [
+     "SC-12",
+     "DEV-05"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 2.1,
+    "dev01": 5,
+    "pairs": 272
+   },
+   "OBJ": {
+    "fails": [
+     "P-01",
+     "P-05",
+     "PERF-04",
+     "PERF-07",
+     "PERF-08",
+     "SC-03",
+     "SC-10",
+     "F-15",
+     "DEP-21"
+    ],
+    "open": 109,
+    "met": 14,
+    "s_met": [
+     "SC-12"
+    ],
+    "s_not": [
+     "P-15",
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "F-22",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 18.08,
+    "dev01": 2,
+    "pairs": 144
+   },
+   "V4": {
+    "fails": [
+     "P-01",
+     "P-02",
+     "P-05",
+     "P-06",
+     "P-07",
+     "P-08",
+     "P-09",
+     "P-10",
+     "P-11",
+     "P-13",
+     "P-14",
+     "P-15",
+     "P-16",
+     "P-17",
+     "P-20",
+     "P-22",
+     "PERF-02",
+     "PERF-03",
+     "PERF-04",
+     "PERF-05",
+     "PERF-06",
+     "PERF-07",
+     "PERF-10",
+     "PERF-11",
+     "PERF-13",
+     "DATA-01",
+     "DATA-07",
+     "SC-03",
+     "SC-05",
+     "SC-08",
+     "SC-10",
+     "SC-13",
+     "F-01",
+     "F-02",
+     "F-03",
+     "F-04",
+     "F-07",
+     "F-08",
+     "F-09",
+     "F-14",
+     "F-21",
+     "DEP-02",
+     "DEP-05",
+     "DEP-12",
+     "DEP-18",
+     "TEST-13",
+     "OPS-01",
+     "OPS-03",
+     "OPS-05",
+     "OPS-06"
+    ],
+    "open": 64,
+    "met": 18,
+    "s_met": [
+     "DEV-05",
+     "DEP-19"
+    ],
+    "s_not": [
+     "P-15",
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "DEV-02",
+     "DEV-04",
+     "DEP-10",
+     "DEP-15",
+     "OPS-11"
+    ],
+    "s_open": [
+     "SC-06",
+     "SC-12",
+     "F-22",
+     "DEP-14",
+     "TEST-11"
+    ],
+    "gap": 10.043999999999999,
+    "dev01": 8,
+    "pairs": 52
+   },
+   "MIN-P": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 91,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 3,
+    "pairs": 252
+   },
+   "MIN-TS": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 89,
+    "met": 36,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "RLOG": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 92,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 268
+   },
+   "EMB-V8": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-17"
+    ],
+    "open": 95,
+    "met": 31,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 269
+   },
+   "SIDE": {
+    "fails": [
+     "P-05",
+     "PERF-04",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 94,
+    "met": 31,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.54,
+    "dev01": 4,
+    "pairs": 277
+   },
+   "BUY": {
+    "fails": [
+     "P-05",
+     "P-06",
+     "P-10",
+     "P-11",
+     "P-14",
+     "PERF-02",
+     "PERF-03",
+     "PERF-04",
+     "PERF-05",
+     "PERF-06",
+     "PERF-07",
+     "PERF-10",
+     "SC-01",
+     "SC-03",
+     "SC-05",
+     "SC-07",
+     "SC-10",
+     "F-02",
+     "F-05",
+     "F-19",
+     "DEV-07",
+     "DEP-12",
+     "DEP-20",
+     "TEST-01",
+     "TEST-09",
+     "TEST-10",
+     "TEST-13",
+     "OPS-11"
+    ],
+    "open": 95,
+    "met": 9,
+    "s_met": [
+     "DEV-04",
+     "DEV-05"
+    ],
+    "s_not": [
+     "P-15",
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEV-02",
+     "DEP-15",
+     "OPS-11"
+    ],
+    "s_open": [
+     "P-22",
+     "SC-12",
+     "F-22",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 9.24,
+    "dev01": 0,
+    "pairs": 12
+   },
+   "COMP": {
+    "fails": [
+     "P-05",
+     "SC-03",
+     "SC-10",
+     "F-05",
+     "F-15",
+     "F-17"
+    ],
+    "open": 92,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 3.21,
+    "dev01": 3,
+    "pairs": 283
+   }
+  },
+  "rank": {
+   "all_out": true,
+   "order": [
+    "ISR",
+    "SLOG",
+    "DRAFT",
+    "SPLIT",
+    "COMP",
+    "SRV",
+    "RLOG",
+    "EMB-V8",
+    "MIN",
+    "RUST",
+    "LEAN",
+    "LANE",
+    "MIN-P",
+    "MIN-TS",
+    "SIDE",
+    "CELL",
+    "PD",
+    "OBJ",
+    "BUY",
+    "V4"
+   ],
+   "winner": "ISR",
+   "in": [],
+   "wins": {},
+   "losses": {},
+   "unbeaten": [],
+   "tied_first": [
+    "ISR"
+   ],
+   "clear": false
+  },
+  "sensitivity": [
+   {
+    "case": "judge 1 alone, before the referee",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SPLIT",
+     "SLOG"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "judge 2 alone, before the referee",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "every open SHOULD counted as met",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "every open SHOULD counted as not met",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "rule 3 the other way: SHOULDs first, then novel mechanisms",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "novel mechanisms as counter a counted them",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "novel mechanisms as counter b counted them",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: F_w",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: N_res",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: PERF-01 losses",
+    "sweep": "",
+    "winner": "level: ISR, SLOG",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user chooses the other way on: region scope",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: shared tier",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: fsync figure",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: other",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads DEV-01 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads F-07 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads P-02 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads P-13 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads PERF-08 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-10",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-14",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-15",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-19",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-02",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-04",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-05",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD F-22",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD OPS-11",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-15",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-20",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-22",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD PERF-09",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD SC-06",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD SC-12",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD TEST-11",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "DRAFT with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "DRAFT with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RUST with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RUST with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SRV with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SRV with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LEAN with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LEAN with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "CELL with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "CELL with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LANE with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LANE with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SPLIT with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SPLIT with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "PD with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "PD with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "ISR with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "ISR with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SLOG with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SLOG with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "OBJ with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "OBJ with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "V4 with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "V4 with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-P with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-P with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-TS with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-TS with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RLOG with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RLOG with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "EMB-V8 with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "EMB-V8 with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SIDE with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SIDE with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "BUY with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "BUY with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "COMP with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "COMP with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "ISR",
+    "in": [],
+    "top3": [
+     "ISR",
+     "SLOG",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   }
+  ],
+  "waivers": []
+ },
+ "restated": {
+  "tally": {
+   "DRAFT": {
+    "fails": [],
+    "open": 97,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.0,
+    "dev01": 6,
+    "pairs": 309
+   },
+   "MIN": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 96,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "RUST": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 97,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "SRV": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 102,
+    "met": 29,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 267
+   },
+   "LEAN": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 96,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 255
+   },
+   "CELL": {
+    "fails": [
+     "P-07",
+     "SC-03",
+     "SC-08",
+     "SC-10",
+     "OPS-01"
+    ],
+    "open": 97,
+    "met": 30,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 1.54,
+    "dev01": 5,
+    "pairs": 262
+   },
+   "LANE": {
+    "fails": [
+     "PERF-04",
+     "SC-03",
+     "SC-04",
+     "SC-10"
+    ],
+    "open": 94,
+    "met": 34,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 1.65,
+    "dev01": 4,
+    "pairs": 232
+   },
+   "SPLIT": {
+    "fails": [],
+    "open": 99,
+    "met": 33,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.0,
+    "dev01": 5,
+    "pairs": 278
+   },
+   "PD": {
+    "fails": [
+     "PERF-04",
+     "SC-05",
+     "F-22"
+    ],
+    "open": 117,
+    "met": 12,
+    "s_met": [
+     "P-15",
+     "SC-06",
+     "SC-12",
+     "DEV-04"
+    ],
+    "s_not": [
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 0.33,
+    "dev01": 0,
+    "pairs": 209
+   },
+   "ISR": {
+    "fails": [
+     "SC-03",
+     "SC-04",
+     "SC-10"
+    ],
+    "open": 117,
+    "met": 12,
+    "s_met": [
+     "SC-12"
+    ],
+    "s_not": [
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-15",
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "F-22",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 1.32,
+    "dev01": 2,
+    "pairs": 214
+   },
+   "SLOG": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 117,
+    "met": 14,
+    "s_met": [
+     "SC-12",
+     "DEV-05"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 0.33,
+    "dev01": 5,
+    "pairs": 272
+   },
+   "OBJ": {
+    "fails": [
+     "P-01",
+     "P-05",
+     "PERF-04",
+     "PERF-07",
+     "PERF-08",
+     "F-15",
+     "DEP-21"
+    ],
+    "open": 111,
+    "met": 14,
+    "s_met": [
+     "SC-12"
+    ],
+    "s_not": [
+     "P-15",
+     "DEV-02",
+     "DEV-04"
+    ],
+    "s_open": [
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "SC-06",
+     "F-22",
+     "DEV-05",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11",
+     "OPS-11"
+    ],
+    "gap": 16.759999999999998,
+    "dev01": 2,
+    "pairs": 144
+   },
+   "V4": {
+    "fails": [
+     "P-01",
+     "P-02",
+     "P-05",
+     "P-06",
+     "P-07",
+     "P-08",
+     "P-09",
+     "P-10",
+     "P-11",
+     "P-13",
+     "P-14",
+     "P-15",
+     "P-16",
+     "P-17",
+     "P-20",
+     "P-22",
+     "PERF-02",
+     "PERF-03",
+     "PERF-04",
+     "PERF-05",
+     "PERF-06",
+     "PERF-07",
+     "PERF-10",
+     "PERF-11",
+     "PERF-13",
+     "DATA-01",
+     "DATA-07",
+     "SC-03",
+     "SC-05",
+     "SC-08",
+     "SC-10",
+     "SC-13",
+     "F-01",
+     "F-02",
+     "F-03",
+     "F-04",
+     "F-07",
+     "F-08",
+     "F-09",
+     "F-14",
+     "F-21",
+     "DEP-02",
+     "DEP-05",
+     "DEP-12",
+     "DEP-18",
+     "TEST-13",
+     "OPS-01",
+     "OPS-03",
+     "OPS-05",
+     "OPS-06"
+    ],
+    "open": 64,
+    "met": 18,
+    "s_met": [
+     "DEV-05",
+     "DEP-19"
+    ],
+    "s_not": [
+     "P-15",
+     "P-20",
+     "P-22",
+     "PERF-09",
+     "DEV-02",
+     "DEV-04",
+     "DEP-10",
+     "DEP-15",
+     "OPS-11"
+    ],
+    "s_open": [
+     "SC-06",
+     "SC-12",
+     "F-22",
+     "DEP-14",
+     "TEST-11"
+    ],
+    "gap": 10.043999999999999,
+    "dev01": 8,
+    "pairs": 52
+   },
+   "MIN-P": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 96,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 3,
+    "pairs": 252
+   },
+   "MIN-TS": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 94,
+    "met": 37,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 253
+   },
+   "RLOG": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 96,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-15",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 268
+   },
+   "EMB-V8": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 99,
+    "met": 32,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 269
+   },
+   "SIDE": {
+    "fails": [
+     "PERF-04"
+    ],
+    "open": 99,
+    "met": 32,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.33,
+    "dev01": 4,
+    "pairs": 277
+   },
+   "BUY": {
+    "fails": [
+     "P-06",
+     "P-10",
+     "P-11",
+     "P-14",
+     "PERF-02",
+     "PERF-03",
+     "PERF-04",
+     "PERF-05",
+     "PERF-06",
+     "PERF-07",
+     "PERF-10",
+     "SC-01",
+     "SC-03",
+     "SC-05",
+     "SC-07",
+     "SC-10",
+     "F-02",
+     "F-05",
+     "F-19",
+     "DEV-07",
+     "DEP-12",
+     "DEP-20",
+     "TEST-01",
+     "TEST-09",
+     "TEST-10",
+     "TEST-13",
+     "OPS-11"
+    ],
+    "open": 96,
+    "met": 9,
+    "s_met": [
+     "DEV-04",
+     "DEV-05"
+    ],
+    "s_not": [
+     "P-15",
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEV-02",
+     "DEP-15",
+     "OPS-11"
+    ],
+    "s_open": [
+     "P-22",
+     "SC-12",
+     "F-22",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 8.79,
+    "dev01": 0,
+    "pairs": 12
+   },
+   "COMP": {
+    "fails": [],
+    "open": 97,
+    "met": 35,
+    "s_met": [
+     "P-22",
+     "SC-12",
+     "DEV-04",
+     "DEV-05",
+     "OPS-11"
+    ],
+    "s_not": [
+     "P-15",
+     "F-22",
+     "DEV-02",
+     "DEP-15"
+    ],
+    "s_open": [
+     "P-20",
+     "PERF-09",
+     "SC-06",
+     "DEP-10",
+     "DEP-14",
+     "DEP-19",
+     "TEST-11"
+    ],
+    "gap": 0.0,
+    "dev01": 3,
+    "pairs": 283
+   }
+  },
+  "rank": {
+   "all_out": false,
+   "in": [
+    "DRAFT",
+    "SPLIT",
+    "COMP"
+   ],
+   "order": [
+    "COMP",
+    "SPLIT",
+    "DRAFT"
+   ],
+   "wins": {
+    "DRAFT": 0,
+    "SPLIT": 1,
+    "COMP": 2
+   },
+   "losses": {
+    "DRAFT": 2,
+    "SPLIT": 1,
+    "COMP": 0
+   },
+   "unbeaten": [
+    "COMP"
+   ],
+   "winner": "COMP",
+   "clear": true
+  },
+  "sensitivity": [
+   {
+    "case": "judge 1 alone, before the referee",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "judge 2 alone, before the referee",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "every open SHOULD counted as met",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "every open SHOULD counted as not met",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "rule 3 the other way: SHOULDs first, then novel mechanisms",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "novel mechanisms as counter a counted them",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "novel mechanisms as counter b counted them",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: F_w",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: N_res",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: PERF-01 losses",
+    "sweep": "",
+    "winner": "MIN-P",
+    "in": [
+     "DRAFT",
+     "MIN",
+     "RUST",
+     "SRV",
+     "LEAN",
+     "SPLIT",
+     "SLOG",
+     "MIN-P",
+     "MIN-TS",
+     "RLOG",
+     "EMB-V8",
+     "SIDE",
+     "COMP"
+    ],
+    "top3": [
+     "MIN-P",
+     "MIN",
+     "RUST"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user chooses the other way on: region scope",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: shared tier",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "COMP"
+    ],
+    "top3": [
+     "COMP"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: fsync figure",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user chooses the other way on: other",
+    "sweep": "",
+    "winner": "level: DRAFT, SPLIT, COMP",
+    "in": [],
+    "top3": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user reads DEV-01 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "the user reads F-07 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "level: DRAFT, SPLIT, COMP",
+    "in": [],
+    "top3": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user reads P-02 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "level: DRAFT, SPLIT, COMP",
+    "in": [],
+    "top3": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user reads P-13 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "level: DRAFT, SPLIT, COMP",
+    "in": [],
+    "top3": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "the user reads PERF-08 the other way (one of \"other\")",
+    "sweep": "",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-10",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-14",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-15",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEP-19",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-02",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-04",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD DEV-05",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD F-22",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD OPS-11",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-15",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-20",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD P-22",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD PERF-09",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD SC-06",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD SC-12",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "without the SHOULD TEST-11",
+    "sweep": "one SHOULD left out, each in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "DRAFT with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "DRAFT with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RUST with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RUST with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SRV with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SRV with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LEAN with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LEAN with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "CELL with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "CELL with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LANE with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "LANE with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SPLIT with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "SPLIT",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "SPLIT",
+     "COMP",
+     "DRAFT"
+    ],
+    "same_as_base": false
+   },
+   {
+    "case": "SPLIT with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "PD with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "PD with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "ISR with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "ISR with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SLOG with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SLOG with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "OBJ with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "OBJ with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "V4 with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "V4 with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-P with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-P with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-TS with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "MIN-TS with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RLOG with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "RLOG with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "EMB-V8 with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "EMB-V8 with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SIDE with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "SIDE with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "BUY with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "BUY with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "COMP with -2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "COMP",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "COMP",
+     "SPLIT",
+     "DRAFT"
+    ],
+    "same_as_base": true
+   },
+   {
+    "case": "COMP with +2 novel mechanisms",
+    "sweep": "one row given 2 more or 2 fewer novel mechanisms, each row in turn",
+    "winner": "SPLIT",
+    "in": [
+     "DRAFT",
+     "SPLIT",
+     "COMP"
+    ],
+    "top3": [
+     "SPLIT",
+     "COMP",
+     "DRAFT"
+    ],
+    "same_as_base": false
+   }
+  ],
+  "waivers": [
+   {
+    "row": "MIN",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "MIN"
+   },
+   {
+    "row": "RUST",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "RUST"
+   },
+   {
+    "row": "SRV",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "SRV"
+   },
+   {
+    "row": "LEAN",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "LEAN"
+   },
+   {
+    "row": "SLOG",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 4,
+    "winner_then": "COMP"
+   },
+   {
+    "row": "MIN-P",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "MIN-P"
+   },
+   {
+    "row": "MIN-TS",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "MIN-TS"
+   },
+   {
+    "row": "RLOG",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "RLOG"
+   },
+   {
+    "row": "EMB-V8",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "EMB-V8"
+   },
+   {
+    "row": "SIDE",
+    "if_these_musts_were_waived": [
+     "PERF-04"
+    ],
+    "it_would_place": 1,
+    "winner_then": "SIDE"
+   }
+  ]
+ }
+}
