@@ -1,0 +1,1469 @@
+{
+ "group": "F",
+ "judge": "j2",
+ "cells": [
+  {
+   "req": "F-01",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-14c",
+     "E-37",
+     "E-17c",
+     "E-29"
+    ],
+    "why": "A `persisted` answer waits for the journal fsync on a majority of voters, and Raft keeps every committed entry: TLC on etcd's spec lost none through crashes and a lost disk replaced under a new id (E-14c), nor with one bad entry under `rejoin` (E-37), and no acknowledged write is lost across a move on E-17's harness. A journal of L0's shape lost 0 of 10,020 acknowledged batches in 2,640 LazyFS power cuts (E-29). So it holds by construction; the phase-2 sweeps on the real kernel are still owed."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A commit here is 'every member of the in-sync set' under a controller, not a majority of voters. This study never modelled or ran the in-sync set, its epochs or its recovery after a power loss of every machine.",
+     "closes": "A model of the in-sync set and its controller under crashes and power loss; none is planned, since the ISR family was not run."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A write quorum of log nodes holds each write, and a seal with a metadata compare-and-swap changes the set. SPACE counts 3 to 4 novel mechanisms there, and no experiment modelled them.",
+     "closes": "A model of loglets, the seal and the metadata compare-and-swap; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-28"
+     ],
+     "why": "A commit is a conditional PUT, so its bytes are as safe as the object store. But the manifest compare-and-swap and the writer lease that tie an answer to a PUT were only timed (E-28), never modelled.",
+     "closes": "A model of the manifest compare-and-swap and the writer lease; none is planned."
+    },
+    "PD": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-14c"
+     ],
+     "why": "Raft with its write-ahead log synced on a majority before the answer keeps every committed entry by construction; this is TiKV's published shape, and A-01's rules reach it by reasoning. One bad entry on a voter is F-22's case, which PD fails; it is not one of F-01's faults."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md pins it red in v4's own sim (sim/scale-probes.test.ts). Step 1: a node writes a row and leaves; another removes the row; tombstone GC and compaction both run. Step 2: the remove is gone from its lane but the old write is still in the leaver's lane, so a durable member that restarts from its disk has the row again. So an acknowledged remove does not survive a restart.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream with three file replicas and an fsync before each ack lost none of 900 writes through a kill -9 of the stream's leader (E-44). A power loss of every machine and a lost disk were not run.",
+     "closes": "Not planned (a reference row): LazyFS and lost-disk runs on nats-server."
+    }
+   }
+  },
+  {
+   "req": "F-02",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-20",
+     "E-22",
+     "E-22b",
+     "E-30",
+     "E-17c"
+    ],
+    "why": "Every dedup option holds 'no attempt twice' and 'a refused attempt never commits later' in every state of E-20's model: lost answers, a failover or a move mid-retry, a restart, expiry, with `forward.once` under `fwd`. Porcupine and real Knossos pass every partition history once a refusal waits for its commit (A-04), and `srchi-slot` marks keep derived outputs once past the horizon (A-05, E-30). Keyed method re-runs are reasoned, not modelled."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-20"
+     ],
+     "why": "Its dedup is transaction ids under two-phase commit (Percolator), which is published but was not modelled here (E-20 ran `win`, `sess`, `pid` and `keys`). fero's attempts, refusals and retries on top of it were never written.",
+     "closes": "A model of transaction ids under two-phase commit on E-20's bounds; none is planned."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md pins it in v4's own sim (sim/scoped-sweep.test.ts, KNOWN_UNSAFE, A2 seed 9). Step 1: a forwarded write commits at its owner, and the owner is cut off before the commit leaves it. Step 2: the issuer retries and the new owner commits it again. Step 3: after the heal both commits stand. A write issued from a tap during a commit is also committed twice.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "On JetStream a retried attempt lands twice once the dedup window has passed, and an `incr` whose answer was lost was counted again after one other write to the row: the counter read 3 where 2 was right (E-44). The message id must name one try, not the attempt, or a refused publish burns it (58 of 200 increments lost).",
+     "proof": "counterexample"
+    }
+   }
+  },
+  {
+   "req": "F-03",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-14",
+     "E-14c",
+     "E-15",
+     "E-17c",
+     "E-16",
+     "E-46"
+    ],
+    "why": "One Raft leader per term commits and a minority cannot: TLC on etcd's spec keeps one leader per term with the campaign guard (A-01), and the TS port was linearizable in 26 of 26 Maelstrom runs under partitions (E-46). A move keeps one writing group per partition: the slot move in 7.5 million states with an unclean recovery (E-15), re-key, split and lanes on E-17's harness, RLOG's writer epoch in E-16. A member that cannot reach its leader refuses at once with a redirect (A-02: a rule, not modelled)."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "One leader per partition under the controller's epochs is Kafka's published rule. This study did not model the in-sync set or run partition schedules on it.",
+     "closes": "A model of leader epochs and the in-sync set under partitions; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "One writer per loglet rests on the seal and the metadata compare-and-swap. SPACE counts them as novel, and no experiment modelled them.",
+     "closes": "A model of the seal and the writer change; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "One writer rests on a lease held by compare-and-swap on the manifest. No experiment modelled the lease, a paused writer or a cut-off one.",
+     "closes": "A model of the lease and the manifest compare-and-swap with a paused writer; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "v4's ring gives each partition one owner per view, a held minority is read-only, and V4-55 closed the four pinned ways its kernel could split (STATUS.md). No TLA+ of it exists; the commit stranded on a cut-off owner that STATUS.md still pins is judged under F-02.",
+     "closes": "Not planned (a reference row): a TLA+ model of v4's views and ownership."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream's stream leader orders every publish, and two sells of the last item gave exactly one `ok` in 100 rounds of 100 (E-44). A cut-off minority and its refusal were not run, and conditions are judged by client retries, not at a writer.",
+     "closes": "Not planned (a reference row): partition schedules against nats-server."
+    }
+   }
+  },
+  {
+   "req": "F-04",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-31",
+     "E-22",
+     "E-22b",
+     "E-46",
+     "E-17c"
+    ],
+    "why": "With A-06 a subscriber's view stays a prefix of the committed log on ten bounds explored in full: a leader crash, a follower's reload, a dropped link, a slot move and a relay, up to 7.6 million states (E-31). Reads passed Porcupine and real Knossos (E-22, E-22b), and ReadIndex and log reads on the TS port were linearizable in every Maelstrom run (E-46)."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Reads go by leader leases and MVCC timestamps. `lease` needs bounded clock drift and was not tested here (G-25).",
+     "closes": "A model or a Jepsen-style run of lease reads under clock drift; none is planned."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-31"
+     ],
+     "why": "Readers stop at the high watermark, and Kafka's KIP-320 detects a truncated log. E-31 did not model the in-sync set's truncation on a leader change, and does not name this row.",
+     "closes": "E-31's model with leader epochs and the high watermark; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "State reads go by a leader lease, which needs bounded clock drift and was never tested (G-25). The commit-by-PUT path under a paused writer was not modelled.",
+     "closes": "A model of lease reads and of the PUT commit path; none is planned."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Per-cell last-writer-wins has no committed log for a reader to be a prefix of. STATUS.md pins the case (sim/scale-probes.test.ts, monitor M6): three nodes show a remove, collect its tombstone, then take an older write from a healed member, so the remove that readers saw is undone.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Clients fold the stream through an ordered consumer, and four clients ended with the same 50 rows after a leader kill (E-44). No reader history was checked by Porcupine.",
+     "closes": "Not planned (a reference row): reader histories through Porcupine under faults."
+    }
+   }
+  },
+  {
+   "req": "F-05",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "measured",
+    "ev": [
+     "E-13"
+    ],
+    "why": "AMENDMENTS 1.3, F-05's handover clause: etcd's own leader transfer pauses its group 9.7 to 9.8 ms at the median and 24 to 31 ms at worst on this disk, against 10 ms; two commits in a row on the TS port take 12.8 ms at p99 under 10,000 writes a second (E-13). Restated as 'C plus the longest normal gap between commits plus 5 ms' the clause holds for etcd's raft, but the row stays open: the failover sum E + 0.25 E + a few ms = 2.5 s sits on the bar and was not run (2.03 to 3.36 s with etcd's jitter), and quiet groups were never failed over (K-22).",
+    "proof": "ceiling",
+    "gap": 1.44,
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2 pins on 3 processes: failover with 0.25 E jitter on ticking and quiet groups, and the handover with A-02's refuse-at-once rule."
+   },
+   "except": {
+    "RUST": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-13",
+      "E-01"
+     ],
+     "why": "AMENDMENTS 1.3, F-05's handover clause: the native bar is 2 ms, and etcd, a native Raft, pauses its group 9.7 to 9.8 ms at the median here (E-13). The bar names NVMe, which this box lacks, so the gap is this disk's (a flush is 0.5 to 0.7 ms at p99, E-01). Restated as 'C plus the longest normal gap plus 5 ms' it is open: at E = 1 s one failover took 1.42 s against 1.25 s, so E must be under 1 s (reasoned, not run).",
+     "proof": "ceiling",
+     "gap": 3.85,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Phase 2 pins on 3 native processes, on NVMe: failover with E under 1 s and 0.25 E jitter, and the handover."
+    },
+    "SRV": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-13",
+      "E-01"
+     ],
+     "why": "AMENDMENTS 1.3, F-05's handover clause: the native bar is 2 ms, and etcd, a native Raft, pauses its group 9.7 to 9.8 ms at the median here (E-13). The bar names NVMe, which this box lacks, so the gap is this disk's (a flush is 0.5 to 0.7 ms at p99, E-01). Restated as 'C plus the longest normal gap plus 5 ms' it is open: at E = 1 s one failover took 1.42 s against 1.25 s, so E must be under 1 s (reasoned, not run).",
+     "proof": "ceiling",
+     "gap": 3.85,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Phase 2 pins on 3 native processes, on NVMe: failover with E under 1 s and 0.25 E jitter, and the handover."
+    },
+    "EMB-V8": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-13",
+      "E-01"
+     ],
+     "why": "AMENDMENTS 1.3, F-05's handover clause: the native bar is 2 ms, and etcd, a native Raft, pauses its group 9.7 to 9.8 ms at the median here (E-13). The bar names NVMe, which this box lacks, so the gap is this disk's (a flush is 0.5 to 0.7 ms at p99, E-01). Restated as 'C plus the longest normal gap plus 5 ms' it is open: at E = 1 s one failover took 1.42 s against 1.25 s, so E must be under 1 s (reasoned, not run).",
+     "proof": "ceiling",
+     "gap": 3.85,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Phase 2 pins on 3 native processes, on NVMe: failover with E under 1 s and 0.25 E jitter, and the handover."
+    },
+    "SIDE": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-13",
+      "E-01"
+     ],
+     "why": "AMENDMENTS 1.3, F-05's handover clause: the native bar is 2 ms, and etcd, a native Raft, pauses its group 9.7 to 9.8 ms at the median here (E-13). The bar names NVMe, which this box lacks, so the gap is this disk's (a flush is 0.5 to 0.7 ms at p99, E-01). Restated as 'C plus the longest normal gap plus 5 ms' it is open: at E = 1 s one failover took 1.42 s against 1.25 s, so E must be under 1 s (reasoned, not run).",
+     "proof": "ceiling",
+     "gap": 3.85,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Phase 2 pins on 3 native processes, on NVMe: failover with E under 1 s and 0.25 E jitter, and the handover."
+    },
+    "PD": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-13",
+      "E-01"
+     ],
+     "why": "AMENDMENTS 1.3, F-05's handover clause: the native bar is 2 ms, and etcd, a native Raft, pauses its group 9.7 to 9.8 ms at the median here (E-13). The bar names NVMe, which this box lacks, so the gap is this disk's (a flush is 0.5 to 0.7 ms at p99, E-01). Restated as 'C plus the longest normal gap plus 5 ms' it is open: at E = 1 s one failover took 1.42 s against 1.25 s, so E must be under 1 s (reasoned, not run).",
+     "proof": "ceiling",
+     "gap": 3.85,
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Phase 2 pins on 3 native processes, on NVMe: failover with E under 1 s and 0.25 E jitter, and the handover."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-09c"
+     ],
+     "why": "A controller picks the new leader from the in-sync set after a session timeout, and SPACE notes that a controller election delays it. Neither a failover nor a handover was timed here (E-09c ran Kafka for speed only).",
+     "closes": "Failover and handover pins on a three-broker prototype; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The controller changes writers by a seal and a compare-and-swap. No experiment timed a writer's crash or a planned change.",
+     "closes": "Failover and handover pins on a log-tier prototype; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-28"
+     ],
+     "why": "A handover or a failover is at least one conditional PUT on the manifest, plus the lease wait: 2.7 ms at p99 on MinIO here, about 30 ms typical on S3 Standard (cited in E-28), which is over the 10 ms handover bar on a real store. The lease-based failover was not timed.",
+     "closes": "Failover and handover pins against a real object store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "DESIGN-V5 4.2 puts v4's eviction at about 4 s by default ('2 s is still half of v4's eviction'), over the 2.5 s bar. It is a setting (`heartbeat.ms`), and nothing in this study timed v4.",
+     "closes": "Not planned (a reference row): v4's own failover pin at its lowest safe heartbeat."
+    },
+    "BUY": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Three kills of the stream's leader on JetStream: the longest wait for an acknowledgement was 5.2, 5.4 and 7.2 s, against 2.5 s (E-44). The election timer is JetStream's own, and fero cannot change it.",
+     "proof": "ceiling",
+     "gap": 1.08
+    }
+   }
+  },
+  {
+   "req": "F-06",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-07",
+     "E-21",
+     "E-34"
+    ],
+    "why": "The kernel on its own thread kept its heartbeat within 5 ms through a 5 s main-thread stall and 0.3 to 0.5 s GCs (E-07), and the median clock rule (A-23) cost no failover in the 60 runs where the leader's clock jumped and ended no row more than 100 ms early (E-21, simulated, three and five clocks). Not run: CheckQuorum every E/4 (500 ms at E = 2 s) against pauses of up to 1 s on kernel threads (K-28), and groups with fewer than three clocks (K-11). Read literally (E-21's reading), the first clause changes no row here: no row holds T `hlc`.",
+    "closes": "Phase 2 sim on the real kernel: pauses up to 1 s on every kernel thread and clock jumps, with A-02's constants; E-21's sim with one and two clocks."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "Time comes from a central oracle (T `tso`), which E-21 did not model, and reads use leader leases that need bounded clock drift (untested, G-25). Its Raft kernel is native, so it has no GC pause of its own.",
+     "closes": "E-21's sim with a timestamp oracle and lease reads; none is planned."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-07",
+      "E-21"
+     ],
+     "why": "A partition fails over on the controller's session timeout, not on Raft's election, and that was not modelled with pauses. Its TTLs take the median rule (A-23, E-21 simulated) and its kernel sits on a worker (E-07).",
+     "closes": "A sim of the controller's sessions with pauses up to 1 s and clock jumps; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-07",
+      "E-21"
+     ],
+     "why": "A writer is changed by the controller on a lost session, and that was not modelled with pauses. Its TTLs take the median rule (A-23, E-21 simulated) and its kernel sits on a worker (E-07).",
+     "closes": "A sim of the controller's sessions with pauses up to 1 s and clock jumps; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-21"
+     ],
+     "why": "The writer holds a time lease by compare-and-swap. How a clock jump or a pause meets that lease was not modelled, and W `lease` was never tested (G-25).",
+     "closes": "A model of the writer lease under pauses and clock jumps; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-07"
+     ],
+     "why": "v4's kernel shares the main thread (M `loop`), where E-07 measured GC pauses of 0.77 to 0.98 s. Whether a pause that long trips v4's failure detector (eviction at about 4 s by DESIGN-V5's word) was not measured; v4 stamps by Lamport clocks, so a wall-clock jump has no lease to end.",
+     "closes": "Not planned (a reference row): v4's sim with injected pauses of up to 1 s."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "NATS's own Raft timers decide failover, and a lock's lease is the stream's maximum message age (E-44). Neither a pause nor a clock jump was injected.",
+     "closes": "Not planned (a reference row): pauses and clock jumps against nats-server."
+    }
+   }
+  },
+  {
+   "req": "F-07",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-14b",
+     "E-14c",
+     "E-10"
+    ],
+    "why": "From three voters up Raft elects once any majority is back: TLC found no stuck state with a live majority (E-14b; E-14c with grow first), and the TS port matches etcd through crash-restarts (E-10). A-01 states one limit: while a group grows from two voters to three, for one message, a restart needs the old leader back (model-checked); and under the draft's `leave`, three clean Ctrl-C stops leave the last to stop as each group's only voter (DESIGN-V5 4.2, reasoned). Read with no room for either, F-07 fails (alt); v4's harness was not run on any v5 kernel.",
+    "depends_on": "other",
+    "alt": "fails",
+    "closes": "Phase 2 sim: v4's `stopsOneByOne` harness and a restart-all sweep, with one schedule inside the two-voter window; and F-07's text says what a clean stop may do to the voter set."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-14b"
+     ],
+     "why": "Its metadata group is Raft and takes A-01's two-voter window (so the alt). A partition comes back when a replica of its last in-sync set returns (Kafka's KIP-966), which was not modelled here.",
+     "depends_on": "other",
+     "alt": "fails",
+     "closes": "A restart-all sweep on the in-sync set and the controller; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-14b"
+     ],
+     "why": "Its metadata group is Raft and takes A-01's two-voter window (so the alt). A loglet reopens once a write quorum of its log nodes is back, which was not modelled here.",
+     "depends_on": "other",
+     "alt": "fails",
+     "closes": "A restart-all sweep on the log tier; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "No group has voters: any process that reaches the store can take the writer lease by compare-and-swap, so the order of restarts should not matter. The lease and the manifest were not modelled.",
+     "closes": "A model of the writer lease across a full stop; none is planned."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md, pinned in sim/leave-harness.ts (`stopsOneByOne`) and tests/stops.test.ts. Step 1: each clean leaver's dir holds the last view it saw, a view it is not in. Step 2: the last view's only voter is the last to stop. Step 3: so the first two back sit `joining` until that one returns, and no kernel rule can re-form them safely.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream's own Raft groups decide. E-44 killed one leader of three; a full stop and a restart in every order were not run.",
+     "closes": "Not planned (a reference row): a restart-all run of three nats-server processes."
+    }
+   }
+  },
+  {
+   "req": "F-08",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-31",
+     "E-33"
+    ],
+    "why": "With one ordered log per partition a remove is an entry that every copy folds, and E-31's model shows no ghost row at a subscriber across a failover, a reload, a move and a relay. But E-33 left erasure out of its restore model, and snapshot layers against retention (the tier's one mechanism) were never modelled, which is the kind of place where v4's rows came back.",
+    "closes": "Phase 2: v4's two row-comes-back cases as sim regression seeds, and the monitor; a model of a restore after a remove and of snapshot layers."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "Removes are MVCC tombstones collected behind a GC safe point (TiKV, published). That was not modelled here, and fero's seed and restore on top of it were not written.",
+     "closes": "A model of the GC safe point with a restore and a rejoin; none is planned."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md pins three ways in v4's own tests. One: after tombstone GC and compaction a removed row comes back from a short lane (sim/scale-probes.test.ts). Two: a write from an evicted member beats a newer remove after a heal. Three: a fresh member's `data:` seed brings back a deleted seed row (2 runs of 2).",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "A row is the last message on its subject (E-44), so a removed row is a marker in the stream. A purge of markers, a rejoin and a restore were not run.",
+     "closes": "Not planned (a reference row): removes through purge, rejoin and restore on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-09",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "reasoned",
+    "ev": [
+     "E-29",
+     "E-38c",
+     "E-16"
+    ],
+    "why": "Every design can raise a health row and a stderr line, and E-29's pipeline shows two (the 80 % line, a full follower saying so). No test per failure kind exists, and the evidence names waits that must speak: a member cut from its leader stalled its clients for 20 s in etcd (E-38c), healing waits while `#meta` has no leader (E-16), and the two-voter window (A-01).",
+    "closes": "Phase 2 on: one test per failure kind, and the sim monitor that fails any silent wait over 2 x `election.ms`."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md: a dead static host holds the first view with no line ('silently': a closed port and a cut look alike), and a host list whose members disagree on the name forms one cluster per name with nothing printed (`nameReject` prints nothing since V4-3). So a loss of writability can show with no health row and no stderr line.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Health would come from NATS advisories and fero's client library, which E-44 did not build. One notice is known to go missing: JetStream announces 'deliveries used up' once, on a subject that is not stored (E-44).",
+     "closes": "Not planned (a reference row): one test per failure kind on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-10",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-29",
+     "E-14b",
+     "E-37"
+    ],
+    "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: LazyFS cannot make a sync fail or lose a directory entry, so both are untested for every row; 1.3 asks for no new wording, so the two verdicts are the same. The rest is shown: 576 torn tails were cut with 0 of 10,020 acknowledged batches lost (E-29), and a lost disk that returns under its old id loses a committed entry in 34 steps, which the incarnation rule stops (E-14b). A-28 narrows 'a torn tail is cut' to a tail the checksum shows was never acknowledged.",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2: the simulator's disk model, or a block-level tool (dm-flakey, dm-log-writes), for a failed fsync and a lost directory entry."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-37"
+     ],
+     "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: untested for every row, with no new wording asked, so the two verdicts are the same. This row holds Z `crash`: a corrupt entry is undefined behaviour, so 'a damaged disk never votes as the replica it replaces' rests on what F-22 judges (E-37).",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "The simulator's disk model or a block-level tool for a failed fsync and a lost directory entry; and a rule for a damaged disk in this row."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29",
+      "E-37"
+     ],
+     "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: untested for every row, with no new wording asked, so the two verdicts are the same. This row holds Z `crash`: a corrupt entry is undefined behaviour, so 'a damaged disk never votes as the replica it replaces' rests on what F-22 judges (E-37).",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "The simulator's disk model or a block-level tool for a failed fsync and a lost directory entry; and a rule for a damaged disk in this row."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: untested for every row, with no new wording asked, so the two verdicts are the same. This row has no voting disk: a PUT lands whole or not at all, and a failed PUT is never acknowledged (design); its local cache was not put under any fault.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Fault-injection on the cache disk and failed PUTs against an object store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-29"
+     ],
+     "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: untested for every row, with no new wording asked. v4 has the pieces by DESIGN-V5's word (a crc32c and a chain check per record, the fsyncgate latch, identity from the dir), but none of them was run in this study.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Not planned (a reference row): fault-injection runs on v4's WAL."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "AMENDMENTS 1.3, F-10's failed-fsync and directory-fsync clauses: untested for every row, with no new wording asked. Here the disk rules are nats-server's own, and none was run.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Not planned (a reference row): fault-injection runs on nats-server's file store."
+    }
+   }
+  },
+  {
+   "req": "F-11",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "construction",
+    "ev": [
+     "E-13",
+     "E-14c",
+     "E-16"
+    ],
+    "why": "Three voters on three failure domains is plain Raft: either machine's crash leaves a majority of two, and every acknowledged write is on two of the three disks; a small full server counts as the third voter, so no witness rule is needed. A failover on three members was measured on etcd (E-13), and RLOG's writer change holds in E-16's model. Without a third voter the draft keeps one voter and words the health line (DESIGN-V5 4.2); that line is design, not a test."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Two data copies plus a controller quorum is the published shape (SPACE 4.2), with commit by the in-sync set. No experiment modelled or ran a machine crash on it.",
+     "closes": "A two-machines-plus-controller test on an ISR prototype; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "It needs a write quorum of log nodes on three failure domains, and the seal rule when one is lost. Neither was modelled or run here.",
+     "closes": "A two-machines-plus-log-node test on a log-tier prototype; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "The object store is the third failure domain: the machine that is left takes the writer lease by compare-and-swap. The lease was not modelled or run.",
+     "closes": "A two-machine test against an object store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md: with two members a crash of one stops writes until it returns, and a witness is still being weighed. With a third full member the majority rule should carry on, which nothing in this study ran.",
+     "closes": "Not planned (a reference row): v4's three-member crash test and its two-machine line."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "measured",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Three nats-server processes with three file replicas lost none of 900 writes through a kill of the stream's leader (E-44). The two-machine health line is not built.",
+     "closes": "Not planned (a reference row): the two-machine health line on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-12",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "model",
+    "ev": [
+     "E-15",
+     "E-33",
+     "E-37"
+    ],
+    "why": "DESIGN-V5 4.2 words the command (`fero recover --unclean`: it lists what may be lost, refuses while a voter it would drop answers, and bumps the slot epochs), and the slot move holds every property with one unclean recovery in 7.5 million states (E-15, TLC). The command, its list and its refusal were not built or modelled, and its new epoch needs A-08's high-water mark, whose home is open for rows with no store.",
+    "closes": "Phase 4: recovery tests with the slot-move spike's cases; and who gives up a move whose target is gone for good (K-27)."
+   },
+   "except": {
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-17",
+      "E-33"
+     ],
+     "why": "DESIGN-V5 4.2 words the command, but unclean recovery was modelled for slot moves only (E-15). E-17 part 1 says every other mapping needs more rules under it: re-key's catalog and generations, or a split's lineage, were not counted.",
+     "closes": "A model of this row's own mapping under one unclean recovery, then the phase-4 recovery tests."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-17",
+      "E-33"
+     ],
+     "why": "DESIGN-V5 4.2 words the command, but unclean recovery was modelled for slot moves only (E-15). E-17 part 1 says every other mapping needs more rules under it: re-key's catalog and generations, or a split's lineage, were not counted.",
+     "closes": "A model of this row's own mapping under one unclean recovery, then the phase-4 recovery tests."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "DESIGN-V5 4.2 words the command, and no unit moves between lanes, so the slot-move cases do not arise. The command, its may-be-lost list and its refusal while a voter answers were not built or modelled.",
+     "closes": "Phase 4: recovery tests on a lane that lost its majority."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "TiKV's `unsafe-recover` is the published command. Whether it lists what may be lost and refuses while a voter answers was not checked here, and this row has no cursors to refuse.",
+     "closes": "A recovery test on a TiKV-shaped prototype; none is planned."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "The published route is an unclean leader election, which drops data without a list; KIP-966's eligible replicas narrow it. None of it was modelled here.",
+     "closes": "A recovery test on an ISR prototype; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A loglet that lost its write quorum of log nodes needs its own command, and the row does not word one. Nothing was modelled.",
+     "closes": "A design and a test of recovery after a lost write quorum; none is planned."
+    },
+    "OBJ": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No group has voters: every commit is an object in the store, and the writer is whoever holds the lease. So there is no majority to lose, and nothing for the command to do."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md: the operator word `reform` is specified (DESIGN-LEAVE, the note of 2026-10-12) and not built, and its hazard is named: a re-form splits the cluster if the missing member comes back from its dir.",
+     "closes": "Not planned (a reference row): build `reform` and test it."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "NATS has its own peer-remove and restore commands. None lists what may be lost in fero's terms or refuses a stale cursor, and none was run.",
+     "closes": "Not planned (a reference row): a majority-loss drill on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-13",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-07",
+     "E-39",
+     "E-20"
+    ],
+    "why": "The bounds are named, not soaked. Commits queued for a stalled main thread grow with the stall (5,000 in 5 s) and the heap must be sized from rows (out of memory at Node's default 2 GB with 5e6 rows, E-07); credits bound the writes in flight (E-39); dedup state is per active client or producer, 309 to 2,133 B, never per write (E-20). No 24 h run and no test per bound exist.",
+    "closes": "Phase 3 on: the 24 h soak at maximum rate, and one test per bound."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 was not soaked in this study, and it takes none of the fixes (A-07's credits, A-13's sized heap). REQUIREMENTS names HISTORY as the source of this row.",
+     "closes": "Not planned (a reference row): a 24 h soak of v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-44"
+     ],
+     "why": "JetStream's own limits bound the streams; the dedup window is bounded in time (E-44). fero's client side was 164 lines with no bounds written, and nothing was soaked.",
+     "closes": "Not planned (a reference row): a 24 h soak on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-14",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-07",
+     "E-34"
+    ],
+    "why": "With the kernel on its own thread (M `kw`), a prototype kept its heartbeat within 5 ms of schedule and write p99 at or under 4 ms through a 5 s main-thread stall and forced GCs of 0.3 to 0.5 s; on the main thread it went silent for 2.6 to 5.1 s (E-07). The seam carries byte batches and the worker keeps its row index off the V8 heap (A-27), since E-34 measured pauses of 0.25 to 0.49 s with it on. A throw goes to the reporter as in V4-47 (design; those tests are not ported yet)."
+   },
+   "except": {
+    "SRV": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No user code runs on a server (U `cli`): methods, rules and views run in clients. So nothing of the user's shares a thread with replication or failure detection."
+    },
+    "PD": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No user code runs on a server (U `cli`): methods, rules and views run in clients. So nothing of the user's shares a thread with replication or failure detection."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-03"
+     ],
+     "why": "User code runs in V8 isolates inside the Rust server, apart from the kernel's threads by design. But no stall and no throw was injected into an isolate: E-03 timed the calls only (2.6 ns an op).",
+     "closes": "A 5 s isolate stall and a throw on E-03's deno_core prototype."
+    },
+    "SIDE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-07"
+     ],
+     "why": "The daemon keeps replication and failure detection through an app stall by construction: it is another process. But L2 for the groups a host leads runs in the app's Node process (SPACE, H `side`), so writes to those groups wait out a 5 s stall unless the daemon hands leadership to the standby, and that rule is not written.",
+     "closes": "A stall test on a SIDE prototype with a watchdog handover to the standby."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "measured",
+     "ev": [
+      "E-07"
+     ],
+     "why": "Step 1: v4 runs the kernel, the fold and user code on one event loop (M `loop`). Step 2: a stalled loop sends no heartbeat and answers no write. Step 3: E-07's control, the same kernel on the main thread, went silent for 5.1 s in a 5 s stall and 2.6 s under forced GCs, with write p99 4.9 s. So a stalled main thread stalls replication and failure detection.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [
+      "E-44"
+     ],
+     "why": "Replication and failure detection run in nats-server, which runs no user code. Each client judges its own conditions (E-44), so one app's stall or throw stops only that app."
+    }
+   }
+  },
+  {
+   "req": "F-15",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "reasoned",
+    "ev": [
+     "E-33"
+    ],
+    "why": "AMENDMENTS 1.3, F-15: this row keeps its restore mark in the object store (A-08). Step 1: every new epoch is recorded in the store's manifest before it is used. Step 2: a slot move raises the slot's epoch. Step 3: so no move can open while the store is down, and F-15 lets only wake, new replicas and old history wait. With slot moves added to that list it is open: writes and failover use local journals only (design), but no sim ran with the store down (E-33's store is always reachable).",
+    "proof": "structural",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 3 sim with the store down for 1 h, a move in flight included (K-21, K-23)."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "SRV": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "EMB-V8": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "RLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: this row requires no object store, and A-08 leaves the home of its restore mark open, so the clash (a move waits for the store) is not shown for it. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "Choose the home of the restore mark (A-08); then the phase 3 sim with the store down for 1 h."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-33"
+     ],
+     "why": "AMENDMENTS 1.3, F-15: no unit moves in this row and it requires no object store, so nothing on the write path waits for the restore mark. Writes and failover use local journals only, by design; no sim ran with the store down.",
+     "depends_on": "restated",
+     "alt": "open",
+     "closes": "The phase 3 sim with the store down for 1 h."
+    },
+    "OBJ": {
+     "v": "fails",
+     "basis": "reasoned",
+     "ev": [
+      "E-28"
+     ],
+     "why": "The object store is this row's log. Step 1: a commit is a conditional PUT (Q `put`). Step 2: with the store down no PUT succeeds, and no writer lease can be taken or renewed. Step 3: so writes and failover stop. Adding slot moves to F-15's list (AMENDMENTS 1.3) does not change that.",
+     "proof": "structural",
+     "depends_on": "restated",
+     "alt": "fails"
+    },
+    "PD": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No object store is on any write, failover or new-replica path: each store keeps its own LSM, and a new replica copies from a peer."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "Old segments are uploaded behind the local log (Kafka's KIP-405), so a down store should only hold retention back, and no partition moves. This was not run here.",
+     "closes": "A run with the store down for 1 h on an ISR prototype; none is planned."
+    },
+    "V4": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "v4 uses no object store: its log is a WAL per group on local disks."
+    },
+    "BUY": {
+     "v": "met",
+     "basis": "construction",
+     "ev": [],
+     "why": "No object store is on JetStream's write or failover path: the streams are files on the servers."
+    }
+   }
+  },
+  {
+   "req": "F-16",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-16",
+     "E-14c"
+    ],
+    "why": "Healing by the group's leader and healing by the controller loop are both safe and live with members cut off and gone marks set by time: 4 members, up to two faults, every state explored (E-16). So a member back after `evict.after` is taken in by a swap with no operator step, and grow-first healing has 0 stuck states (E-14c). Raft's log matching sends a returning replica only the tail it lacks, or a snapshot when that tail was dropped (by construction)."
+   },
+   "except": {
+    "DRAFT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-14c"
+     ],
+     "why": "Healing with full voters and learners is model-checked (E-16, E-14c). But this row's log replicas join healing when servers are short and 'lead only to repair' (DESIGN-V5 4.2), and E-16 left witnesses out (G-25).",
+     "closes": "A healing model with a log replica in the voter set, with partitions from 10 s to 1 h."
+    },
+    "CELL": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-14c"
+     ],
+     "why": "Healing with full voters and learners is model-checked (E-16, E-14c). But this row's log replicas join healing when servers are short and 'lead only to repair' (DESIGN-V5 4.2), and E-16 left witnesses out (G-25).",
+     "closes": "A healing model with a log replica in the voter set, with partitions from 10 s to 1 h."
+    },
+    "LANE": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-14c"
+     ],
+     "why": "Healing with full voters and learners is model-checked (E-16, E-14c). But this row's log replicas join healing when servers are short and 'lead only to repair' (DESIGN-V5 4.2), and E-16 left witnesses out (G-25).",
+     "closes": "A healing model with a log replica in the voter set, with partitions from 10 s to 1 h."
+    },
+    "SPLIT": {
+     "v": "open",
+     "basis": "model",
+     "ev": [
+      "E-16",
+      "E-14c"
+     ],
+     "why": "Healing with full voters and learners is model-checked (E-16, E-14c). But this row's log replicas join healing when servers are short and 'lead only to repair' (DESIGN-V5 4.2), and E-16 left witnesses out (G-25).",
+     "closes": "A healing model with a log replica in the voter set, with partitions from 10 s to 1 h."
+    },
+    "PD": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-16"
+     ],
+     "why": "A-19 and A-20 reach PD by reasoning from TiKV's published scheduler (region epoch, operator timeout). E-16 did not model it.",
+     "closes": "E-16's model with PD's separate controller; none is planned."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [],
+     "why": "A returning broker cuts its log back to the leader's epoch and catches up (Kafka's KIP-101 and KIP-279, published). That was not modelled here.",
+     "closes": "A model of a returning replica in the in-sync set; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A returning log node must not serve a sealed loglet as live. The seal rule was not modelled here.",
+     "closes": "A model of a returning log node after a seal; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A returning process reads the manifest and refills its cache: there is no vote to rejoin. Nothing of it was modelled or run.",
+     "closes": "A model of a returning writer and its stale lease; none is planned."
+    },
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "STATUS.md. Step 1: sim/leave-sweep.test.ts pins 10 of the 100 cut-and-restart schedules as wedged for good (safe, not live), which a longer window does not change. Step 2: a member cut off and voted out can also leave the copies split for good after the heal, when its old write beats a newer remove (monitor M6 red). So a returning member does not always rejoin by itself.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "A nats-server that returns catches its streams up by itself, by JetStream's design. That was not run here.",
+     "closes": "Not planned (a reference row): partitions from 10 s to 1 h against nats-server."
+    }
+   }
+  },
+  {
+   "req": "F-17",
+   "part": "M",
+   "default": {
+    "v": "fails",
+    "basis": "model",
+    "ev": [
+     "E-38",
+     "E-38c"
+    ],
+    "why": "AMENDMENTS 1.3, F-17: 5 of 280 five-node partial partitions stayed stuck for good with a connected majority, because the one server linked to a majority had a shorter log and Raft's vote rule refused it (E-38, simulated on etcd's own raft code; none with three nodes). Restated to 'a connected majority that includes an up-to-date replica' it is open: nothing flapped, but 62 of 280 runs took 3.0 to 3.9 E with etcd's timers, and CheckQuorum every E/4 (A-02) was run on the named cases only (1.52 E at worst).",
+    "proof": "counterexample",
+    "depends_on": "restated",
+    "alt": "open",
+    "closes": "Phase 2 sim: the three- and five-node sweeps and the Jensen, Howard and Cloudflare seeds with A-02's constants; one real-TCP run with five members."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "AMENDMENTS 1.3 names the Raft rows; the in-sync set was not run under partial partitions. A partition leader that the controller cannot hear is a case of its own.",
+     "closes": "E-38's topologies against the in-sync set and its controller; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "AMENDMENTS 1.3 names the Raft rows; loglets and the controller's sessions were not run under partial partitions.",
+     "closes": "E-38's topologies against the log tier; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "AMENDMENTS 1.3 names the Raft rows; this row was not run. A writer needs only its link to the store, so server-to-server cuts should matter less (reasoned).",
+     "closes": "Partial-partition schedules between servers and the store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-38"
+     ],
+     "why": "AMENDMENTS 1.3 names the Raft rows; v4 was not run on these shapes. STATUS.md lists cut shapes that stay read-only until the cut heals or an operator acts.",
+     "closes": "Not planned (a reference row): E-38's topologies in v4's sim."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "AMENDMENTS 1.3 names the Raft rows of this study; nats-server's own Raft was not run under partial partitions.",
+     "closes": "Not planned (a reference row): E-38c's iptables run against nats-server."
+    }
+   }
+  },
+  {
+   "req": "F-18",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-38",
+     "E-38c"
+    ],
+    "why": "Raft as published never gives up leadership for slowness: a leader capped at 10 % of a core led for 20 E with p99 32 times worse on real etcd (E-38c), and a 10 times slower leader was never replaced at 200 writes a second (E-38). A-03 gives this row a slow-leader rule and async leader writes, which removes the failure on paper; the rule was named, not built, modelled or counted (G-03).",
+    "closes": "Build and model the slow-leader rule (K-17): the sim with per-node latency, and one run under a cgroup or dm-delay cap."
+   },
+   "except": {
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "This family was not run with a slow leader or writer, and no rule that moves one is named for it. E-38 shows that a rule is needed wherever leadership is held by heartbeats alone.",
+     "closes": "A fail-slow run on a prototype of this family, and a rule if it holds on; none is planned."
+    },
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "This family was not run with a slow leader or writer, and no rule that moves one is named for it. E-38 shows that a rule is needed wherever leadership is held by heartbeats alone.",
+     "closes": "A fail-slow run on a prototype of this family, and a rule if it holds on; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "This family was not run with a slow leader or writer, and no rule that moves one is named for it. E-38 shows that a rule is needed wherever leadership is held by heartbeats alone.",
+     "closes": "A fail-slow run on a prototype of this family, and a rule if it holds on; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "v4 has no leader, but a partition has one owner by the ring, and nothing moves a slow owner. No run here slowed one.",
+     "closes": "Not planned (a reference row): a fail-slow owner in v4's sim."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-38"
+     ],
+     "why": "nats-server's Raft has no slow-leader rule that fero could set; a client-side watcher could ask a leader to step down. Nothing was run.",
+     "closes": "Not planned (a reference row): a CPU-capped stream leader on JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-19",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-39",
+     "E-27"
+    ],
+    "why": "With a client credit window (A-07) the pipeline kept 79 to 82 % goodput in TS and 88 to 89 % in Rust at twice capacity, admitted p99 at 0.8 x steady, and was back to steady in 0 to 6 s; without it every variant fell to 0 to 50 % and stayed there (E-39). Not shown: a grant handed out by the server, the handshake budget (a TLS storm raised p99 27 to 45 x), other groups and tenants, and 1,000 groups failing over at once.",
+    "closes": "Phase 3: server-granted credits and the handshake budget on the real kernel, E-39's runs with many groups and tenants, and the sim with 1,000 groups failing over together."
+   },
+   "except": {
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-39"
+     ],
+     "why": "v4 takes no fix, so it has no credit window. E-39 shows that bounded queues with retry-after fall to 0 to 50 % goodput without one, but that was measured on E-02's pipeline, not on v4.",
+     "closes": "Not planned (a reference row): E-39's overload run against v4."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-39",
+      "E-44"
+     ],
+     "why": "JetStream gives a publisher no credit window; fero's client could hold one, as E-39's clients did. Nothing was run at twice capacity, and failover alone takes 5.2 to 7.2 s (E-44).",
+     "closes": "Not planned (a reference row): E-39's overload run against JetStream."
+    }
+   }
+  },
+  {
+   "req": "F-20",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "measured",
+    "ev": [
+     "E-29"
+    ],
+    "why": "E-29 ran F-20's own test on a journal of L0's shape and on a three-process pipeline, on 64 MB tmpfs and ext4. The 80 % line printed once; at the hard limit data writes were refused `disk-full` with a retry-after while reads, 500 removes, 200 term changes, a member change, a snapshot and a retention pass went on from the reserve; a full follower stopped acknowledging, said so, and caught up by itself in 348 to 513 ms. A-09's six format rules are what make it hold; an election on a full disk was sized (56 B a vote), not run."
+   },
+   "except": {
+    "PD": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "Its store is an LSM, not E-29's journal: a remove adds bytes and compaction needs free space, so the reserve is a different problem. TiKV keeps a reserved-space file for it (cited from memory, not checked here).",
+     "closes": "E-29(b) on an LSM store; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "It has no local log to fill: a full cache disk evicts, and the store has no hard limit of its own. E-29's journal is not this row's shape, and nothing was run.",
+     "closes": "A full-cache test against an object store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-29"
+     ],
+     "why": "v4 takes none of A-09's format rules (it has no reserve segment), and E-29 found that a full disk with no reserve cannot record a vote or a remove. That was measured on E-29's journal, not on v4's WAL.",
+     "closes": "Not planned (a reference row): E-29(b) on v4's WAL."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "nats-server's own behaviour on a full disk decides, and it was not run.",
+     "closes": "Not planned (a reference row): E-29(b) on a JetStream server."
+    }
+   }
+  },
+  {
+   "req": "F-21",
+   "part": "M",
+   "default": {
+    "v": "open",
+    "basis": "measured",
+    "ev": [
+     "E-05",
+     "E-43"
+    ],
+    "why": "The hash is priced: 1e6 rows in 259 ms on a worker that holds encoded rows (1,919 ms from objects, E-05), and E-43 fixes what to hash: rows in a fixed key order, never views. The check itself (the leader's named offset, the compare between the replicas that fold, the health row, keeping both states) was not built, and no wrong fold was injected in a sim.",
+    "closes": "Phase 3 sim: one wrong fold on one replica is reported within one check period, and after every move."
+   },
+   "except": {
+    "V4": {
+     "v": "fails",
+     "basis": "cited",
+     "ev": [],
+     "why": "Step 1: v4's anti-entropy compares log digests between nodes, not folded state. Step 2: STATUS.md pins copies that disagree with nothing said: after a fresh member's seed, three members show a deleted row and the fourth does not, at one writable view (2 runs of 2). So a divergence of the fold is not caught.",
+     "proof": "structural"
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Servers hold streams and clients fold them, so no server replica of fero's folds to compare. No check between clients was designed.",
+     "closes": "Not planned (a reference row): a client-side hash at a stream sequence."
+    }
+   }
+  },
+  {
+   "req": "F-22",
+   "part": "M",
+   "default": {
+    "v": "met",
+    "basis": "model",
+    "ev": [
+     "E-37"
+    ],
+    "why": "With Z `rejoin` a checksum per entry finds the bad entry, and the replica wipes itself and returns as a new one that never votes under its old id. TLC on etcd's spec explored all 27,985 states: all 10 invariants hold, no committed write is lost, and no judged state is stuck (E-37). Both rules are needed: without the checksum a committed write is lost with one fault, in 32 states."
+   },
+   "except": {
+    "SLOG": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "A-28 reaches SLOG by reasoning only: its data path is loglets on log nodes, not Raft, so E-37 did not check it.",
+     "closes": "E-37's lose-or-corrupt action on a model of loglets; none is planned."
+    },
+    "PD": {
+     "v": "fails",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "PD holds Z `crash`: Raft as published. TLC on etcd's spec: a voter that keeps its id and cuts one bad entry as a torn tail votes for a lagging candidate, and the new leader overwrites a committed write (one fault, 32 states, E-37). It meets the bar only by taking another row's option, `rejoin`.",
+     "proof": "counterexample"
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "It holds Z `crash`, and E-37 did not check the in-sync set. Its metadata group is Raft as published, where E-37's 32-state loss would apply by reasoning; neither was run for this row.",
+     "closes": "E-37's action on a model of the in-sync set and of its metadata group; none is planned."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "No voter holds entries: objects carry the store's own checksums, and a bad cache block can be fetched again. E-37 did not check it.",
+     "closes": "A corrupt-object and corrupt-cache test against an object store; none is planned."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "cited",
+     "ev": [
+      "E-37"
+     ],
+     "why": "v4's records carry a crc32c and a chain check at boot (DESIGN-V5 4.1 cites V3-8). What a member does with one bad record below what it acknowledged was not checked here.",
+     "closes": "Not planned (a reference row): one bad record in v4's sim disk model."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "nats-server's file store decides what one bad block does, and it was not run here.",
+     "closes": "Not planned (a reference row): one corrupt block in a JetStream file store."
+    }
+   }
+  },
+  {
+   "req": "F-22",
+   "part": "S",
+   "default": {
+    "v": "not",
+    "basis": "model",
+    "ev": [
+     "E-37"
+    ],
+    "why": "With `rejoin`, one bad entry on each of two replicas wipes two of three voters: every such state is stuck (E-37, run `rejoin2`, 28 states), and only F-12's operator step restarts writes. `par` keeps all 276 two-damage states writable at 7 rules, but this row does not hold it."
+   },
+   "except": {
+    "SLOG": {
+     "v": "not",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "By reasoning from SPACE's `rejoin`: two log nodes that each wipe on one bad entry leave one copy of a loglet, below its write quorum, so an operator must act. Its data path was not modelled."
+    },
+    "PD": {
+     "v": "not",
+     "basis": "model",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Z `crash` has no checksum and no repair: one bad entry already loses a committed write (E-37, 32 states). So the group can stay writable only by losing data, which is not what this asks."
+    },
+    "ISR": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Not checked. A follower with a bad record cuts its log and fetches again from its leader, which may keep a partition writable; no model here says so."
+    },
+    "OBJ": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Not checked. No replica holds entries; a bad object in the store is the store's to repair."
+    },
+    "V4": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [
+      "E-37"
+     ],
+     "why": "Not checked. v4's digest anti-entropy can fetch a missing record from a peer, which may cover it; nothing here ran two damaged members."
+    },
+    "BUY": {
+     "v": "open",
+     "basis": "reasoned",
+     "ev": [],
+     "why": "Not checked: nats-server's file store and its Raft decide, and neither was run with damage."
+    }
+   }
+  }
+ ]
+}
