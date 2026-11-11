@@ -382,15 +382,27 @@ def tally1(cells, scenario='restated', choice=None, only_req=None):
 
 
 def unbeaten(rows):
-    """Rule 3 over many rows at once: the rows no other row beats. rows: name -> (novel, shoulds, pairs)."""
+    """Rule 3 pair by pair over many rows at once: the rows no other row beats. rows: name -> (novel, shoulds, pairs).
+    A beats B when A has 2 or more fewer novel mechanisms; or, within 1, more SHOULDs; or, level on both, fewer
+    pairs. Rule 3 is not transitive (the 2-apart test), so the set can be empty: then rule 3 goes round in a
+    circle and names no winner. Linear: B can only be beaten, within 1 novel mechanism, by the best (SHOULDs, then
+    fewest pairs) row at novel n-1, n or n+1."""
     if not rows:
         return []
     lo = min(v[0] for v in rows.values())
-    cand = {k: v for k, v in rows.items() if v[0] <= lo + 1}
-    best_s = max(v[1] for v in cand.values())
-    cand = {k: v for k, v in cand.items() if v[1] == best_s}
-    best_p = min(v[2] for v in cand.values())
-    return sorted(k for k, v in cand.items() if v[2] == best_p)
+    best = {}
+    for n, sh, pr in rows.values():
+        k = (sh, -pr)
+        if n not in best or k > best[n]:
+            best[n] = k
+    out = []
+    for name, (n, sh, pr) in rows.items():
+        if n >= lo + 2:
+            continue
+        if any(m in best and best[m] > (sh, -pr) for m in (n - 1, n, n + 1)):
+            continue
+        out.append(name)
+    return sorted(out)
 
 
 def r3key(score, lo):
@@ -474,7 +486,7 @@ class Search:
 
     def run(self, depth=2, rounds=4, top=25):
         ax = self.M.ax
-        for r, v in ax['rows'].items():
+        for r, v in all_rows(ax).items():
             if r != 'BUY':
                 self.expand(v, r, depth)
         for nm, (b, ch) in SEEDS.items():
@@ -537,7 +549,7 @@ def search(depth=2, scenario='restated', choice=None, only_req=None, top=30, out
     return res, S
 
 
-def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 5, 8, 12, 20, 40, 148), top=6, depth=2):
+def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 4, 5, 6, 8, 12, 16, 20, 30, 148), top=6, depth=2):
     """Rule 3 among the rows that are in, as the number of cells no judged row supports is allowed to grow."""
     res, S = search(depth, scenario, choice, only_req, quiet=True)
     ub, order, inn = res['strict']
@@ -556,14 +568,18 @@ def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 5,
         if not sel:
             out.append('| %d | 0 | none | | |' % cap)
             continue
-        u = C_unbeaten = unbeaten(sel)
+        u = unbeaten(sel)
         lo = min(v[0] for v in sel.values())
+        if not u:
+            out.append('| %d | %d | none: rule 3 goes round in a circle | | |' % (cap, len(sel)))
+            tops.append((cap, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
+            continue
         first = sorted(u, key=lambda i: (rows[i][0], rows[i][1]['name']))[0]
         n, r, uns = rows[first]
         out.append('| %d | %d | %s | %d / %d / %d / %d | %s |' % (cap, len(sel), '; '.join(rows[i][1]['name'] for i in u[:6]) + (' (+%d more)' % (len(u) - 6) if len(u) > 6 else ''),
                    r['novel'], r['shoulds'], r['pairs'], r['open'], ', '.join(uns) if len(uns) <= 12 else ', '.join(uns[:12]) + ' and %d more' % (len(uns) - 12)))
         tops.append((cap, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
-    out += ['', 'The first rows at each step:', '']
+    out += ['', 'The first rows at each step (in a circle, the rows ordered by novel count within one of the fewest, then SHOULDs, then pairs; that order is a display aid, not rule 3):', '']
     for cap, lst in tops:
         out.append('- at most %d: ' % cap + '; '.join('%s (%d/%d/%d, %d unsupported)' % (r['name'], r['novel'], r['shoulds'], r['pairs'], n) for n, r, u in lst))
     return '\n'.join(out), rows, S
