@@ -220,6 +220,23 @@
     },
     {
      "when": {
+      "Q": [
+       "mix"
+      ],
+      "R": [
+       "raft",
+       "rlog"
+      ],
+      "D": [
+       "sess",
+       "pid"
+      ]
+     },
+     "v": "open",
+     "basis": "Re-ruled RR-13 (judging/closure/rerulings.cells.json): with the memory rung (Q `mix`), a refusal and a session's floor sit in the group's log and can be lost with its unsynced tail when a majority stops uncleanly, so a late copy of an attempt told 'refused' (a forwarder's copy, or a keyed method re-run with the same attempt ids) can commit after the recovery. E-20's groups are crash-only, and E-32 left the rung out (K-09). Reasoned, so open, not fails. Closer: session-bound writes and refusals never on a memory resource, or the recovery starts a new session generation (A-08, E-33). Overrides the sess and pid rule below (met)."
+    },
+    {
+     "when": {
       "R": [
        "raft",
        "rlog"
@@ -237,7 +254,7 @@
     "v": "open",
     "basis": "not judged: a dedup option or a writer change that E-20 did not model"
    },
-   "why": "The judges hold the dedup option (D) shown on Raft groups and open it where the writer change under it was never modelled (R isr, slog, obj; C cent(manifest CAS)), where it is 2PC (D txn, X 2pc), or where calls run at the leader (U ldr). V4 and BUY fail on their own logs (R)."
+   "why": "The judges hold the dedup option (D) shown on Raft groups and open it where the writer change under it was never modelled (R isr, slog, obj; C cent(manifest CAS)), where it is 2PC (D txn, X 2pc), or where calls run at the leader (U ldr). V4 and BUY fail on their own logs (R). A Raft row with the memory rung and D `sess` or `pid` is open, not met (RR-13)."
   },
   {
    "req": "F-03",

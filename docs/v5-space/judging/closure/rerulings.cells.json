@@ -1,6 +1,6 @@
 {
  "by": "referee for the VERDICT review's proposed re-rulings (closure pass, 2026-11-10)",
- "about": "Rulings on the eight items of VERDICT section 10's re-rule table and the recheck's notes. Each entry lists every judged row it touches. 'accept' entries change the settled cells when this file is renamed to rerulings.cells.json; 'reject' entries keep the settled cell (from equals to) and say why. A null in 'to' means the cell loses that field.",
+ "about": "Rulings on the eight items of VERDICT section 10's re-rule table and the recheck's notes. Each entry lists every judged row it touches. 'accept' entries change the settled cells when this file is renamed to rerulings.cells.json; 'reject' entries keep the settled cell (from equals to) and say why. A null in 'to' means the cell loses that field. RR-12 to RR-19 rule on items 1 to 7 of VERDICT draft 3's section 11.3 (2026-11-11); an entry whose 'rows' is empty touches closure rows only, named in 'closure_rows'.",
  "cells": [
   {
    "id": "RR-01",
@@ -444,6 +444,339 @@
     "judging/closure/hybrids/B.settled.json (B1 and B3, P-15 M and S: the same trace for two-phase commit)"
    ],
    "closure_rows": "The closure rows with Q `mix` and X `saga` (MIN-P+m, COMP2, COMP2 V=full, COMP+par C=cent V=full) had this cell predicted from COMP, not judged; judging/closure/attrib/P.json now gives them open by the same reason. No closure judge settled their P-15 cell, so no hybrids settled file changes."
+  },
+  {
+   "id": "RR-12",
+   "item": 1,
+   "group": "P",
+   "req": "P-10",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "from": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null,
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "Open, not met, for RR-11's reason. These four rows carry the `memory` rung (Q `mix`), and no rule of theirs keeps a lock's protected writes off a `memory` resource. If a majority of that group stops uncleanly inside the sync window, the tail it acknowledged is gone, and the writer's fence table goes back with it. The trace, by the rows' own rules: (1) holder A takes lock L with token t1 and pauses; (2) L lapses, holder B takes it with token t2 and writes to p, a `memory` resource; p's leader raises its fence for L to t2 and acknowledges; (3) a majority of p's group stops uncleanly before its disks catch up, its replicas come back as new, and `fero recover --unclean` rebuilds the group from what is left, without B's write and without the raise; (4) A wakes and writes to p under t1, and p's table now holds t1 or less, so the write commits. A write under t1 has committed after a write under t2 was acknowledged. TEST-13's fencing checker fails that history, and P-10 says 'a write with an older token than one a writer has seen is refused'. The recovery bumps the epochs of p's slots (DESIGN-V5 4.2), but a token is a version of `#locks`' own slot, so the bump does not reach it: tokens still rise, while p's record of the highest one it saw goes back. The met cell's support never loses an acknowledged tail: E-22's lock check, E-21, E-17 and E-33 keep every committed entry, and E-24 says of unclean recovery that 'a fence table can go back'. AMENDMENTS 4 lists 'lock fence tokens' in K-09's unsynced tail, and G-05 says the rung's safety was never modelled. So 'met' has no support for these rows. Not fails: the trace is reasoned, not run or model-checked, no second agent has confirmed it in writing, and one stated rule closes it. Closer: either no protected write, fence raise or saga record sits on a `memory` resource (the refusal of RR-14), or `fero recover --unclean` on a `memory` group restarts every fence table it held above every token `#locks` has handed out (OPS-07's rule for a restore); then E-24's lock and saga bounds run with a group that can lose its unsynced tail, once without the rule and once with it. Rows with Q `maj-d` keep met: there a committed raise is lost only with a majority's disks, F-12's operator case, as RR-11 ruled.",
+   "evidence": [
+    "REQUIREMENTS P-10 (M), TEST-13 (the fencing checker), OPS-07 (tokens after a restore), F-12",
+    "RR-11 (the same lost tail, for P-15)",
+    "E-24 (experiments/E24-sagas-ramp/README.md, 'What the models leave out': 'a fence table can go back')",
+    "E-22, E-21, E-17, E-33 (the met cell's support: no acknowledged tail is ever lost)",
+    "AMENDMENTS 4 (K-09: 'lock fence tokens' in the unsynced tail), 5 (G-05)",
+    "docs/DESIGN-V5.md 4.2 (`fero recover --unclean` bumps slot epochs; a token is a version in `#locks`, compared as (epoch, sequence)), 5.3 (locks and fences) and decision 4b",
+    "judging/mechanisms.json (memory-rung, fence-tokens)",
+    "VERDICT.md 11.3 item 1; judging/VERDICT.review3.json (evidence findings F2 and F7)"
+   ],
+   "closure_rows": "MIN-P+m, COMP2, COMP2 V=full and COMP+par C=cent V=full hold Q `mix` too. Their P-10 (M) cell is in judging/closure/hybrids/A.settled.json (A1 to A4) with this id, and attrib/P.json gives every row with the memory rung open by this rule. TiKV-TS and PD+fix were open already (K `kern`)."
+  },
+  {
+   "id": "RR-13",
+   "item": 1,
+   "group": "F",
+   "req": "F-02",
+   "part": "M",
+   "rows": [
+    "CELL",
+    "COMP"
+   ],
+   "from": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null,
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "Open, not met, for the same lost tail. These two rows hold Q `mix` and D `sess`. A session's outcomes and floor, and a refusal that waited for its commit (A-04), sit in the same group's log as the writes, so a `memory` group whose majority stops uncleanly loses them with its unsynced tail. E-20's model lets a copy of an attempt reach a group at any time, and it holds 'a refused attempt never commits later' because the refusal is kept. With the refusal in the lost tail, a late copy of the same attempt is judged again after `fero recover --unclean` and can commit: a copy that a forwarder still holds, or a keyed method re-run, which issues the same attempt ids (E-20, 'Keyed calls'). Then an attempt told 'refused' commits later, which F-02 forbids. A fence refusal goes back the same way (RR-12). The met cell's support leaves this out in its own words: E-20's groups are crash-only ('Unclean recovery (a committed log cut back)' is left out), E-32 left the rung out ('the unsynced tail a `memory` rung can lose is not modelled'), and E-30's groups are crash-only. AMENDMENTS 4 lists 'session floors' in K-09's unsynced tail. Not fails: reasoned, not run, and no second agent confirmed a structural argument. Closer: either session-bound writes, refusals and fence raises never sit on a `memory` resource, or `fero recover --unclean` on a `memory` group starts a new session generation for its slots, as a restore does (A-08, E-33: a retry from an older generation is refused); then E-20's bounds run with a lost tail. DRAFT and SPLIT, the other rows with the rung, are open already (RR-05). Rows with Q `maj-d` keep met.",
+   "evidence": [
+    "REQUIREMENTS F-02 (M), F-12",
+    "E-20 (experiments/E20-dedup/README.md, 'What the model leaves out': unclean recovery; keyed calls re-issue the same attempt ids)",
+    "E-32 (experiments/E32-composition/crossing/README.md, K-09: 'the unsynced tail a `memory` rung can lose is not modelled')",
+    "E-30 (crash-only groups)",
+    "A-04 (a refusal waits for its commit), A-08 and E-33 (a session generation raised on a restore)",
+    "AMENDMENTS 4 (K-09: 'session floors'), 5 (G-05)",
+    "RR-05, RR-11, RR-12",
+    "VERDICT.md 11.3 item 1; judging/VERDICT.review3.json (F7)"
+   ],
+   "closure_rows": "MIN-P+m, COMP2, COMP2 V=full and COMP+par C=cent V=full (Q `mix`, D `sess`): their F-02 (M) cell is in hybrids/A.settled.json with this id, and attrib/F.json opens every row with the memory rung and D `sess` or `pid` by this rule."
+  },
+  {
+   "id": "RR-14",
+   "item": 2,
+   "group": "P",
+   "req": "P-15",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "from": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null,
+    "basis": "reasoned"
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null,
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "The cell stays open; RR-11's closer narrows to its refusal half for these rows as they stand. RR-11 named two ways to close P-15: a saga's steps, fence raises and end record on a `memory` resource commit at `persisted` ('Q `mix` may choose per write'), or the saga library refuses such a unit. The first needs a rung chosen per write, and none of these rows has one. COMP's definition forbids it: AMENDMENTS 4, footnote 13, '`maj-m` and `none` per resource, never per write, because G `pslot` cuts groups by durability'. COMP2's family shares that footnote. DRAFT, CELL and SPLIT set the rung per resource in their own sources (DESIGN-V5 3.2: '`durability` has two rungs, per resource', and decision 4b; V5-PRIMITIVE: the rungs are parameters of a cell; V5-UNITS: per-resource durability). SPACE's Q `mix` allows a per-write choice, so for those three shard rows it would be a change of the row (a second rung inside one group, v4's ladder), not a rule they hold; for the `pslot` rows it is ruled out. So the closer these rows can state is the refusal: no saga step, fence raise or end record on a `memory` resource. With RR-12's and RR-13's closers it is one rule: locks, fences, sagas and session-bound writes never sit on a `memory` resource. Its model run is RR-11's (E-24 with a lost tail, without and with the rule). This narrows what P-15 offers a `memory` resource; it moves no cell.",
+   "evidence": [
+    "AMENDMENTS 4, footnote 13",
+    "docs/DESIGN-V5.md 3.2 ('`durability` has two rungs, per resource') and decision 4b",
+    "docs/V5-PRIMITIVE.md (item 8: the rungs as cell parameters)",
+    "docs/V5-UNITS.md (per-resource durability)",
+    "SPACE 2 Q (`mix`: chosen per resource, or per write)",
+    "RR-11, RR-12, RR-13",
+    "VERDICT.md 11.3 item 2; judging/VERDICT.review3.json (F3)"
+   ],
+   "closure_rows": "MIN-P+m, COMP2, COMP2 V=full and COMP+par C=cent V=full (G `pslot`, footnote 13): the same closer. Their P-15 (M) cell, predicted by RR-11's rule, is in hybrids/A.settled.json with this id, and attrib/P.json's RR-11 rule names it."
+  },
+  {
+   "id": "RR-15",
+   "item": 3,
+   "group": "PERF-DATA",
+   "req": "PERF-04",
+   "part": "M",
+   "rows": [
+    "MIN",
+    "RUST",
+    "SRV",
+    "LEAN",
+    "LANE",
+    "PD",
+    "SLOG",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "EMB-V8",
+    "SIDE"
+   ],
+   "from": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "PERF-01 losses",
+    "gap": 0.39,
+    "proof": "ceiling"
+   },
+   "to": {
+    "v": "fails",
+    "alt": "open",
+    "depends_on": "PERF-01 losses",
+    "gap": 0.07,
+    "proof": "ceiling",
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "The fail stands; its gap is 0.07, not 0.39. Rule 2 asks for the distance the proof shows, and RR-04 itself refused a gap counted from a figure that is not the row's floor. Its 0.422 ms adds the round trip's p99 (58 us) as a constant, twice, and a p99 added as a constant is not a lower bound, so 0.39 claims more than is shown. Recomputed here from the same table (E-01's one-writer fdatasync quantiles, 290,235 samples), with three independent disks: the second-fastest of three fsyncs has p99 0.323 ms with no network cost at all (gap 0.066). Counting the client's hop by a bound that holds for any shape of round-trip time (for independent parts, P(X + Y > a + b) is at least P(X > a) times P(Y > b), so the p99 of the sum is at least the race's p98, 0.295 ms, plus the hop's median, 30.6 us in Rust), it is at least 0.326 ms (gap 0.075). Both round to 0.07, and both are above the 0.303 ms bar, so no `persisted` commit on this box can win JetStream's default row: the fail holds. The figures in between (0.23 with the median round trip added as a constant; 0.39 with its p99) estimate a real commit; they are not bounds. Effect: each of these rows' gap sum falls by 0.32 (1.71 to 1.39 where the row fails SC-03, SC-10 and PERF-04). As worded, PD (6 MUSTs failed, 1.39) now ranks above CELL (6, 1.54); no winner moves. The alternative and its dependence stay: open if the user accepts JetStream's default row as a loss by name.",
+   "evidence": [
+    "E-01 (experiments/E01-floors/results/fdatasync-1w-cdf.txt: 1,000 quantiles of 290,235 one-writer fdatasyncs; results/rtt.jsonl: Rust 1 KiB loopback round trip p50 30.6 us, p99 58.3 us)",
+    "E-09b (js-default:pub-sync-1c-100B: p99 0.550 ms, 0.536 to 0.783 ms over runs)",
+    "PERF-01 (the spread rule)",
+    "RR-04",
+    "REQUIREMENTS, judging rule 2 (gap divided by bar)",
+    "VERDICT.md section 2 ('PERF-04's gap is a range') and 11.3 item 3; judging/VERDICT.review3.json (F4: 0.3215 ms with no network)"
+   ],
+   "closure_rows": "MIN-P+par, MIN-P+par V=full, MIN-P+par C=cent V=full, SRV V=full Y=fwd and TiKV-persisted (Q `maj-d`): the same gap. Their PERF-04 (M) cell is in hybrids/A.settled.json (A5 to A8) and B.settled.json (B2) with this id, and attrib/PERF-DATA.json's `maj-d` rule carries the gap."
+  },
+  {
+   "id": "RR-16",
+   "item": 4,
+   "group": "PERF-DATA",
+   "req": "PERF-04",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "from": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "The cell stays open; its reason changes. The settled reason calls Rust's 0.33 ms 'a win' and says 'the native step carries' JetStream's default row. That was written against JetStream's 0.55 ms, before RR-04 set the win bar by PERF-01's spread rule at about 0.303 ms p99 (0.550 ms, over runs of 0.536 to 0.783 ms, E-09b). Against that bar neither of E-02's `memory` figures wins: 0.57 ms in TypeScript, 0.33 ms in Rust. So no measurement shows any rung winning the default row. Nor is a loss shown: E-02 read both at 50,000 writes a second with no client hop and no gateway, never with one write in flight, and one working point is no ceiling (RR-02, RR-03 for P-05). A `memory` commit needs no fsync: about one round trip to a follower plus the client's hop, 2 x 30.6 us at the median in Rust (E-01), far under the bar, so a win is not ruled out (reasoned). Open in both phases. The matched one-publisher row (JetStream p99 1.31 ms) stays open too. Closer: `nats bench --js` through the JetStream gateway on a real kernel with one write in flight, the `memory` rung against JetStream's default, judged by PERF-01's spread rule and by msgs a second, which PERF-04 also reports.",
+   "evidence": [
+    "E-02 (memory rung: p99 0.57 ms TS, 0.33 ms Rust, at 50,000 writes a second)",
+    "E-09b",
+    "E-01 (round trip)",
+    "PERF-01",
+    "RR-02, RR-03, RR-04",
+    "VERDICT.md 5.2 and 11.3 item 4; judging/VERDICT.review3.json (F8, S9)"
+   ],
+   "closure_rows": "MIN-P+m, COMP2, COMP2 V=full, COMP+par C=cent V=full, TiKV-TS and PD+fix (Q `mix`): the same reason; for the last two every write also takes the timestamp oracle's round trip (family B's note). Their PERF-04 (M) cell is in hybrids/A.settled.json (A1 to A4) and B.settled.json (B1, B3) with this id, and attrib/PERF-DATA.json's Q `mix` rule carries the reason."
+  },
+  {
+   "id": "RR-17",
+   "item": 5,
+   "group": "PERF-DATA",
+   "req": "DATA-01",
+   "part": "M",
+   "rows": [
+    "SRV",
+    "PD"
+   ],
+   "from": {
+    "v": "open",
+    "alt": "fails",
+    "depends_on": "DATA-01 reading",
+    "gap": null,
+    "proof": "structural"
+   },
+   "to": {
+    "v": "open",
+    "alt": "fails",
+    "depends_on": "DATA-01 reading",
+    "gap": null,
+    "proof": "structural"
+   },
+   "ruling": "accept",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "The strict reading stays as RR-10 framed it, now written out; SRV's and PD's cells do not change; COMP2's pin is accepted. (1) Written out: on the strict reading, data's own code folds every row of record (the rows a replica serves, reads, replays and judges writes by) on writers and followers, in every phase the row plans. A row fails it by structure when its own tags put those rows in another engine: servers that fold in Rust or Go (F `all(srv)`: SRV), or a kernel whose commands write the rows into its own store (K `kern` with an LSM: PD's multi-version store, in Rust or in TypeScript). Those are the two cases RR-10's referee named, and the tool encodes exactly them. (2) Rows whose tags leave the fold to a design rule are not failed by it: a `ts→rs` row's native step (both DATA-09 judges, for every such row: 'the row either keeps data folding in JavaScript ... or holds rows natively'), an H `srv` row after its Rust core (its server can keep a Node host for data), a kernel worker's compact copy of the rows (M `kw`, A-27), and K `lib` with an LSM that stores data's rows. DESIGN-V5 plans a Rust L0 to L3 and a kernel that owns the rows, so the evidence skeptic (F1) showed that a word-for-word reading of that plan would fail most rows. But the DATA-09 judges read the native step as undecided, RR-10 framed the reading for SRV and PD only, and a structural fail needs a second agent's written confirmation, which no one has given for these rows. So their cells stay as they are. Such a row passes the strict reading for sure only by stating that data keeps folding (REQUIREMENTS X3's first way), and any of them may state it. (3) COMP2's pin is a design rule the row may carry. It is recorded as part of the definition of COMP2 and of the six family A rows that share its plan (hybrids/A.settled.json, 'pins'), not SRV V=full Y=fwd, whose tags fold natively. The pin: the native core holds L0 and L1 and never folds rows; L2 and data's fold stay in JavaScript, as RUST's row has them (A-30's call rules; E-03: under 1 ns a record at batch 256); every full replica keeps a full data projection; and the kernel worker keeps at most an index or cache of the rows (A-27), never served and checked against data's rows by F-21's hash (E-05: the two digests matched). Its price is memory: E-05 put both copies at 510 to 528 B a small row, under DEP-13's 2 KB, and E-34 woke 5.1 GB of 2 KB rows in that form, but at 10 GB it needs about twice the heap and could not run on the 16 GB box; SC-05 is open on its own reasons either way, and an index without the values halves the cost. It adds no mechanism and moves no rule-3 count. It meets DATA-09 by construction, for the reason both judges gave RUST's met cell ('data's own JS code still folds, so the fold's results are data's by identity'). DATA-01 stays open on its settled reasons (E-22's one thread, E-23's merge contract, E-05's digest only). If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does. (4) TiKV-persisted failed through SRV's rule (F `all(srv)`) and carried SRV's reason, though its engine is PD's. PD's rule now comes first, so it carries PD's reason. Its verdict does not move. Effect: COMP2's open MUSTs fall by one (DATA-09); no matrix winner moves.",
+   "evidence": [
+    "REQUIREMENTS DATA-01, DATA-09, X3 (two ways out: data folds on the JS side, or a port of data's lane with differential tests)",
+    "RR-07, RR-10",
+    "judging/PERF-DATA.settled.json (DATA-09: every `ts→rs` row 'either keeps data folding in JavaScript ... or holds rows natively'; RUST met by both judges)",
+    "AMENDMENTS A-27, A-30",
+    "E-03 (the batch crossing), E-05 (decision 13's form: projection all, the worker's digest), E-34 (wake in that form), E-43",
+    "docs/DESIGN-V5.md 4 (L2: 'records → rows') and 11 ('TypeScript first, native next': the kernel owns the rows; the projection holds the rows the process reads)",
+    "SPACE 2 L (`ts→rs`, `rs+napi`), H (`srv`), and its G6 notes",
+    "VERDICT.md 3.3 and 11.3 item 5; judging/VERDICT.review3.json (F1, S2, S12, I-7)"
+   ],
+   "closure_rows": "COMP2 and family A's MIN-P+m, COMP2 V=full, COMP+par C=cent V=full, MIN-P+par, MIN-P+par V=full and MIN-P+par C=cent V=full carry the pin (hybrids/A.settled.json, 'pins'). Their DATA-09 (M) cell is met with this id there, and an override in attrib/PERF-DATA.json, since no axis tag says it. TiKV-persisted's DATA-01 (M) cell is in hybrids/B.settled.json (B2) with this id; attrib/PERF-DATA.json now tries PD's rule before SRV's."
+  },
+  {
+   "id": "RR-18",
+   "item": 6,
+   "group": "PERF-DATA",
+   "req": "DATA-01",
+   "part": "M",
+   "rows": [],
+   "from": {
+    "v": "open",
+    "alt": "fails",
+    "depends_on": "DATA-01 reading",
+    "gap": null,
+    "proof": "structural"
+   },
+   "to": {
+    "v": "open",
+    "alt": "fails",
+    "depends_on": "DATA-01 reading",
+    "gap": null,
+    "proof": "structural"
+   },
+   "ruling": "reject",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "TiKV-TS (a closure row, so no study row is listed): kept open on the loose reading and failing on the strict one, as now. The reason is restated and the row takes a pin. In its TypeScript phase its servers keep MVCC versions in an LSM written in TypeScript by kernel commands (K `kern`, S `lsm +tier`, L `ts→rs`): neither data's lane nor native code. So the borrowed reason ('rows whose servers fold natively') is wrong for that phase. The verdict is not. The loose reading, as the judges and RR-07 read it, lets a server fold in another engine once a differential test proves its rows equal data's fold ('PD meets DATA-01 only if a differential test proves that store's rows equal data's fold'). What makes another engine acceptable there is the proof of equal rows, not the language. DATA-09's words ('if any layer moves to native code') say when that test is owed, not which engines it may clear, and nothing in the files reads them as clearing a native engine but not a TypeScript one. A fail on the loose reading would need a structural argument a second agent confirms in writing: the independent skeptic (I-2) called it plausible and left it to a referee, and no second agent confirmed it. So the cell stands: open on the loose reading; fails by structure on the strict reading and on the middle one (a TypeScript MVCC store is neither data's lane nor a port of it). The pin, recorded in hybrids/B.settled.json (B1): DATA-09's differential test against data binds the servers' store from the TypeScript phase on, not only after the native step, because that test is the only path by which this row meets DATA-01 on the loose reading, and DATA-09's words alone would not oblige it before the native step. It adds no mechanism and moves no count; DATA-09 stays open (the test was not run). The loose leader does not move: TiKV-TS, tied by its native twin (PD+fix Y=fwd M=kw Z=par), whose cell has the same verdict on its own reason.",
+   "evidence": [
+    "REQUIREMENTS DATA-01, DATA-09",
+    "RR-07, RR-10, RR-17",
+    "judging/PERF-DATA.settled.json (DATA-01 for PD: both judges)",
+    "judging/closure/hybrids/B.settled.json (B1's review: the TypeScript phase's server is a Node server)",
+    "SPACE 4.2 (PD row: data is not the engine on servers)",
+    "VERDICT.md 3.2 and 11.3 item 6; judging/VERDICT.review3.json (I-2)"
+   ],
+   "closure_rows": "TiKV-TS: its DATA-01 (M) and DATA-09 (M) cells are in hybrids/B.settled.json (B1) with this id, beside its pin. attrib/PERF-DATA.json's PD rule now names both phases."
+  },
+  {
+   "id": "RR-19",
+   "item": 7,
+   "group": "TEST-OPS",
+   "req": "TEST-07",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "MIN",
+    "RUST",
+    "LEAN",
+    "CELL",
+    "LANE",
+    "SPLIT",
+    "ISR",
+    "SLOG",
+    "OBJ",
+    "MIN-P",
+    "MIN-TS",
+    "RLOG",
+    "COMP"
+   ],
+   "from": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "ruling": "reject",
+   "by": "referee for VERDICT draft 3's re-rule list (VERDICT.md section 11.3, items 1 to 7), 2026-11-11",
+   "why": "Kept met. The review is right in fact: in an M `kw` row the state that judges a write also includes the kernel worker's compact rows and its tables (dedup outcomes, fences, sequences; A-27, E-05), and E-06 timed only data's undo (0.03 to 0.05 ms a rerun) and data's snapshots (0.6 to 1.2 ms at the cafe's size). But that is not the ground family B used for TiKV-TS. There the rows of record live in another engine (MVCC versions in the kernel's LSM, written by kernel commands), so undoing data's records puts back none of the server's state, as for PD, SRV and BUY. In these rows data holds the rows. The worker's copy is built from the same records in the same log order (decision 13's form, E-05), so a rerun rewinds it with the same inverse records, and its tables are small maps of the kind E-06 rewound. E-06's undo sits 200 times under the 10 ms bar and its snapshot rerun 8 times under, and no figure in the files puts a second copy near the bar. That is reasoned support with a wide margin, which both judges accepted, not a gap that 'met' lacks. The same argument would also reach every row whose kernel keeps tables (EMB-V8, SIDE and V4 too), which no judge read TEST-07 as asking. The evidence is not clear enough to move a cell both judges agreed on. Closer, for the build: time one rerun in fero test with the kernel's own state rewound as well (phase 2).",
+   "evidence": [
+    "E-06 (undo 0.03 to 0.05 ms; snapshot rerun 0.6 to 1.2 ms; against 10 ms)",
+    "E-05 (decision 13's form)",
+    "AMENDMENTS A-27",
+    "judging/TEST-OPS.settled.json (TEST-07: both judges met for these rows; PD, SRV, BUY open on state held outside data)",
+    "judging/closure/hybrids/B.settled.json (TEST-07 for TiKV-TS: 'the state that judges a write is the kernel's multi-version rows ... not data')",
+    "VERDICT.md 4.8 and 11.3 item 7; judging/VERDICT.review3.json (F7)"
+   ],
+   "closure_rows": "The seven family A rows with M `kw` (MIN-P+m, COMP2, COMP2 V=full, COMP+par C=cent V=full, MIN-P+par, MIN-P+par V=full, MIN-P+par C=cent V=full) keep met by the same reason; their predicted cell does not change."
   }
  ],
  "user_choices": [
