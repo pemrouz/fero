@@ -17,7 +17,7 @@ Built by `python3 tools/judging.py verdict` from the settled judging files in th
 
 A cell is one requirement part for one row. A decisive difference could change the ranking: a MUST that one judge failed and the other did not, or a SHOULD that one counted as met and the other did not. A referee ruled on every difference in writing.
 
-After the VERDICT review a referee re-ruled 54 cells and the mechanism count ([closure/rerulings.cells.json](closure/rerulings.cells.json), [closure/rerulings.mech.json](closure/rerulings.mech.json)). The arithmetic below applies those rulings; the table above counts the first settlement.
+After the VERDICT review a referee re-ruled 64 cells and the mechanism count ([closure/rerulings.cells.json](closure/rerulings.cells.json), [closure/rerulings.mech.json](closure/rerulings.mech.json)). The arithmetic below applies those rulings; the table above counts the first settlement.
 
 Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists requirement clauses that the evidence shows no row can meet as worded, and what each experiment asks instead. 169 cells carry two verdicts for that reason: one as the requirement is worded, one as restated. Part A uses the first, part B the second.
 
@@ -27,14 +27,14 @@ Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists require
 
 | Row | MUSTs failed by design | MUSTs open | MUSTs met | Novel mechanisms (DEV-01) | SHOULDs met | SHOULDs not met | SHOULDs open | Interacting pairs (DEV-02) |
 |---|---|---|---|---|---|---|---|---|
-| DRAFT | F-17, SC-03, SC-10 | 97 | 32 | 5 | 5 | 3 | 8 | 309 |
+| DRAFT | F-17, SC-03, SC-10 | 98 | 31 | 5 | 5 | 3 | 8 | 309 |
 | MIN | F-15, F-17, PERF-04, SC-03, SC-10 | 93 | 34 | 4 | 5 | 4 | 7 | 253 |
 | RUST | F-15, F-17, PERF-04, SC-03, SC-10 | 94 | 33 | 4 | 5 | 4 | 7 | 253 |
 | SRV | F-17, PERF-04, SC-03, SC-10 | 100 | 28 | 4 | 5 | 4 | 7 | 267 |
 | LEAN | F-15, F-17, PERF-04, SC-03, SC-10 | 93 | 34 | 4 | 5 | 4 | 7 | 255 |
-| CELL | F-17, OPS-01, P-07, SC-03, SC-08, SC-10 | 97 | 29 | 4 | 5 | 3 | 8 | 277 |
+| CELL | F-17, OPS-01, P-07, SC-03, SC-08, SC-10 | 99 | 27 | 4 | 5 | 3 | 8 | 277 |
 | LANE | F-17, PERF-04, SC-03, SC-04, SC-10 | 95 | 32 | 3 | 5 | 3 | 8 | 232 |
-| SPLIT | F-17, SC-03, SC-10 | 99 | 30 | 4 | 5 | 3 | 8 | 295 |
+| SPLIT | F-17, SC-03, SC-10 | 100 | 29 | 4 | 5 | 3 | 8 | 295 |
 | PD | F-17, F-22, PERF-04, SC-03, SC-05, SC-10 | 114 | 12 | 0 | 4 | 3 | 9 | 218 |
 | ISR | SC-03, SC-04, SC-10 | 117 | 12 | 2 | 1 | 2 | 13 | 214 |
 | SLOG | F-15, PERF-04, SC-03, SC-10 | 114 | 14 | 5 | 2 | 4 | 10 | 272 |
@@ -46,7 +46,7 @@ Two outcomes follow. [AMENDMENTS.md](../AMENDMENTS.md) section 1.3 lists require
 | EMB-V8 | F-17, PERF-04, SC-03, SC-10 | 97 | 31 | 4 | 5 | 4 | 7 | 269 |
 | SIDE | F-15, F-17, PERF-04, SC-03, SC-10 | 96 | 31 | 4 | 5 | 4 | 7 | 277 |
 | BUY | DEP-12, DEP-20, DEV-07, F-02, F-05, F-19, OPS-11, P-06, P-10, P-11, P-14, PERF-02, PERF-03, PERF-04, PERF-05, PERF-06, PERF-07, PERF-10, SC-01, SC-03, SC-05, SC-07, SC-10, TEST-01, TEST-09, TEST-10, TEST-13 | 96 | 9 | 0 | 2 | 7 | 7 | 12 |
-| COMP | F-15, F-17, SC-03, SC-10 | 95 | 33 | 3 | 5 | 4 | 7 | 283 |
+| COMP | F-15, F-17, SC-03, SC-10 | 97 | 31 | 3 | 5 | 4 | 7 | 283 |
 
 ### A.2 The ranking
 
@@ -58,19 +58,19 @@ Every row fails at least one MUST, so rule 2 applies: fewest MUSTs failed first,
 | 1 | SPLIT | 3 | 1.32 |
 | 1 | ISR | 3 | 1.32 |
 | 4 | COMP | 4 | 1.32 |
-| 5 | SRV | 4 | 1.71 |
-| 5 | SLOG | 4 | 1.71 |
-| 5 | RLOG | 4 | 1.71 |
-| 5 | EMB-V8 | 4 | 1.71 |
-| 9 | MIN | 5 | 1.71 |
-| 9 | RUST | 5 | 1.71 |
-| 9 | LEAN | 5 | 1.71 |
-| 9 | LANE | 5 | 1.71 |
-| 9 | MIN-P | 5 | 1.71 |
-| 9 | MIN-TS | 5 | 1.71 |
-| 9 | SIDE | 5 | 1.71 |
-| 16 | CELL | 6 | 1.54 |
-| 17 | PD | 6 | 1.71 |
+| 5 | SRV | 4 | 1.39 |
+| 5 | SLOG | 4 | 1.39 |
+| 5 | RLOG | 4 | 1.39 |
+| 5 | EMB-V8 | 4 | 1.39 |
+| 9 | MIN | 5 | 1.39 |
+| 9 | RUST | 5 | 1.39 |
+| 9 | LEAN | 5 | 1.39 |
+| 9 | LANE | 5 | 1.39 |
+| 9 | MIN-P | 5 | 1.39 |
+| 9 | MIN-TS | 5 | 1.39 |
+| 9 | SIDE | 5 | 1.39 |
+| 16 | PD | 6 | 1.39 |
+| 17 | CELL | 6 | 1.54 |
 | 18 | OBJ | 9 | 18.08 |
 | 19 | BUY | 27 | 8.79 |
 | 20 | V4 | 50 | 10.04 |
@@ -110,14 +110,14 @@ Each line changes one thing and runs the rule again.
 
 | Row | MUSTs failed by design | MUSTs open | MUSTs met | Novel mechanisms (DEV-01) | SHOULDs met | SHOULDs not met | SHOULDs open | Interacting pairs (DEV-02) |
 |---|---|---|---|---|---|---|---|---|
-| DRAFT | none | 99 | 33 | 5 | 5 | 3 | 8 | 309 |
+| DRAFT | none | 100 | 32 | 5 | 5 | 3 | 8 | 309 |
 | MIN | PERF-04 | 96 | 35 | 4 | 5 | 4 | 7 | 253 |
 | RUST | PERF-04 | 97 | 34 | 4 | 5 | 4 | 7 | 253 |
 | SRV | PERF-04 | 102 | 29 | 4 | 5 | 4 | 7 | 267 |
 | LEAN | PERF-04 | 96 | 35 | 4 | 5 | 4 | 7 | 255 |
-| CELL | OPS-01, P-07, SC-03, SC-08, SC-10 | 98 | 29 | 4 | 5 | 3 | 8 | 277 |
+| CELL | OPS-01, P-07, SC-03, SC-08, SC-10 | 100 | 27 | 4 | 5 | 3 | 8 | 277 |
 | LANE | PERF-04, SC-03, SC-04, SC-10 | 95 | 33 | 3 | 5 | 3 | 8 | 232 |
-| SPLIT | none | 101 | 31 | 4 | 5 | 3 | 8 | 295 |
+| SPLIT | none | 102 | 30 | 4 | 5 | 3 | 8 | 295 |
 | PD | F-22, PERF-04, SC-05 | 117 | 12 | 0 | 4 | 3 | 9 | 218 |
 | ISR | SC-03, SC-04, SC-10 | 117 | 12 | 2 | 1 | 2 | 13 | 214 |
 | SLOG | PERF-04 | 117 | 14 | 5 | 2 | 4 | 10 | 272 |
@@ -129,7 +129,7 @@ Each line changes one thing and runs the rule again.
 | EMB-V8 | PERF-04 | 99 | 32 | 4 | 5 | 4 | 7 | 269 |
 | SIDE | PERF-04 | 99 | 32 | 4 | 5 | 4 | 7 | 277 |
 | BUY | DEP-12, DEP-20, DEV-07, F-02, F-05, F-19, OPS-11, P-06, P-10, P-11, P-14, PERF-02, PERF-03, PERF-04, PERF-05, PERF-06, PERF-07, PERF-10, SC-01, SC-03, SC-05, SC-07, SC-10, TEST-01, TEST-09, TEST-10, TEST-13 | 96 | 9 | 0 | 2 | 7 | 7 | 12 |
-| COMP | none | 98 | 34 | 3 | 5 | 4 | 7 | 283 |
+| COMP | none | 100 | 32 | 3 | 5 | 4 | 7 | 283 |
 
 ### B.2 The ranking
 

@@ -92,7 +92,103 @@
   "A1": {
    "name": "MIN-P+m",
    "card": "'C=cent-co' COMP",
-   "cells": [],
+   "cells": [
+    {
+     "req": "P-10",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-24",
+      "E-33",
+      "AMENDMENTS 4 (K-09)",
+      "RR-11"
+     ],
+     "why": "Open, not met (re-ruled RR-12, judging/closure/rerulings.cells.json). The prediction copied COMP's met cell, which rests on E-22, E-21, E-17 and E-33; none of them loses an acknowledged tail. This row holds Q `mix`. If a `memory` group that takes a lock's protected writes loses its unsynced tail when a majority stops uncleanly, its fence table goes back, and a paused holder's write under the older token commits after a write under the newer one was acknowledged (RR-12's trace; K-09 names 'lock fence tokens'). Reasoned, not run, so open, not fails. Closer: no protected write, fence raise or saga record on a `memory` resource, or `fero recover --unclean` restarts the group's fence tables above every token `#locks` has handed out (OPS-07's rule); then E-24's bounds with a lost tail.",
+     "by": "referee (RR-12)",
+     "kind": "reruled"
+    },
+    {
+     "req": "F-02",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-20",
+      "E-32",
+      "AMENDMENTS 4 (K-09)",
+      "A-04",
+      "E-33"
+     ],
+     "why": "Open, not met (re-ruled RR-13). The prediction copied COMP's met cell, which rests on E-20's crash-only groups. This row holds Q `mix` and D `sess`: a refusal (A-04) and the session's floor sit in the group's log, so a `memory` group whose majority stops uncleanly can lose them, and a late copy of an attempt told 'refused' (a copy a forwarder still holds, or a keyed method re-run with the same attempt ids) can commit after `fero recover --unclean` (RR-13's trace; K-09 names 'session floors'). Reasoned, not run. Closer: session-bound writes, refusals and fence raises never on a `memory` resource, or the recovery starts a new session generation for the group's slots (A-08, E-33); then E-20's bounds with a lost tail.",
+     "by": "referee (RR-13)",
+     "kind": "reruled"
+    },
+    {
+     "req": "P-15",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-24",
+      "AMENDMENTS 4 (K-09, footnote 13)",
+      "RR-11"
+     ],
+     "why": "Open, not met (RR-11's reason, predicted from COMP; its closer narrowed by RR-14). A saga step on a `memory` resource can be lost with the group's unsynced tail while the unit is recorded done, and the lost tail can take back the fence raise that stops a paused holder. This row sets its rungs per resource, never per write (AMENDMENTS 4, footnote 13: G `pslot` cuts groups by durability), so RR-11's first closer (commit those writes at `persisted`) is not open to it. Its closer is the refusal: the saga library refuses a unit with a step, fence raise or end record on a `memory` resource. With RR-12's and RR-13's closers that is one rule: locks, fences, sagas and session-bound writes never sit on a `memory` resource. Model run: E-24 with a lost tail, without the rule and with it.",
+     "by": "referee (RR-14)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
+    }
+   ],
    "rejected": [],
    "checked": [
     {
@@ -116,7 +212,16 @@
      "pairs": 264,
      "pairs_with_record_fixes": 264
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A2": {
    "name": "COMP2",
@@ -157,6 +262,101 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "P-10",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-24",
+      "E-33",
+      "AMENDMENTS 4 (K-09)",
+      "RR-11"
+     ],
+     "why": "Open, not met (re-ruled RR-12, judging/closure/rerulings.cells.json). The prediction copied COMP's met cell, which rests on E-22, E-21, E-17 and E-33; none of them loses an acknowledged tail. This row holds Q `mix`. If a `memory` group that takes a lock's protected writes loses its unsynced tail when a majority stops uncleanly, its fence table goes back, and a paused holder's write under the older token commits after a write under the newer one was acknowledged (RR-12's trace; K-09 names 'lock fence tokens'). Reasoned, not run, so open, not fails. Closer: no protected write, fence raise or saga record on a `memory` resource, or `fero recover --unclean` restarts the group's fence tables above every token `#locks` has handed out (OPS-07's rule); then E-24's bounds with a lost tail.",
+     "by": "referee (RR-12)",
+     "kind": "reruled"
+    },
+    {
+     "req": "F-02",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-20",
+      "E-32",
+      "AMENDMENTS 4 (K-09)",
+      "A-04",
+      "E-33"
+     ],
+     "why": "Open, not met (re-ruled RR-13). The prediction copied COMP's met cell, which rests on E-20's crash-only groups. This row holds Q `mix` and D `sess`: a refusal (A-04) and the session's floor sit in the group's log, so a `memory` group whose majority stops uncleanly can lose them, and a late copy of an attempt told 'refused' (a copy a forwarder still holds, or a keyed method re-run with the same attempt ids) can commit after `fero recover --unclean` (RR-13's trace; K-09 names 'session floors'). Reasoned, not run. Closer: session-bound writes, refusals and fence raises never on a `memory` resource, or the recovery starts a new session generation for the group's slots (A-08, E-33); then E-20's bounds with a lost tail.",
+     "by": "referee (RR-13)",
+     "kind": "reruled"
+    },
+    {
+     "req": "P-15",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-24",
+      "AMENDMENTS 4 (K-09, footnote 13)",
+      "RR-11"
+     ],
+     "why": "Open, not met (RR-11's reason, predicted from COMP; its closer narrowed by RR-14). A saga step on a `memory` resource can be lost with the group's unsynced tail while the unit is recorded done, and the lost tail can take back the fence raise that stops a paused holder. This row sets its rungs per resource, never per write (AMENDMENTS 4, footnote 13: G `pslot` cuts groups by durability), so RR-11's first closer (commit those writes at `persisted`) is not open to it. Its closer is the refusal: the saga library refuses a unit with a step, fence raise or end record on a `memory` resource. With RR-12's and RR-13's closers that is one rule: locks, fences, sagas and session-bound writes never sit on a `memory` resource. Model run: E-24 with a lost tail, without the rule and with it.",
+     "by": "referee (RR-14)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -213,7 +413,16 @@
      "pairs": 274,
      "pairs_with_record_fixes": 277
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A3": {
    "name": "COMP2 V=full",
@@ -294,6 +503,101 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "P-10",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-24",
+      "E-33",
+      "AMENDMENTS 4 (K-09)",
+      "RR-11"
+     ],
+     "why": "Open, not met (re-ruled RR-12, judging/closure/rerulings.cells.json). The prediction copied COMP's met cell, which rests on E-22, E-21, E-17 and E-33; none of them loses an acknowledged tail. This row holds Q `mix`. If a `memory` group that takes a lock's protected writes loses its unsynced tail when a majority stops uncleanly, its fence table goes back, and a paused holder's write under the older token commits after a write under the newer one was acknowledged (RR-12's trace; K-09 names 'lock fence tokens'). Reasoned, not run, so open, not fails. Closer: no protected write, fence raise or saga record on a `memory` resource, or `fero recover --unclean` restarts the group's fence tables above every token `#locks` has handed out (OPS-07's rule); then E-24's bounds with a lost tail.",
+     "by": "referee (RR-12)",
+     "kind": "reruled"
+    },
+    {
+     "req": "F-02",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-20",
+      "E-32",
+      "AMENDMENTS 4 (K-09)",
+      "A-04",
+      "E-33"
+     ],
+     "why": "Open, not met (re-ruled RR-13). The prediction copied COMP's met cell, which rests on E-20's crash-only groups. This row holds Q `mix` and D `sess`: a refusal (A-04) and the session's floor sit in the group's log, so a `memory` group whose majority stops uncleanly can lose them, and a late copy of an attempt told 'refused' (a copy a forwarder still holds, or a keyed method re-run with the same attempt ids) can commit after `fero recover --unclean` (RR-13's trace; K-09 names 'session floors'). Reasoned, not run. Closer: session-bound writes, refusals and fence raises never on a `memory` resource, or the recovery starts a new session generation for the group's slots (A-08, E-33); then E-20's bounds with a lost tail.",
+     "by": "referee (RR-13)",
+     "kind": "reruled"
+    },
+    {
+     "req": "P-15",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-24",
+      "AMENDMENTS 4 (K-09, footnote 13)",
+      "RR-11"
+     ],
+     "why": "Open, not met (RR-11's reason, predicted from COMP; its closer narrowed by RR-14). A saga step on a `memory` resource can be lost with the group's unsynced tail while the unit is recorded done, and the lost tail can take back the fence raise that stops a paused holder. This row sets its rungs per resource, never per write (AMENDMENTS 4, footnote 13: G `pslot` cuts groups by durability), so RR-11's first closer (commit those writes at `persisted`) is not open to it. Its closer is the refusal: the saga library refuses a unit with a step, fence raise or end record on a `memory` resource. With RR-12's and RR-13's closers that is one rule: locks, fences, sagas and session-bound writes never sit on a `memory` resource. Model run: E-24 with a lost tail, without the rule and with it.",
+     "by": "referee (RR-14)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -338,7 +642,16 @@
       266
      ]
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A4": {
    "name": "COMP+par C=cent V=full",
@@ -461,6 +774,101 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "P-10",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-22",
+      "E-24",
+      "E-33",
+      "AMENDMENTS 4 (K-09)",
+      "RR-11"
+     ],
+     "why": "Open, not met (re-ruled RR-12, judging/closure/rerulings.cells.json). The prediction copied COMP's met cell, which rests on E-22, E-21, E-17 and E-33; none of them loses an acknowledged tail. This row holds Q `mix`. If a `memory` group that takes a lock's protected writes loses its unsynced tail when a majority stops uncleanly, its fence table goes back, and a paused holder's write under the older token commits after a write under the newer one was acknowledged (RR-12's trace; K-09 names 'lock fence tokens'). Reasoned, not run, so open, not fails. Closer: no protected write, fence raise or saga record on a `memory` resource, or `fero recover --unclean` restarts the group's fence tables above every token `#locks` has handed out (OPS-07's rule); then E-24's bounds with a lost tail.",
+     "by": "referee (RR-12)",
+     "kind": "reruled"
+    },
+    {
+     "req": "F-02",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-20",
+      "E-32",
+      "AMENDMENTS 4 (K-09)",
+      "A-04",
+      "E-33"
+     ],
+     "why": "Open, not met (re-ruled RR-13). The prediction copied COMP's met cell, which rests on E-20's crash-only groups. This row holds Q `mix` and D `sess`: a refusal (A-04) and the session's floor sit in the group's log, so a `memory` group whose majority stops uncleanly can lose them, and a late copy of an attempt told 'refused' (a copy a forwarder still holds, or a keyed method re-run with the same attempt ids) can commit after `fero recover --unclean` (RR-13's trace; K-09 names 'session floors'). Reasoned, not run. Closer: session-bound writes, refusals and fence raises never on a `memory` resource, or the recovery starts a new session generation for the group's slots (A-08, E-33); then E-20's bounds with a lost tail.",
+     "by": "referee (RR-13)",
+     "kind": "reruled"
+    },
+    {
+     "req": "P-15",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-24",
+      "AMENDMENTS 4 (K-09, footnote 13)",
+      "RR-11"
+     ],
+     "why": "Open, not met (RR-11's reason, predicted from COMP; its closer narrowed by RR-14). A saga step on a `memory` resource can be lost with the group's unsynced tail while the unit is recorded done, and the lost tail can take back the fence raise that stops a paused holder. This row sets its rungs per resource, never per write (AMENDMENTS 4, footnote 13: G `pslot` cuts groups by durability), so RR-11's first closer (commit those writes at `persisted`) is not open to it. Its closer is the refusal: the saga library refuses a unit with a step, fence raise or end record on a `memory` resource. With RR-12's and RR-13's closers that is one rule: locks, fences, sagas and session-bound writes never sit on a `memory` resource. Model run: E-24 with a lost tail, without the rule and with it.",
+     "by": "referee (RR-14)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -523,7 +931,16 @@
       262
      ]
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A5": {
    "name": "MIN-P+par",
@@ -564,6 +981,43 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "PERF-01 losses",
+     "gap": 0.07,
+     "proof": "ceiling",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-09b",
+      "PERF-01",
+      "RR-04"
+     ],
+     "why": "Fails, gap 0.07 (re-ruled RR-15; RR-04 recorded 0.39). The row's only durable rung is `persisted`. A win over JetStream's default single-publisher row needs a p99 under about 0.303 ms (PERF-01's spread rule, RR-04). The best `persisted` commit here, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost at all, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): above the bar either way. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Open if the user accepts this row as a loss by name.",
+     "by": "referee (RR-15)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -584,7 +1038,16 @@
      "pairs": 261,
      "pairs_with_record_fixes": 264
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A6": {
    "name": "MIN-P+par V=full",
@@ -665,6 +1128,43 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "PERF-01 losses",
+     "gap": 0.07,
+     "proof": "ceiling",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-09b",
+      "PERF-01",
+      "RR-04"
+     ],
+     "why": "Fails, gap 0.07 (re-ruled RR-15; RR-04 recorded 0.39). The row's only durable rung is `persisted`. A win over JetStream's default single-publisher row needs a p99 under about 0.303 ms (PERF-01's spread rule, RR-04). The best `persisted` commit here, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost at all, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): above the bar either way. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Open if the user accepts this row as a loss by name.",
+     "by": "referee (RR-15)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -709,7 +1209,16 @@
       253
      ]
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A7": {
    "name": "MIN-P+par C=cent V=full",
@@ -832,6 +1341,43 @@
      "j2": "met (par2d 276 of 276; par2 stuck only with no good copy; repair from any peer)",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "PERF-01 losses",
+     "gap": 0.07,
+     "proof": "ceiling",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-09b",
+      "PERF-01",
+      "RR-04"
+     ],
+     "why": "Fails, gap 0.07 (re-ruled RR-15; RR-04 recorded 0.39). The row's only durable rung is `persisted`. A win over JetStream's default single-publisher row needs a p99 under about 0.303 ms (PERF-01's spread rule, RR-04). The best `persisted` commit here, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost at all, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): above the bar either way. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Open if the user accepts this row as a loss by name.",
+     "by": "referee (RR-15)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "met",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "construction",
+     "ev": [
+      "E-03",
+      "E-43",
+      "A-30"
+     ],
+     "why": "Met by construction (re-ruled RR-17; the pin is in this row's 'pins'). The native core holds L0 and L1 and never folds rows; L2 and data's own lane fold every row in JavaScript, as RUST's row has it, so the fold's results are data's by identity, the reason both judges gave RUST's met cell. A 256-record batch crosses to the JS fold at under 1 ns a record (E-03), and two V8 versions folded 1e6 records to the same rows (E-43). Without the pin the cell is open, as every `ts→rs` row's is.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -894,7 +1440,16 @@
       249
      ]
     }
-   }
+   },
+   "pins": [
+    {
+     "id": "RR-17",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "The native core, when it comes, holds L0 and L1 (the journal, Raft and the log) and never folds rows: records cross to JavaScript in batches (A-30's call rules), and L2 and data's own lane fold every row there, as RUST's row has it (REQUIREMENTS X3's first way). Every full replica keeps a full data projection (projection all). The kernel worker keeps at most an index or a cache of the rows (A-27): never served, never the rows of record, and checked against data's rows by F-21's hash.",
+     "why": "Read word for word, this row's plan moves L2 ('records → rows') to Rust at its native step (DESIGN-V5 4 and 11), and in TypeScript lets the kernel own the rows while the main thread projects only the rows it reads (DESIGN-V5 11, decision 13). On the strict DATA-01 reading that would put the rows of record in a second engine, SRV's shape. The pin keeps data the engine on every full replica in every phase. It is a rule the row may carry: REQUIREMENTS X3 names it as one of the two ways out of the clash; E-03 measured the crossing (under 1 ns a record at batch 256); RUST runs this split and both judges met its DATA-09; E-05 priced a full projection beside the worker's copy at 510 to 528 B a small row, under DEP-13's 2 KB, and found the worker's digest equal to the main thread's; E-34 woke 5.1 GB of 2 KB rows in that form. It adds no mechanism (the seam is A-30's, which the row already takes) and moves no counted cell but DATA-09. Its price: memory, since a full replica holds every row in data as well as whatever the worker keeps (E-34 could not run 10 GB of 2 KB rows in the two-copy form on its 16 GB box: about twice the heap; an index without the values halves that); and the native step does not speed up the fold (data's lane folds at 0.22 to 1.90 us a record, E-05). No settled cell of this row credits a native fold or a single copy: SC-05 (10 GB) is open on its own reasons, and DEP-13 on the empty copy. If a later timing shows L2 must go native, the row drops the pin, DATA-09 goes back to open, and on the strict reading the row then fails as SRV does.",
+     "cells": "DATA-09 (M) met by construction; DATA-01 (M) stays open on its settled reasons; no mechanism, pair or SHOULD moves."
+    }
+   ]
   },
   "A8": {
    "name": "SRV V=full Y=fwd",
@@ -919,6 +1474,25 @@
      "j2": "open: as every Raft row; no model gives a counterexample",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "PERF-01 losses",
+     "gap": 0.07,
+     "proof": "ceiling",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-09b",
+      "PERF-01",
+      "RR-04"
+     ],
+     "why": "Fails, gap 0.07 (re-ruled RR-15; RR-04 recorded 0.39). The row's only durable rung is `persisted`. A win over JetStream's default single-publisher row needs a p99 under about 0.303 ms (PERF-01's spread rule, RR-04). The best `persisted` commit here, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost at all, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): above the bar either way. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Open if the user accepts this row as a loss by name.",
+     "by": "referee (RR-15)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -970,5 +1544,6 @@
     }
    }
   }
- }
+ },
+ "rerulings": "Added by the referee for VERDICT draft 3's re-rule list (section 11.3), 2026-11-11, after the families' settlement: cells of kind 'reruled' (P-10, F-02, P-15, PERF-04 and DATA-09; RR-12 to RR-17 in judging/closure/rerulings.cells.json), and the pin of RR-17 in 'pins' on A1 to A7, part of each row's definition, not a cell. A8 (SRV V=full Y=fwd) folds natively by its own tags, so it takes no pin."
 }

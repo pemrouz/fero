@@ -99,7 +99,7 @@
       ]
      },
      "v": "open",
-     "basis": "Q `mix` has a `memory` rung, the matching rung for JetStream's default (p99 0.55 ms). E-02's bare pipeline reads 0.57 ms in TS, a tie, and 0.33 ms in Rust, a win, at 50,000 writes a second and never with one write in flight, so the native step carries the default row; the matched one-publisher row (1.31 ms) is open in both phases (E-09b, E-02)."
+     "basis": "Re-ruled RR-16 (the reason, not the verdict): Q `mix` has a `memory` rung, the matching rung for JetStream's default row. No measurement shows it winning by PERF-01's spread rule (a p99 under about 0.303 ms, RR-04): E-02's bare pipeline read 0.57 ms in TS and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran at 50,000 writes a second, never with one write in flight, and one working point is no ceiling (RR-02, RR-03); a memory commit needs no fsync, about two round trips (E-01), so a win is not ruled out. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases (E-09b, E-02)."
     },
     {
      "when": {
@@ -120,8 +120,8 @@
      "v": "fails",
      "depends_on": "PERF-01 losses",
      "alt": "open",
-     "gap": 0.39,
-     "basis": "Re-ruled (RR-04): still fails, on PERF-01's spread rule. A win needs a p99 below about 0.303 ms; the best case for a persisted 2-of-3 commit plus one hop is about 0.422 ms, sampled from E-01's fsync table (a ceiling, reasoned from measured parts). Gap 0.39. Earlier reason: the row's only durable rung is `persisted`, whose floor on this box is C = 0.73 ms (E-01). JetStream's default acks one publisher at p99 0.55 ms, below that floor (E-09b), so the default single-publisher row cannot be won, and PERF-01 allows no loss while the user's list of accepted losses is empty. The matched rows stay open (JetStream 1,228 acks a second, p99 1.31 ms)."
+     "gap": 0.07,
+     "basis": "Re-ruled RR-15 (the gap) on RR-04 (the fail): still fails, on PERF-01's spread rule. A win needs a p99 below about 0.303 ms. The best persisted 2-of-3 commit, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): a ceiling, reasoned from measured parts. Gap 0.07. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Earlier reason: C = 0.73 ms as the floor of any persisted commit (E-01), which is a sum of two p99s, not a floor. The matched rows stay open (JetStream 1,228 acks a second, p99 1.31 ms)."
     }
    ],
    "else": {
@@ -135,7 +135,7 @@
      "basis": "V4 holds Q `mix` like the draft, but both judges failed it on its build: v4 syncs once per write step, about 250 persisted writes a second per member (STATUS), against JetStream's 1,228 to 3,700 acks a second with a sync before each ack; v4 has no group commit to close it. No axis tag says a row lacks group commit: S `walg` is a WAL per group, and ISR's WAL per group still batches (DEP-12, E-12). The DEP-12 referee: group commit would be a change to the row, and V4 takes no fix (AMENDMENTS 3)."
     }
    },
-   "why": "The judges split the Raft rows by Q, the rung that meets JetStream's 0.55 ms default: `mix` (a `memory` rung) and `isr` are open, `maj-d` alone fails on the persisted floor. OBJ follows its commit, a PUT (R `obj`, Q `put`). V4 shares Q `mix` with the open rows but fails on its build, so it is an override."
+   "why": "The judges split the Raft rows by Q, the rung that meets JetStream's 0.55 ms default: `mix` (a `memory` rung) and `isr` are open, `maj-d` alone fails on the persisted floor. OBJ follows its commit, a PUT (R `obj`, Q `put`). V4 shares Q `mix` with the open rows but fails on its build, so it is an override. The `maj-d` gap is RR-15's (0.07); the `mix` reason is RR-16's."
   },
   {
    "req": "PERF-05",
@@ -524,17 +524,6 @@
     },
     {
      "when": {
-      "F": [
-       "all(srv)"
-      ]
-     },
-     "v": "open",
-     "depends_on": "DATA-01 reading",
-     "alt": "fails",
-     "basis": "SRV: the server folds plain rows in Rust or Go. RR-10: rows whose servers fold natively are open on DATA-09's path (a differential test against data, never run) and fail by structure if the user reads DATA-01 as data's own code folding on writers and followers (the cell referee's user choice; BRIEF item 6)."
-    },
-    {
-     "when": {
       "K": [
        "kern"
       ],
@@ -546,14 +535,25 @@
      "v": "open",
      "depends_on": "DATA-01 reading",
      "alt": "fails",
-     "basis": "PD's shape: server state is MVCC versions in an LSM written by kernel commands and 2PC; only clients fold with data. RR-10: rows whose servers fold natively are open on DATA-09's path (a differential test against data, never run) and fail by structure if the user reads DATA-01 as data's own code folding on writers and followers (the cell referee's user choice; BRIEF item 6)."
+     "basis": "PD's shape: server state is MVCC versions in an LSM written by kernel commands and 2PC, in Rust or Go, or in TypeScript first for a `ts→rs` row (TiKV-TS); only clients fold with data. Loose (RR-07): open on DATA-09's path, a differential test of the store against data, never run; the test clears a TypeScript store as it clears a native one, and TiKV-TS's pin binds it from its TypeScript phase (RR-18). Strict (RR-10, written out by RR-17): fails by structure, since a store that is not data's lane holds the rows on writers and followers (the cell referee's user choice; BRIEF item 6). Tried before SRV's rule since RR-17, so a row with both (TiKV-persisted) carries PD's reason."
+    },
+    {
+     "when": {
+      "F": [
+       "all(srv)"
+      ]
+     },
+     "v": "open",
+     "depends_on": "DATA-01 reading",
+     "alt": "fails",
+     "basis": "SRV: the server folds plain rows in Rust or Go. RR-10: rows whose servers fold natively are open on DATA-09's path (a differential test against data, never run) and fail by structure if the user reads DATA-01 as data's own code folding on writers and followers (the cell referee's user choice; BRIEF item 6; written out by RR-17)."
     }
    ],
    "else": {
     "v": "open",
     "basis": "judge 2 was right: E-22's prototype found every caught-up replica's rows equal to a fresh fold of the log on every seed, but on one TS thread with rows by value only; views over the same rows (a float `sum`, tie order) differ between a replica that folded every record and one that rebuilt or started from a snapshot until data takes the merge contract (E-23 run B, E-43; A-10). Rows kept off the V8 heap were checked only by E-05's digest. SRV and PD fold natively and need DATA-09's differential test; ISR's Kafka-style transactions make the fold hold records back, not designed; no monitor compares folds on BUY."
    },
-   "why": "V4's reasons name R `lww` and O `lamp`; both are listed."
+   "why": "V4's reasons name R `lww` and O `lamp`; both are listed. RR-17 writes the strict reading out: it fails a row only where the row's tags put the rows of record in another engine on writers and followers (K `kern` with an LSM; F `all(srv)`). Rows whose tags leave the fold to a design rule (a `ts→rs` native step, H `srv` after a Rust core, M `kw`'s compact copy, K `lib` with an LSM) are not failed; a row passes it for sure only by stating that data keeps folding, as COMP2's family does (hybrids/A.settled.json, 'pins'). RR-18: TiKV-TS's TypeScript phase stays on PD's rule."
   },
   {
    "req": "DATA-02",
@@ -735,7 +735,37 @@
     "v": "open",
     "basis": "`ts→rs` rows: in the TS phase nothing is native, and the native step carries the verdict. It either keeps data folding in JS (holds by construction, E-03) or holds rows natively, as DESIGN-V5's native fold would, which needs the differential test; that test was not run (E-43's 1e6-record stream and E-04's state-comparing guard are ready inputs). SRV's and PD's servers fold plain rows natively (PD in a multi-version LSM store), and the test was not run for them either."
    },
-   "why": "The cell follows where data's fold runs once a layer is native: L, and for the two rows whose footnotes say where the fold runs (EMB-V8's isolates, SIDE's app process) F as well. BUY's rule also names R `outside`, since its reason is that the outside log never folds."
+   "why": "The cell follows where data's fold runs once a layer is native: L, and for the two rows whose footnotes say where the fold runs (EMB-V8's isolates, SIDE's app process) F as well. BUY's rule also names R `outside`, since its reason is that the outside log never folds. The pinned rows of family A meet it by construction (RR-17); the pin is not an axis tag, so they are overrides.",
+   "overrides": {
+    "MIN-P+m": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "COMP2": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "COMP2 V=full": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "COMP+par C=cent V=full": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "MIN-P+par": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "MIN-P+par V=full": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    },
+    "MIN-P+par C=cent V=full": {
+     "v": "met",
+     "basis": "Re-ruled RR-17: the row's pin (judging/closure/hybrids/A.settled.json, 'pins') keeps the native core to L0 and L1 and L2 and data's fold in JavaScript, as RUST's row has it, so the fold's results are data's by identity (E-03, E-43). No axis tag says this, so it is an override, and no other row may borrow it."
+    }
+   }
   }
  ]
 }

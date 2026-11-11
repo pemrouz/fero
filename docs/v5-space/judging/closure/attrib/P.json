@@ -1121,13 +1121,28 @@
      },
      "v": "open",
      "basis": "PD's family: the judges name it as 'semantics in the kernel on TiKV's shape ... T tso, O hlc' and as 'TiKV's shape (kernel commands, 2PC, a timestamp oracle, an LSM store)' (K kern, X 2pc, T tso, S lsm, O hlc). It was never modelled or run here; E-22's prototype is a Raft kernel with K lib, so the kernel promises this pattern stands on are not shown"
+    },
+    {
+     "when": {
+      "Q": [
+       "mix"
+      ],
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "Re-ruled RR-12 (judging/closure/rerulings.cells.json): with the memory rung (Q `mix`), a group that takes a lock's protected writes can lose its unsynced tail when a majority stops uncleanly; its fence table goes back, and a paused holder's write under the older token commits after a write under the newer one was acknowledged. The met cell's support (E-22, E-21, E-17, E-33) never loses an acknowledged tail (K-09, G-05). Reasoned, so open, not fails. Closer: no protected write, fence raise or saga record on a memory resource, or the unclean recovery restarts the group's fence tables above every token handed out (OPS-07's rule). R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the else (met)."
     }
    ],
    "else": {
     "v": "met",
     "basis": "E-22's lock check (holder paused 15 s, clock skewed 3 s, a #locks failover): both fencing checkers clean in every seed; the fence refused every stale write under every clock rule (E-21); the highest token travels in a move, a re-key and a split (E-17, E-17b, E-17c); a restore starts above the store's mark (E-33). Acquire is one conditional write, so one commit"
    },
-   "why": "V4's judges name R lww and O lamp; BUY's names the client as judge (R outside); the open rows are named by family."
+   "why": "V4's judges name R lww and O lamp; BUY's names the client as judge (R outside); the open rows are named by family. A Raft-family row with the memory rung that no family rule above catches is open, not met (RR-12)."
   },
   {
    "req": "P-11",
@@ -1510,7 +1525,7 @@
       ]
      },
      "v": "open",
-     "basis": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met)."
+     "basis": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met). Its closer narrows (RR-14): these rows set rungs per resource, never per write (AMENDMENTS 4 footnote 13 for G `pslot`; DESIGN-V5 3.2, V5-PRIMITIVE and V5-UNITS for the shard rows), so the closer they can state is the refusal: no saga step, fence raise or end record on a memory resource."
     },
     {
      "when": {

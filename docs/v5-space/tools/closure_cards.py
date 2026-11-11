@@ -60,6 +60,8 @@ def main():
             mechs = sorted((have | set(add)) - set(mech.get('drop', [])))
             rows[NAMES[rid]] = {'id': rid, 'family': fam, 'card': r['card'], 'vec': vec, 'cells': cells, 'mechs': mechs,
                                 'judged_cells': sorted('%s %s' % k for k in judged)}
+            if r.get('pins'):
+                rows[NAMES[rid]]['pins'] = r['pins']  # design rules the referee made part of the row (not cells)
     json.dump({'about': 'Rows the closure pass judged: options, full card and mechanisms. Built by tools/closure_cards.py from hybrids/A.settled.json and B.settled.json.',
                'rows': rows}, open(OUT, 'w'), indent=1, ensure_ascii=False)
     print('wrote %d rows to %s' % (len(rows), OUT))

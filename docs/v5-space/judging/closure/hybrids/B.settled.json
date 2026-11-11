@@ -320,6 +320,25 @@
      "j2": "open",
      "by": "referee",
      "kind": "crossing"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. Here every write also takes the timestamp oracle's round trip (family B's note), about one more 31 us at the median. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -724,6 +743,61 @@
      "j2": "open",
      "by": "both",
      "kind": "crossing"
+    },
+    {
+     "req": "DATA-01",
+     "part": "M",
+     "v": "open",
+     "alt": "fails",
+     "depends_on": "DATA-01 reading",
+     "gap": null,
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "RR-07",
+      "RR-10",
+      "SPACE 4.2 (PD row)"
+     ],
+     "why": "Open on the loose reading, fails by structure on the strict and middle readings (re-ruled RR-18: verdict kept, reason restated, pin added). In the TypeScript phase the servers keep MVCC versions in an LSM written in TypeScript by kernel commands; after the native step, in Rust. Neither is data's lane, and only clients fold with data. The loose reading lets another engine fold once a differential test proves its rows equal data's (RR-07); that holds for a TypeScript store as for a native one, and this row's pin binds DATA-09's test from the TypeScript phase on. The test was not run, so open. A fail on the loose reading would need a structural argument a second agent confirms in writing; none has.",
+     "by": "referee (RR-18)",
+     "kind": "reruled"
+    },
+    {
+     "req": "DATA-09",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "reasoned",
+     "ev": [
+      "E-43",
+      "E-04",
+      "A-30"
+     ],
+     "why": "Open (RR-18). The servers' engine is an MVCC store, in TypeScript first and then in Rust; data's own code never folds on servers, so the clause cannot hold by construction in either phase. This row's pin makes DATA-09's differential test (1e6 records: E-43's stream, E-04's state-comparing guard) bind the store from the TypeScript phase on. The test was not run.",
+     "by": "referee (RR-18)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "open",
+     "alt": null,
+     "depends_on": null,
+     "gap": null,
+     "proof": null,
+     "basis": "measured",
+     "ev": [
+      "E-02",
+      "E-09b",
+      "E-01",
+      "RR-04"
+     ],
+     "why": "Open (re-ruled RR-16: the reason, not the verdict). No measurement shows any rung winning JetStream's default single-publisher row by PERF-01's spread rule, whose bar is about 0.303 ms p99 (RR-04): E-02's `memory` rung read 0.57 ms in TypeScript and 0.33 ms in Rust, neither under the bar. Nor is a loss shown: E-02 ran 50,000 writes a second with no client hop, never one write in flight, and one working point is no ceiling (RR-02, RR-03). A `memory` commit needs no fsync, about two round trips at 30.6 us each at the median (E-01), so a win is not ruled out. Here every write also takes the timestamp oracle's round trip (family B's note), about one more 31 us at the median. The matched one-publisher row (JetStream p99 1.31 ms) is open in both phases.",
+     "by": "referee (RR-16)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -774,7 +848,16 @@
      "pairs": 232
     }
    },
-   "reviewed": "Every supported cell read against the options that changed (Z par, S lsm +tier, Q mix, V full, L ts→rs, I port, Y fwd, M kw). Changed: P-15 (M and S), TEST-07 and DEP-20, above. Kept: PERF-04 open (the Q `mix` rows' cell): the TS phase does not carry it (COMP's cell: TS ties at 0.57 ms); at the native step a write takes the forward, the oracle's round trip and the replication round trip, about 4 x 31 us at p50 in Rust (E-01), against a bar of about 0.30 ms p99 (RR-04): a weak point, not a ceiling (VERDICT 2-S2). PERF-08 open (the `ts→rs` rows' cell; the TS bar first, and the native LSM adds an untimed write path). SC-12 (S) met: the TS phase's server is a Node server (E-27: 10,000 idle links in 89 MB). DEV-04 (S) met (I `port`). DEP-15 (S) not (V `full`: no log-only voter, no log tier). F-07 open with its alternative (I `port`). F-03 met: the rung adds no writer, and the TS port was linearizable in 26 of 26 Maelstrom runs (E-46). F-11 met, as B3. DEP-18, OPS-01, F-14, DATA-02, DEV-01, DEV-10, DEP-14 met; DATA-01 open (RR-07); DEP-21 open in both readings; SC-03, SC-10, F-17 fail as worded like every row, open restated. Tally with these rulings: as worded fails SC-03, SC-10, F-17; restated fails none; 122 MUSTs open restated (119 as worded); SHOULDs met 4 (SC-06, SC-12, F-22, DEV-04); 0 novel; 232 pairs."
+   "reviewed": "Every supported cell read against the options that changed (Z par, S lsm +tier, Q mix, V full, L ts→rs, I port, Y fwd, M kw). Changed: P-15 (M and S), TEST-07 and DEP-20, above. Kept: PERF-04 open (the Q `mix` rows' cell): the TS phase does not carry it (COMP's cell: TS ties at 0.57 ms); at the native step a write takes the forward, the oracle's round trip and the replication round trip, about 4 x 31 us at p50 in Rust (E-01), against a bar of about 0.30 ms p99 (RR-04): a weak point, not a ceiling (VERDICT 2-S2). PERF-08 open (the `ts→rs` rows' cell; the TS bar first, and the native LSM adds an untimed write path). SC-12 (S) met: the TS phase's server is a Node server (E-27: 10,000 idle links in 89 MB). DEV-04 (S) met (I `port`). DEP-15 (S) not (V `full`: no log-only voter, no log tier). F-07 open with its alternative (I `port`). F-03 met: the rung adds no writer, and the TS port was linearizable in 26 of 26 Maelstrom runs (E-46). F-11 met, as B3. DEP-18, OPS-01, F-14, DATA-02, DEV-01, DEV-10, DEP-14 met; DATA-01 open (RR-07); DEP-21 open in both readings; SC-03, SC-10, F-17 fail as worded like every row, open restated. Tally with these rulings: as worded fails SC-03, SC-10, F-17; restated fails none; 122 MUSTs open restated (119 as worded); SHOULDs met 4 (SC-06, SC-12, F-22, DEV-04); 0 novel; 232 pairs.",
+   "pins": [
+    {
+     "id": "RR-18",
+     "by": "referee (VERDICT draft 3, section 11.3), 2026-11-11",
+     "rule": "DATA-09's differential test against data, on random record streams (1e6 records: E-43's stream, E-04's state-comparing guard), binds the servers' MVCC store from the TypeScript phase on, not only after the native step; a build whose store fails it does not serve rows.",
+     "why": "On the loose DATA-01 reading this row meets DATA-01 only through a proof that its servers' rows equal data's fold (RR-07). DATA-09's words owe that test only once a layer is native, so in the TypeScript phase nothing would oblige it. The pin closes that gap at no counted cost: no mechanism, pair or SHOULD moves, and DATA-09 stays open because the test was not run. It does not help on the strict or middle reading, where a TypeScript MVCC store fails by structure (RR-10, RR-17).",
+     "cells": "DATA-01 (M) and DATA-09 (M) keep their verdicts with their reasons restated; no count moves."
+    }
+   ]
   },
   "B2": {
    "name": "TiKV-persisted",
@@ -1004,6 +1087,43 @@
      "j2": "open",
      "by": "both",
      "kind": "unsupported"
+    },
+    {
+     "req": "DATA-01",
+     "part": "M",
+     "v": "open",
+     "alt": "fails",
+     "depends_on": "DATA-01 reading",
+     "gap": null,
+     "proof": "structural",
+     "basis": "reasoned",
+     "ev": [
+      "RR-07",
+      "RR-10",
+      "SPACE 4.2 (PD row)"
+     ],
+     "why": "Open on the loose reading, fails by structure on the strict one, as before; the reason is now its own (re-ruled RR-17, part 4). Its servers keep MVCC versions in an LSM written by kernel commands and two-phase commit (K `kern`, S `lsm +tier`): PD's engine, in Rust or Go. Only clients fold with data. Loose (RR-07): open on DATA-09's path, a differential test of the store against data, never run. Strict (RR-10): a store that is not data's lane holds the rows on writers and followers. It used to reach this cell through SRV's rule (F `all(srv)`), with SRV's reason.",
+     "by": "referee (RR-17)",
+     "kind": "reruled"
+    },
+    {
+     "req": "PERF-04",
+     "part": "M",
+     "v": "fails",
+     "alt": "open",
+     "depends_on": "PERF-01 losses",
+     "gap": 0.07,
+     "proof": "ceiling",
+     "basis": "reasoned",
+     "ev": [
+      "E-01",
+      "E-09b",
+      "PERF-01",
+      "RR-04"
+     ],
+     "why": "Fails, gap 0.07 (re-ruled RR-15; RR-04 recorded 0.39). The row's only durable rung is `persisted`. A win over JetStream's default single-publisher row needs a p99 under about 0.303 ms (PERF-01's spread rule, RR-04). The best `persisted` commit here, sampled from E-01's one-writer fsync table with three independent disks, has p99 0.323 ms with no network cost at all, and at least 0.326 ms counting the client's hop by a bound that holds for any round-trip shape (the race's p98 plus the hop's median): above the bar either way. RR-04's 0.39 added the round trip's p99 as a constant, which is not a lower bound. Open if the user accepts this row as a loss by name.",
+     "by": "referee (RR-15)",
+     "kind": "reruled"
     }
    ],
    "rejected": [],
@@ -1056,5 +1176,6 @@
    },
    "reviewed": "Only the unsupported cells and the mechanism list were asked for. Read in passing: no crossing was raised by either judge; P-15 (M, S) stays met (no memory rung); TEST-07 and DEP-20 open from SRV's native rows; PERF-04 fails as worded (RR-04: gap 0.39, a `persisted`-only row), open if the user accepts JetStream's default row as a loss (PERF-01). Tally with these rulings: as worded fails PERF-04, SC-03, SC-10, F-17; restated fails PERF-04 (open if the loss is accepted); 120 MUSTs open restated (117 as worded); SHOULDs met 5 (P-15, SC-06, SC-12, F-22, DEV-04); 0 novel; 221 pairs."
   }
- }
+ },
+ "rerulings": "Added by the referee for VERDICT draft 3's re-rule list (section 11.3), 2026-11-11, after the family's settlement: cells of kind 'reruled' (DATA-01, DATA-09 and PERF-04; RR-15 to RR-18 in judging/closure/rerulings.cells.json), and the pin of RR-18 in 'pins' on B1 (TiKV-TS), part of the row's definition, not a cell."
 }
