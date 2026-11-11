@@ -106,6 +106,8 @@ What happens, where, and the fix if one is known. The evidence behind each line 
 
 - **fero on npm.** `npm install fero` cannot run v4 today: Node will not strip types under `node_modules`, and `api/substrate.ts` imports data from a sibling folder. A 192-line build with no dependencies (`~/.claude/plans/fero-platform/spikes/pack/build.mjs`) strips the types file for file, copies data inside the package (npm's data 4.0.0 is SCHEDULE_VERSION 4; fero needs 5) and ran example 02 on Node 22 and 26 from a 451 KB tarball. To bring it in: the build and a `bin`; `FERO_OWN` in `api/index.ts` must match `.js` frames too, or a fault names fero's file instead of the user's line; a LICENSE file (package.json says MIT, the repo has none); types. npm's latest fero is 1.7.1, so v4 alphas go out under a dist-tag.
 
+- **The v5 design study is done; it waits on the owner's answers (2026-11-11).** Its answer: aim for COMP2 (Raft groups owned by the project hold fixed slots of many resources, one loop on the leader of `#meta`, the project's own system group, heals replicas and moves slots, and `data` folds the rows on every full replica), and build it first without the in-memory commit rung (MIN-P+par), in TypeScript. Before any code it needs the owner's answers to VERDICT section 8. The first: may a server fold rows in an engine other than `data` once a test proves it equal (the DATA-01 reading)? If yes, TiKV's shape wins instead: groups that split and merge by size, with two-phase commit across them. Then it needs three models and four more experiments, all without code (VERDICT section 9, steps 2 and 3) ([docs/v5-space/README.md](docs/v5-space/README.md)).
+
 ### Someday
 
 Each of these is one plain line here; the long form is in `git show 0055e6e:IDEAS.md`.
