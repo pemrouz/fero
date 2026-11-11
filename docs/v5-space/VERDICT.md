@@ -1049,6 +1049,7 @@ Settle the readings, and write the models COMP2 rests on. Then build the thinnes
 | 3 | D `keys` keeps F-02 beside fence tokens and fits DEP-13; or `rampv` holds read atomicity with one novel mechanism; or `vsr` costs fewer pairs | as the critic prices them | COMP2 with D `keys` (8 to 10 fewer pairs), with `rampv` (one more SHOULD) or with `vsr` (up to 10 fewer pairs), after a judging pass of their unjudged cells and a two-counter novelty ruling |
 | 4 | the whole-resource cursor at 4,096 slots | ≤ Q-19's 8 KB (E-18 reasons about 32 KB) | fall back to 1,024 slots: 72 effective writers, still above 64 |
 | 6a | p99 commit on the real kernel at 50,000 writes a second | ≤ C + 5 ms = 5.73 ms (TS) | over it, P-01 and PERF-08 fail in TS |
+| 6a, with L2 on the main thread | E-07's 5 s main-thread stall, rerun with writes judged on `data`'s rows on the main thread, as the design rule reads (section 11.5; [LAYERS.md section 10](LAYERS.md#10-this-pages-own-readings), item 1) | writes keep going (F-14's test), and commit p99 stays ≤ 5.73 ms | if writes stop, F-14 fails for COMP2 on the strict reading, and for every row that judges writes on `data`'s rows. Two ways back, both untested: a referee ruling that lets the worker judge against its checked copy (RR-17 as written does not), or a watchdog that hands a stalled server's leaderships to a peer |
 | 6c | memtier SET, matched | about 92,000 persisted SETs a second at 200 connections with p99 under 4.9 ms ([E-09a2]) | below it, PERF-02 fails |
 | 6d | etcd one-client put | p99 under 1.73 ms ([E-09e]) | over it in TS and native, PERF-07 fails |
 | 6e | Redpanda, matched | a TS build keeps at least 62 % of E-02's protocol-free ceiling ([E-09d]) | below it in TS and native, PERF-06 fails |
@@ -1199,10 +1200,19 @@ A fresh reader rebuilt every output on a scratch copy and checked this page agai
 - **FR6 and FR7:** one list of the choices that change the winner (under section 8's table), and item 0.8 names its reading.
 - **FR8 to FR10:** more terms in the key, one meaning per word ("test line", "mechanism", "saga unit"), and the densest table cells split into notes.
 
+### 11.5 After the verdict: what the layer write-up found
+
+Writing [LAYERS.md](LAYERS.md) and the final [API.md](API.md) for COMP2 brought up one point this page had not priced. It changes no cell and no count.
+- **F-14 and the design rule.** RR-17 makes `data`'s rows the rows a replica "judges writes by". So L2 judges writes on the main thread, beside `data`. DESIGN-V5 4.3 judged them on the kernel thread, before RR-17 existed.
+- **Why that matters.** COMP2's F-14 (a MUST) is met on [E-07]: its worker kept acking writes through a 5 s main-thread stall, without the main thread. With judging on the main thread, the same stall holds every new write of the groups that server leads. Every judged write also waits on the event loop, whose delay E-07 measured at p99 1.5 to 14.1 ms under steady writes. P-01's bar is 5.73 ms.
+- **What this page does with it.** The cell stays met until a test says otherwise. The kill table in section 9 now has a row for it ("6a, with L2 on the main thread").
+- **Who it hits.** Every row that judges writes on `data`'s rows, and the strict reading asks that of every row it keeps in. So on its own it moves no winner. If neither way back works, the strict reading has no row left in. TiKV's shape is not hit: its kernel judges writes in its own store (K `kern`), which is why it fails the strict reading in the first place.
+
 [pairs.md]: experiments/E32-composition/pairs.md
 [crossing/README.md]: experiments/E32-composition/crossing/README.md
 [E-01]: experiments/E01-floors/README.md
 [E-02]: experiments/E02-pipeline/README.md
+[E-07]: experiments/E07-gc-worker/README.md
 [E-08]: experiments/E08-relay-fanout/README.md
 [E-09a2]: experiments/E09a2-redis-memtier/README.md
 [E-09b]: experiments/E09b-nats/README.md
