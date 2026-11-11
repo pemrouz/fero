@@ -1496,6 +1496,24 @@
     },
     {
      "when": {
+      "Q": [
+       "mix"
+      ],
+      "X": [
+       "saga"
+      ],
+      "R": [
+       "raft",
+       "rlog",
+       "isr",
+       "slog"
+      ]
+     },
+     "v": "open",
+     "basis": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met)."
+    },
+    {
+     "when": {
       "X": [
        "none"
       ]
@@ -1634,7 +1652,7 @@
     "v": "met",
     "basis": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row"
    },
-   "why": "The cell follows X (none fails; 2pc, ktxn and saga meet) and, for a saga, the R whose one-writer fence was not modelled (slog, obj, outside), with V4's R lww as its judge's second reason."
+   "why": "The cell follows X (none fails; 2pc, ktxn and saga meet) and, for a saga, the R whose one-writer fence was not modelled (slog, obj, outside), with V4's R lww as its judge's second reason. A saga or 2pc unit on a row with Q mix (the memory rung) is open first: closure referee B for 2pc, RR-11 for the saga."
   },
   {
    "req": "P-15",
