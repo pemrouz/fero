@@ -549,7 +549,7 @@ def search(depth=2, scenario='restated', choice=None, only_req=None, top=30, out
     return res, S
 
 
-def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 4, 5, 6, 8, 12, 16, 20, 30, 148), top=6, depth=2):
+def ladder(scenario='restated', choice=None, only_req=None, caps=None, top=6, depth=2):
     """Rule 3 among the rows that are in, as the number of cells no judged row supports is allowed to grow."""
     res, S = search(depth, scenario, choice, only_req, quiet=True)
     ub, order, inn = res['strict']
@@ -561,27 +561,39 @@ def ladder(scenario='restated', choice=None, only_req=None, caps=(0, 1, 2, 3, 4,
         rows.append((len(uns), r, uns))
     chs = (choice,) if isinstance(choice, str) else tuple(choice or ())
     head = 'Scenario: %s%s. %d rows searched, %d in.' % (scenario, (', choices ' + ', '.join(chs) + (' (' + only_req + ' only)' if only_req else '')) if chs else '', len(S.res), len(inn))
-    out = [head, '', '| At most this many unsupported cells | Rows in | Rule 3 unbeaten | novel / SHOULDs / pairs / open MUSTs | Unsupported cells of the first |', '|---|---|---|---|---|']
+    out = [head, '', '| At most this many unsupported cells (every cap; a run of caps with the same result is one line) | Rows in | Rule 3 unbeaten | novel / SHOULDs / pairs / open MUSTs | Unsupported cells of the first |', '|---|---|---|---|---|']
     tops = []
+    # Every cap from 0 to the largest count of unsupported cells is computed. A run of caps with the same
+    # unbeaten rows prints as one line ('4 to 9'), so no cap is skipped and none is guessed.
+    if caps is None:
+        caps = range(0, max([n for n, r, u in rows] + [0]) + 1)
+    runs = []
     for cap in caps:
         sel = {i: (r['novel'], r['shoulds'], r['pairs']) for i, (n, r, u) in enumerate(rows) if n <= cap}
-        if not sel:
-            out.append('| %d | 0 | none | | |' % cap)
+        u = tuple(unbeaten(sel)) if sel else None
+        if runs and runs[-1][2] == u:
+            runs[-1][1] = cap; runs[-1][3] = len(sel); runs[-1][4] = sel
+        else:
+            runs.append([cap, cap, u, len(sel), sel, len(sel)])
+    for c0, c1, u, nin, sel, nin0 in runs:
+        span = '%d' % c0 if c0 == c1 else '%d to %d' % (c0, c1)
+        count = '%d' % nin if nin == nin0 else '%d to %d' % (nin0, nin)
+        if u is None:
+            out.append('| %s | 0 | none | | |' % span)
             continue
-        u = unbeaten(sel)
         lo = min(v[0] for v in sel.values())
         if not u:
-            out.append('| %d | %d | none: rule 3 goes round in a circle | | |' % (cap, len(sel)))
-            tops.append((cap, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
+            out.append('| %s | %s | none: rule 3 goes round in a circle | | |' % (span, count))
+            tops.append((span, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
             continue
         first = sorted(u, key=lambda i: (rows[i][0], rows[i][1]['name']))[0]
         n, r, uns = rows[first]
-        out.append('| %d | %d | %s | %d / %d / %d / %d | %s |' % (cap, len(sel), '; '.join(rows[i][1]['name'] for i in u[:6]) + (' (+%d more)' % (len(u) - 6) if len(u) > 6 else ''),
+        out.append('| %s | %s | %s | %d / %d / %d / %d | %s |' % (span, count, '; '.join(rows[i][1]['name'] for i in u[:6]) + (' (+%d more)' % (len(u) - 6) if len(u) > 6 else ''),
                    r['novel'], r['shoulds'], r['pairs'], r['open'], ', '.join(uns) if len(uns) <= 12 else ', '.join(uns[:12]) + ' and %d more' % (len(uns) - 12)))
-        tops.append((cap, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
+        tops.append((span, [rows[i] for i in sorted(sel, key=lambda i: r3key(sel[i], lo))[:top]]))
     out += ['', 'The first rows at each step (in a circle, the rows ordered by novel count within one of the fewest, then SHOULDs, then pairs; that order is a display aid, not rule 3):', '']
     for cap, lst in tops:
-        out.append('- at most %d: ' % cap + '; '.join('%s (%d/%d/%d, %d unsupported)' % (r['name'], r['novel'], r['shoulds'], r['pairs'], n) for n, r, u in lst))
+        out.append('- at most %s: ' % cap + '; '.join('%s (%d/%d/%d, %d unsupported)' % (r['name'], r['novel'], r['shoulds'], r['pairs'], n) for n, r, u in lst))
     return '\n'.join(out), rows, S
 
 

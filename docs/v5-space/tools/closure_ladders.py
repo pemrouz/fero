@@ -14,7 +14,7 @@ for f in os.listdir(R):
     if f.startswith('ladder-'):
         os.remove(os.path.join(R, f))
 for sc, ch in RUNS:
-    txt, rows, S = C.ladder(sc, ch or None, None)  # closure.ladder's own caps: 0 to 6, then 8 up to 148
+    txt, rows, S = C.ladder(sc, ch or None, None)  # every cap from 0 up; a run of caps with the same result prints as one line
     tag = sc + ''.join('-' + c.replace(' ', '_') for c in ch)
     head = '# Support ladder: %s%s\n\nBuilt by `python3 tools/closure_ladders.py`. Rule 3 among the rows that are in, as more cells that no judged row supports are allowed (the judged rows include the closure pass\'s, judging/closure/hybrids/cards.json). Columns: novel / SHOULDs / pairs / open MUSTs.\n\n' % (sc, (', choices: ' + ', '.join(ch)) if ch else '')
     open('%s/ladder-%s.md' % (R, tag), 'w').write(head + txt + '\n')
