@@ -11,7 +11,7 @@ Built by `python3 tools/judging.py rows` from the settled judging files. Each li
 | SHOULDs not met | 3 | 3 |
 | SHOULDs open | 9 | 9 |
 
-Novel mechanisms (DEV-01): 0. Interacting pairs (DEV-02): 209.
+Novel mechanisms (DEV-01): 0. Interacting pairs (DEV-02): 218.
 
 ## MUSTs failed by design
 

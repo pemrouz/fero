@@ -148,6 +148,55 @@
     "judging/VERDICT.review.json, skeptic alternatives S9"
    ],
    "effect": "None (dormant-groups is not in COMP, MIN-P or COMP2)."
+  },
+  {
+   "id": "RM-08",
+   "lead": "judging/closure/hybrids/B.settled.json, leads[2] and each row's 'deferred' (link-pings); family A's referee deferred PD's shape (A.settled.json, A4)",
+   "key": "link-pings",
+   "add_rows": [
+    "PD"
+   ],
+   "drop_rows": [],
+   "ruling": "accept",
+   "by": "referee for the closure pass's family B leads (2026-11-11)",
+   "asked": "PD's settled list has five units that read link.ping (raft-prevote-checkquorum, quiet-groups, slow-leader-controller, meta-members, controller-commands) and none that writes it. Does PD carry link-pings, another unit that writes link.ping, or are the reads wrong?",
+   "why": "PD carries link pings: its own source keeps the same state, rules and role. Under DEV-02's pair rule a read needs a unit in the row that writes the state; if none does, either the row lacks a unit or the read is wrong for it. So the question is whether TiKV, PD's own shape (I raft-rs, SPACE 4.2), keeps link state for each pair of members. It does. Read at the source in this session (tikv master 3b72fdb): (1) Each store keeps one gRPC link to each other store, kept alive by pings when idle (grpc-keepalive-time 10 s, grpc-keepalive-timeout 3 s: src/server/config.rs; set on the channel in src/server/raft_client.rs, connect). When a link cannot connect or drops, the raft client reports that store unreachable (raft_client.rs, report_store_unreachable). The store keeps a reachability record for each other store and broadcasts StoreUnreachable to every region it holds (components/raftstore/src/router.rs, broadcast_unreachable; store/fsm/store.rs, on_store_unreachable and store_reachability). (2) In each region a leader reports that peer unreachable to Raft, and a follower whose leader sits on that store leaves hibernation and ticks again, so it stands for election (store/fsm/peer.rs: reset_hibernate_state(GroupState::Chaos), register_raft_base_tick). That is exactly what quiet-groups and raft-prevote-checkquorum read link.ping for: a quiet group learns from the shared link that its leader is gone (fero's form: 'a quiet shard's leader dies: election.ms of missed link pings: the followers wake the shard and elect', DESIGN-V5 4.2). (3) A health checker probes every other store once each inspect-network-interval (100 ms by default) and keeps the worst latency for each; the network slow score built from it goes to PD, whose evict-slow-store scheduler moves leaders off a slow store (raft_client.rs, HealthChecker; tikv/rfcs 0119). That is slow-leader-controller's read. So TiKV has the state (for each pair of stores: is the link up, and when it last answered), the rules (ping an idle link; a link that stays silent or breaks makes the peer unreachable for every region the two share) and the role (one detector per pair, shared by many quiet groups). That is the settled link-pings unit, and it is not novel. Family A's referee wrote that 'PD does without pairwise pings only because its quiet groups are TiKV's hibernate regions'. The hibernate slow heartbeat is real (tikv/rfcs 0023: an idle leader still broadcasts heartbeats in a long period), but it is the backstop. TiKV also wakes a hibernated follower from the store link, and that link is pinged pair by pair. Not every read of the five is live in PD. meta-members and controller-commands mark and re-check 'gone' from the store heartbeats to PD (controller-sessions) and from each region leader's own record of when it last heard each peer (store/peer.rs: peer_heartbeats, collect_down_peers, reported to PD as down peers). Their link.ping read is the other failure-detector form's, in records written once for both forms; it adds no pair, since both units already pair with link-pings through meta.members and group.config. TiKV's pings carry no clock (PD's time is its TSO), so the record's link.clocks write has no reader in PD. It still pairs link-pings with controller-sessions, which writes link.clocks too: one pair that comes from the shared records, counted the way the tool counts it. Another unit that writes link.ping (option b) would have to be this same state with these same rules, so DEV-10 counts it as link-pings.",
+   "precedent": "Unchanged (CockroachDB's store liveness and RPC heartbeat, both counters). For PD's form, TiKV itself: the raft client's per-store gRPC link with keepalive pings, the store reachability record and the StoreUnreachable broadcast that wakes hibernated regions, and the per-store network health checker behind the network slow score (tikv master 3b72fdb, read here; tikv/rfcs 0023 and 0119).",
+   "evidence": [
+    "tikv/tikv master 3b72fdb: src/server/config.rs (grpc_keepalive_time 10 s, grpc_keepalive_timeout 3 s, inspect_network_interval 100 ms)",
+    "tikv/tikv master 3b72fdb: src/server/raft_client.rs (connect: keepalive on the channel; report_store_unreachable when a link fails or aborts; HealthChecker)",
+    "tikv/tikv master 3b72fdb: components/raftstore/src/router.rs (broadcast_unreachable); store/fsm/store.rs (on_store_unreachable, store_reachability); store/fsm/peer.rs (SignificantMsg::StoreUnreachable: a follower whose leader is on that store goes to GroupState::Chaos and ticks); store/peer.rs (peer_heartbeats, collect_down_peers)",
+    "tikv/rfcs text/0023-hibernate-raft.md (the long-period heartbeat; 'Drawbacks'); text/0119-enhance-slow-score-store-scheduler.md (the network slow score)",
+    "docs/DESIGN-V5.md 4.2, 'Failure detection' (a quiet shard's leader dies: election.ms of missed link pings; CheckQuorum on a quiet shard uses the link pings)",
+    "SPACE.md 2 C (the failure-detector sub-choice), 4.2 (PD)",
+    "judging/mechanisms.json: link-pings, raft-prevote-checkquorum, quiet-groups, slow-leader-controller, meta-members, controller-commands, controller-sessions",
+    "judging/closure/hybrids/A.settled.json (A4: link-pings added for C `cent` over fero's own quiet groups; PD deferred)",
+    "judging/closure/hybrids/B.settled.json (B1, B2, B3: 'deferred', link-pings)",
+    "judging/PERF-DATA.settled.json (PERF-12 M, PD: its idle scheme not counted)"
+   ],
+   "sources_read": "/tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/mech-ref/src/tikv (sparse checkout, blobless clone of github.com/tikv/tikv at 3b72fdb), /tmp/claude-0/-home-user-fero/bac5b7a6-c95f-59b1-b9a5-8d26a3a427c5/scratchpad/mech-ref/src/tikv-rfcs",
+   "effect": "PD: 46 to 47 units, novel unchanged, 209 to 218 pairs (+9: raft-config, learners, raft-prevote-checkquorum, quiet-groups, slow-leader-controller, meta-members, controller-commands, genesis-init, controller-sessions). Three of the nine come only through link.ping (raft-prevote-checkquorum, quiet-groups, slow-leader-controller). No cell changes: PD's PERF-12 cell is already open because its idle scheme was never counted, and the pings are part of that scheme. The closure rows of PD's family (PD+fix, TiKV-TS, TiKV-persisted) carry it too, as their referee said they would if it were taken (+1 unit each, not novel).",
+   "follow_up": "Applied here: judging/closure/mechanisms.json, link-pings, now carries every C `cent` row with a Raft data path ({\"C\": [\"cent\"], \"R\": [\"raft\", \"rlog\"]}), in place of family A's narrower {\"C\": [\"cent\"], \"R\": [\"raft\", \"rlog\"], \"K\": [\"lib\"]}. The wording of quiet-groups is fixed by RF-04 (0 pairs)."
+  },
+  {
+   "id": "RM-09",
+   "lead": "judging/closure/hybrids/B.settled.json, leads[2] ('one ruling for PD, ISR, SLOG and the C `cent` hybrids')",
+   "key": "link-pings",
+   "add_rows": [],
+   "drop_rows": [],
+   "ruling": "reject",
+   "by": "referee for the closure pass's family B leads (2026-11-11)",
+   "asked": "Add link-pings to ISR and SLOG (and OBJ, the same case), whose settled lists also read link.ping with no unit that writes it.",
+   "why": "Not added: here the reads are wrong for the row, not the list. These rows detect failure by sessions to the controller (SPACE 2 C's third form; controller-sessions writes member.session in ISR and SLOG), and E-25 counts them so: SLOG's servers keep one session each (400 frames a second at n = 100, no peer bound needed); ISR has sessions plus Kafka's idle follower fetches. Those fetches are data traffic per broker pair, not a gone timer: a follower that stops fetching drops out of each partition's in-sync set after replica.lag.time.max.ms, which is isr-set's own state, kept per partition; and a dead broker is fenced when its heartbeats to the controller stop (KIP-631). Each link.ping read in these rows is a clause that does not apply to them. raft-prevote-checkquorum reads the pings only 'on a quiet group' (A-02). These rows run Raft only for the controller's metadata group, and it never goes quiet: no unit in ISR or SLOG writes group.quiet, and KRaft's voters fetch from the leader all the time. meta-members and controller-commands mark and re-check 'gone' from the sessions here, the other half of records written once for both forms. SLOG's dormant-groups reads link.ping and group.quiet, and neither has a writer in SLOG: its data groups go dormant and wake on the first message, and a writer that dies is replaced when its session lapses (writer-epoch-slog, member.session). OBJ is the same case: its members renew leases by conditional PUT (E-25: 0 frames), and its two link.ping reads (meta-members, controller-commands) are the other form's. A read with no writer adds no pair, so the settled counts already say this. Adding link-pings would charge these rows for state their own sources do not keep. PD differs because TiKV does keep a link per pair of stores and reads it from its quiet groups (RM-08).",
+   "precedent": "Unchanged.",
+   "evidence": [
+    "experiments/E25-idle-fd/README.md (table (a): ISR 'sessions + idle fetches', SLOG 'sessions to a controller', OBJ 'leases by conditional PUT')",
+    "SPACE.md 2 C (the failure-detector sub-choice); 5 (R isr forces C cent)",
+    "AMENDMENTS A-02 (CheckQuorum on a quiet group reads the pings)",
+    "judging/mechanisms.json: controller-sessions (KIP-631 broker heartbeats; PD, ISR, SLOG), raft-prevote-checkquorum, dormant-groups, meta-members, controller-commands, isr-set, writer-epoch-slog",
+    "judging/PERF-DATA.settled.json (PERF-12 M: ISR's idle fetches; SLOG's sessions)"
+   ],
+   "effect": "None: ISR 214, SLOG 272 and OBJ 144 pairs stay. Taken as asked, ISR and SLOG would each gain a unit and pairs for a ping no part of them sends."
   }
  ],
  "new": [],
@@ -314,6 +363,17 @@
    "why": "The settled records give a group.config read to every Raft unit whose rule picks peers or counts a majority (raft-log, raft-term-vote, raft-commit, raft-leader-transfer, raft-readindex). par-repair's rule picks a peer to copy from, and its 'possibly committed' rule counts a majority, so by the same convention it reads the config. It also lets the pair rule see the interaction VERDICT section 0 line 7 names as an owed model, par with a voter change (G-15): par-repair now pairs with raft-config and with whatever else writes group.config (controller-commands here; healing-self in a self row). +2 pairs.",
    "id": "RF-03",
    "source": "judging/closure/hybrids/A.settled.json (row A2)"
+  },
+  {
+   "id": "RF-04",
+   "key": "quiet-groups",
+   "field": "rules",
+   "to": "A leader with no writes for two ticks, whose live voters all hold its commit offset, tells them 'quiet at i' and stops sending. Any write or read index wakes it; a follower below i asks to wake; a returning link reports log ends; a follower whose link to the leader has missed election.ms of pings wakes the group and stands (DESIGN-V5 4.2). In PD's form (TiKV's hibernate regions) a broken store link wakes such a follower the same way (StoreUnreachable), and the quiet leader still sends one heartbeat each long period, which a follower that misses it twice takes as a dead leader (tikv/rfcs 0023).",
+   "ruling": "accept",
+   "by": "referee for the closure pass's family B leads (2026-11-11)",
+   "pairs": 0,
+   "why": "Family A's referee left a wording lead: PD's quiet groups are TiKV's hibernate regions, which the record's 'stops sending' does not say. The new text says how a quiet group learns its leader is gone in both forms: fero's (missed link pings, DESIGN-V5 4.2's failure table) and TiKV's (a broken store link, and a slow heartbeat as the backstop). It names the read of link.ping the record already has. Reads and writes are unchanged, so no pair moves.",
+   "source": "judging/closure/hybrids/A.settled.json (follow_up, last line); RM-08"
   }
  ]
 }

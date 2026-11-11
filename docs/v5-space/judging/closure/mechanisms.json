@@ -190,13 +190,10 @@
      "R": [
       "raft",
       "rlog"
-     ],
-     "K": [
-      "lib"
      ]
     }
    ],
-   "basis": "The failure detector sub-choice of SPACE 2 C: one ping per member pair, standing in for the heartbeats of quiet Raft groups (A-12). Rows where members decide (self, self+p, self+mv) or where the decider is #meta's own leader (cent-co) use it. A separate controller (cent: PD, ISR, SLOG) uses sessions to the controller instead; OBJ has leases, V4 its own kernel. Closure referee A (A4, A7): a separate controller over fero's own Raft groups still needs the pings its quiet groups and checks read (A-12, A-02, A-20). PD's shape is deferred (its own gap, TiKV hibernate heartbeats)."
+   "basis": "The failure detector sub-choice of SPACE 2 C: one ping per member pair, standing in for the heartbeats of quiet Raft groups (A-12). Every row whose data groups are Raft carries it: rows where members decide (self, self+p, self+mv), where the decider is #meta's own leader (cent-co), and where a separate controller sits over Raft groups (cent). Closure referee A (A4, A7): a separate controller over fero's own Raft groups still needs the pings its quiet groups and checks read (A-12, A-02, A-20). Re-ruled RM-08 (rerulings.mech.json): PD carries them too, since TiKV keeps a kept-alive link per pair of stores whose failure wakes hibernated regions, and probes each pair for the slow score; so the condition no longer needs K lib. Rows whose data path is not Raft use sessions to the controller (ISR, SLOG; RM-09), leases (OBJ) or their own kernel (V4)."
   },
   {
    "key": "quiet-groups",

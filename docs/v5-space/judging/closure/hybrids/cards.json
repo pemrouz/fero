@@ -303,13 +303,16 @@
      "row": "MIN-P+m"
     },
     {
-     "v": "met",
+     "v": "open",
      "basis": "predicted",
-     "why": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row",
+     "why": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met).",
      "support": [
+      "DRAFT",
+      "CELL",
+      "SPLIT",
       "COMP"
      ],
-     "source": "predicted from the judged rows (rule else)",
+     "source": "predicted from the judged rows (rule 1)",
      "req": "P-15",
      "part": "M",
      "group": "P",
@@ -4138,13 +4141,16 @@
      "row": "COMP2"
     },
     {
-     "v": "met",
+     "v": "open",
      "basis": "predicted",
-     "why": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row",
+     "why": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met).",
      "support": [
+      "DRAFT",
+      "CELL",
+      "SPLIT",
       "COMP"
      ],
-     "source": "predicted from the judged rows (rule else)",
+     "source": "predicted from the judged rows (rule 1)",
      "req": "P-15",
      "part": "M",
      "group": "P",
@@ -7959,13 +7965,16 @@
      "row": "COMP2 V=full"
     },
     {
-     "v": "met",
+     "v": "open",
      "basis": "predicted",
-     "why": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row",
+     "why": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met).",
      "support": [
+      "DRAFT",
+      "CELL",
+      "SPLIT",
       "COMP"
      ],
-     "source": "predicted from the judged rows (rule else)",
+     "source": "predicted from the judged rows (rule 1)",
      "req": "P-15",
      "part": "M",
      "group": "P",
@@ -11781,13 +11790,16 @@
      "row": "COMP+par C=cent V=full"
     },
     {
-     "v": "met",
+     "v": "open",
      "basis": "predicted",
-     "why": "X saga with A-24 (locks belong to the unit; a failed run undoes every step): E-24 holds all-or-nothing, no G0 and 'every unit ends' on seven bounds, up to 2.9 million states, with a crash at every step and a paused holder (41 of 44 mutants); real Elle finds no G0 in 300 histories (E-22b). The saga is an L5 library on fenced locks, the same in every saga row",
+     "why": "Re-ruled RR-11 (judging/closure/rerulings.cells.json), on closure referee B's lead: a saga unit that touches a memory-rung resource can be half kept when that group's majority stops uncleanly inside the sync window (its step is lost while the unit is recorded done), and the lost tail can take back the fence raise that stops a paused holder. E-24, the met cell's support, leaves unclean recovery out (K-09, G-05). One stated rule would close it (a saga's writes on a memory resource commit at persisted, or the unit is refused); no row states it, so the cell is open, not a fail. R lists the rows that carry the memory rung (closure/mechanisms.json, memory-rung). Overrides the saga else (met).",
      "support": [
+      "DRAFT",
+      "CELL",
+      "SPLIT",
       "COMP"
      ],
-     "source": "predicted from the judged rows (rule else)",
+     "source": "predicted from the judged rows (rule 1)",
      "req": "P-15",
      "part": "M",
      "group": "P",
@@ -34059,6 +34071,7 @@
     "genesis-init",
     "input-recorder",
     "learners",
+    "link-pings",
     "lock-rows",
     "lsm-store",
     "memory-rung",
@@ -37590,6 +37603,7 @@
     "genesis-init",
     "input-recorder",
     "learners",
+    "link-pings",
     "lock-rows",
     "lsm-store",
     "memory-rung",
@@ -37914,7 +37928,7 @@
      "support": [
       "PD"
      ],
-     "source": "predicted from the judged rows (rule 3)",
+     "source": "predicted from the judged rows (rule 4)",
      "req": "P-15",
      "part": "M",
      "group": "P",
@@ -41052,6 +41066,7 @@
     "genesis-init",
     "input-recorder",
     "learners",
+    "link-pings",
     "lock-rows",
     "lsm-store",
     "merge-record",

@@ -12,7 +12,7 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | CELL | 49 | 277 |
 | LANE | 47 | 232 |
 | SPLIT | 53 | 295 |
-| PD | 46 | 209 |
+| PD | 47 | 218 |
 | ISR | 45 | 214 |
 | SLOG | 49 | 272 |
 | OBJ | 37 | 144 |
@@ -140,16 +140,21 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | disk-incarnation | input-recorder | durable.log | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | fold-all | presence-rows | group.rows | DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, PD, ISR, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, COMP |
 | fold-all | subscribe | group.rows | DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, PD, ISR, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, COMP |
+| learners | link-pings | group.learners | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
+| link-pings | meta-members | link.ping, meta.members | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
+| link-pings | quiet-groups | link.ping | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | meta-members | disk-incarnation | disk.incarnation | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-commit | disk-incarnation | durable.log | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-commit | fold-all | group.commit | DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, PD, ISR, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, COMP |
 | raft-commit | quiet-groups | group.commit | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-commit | raft-readindex | group.commit | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-config | disk-incarnation | disk.incarnation | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
+| raft-config | link-pings | group.config | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-config | quiet-groups | group.config | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-config | raft-readindex | group.config | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-log | fold-all | group.log | DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, PD, ISR, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, COMP |
 | raft-log | quiet-groups | group.log | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
+| raft-prevote-checkquorum | link-pings | link.ping | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-prevote-checkquorum | quiet-groups | group.leader, group.quiet | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-prevote-checkquorum | raft-readindex | group.leader | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-readindex | presence-rows | group.rows | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
@@ -166,15 +171,10 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | journal | input-recorder | durable.log, recorder.tape | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | journal | subscribe | journal.segments | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | journal | tier | durable.log, journal.segments | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
-| learners | link-pings | group.learners | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
-| link-pings | meta-members | link.ping, meta.members | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
-| link-pings | quiet-groups | link.ping | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | link-pings | writer-time | link.clocks | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | quiet-groups | writer-time | group.quiet | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-commit | journal | durable.log | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
-| raft-config | link-pings | group.config | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-log | journal | group.log | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
-| raft-prevote-checkquorum | link-pings | link.ping | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-snapshot | journal | group.log, group.snapshot | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | raft-term-vote | journal | durable.log, group.term-vote | DRAFT, MIN, RUST, SRV, LEAN, CELL, LANE, SPLIT, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | writer-time | fold-all | group.rows | DRAFT, MIN, RUST, SRV, CELL, LANE, SPLIT, ISR, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, COMP |
@@ -266,6 +266,8 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | slot-move | journal | journal.segments | DRAFT, MIN, RUST, SRV, LEAN, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE, COMP |
 | controller-commands | disk-incarnation | disk.incarnation | MIN, RUST, SRV, LEAN, SLOG, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | dormant-groups | move-policy | meta.directory | DRAFT, MIN, RUST, SRV, LEAN, SLOG, MIN-TS, RLOG, EMB-V8, SIDE |
+| link-pings | controller-commands | group.config, group.learners, link.ping | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
+| link-pings | slow-leader-controller | link.ping | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | quiet-groups | controller-commands | group.config | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | quiet-groups | slow-leader-controller | group.quiet | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | raft-leader-transfer | slow-leader-controller | group.transfer | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
@@ -277,14 +279,12 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | slow-leader-controller | meta-members | meta.members | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | slow-leader-controller | route-forward | group.transfer | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | slow-leader-controller | writer-judging | group.transfer | MIN, RUST, SRV, LEAN, PD, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
-| link-pings | controller-commands | group.config, group.learners, link.ping | MIN, RUST, SRV, LEAN, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
-| link-pings | slow-leader-controller | link.ping | MIN, RUST, SRV, LEAN, MIN-P, MIN-TS, RLOG, EMB-V8, SIDE |
 | meta-members | genesis-conditional-create | cluster.id | MIN, RUST, LEAN, SLOG, OBJ, MIN-P, MIN-TS, SIDE, COMP |
 | meta-members | genesis-init | cluster.id | DRAFT, SRV, CELL, LANE, SPLIT, PD, ISR, RLOG, EMB-V8 |
 | subscribe | genesis-conditional-create | cluster.id | MIN, RUST, LEAN, SLOG, OBJ, MIN-P, MIN-TS, SIDE, COMP |
 | subscribe | genesis-init | cluster.id | DRAFT, SRV, CELL, LANE, SPLIT, PD, ISR, RLOG, EMB-V8 |
+| link-pings | genesis-init | cluster.id | DRAFT, SRV, CELL, LANE, SPLIT, PD, RLOG, EMB-V8 |
 | link-pings | genesis-conditional-create | cluster.id | MIN, RUST, LEAN, MIN-P, MIN-TS, SIDE, COMP |
-| link-pings | genesis-init | cluster.id | DRAFT, SRV, CELL, LANE, SPLIT, RLOG, EMB-V8 |
 | tenant-budget | disk-incarnation | durable.log | DRAFT, CELL, LANE, SPLIT, SLOG, RLOG, EMB-V8 |
 | journal | tenant-budget | durable.log | DRAFT, CELL, LANE, SPLIT, RLOG, EMB-V8 |
 | dedup-window | caller-keys | issuer.table | DRAFT, LANE, SPLIT, SLOG, V4 |
@@ -527,6 +527,7 @@ Built by `python3 tools/judging.py pairs` from [mechanisms.json](mechanisms.json
 | lineage | consumer-groups | sub.cursor | SPLIT |
 | lineage | srchi-marks | sub.cursor | SPLIT |
 | lineage | subscribe | sub.cursor | SPLIT |
+| link-pings | controller-sessions | link.clocks | PD |
 | link-pings | writer-epoch-rlog | link.ping | RLOG |
 | lock-rows | outside-log | outside.log | BUY |
 | log-replicas | move-policy | group.config | DRAFT |

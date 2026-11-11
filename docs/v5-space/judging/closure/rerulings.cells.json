@@ -402,6 +402,48 @@
     "REQUIREMENTS DATA-01, DATA-09",
     "BRIEF item 6: data stays the state engine"
    ]
+  },
+  {
+   "id": "RR-11",
+   "lead": "judging/closure/hybrids/B.settled.json, leads[0] (P-15 with Q `mix`)",
+   "group": "P",
+   "req": "P-15",
+   "part": "M",
+   "rows": [
+    "DRAFT",
+    "CELL",
+    "SPLIT",
+    "COMP"
+   ],
+   "from": {
+    "v": "met",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null
+   },
+   "to": {
+    "v": "open",
+    "alt": null,
+    "depends_on": null,
+    "gap": null,
+    "proof": null,
+    "basis": "reasoned"
+   },
+   "ruling": "accept",
+   "by": "referee for the closure pass's family B leads (2026-11-11)",
+   "why": "Open, not met. These four rows hold Q `mix`, so they carry the `memory` rung (the settled memory-rung unit: DRAFT, CELL, SPLIT, COMP). A `memory` write commits when a majority holds it in memory, and the disks catch up within about a second. If a majority of that group stops uncleanly inside that second, the write is gone: DESIGN-V5 decision 4b says such a stop 'needs `fero recover`', which only lists what may be lost (F-12). A `persisted` write survives 'a power loss of all of them' (DESIGN-V5 3.2); a `memory` write does not. The family B referee's trace for two-phase commit (B1, B3) works the same way for a saga. Checked here against the saga's own rules (E-24's `fullundo`, A-24): (1) a unit has a step on p, a `memory` resource, and a step on q, a `persisted` one; (2) both steps commit, and the holder records the unit `done` in #sagas; (3) a majority of p's group stops uncleanly inside the window, and its replicas come back as new. Now q keeps its step and p has lost its own, while #sagas says `done`, so no later holder takes the unit up again. That is half a unit, which P-15 forbids: 'every unit ends all applied or all undone' (its acceptance test; E-24's property A1). A second path breaks the paused-holder clause. The ender's last write at p also raised p's fence (that is why `fullundo` works in E-24), and that raise sits in the lost tail. E-24 says of unclean recovery that 'a fence table can go back', so a paused holder's late step with its old token can land at p after the unit ended: E-24's 12-step case comes back. E-24 is the only support for the met cell, and it leaves unclean recovery out in its own words. AMENDMENTS 4 lists this very crossing as open for COMP (K-09: the unsynced tail and what it held, 'lock fence tokens' among them), and G-05 says the rung's safety was never modelled. So 'met' has no support for these rows. Not fails. The trace is reasoned, not run or model-checked, and no second agent confirmed a structural argument (rule 1). One stated rule inside the row closes it: a saga's steps, fence raises and end record on a `memory` resource commit at `persisted` (Q `mix` may choose per write), or the saga library refuses such a unit. No row states that rule. This is the verdict the family B referee gave B1 and B3 for the same trace, with no alternative and no dependence. The saga rows with Q `maj-d` keep met: there a committed step is lost only when a majority's disks are lost for good, F-12's operator case, which no row's P-15 cell counts. P-15 (S) does not move: it is already 'not' for every saga row (a saga shows its steps one at a time). Closer: E-24's saga model with a group that can lose its unsynced tail when a majority stops uncleanly, once without the rule (it should break A1) and once with it.",
+   "evidence": [
+    "E-24 (experiments/E24-sagas-ramp/README.md: property A1, the `fullundo` option, 'What the models leave out': unclean recovery)",
+    "REQUIREMENTS P-15 (M and its acceptance test), F-12, and the durability rungs (How to read this, Words)",
+    "SPACE 2 Q (`maj-m`, `mix`); SPACE 5 (Q `maj-m` needs rejoin-as-new)",
+    "AMENDMENTS 2 (Q), 4 (K-09), 5 (G-05)",
+    "docs/DESIGN-V5.md 3.2 (the rung table: `persisted` survives a power loss of all voters) and decision 4b (`memory`: a majority's unclean stop needs `fero recover`)",
+    "judging/mechanisms.json (memory-rung: DRAFT, CELL, SPLIT, COMP; fence-tokens)",
+    "judging/P.settled.json (P-15 M and S, the saga rows)",
+    "judging/closure/hybrids/B.settled.json (B1 and B3, P-15 M and S: the same trace for two-phase commit)"
+   ],
+   "closure_rows": "The closure rows with Q `mix` and X `saga` (MIN-P+m, COMP2, COMP2 V=full, COMP+par C=cent V=full) had this cell predicted from COMP, not judged; judging/closure/attrib/P.json now gives them open by the same reason. No closure judge settled their P-15 cell, so no hybrids settled file changes."
   }
  ],
  "user_choices": [

@@ -8,7 +8,7 @@
   "CELL": 277,
   "LANE": 232,
   "SPLIT": 295,
-  "PD": 209,
+  "PD": 218,
   "ISR": 214,
   "SLOG": 272,
   "OBJ": 144,
@@ -16311,6 +16311,13 @@
    ],
    [
     "raft-config",
+    "link-pings",
+    [
+     "group.config"
+    ]
+   ],
+   [
+    "raft-config",
     "quiet-groups",
     [
      "group.config"
@@ -16352,6 +16359,13 @@
      "group.learners",
      "group.log",
      "group.snapshot"
+    ]
+   ],
+   [
+    "learners",
+    "link-pings",
+    [
+     "group.learners"
     ]
    ],
    [
@@ -16481,6 +16495,13 @@
     "raft-readindex",
     [
      "group.leader"
+    ]
+   ],
+   [
+    "raft-prevote-checkquorum",
+    "link-pings",
+    [
+     "link.ping"
     ]
    ],
    [
@@ -16645,6 +16666,51 @@
     "presence-rows",
     [
      "group.rows"
+    ]
+   ],
+   [
+    "link-pings",
+    "quiet-groups",
+    [
+     "link.ping"
+    ]
+   ],
+   [
+    "link-pings",
+    "slow-leader-controller",
+    [
+     "link.ping"
+    ]
+   ],
+   [
+    "link-pings",
+    "meta-members",
+    [
+     "link.ping",
+     "meta.members"
+    ]
+   ],
+   [
+    "link-pings",
+    "controller-commands",
+    [
+     "group.config",
+     "group.learners",
+     "link.ping"
+    ]
+   ],
+   [
+    "link-pings",
+    "genesis-init",
+    [
+     "cluster.id"
+    ]
+   ],
+   [
+    "link-pings",
+    "controller-sessions",
+    [
+     "link.clocks"
     ]
    ],
    [
@@ -36638,6 +36704,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -37008,6 +37075,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -37865,6 +37933,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -38787,6 +38856,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -38826,6 +38896,7 @@
     "RUST",
     "SRV",
     "LEAN",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -38863,6 +38934,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -38900,6 +38972,7 @@
     "RUST",
     "SRV",
     "LEAN",
+    "PD",
     "MIN-P",
     "MIN-TS",
     "RLOG",
@@ -38987,6 +39060,7 @@
     "CELL",
     "LANE",
     "SPLIT",
+    "PD",
     "RLOG",
     "EMB-V8"
    ]
@@ -38999,6 +39073,16 @@
    ],
    "rows": [
     "RLOG"
+   ]
+  },
+  {
+   "a": "link-pings",
+   "b": "controller-sessions",
+   "state": [
+    "link.clocks"
+   ],
+   "rows": [
+    "PD"
    ]
   },
   {
