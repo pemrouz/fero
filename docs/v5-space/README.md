@@ -10,7 +10,7 @@ Start here. This folder asks one question: which design should fero v5 be? The s
 
 **Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** ([VERDICT 0](VERDICT.md#0-the-answer)). [API.md](API.md) is its API as first built, and [LAYERS.md](LAYERS.md) its layers.
 
-> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. Second come answer stages per call: every write still commits on disk, and only its own caller may hear earlier that it was received or replicated ([E-48](experiments/E48-ack-stages/README.md)). A `memory` option comes third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. **The owner then chose the log-first shape instead**, judged by simplicity: each resource is its own cluster whose truth is its log, with MIN's row as the base ([VERDICT 11.7](VERDICT.md#117-the-owners-design-decisions-2026-11-12), [DECISIONS V5-1 to V5-6](../DECISIONS.md)). The rest of Part 1 still reads on VERDICT's own frame.
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. Second come answer stages per call: every write still commits on disk, and only its own caller may hear earlier that it was received or replicated ([E-48](experiments/E48-ack-stages/README.md)). A `memory` option comes third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. **The owner then chose the log-first shape instead**, judged by simplicity: each resource is its own cluster whose truth is its log, with MIN's row as the base ([VERDICT 11.7](VERDICT.md#117-the-owners-design-decisions-2026-11-12), [DECISIONS V5-1 to V5-6](../DECISIONS.md)). By that measure the base has 405 rules, 22nd of the 24 rows that fail no MUST, and more than MIN-P's plain family at every bound; each rule of that gap comes from one of the owner's choices ([SIMPLICITY.md](SIMPLICITY.md)). The rest of Part 1 still reads on VERDICT's own frame.
 
 - **COMP2 in short.** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica. (A **group** is one Raft log with one leader. A **slot** is a fixed share of a resource's keys. `#meta` is the project's own system group. To **fold** is to turn the log's change records into rows.)
 - **MIN-P+par is COMP2 without the `memory` rung.** A **rung** is what a commit means: `persisted` is on disk at a majority, `memory` is in memory at a majority. So the first build always commits to disk.
@@ -84,10 +84,11 @@ Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer), the [COMP
 | 9 | [API.md](API.md) | the public API of COMP2 as first built: every declaration, error and config key, and the code for every pattern | to see what an app developer writes |
 | 10 | [LAYERS.md](LAYERS.md) | what each layer, L0 to L5, keeps, does and still owes, with walk-throughs | to see how the design works inside |
 | 11 | [MEMORY.md](MEMORY.md) | whether to offer a `memory` option on TiKV's shape: what it buys, what a lost tail breaks, the forms, the rules and the API | after the owner's answers, to see the speed trade |
-| 12 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
-| 13 | [experiments/](#experiments) | 59 experiment folders, listed below | to check a measurement or a model |
-| 14 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
-| 15 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
+| 12 | [SIMPLICITY.md](SIMPLICITY.md) | the rows re-ranked by every rule a builder must get right, borrowed or not (V5-6): where the owner's base lands, and how sure the count is | after DECISIONS V5-1 to V5-6, to see what each design costs in rules |
+| 13 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
+| 14 | [experiments/](#experiments) | 59 experiment folders, listed below | to check a measurement or a model |
+| 15 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
+| 16 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
 
 ### experiments/
 
@@ -180,6 +181,7 @@ How every cell was scored, settled and counted. The tools build the outputs; nob
   - [rerulings.cells.json](judging/closure/rerulings.cells.json) (RR-nn) and [rerulings.mech.json](judging/closure/rerulings.mech.json) (RM-nn, RF-nn): the referee's later re-rulings, applied on top of the settled files.
   - [hybrids/](judging/closure/hybrids): the 11 closure rows. Families A and B each have two blind judges' files and a settled file; [cards.json](judging/closure/hybrids/cards.json) holds each row's full card.
   - [results/](judging/closure/results): [matrix.md](judging/closure/results/matrix.md) (the winner under each mix of the user's choices), 11 `ladder-*.md` files (rule 3 as more guessed cells are allowed, for example [the strict ladder](judging/closure/results/ladder-restated-DATA-01_reading.md)), [frontier.json](judging/closure/results/frontier.json) (the 11 rows sent to blind judges, as the search priced them) and [critic-unheld-options.md](judging/closure/results/critic-unheld-options.md) (the options no judged row holds).
+- [simplicity.json](judging/simplicity.json): the simplicity re-rank's counts: each mechanism's rules at one grain, with low and high bounds, basis and owner; the owner's base and its decisions; the calibration and skeptic notes. Read with [SIMPLICITY.md](SIMPLICITY.md).
 - **The reviews of VERDICT:** [VERDICT.review.json](judging/VERDICT.review.json) (draft 2: skeptics, a price re-check and a fresh reader, V-01 to V-18), [VERDICT.review3.json](judging/VERDICT.review3.json) (draft 3: the referee's summary and file list, the four skeptics' findings A1 to A10, F1 to F8, S1 to S12 and I-1 to I-7, the reviser's summary, and the fresh reader's R1 to R14) and [VERDICT.review4.json](judging/VERDICT.review4.json) (the final recheck, FR1 to FR10, with the referee's and the editor's summaries before it).
 
 ### tools/
@@ -193,11 +195,12 @@ Run every script from `docs/v5-space`. Python 3, no packages to install. (`tools
 | [closure_matrix.py](tools/closure_matrix.py) | writes the decision matrix over the 31 judged rows | `python3 tools/closure_matrix.py` |
 | [closure_ladders.py](tools/closure_ladders.py) | writes the 11 ladder files, one per mix of choices | `python3 tools/closure_ladders.py` |
 | [closure_cards.py](tools/closure_cards.py) | builds `hybrids/cards.json` from the two families' settled files | `python3 tools/closure_cards.py` |
+| [simplicity.py](tools/simplicity.py) | sums every row's rules from simplicity.json, adds the owner's base, and sets rule 3's place beside each; writes nothing | `python3 tools/simplicity.py` (also `--strict`, `row NAME`, `diff A B`) |
 | [evidence.py](tools/evidence.py) | builds EVIDENCE.md from each experiment's README | `python3 tools/evidence.py` |
 
 ## How to check any number
 
-Every number in this study comes from a file or a tool. These are the commands [VERDICT 10](VERDICT.md#10-how-this-page-was-made-and-what-changed) gives. Run them from `docs/v5-space`. All but `check-all` and `mechrow` rewrite files, so run those on a scratch copy and compare it with the repo:
+Every number in this study comes from a file or a tool. These are the commands [VERDICT 10](VERDICT.md#10-how-this-page-was-made-and-what-changed) gives. Run them from `docs/v5-space`. All but `check-all`, `mechrow` and `simplicity.py` rewrite files, so run those on a scratch copy and compare it with the repo:
 
 ```sh
 python3 tools/closure.py check-all              # 4,588 cells, 0 mismatches, 36 overrides; 112 mechanism entries; 54 constraints
@@ -206,6 +209,7 @@ python3 tools/judging.py verdict                # rebuilds judging/OUTCOME.md an
 python3 tools/closure.py mechrow 'Z=par' COMP              # COMP with par: 296 pairs
 python3 tools/closure.py mechrow 'C=cent-co,Z=par' COMP    # COMP2: 277 pairs
 python3 tools/closure_ladders.py                # rebuilds the 11 ladder files (slow: about 15 minutes here)
+python3 tools/simplicity.py                     # SIMPLICITY.md's table: the base has 405 rules, ~22nd of 24
 ```
 
 `mechrow` reads only the 20 study rows, so it starts from COMP; `row '' COMP2` and `card '' COMP2` read the closure rows too. The other outputs rebuild the same way: `python3 tools/judging.py rows` (the scorecards), `python3 tools/closure_cards.py` (cards.json) and `python3 tools/evidence.py` (EVIDENCE.md).
