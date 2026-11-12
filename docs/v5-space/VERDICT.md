@@ -1262,7 +1262,9 @@ After 11.6, the owner set the arithmetic's pick aside and chose by judgement. Th
 
 **What this gives up**, against TiKV's shape: true transactions across partitions (sagas instead; a reader can see half a saga) and key-ordered scans across partitions. Against MIN-P+par: many tiny resources cost a group each.
 
-**Next, all without code:** a re-rank of the study's rows by simplicity; how overhead grows per resource; the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one.
+**The re-rank by simplicity** ([SIMPLICITY.md](SIMPLICITY.md), the same day). The base has 405 rules, 22nd of the 24 rows that fail no MUST (393 and 14th without answer stages, which no study row priced). It has more rules than MIN-P's plain family at every bound, by 22 to 24, and each rule of that gap comes from one of the owner's choices: `par`, the soft directory, answer stages. Against the other rows the count is not sure enough to order them. TiKV-persisted is 5th, 3 rules behind MIN-P, so counting borrowed rules neither sinks TiKV's shape nor backs V5-1 alone; V5-1 rests on what the log gives for free (121 MUSTs open there against 97).
+
+**Next, all without code:** how overhead grows per resource; the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one.
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md
