@@ -1,0 +1,142 @@
+# E-47 info: what the rung's contract allows: an acknowledged write on a memory group lost (LOST), a later snapshot older on a memory key (READBACK); reported, not counted
+# 2026-11-12T06:25:32Z, Python 3.13.17, 4 vCPU, load ['0.96', '0.95', '0.99']
+
+## MP, no rules
+MP  no rules                     txn           350,895 states    18.8s  LOST 4, READBACK 16
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+  READBACK (allowed), shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. B (persisted) appends: prewrite b (txn 1, primary a), committed
+     5. T0 hears its prewrite of b: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A (memory) appends: commit a (txn 1 at ts 2), committed
+     9. T0 hears the primary's commit: ok (told committed)
+    10. T0 sends the secondaries' commits and stops
+    11. the reader reads a: value of txn 1
+    12. A: a majority stops uncleanly: 2 entries, 0 on a majority's disks; the new leader keeps 0
+    13. B (persisted) appends: commit b (txn 1 at ts 2), committed
+    14. the reader reads b: value of txn 1
+    15. the reader takes a snapshot ts from the TSO
+    16. the reader reads a: initial value
+MP  no rules                     txnb          106,530 states     5.3s  LOST 4, READBACK 16
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary b), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+  READBACK (allowed), shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary b), committed
+     3. T0 hears its prewrite of a: ok
+     4. B (persisted) appends: prewrite b (txn 1, primary), committed
+     5. T0 hears its prewrite of b: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. B (persisted) appends: commit b (txn 1 at ts 2), committed
+     9. T0 hears the primary's commit: ok (told committed)
+    10. T0 sends the secondaries' commits and stops
+    11. the reader reads b: value of txn 1
+    12. A (memory) appends: commit a (txn 1 at ts 2), committed
+    13. the reader reads a: value of txn 1
+    14. A: a majority stops uncleanly: 2 entries, 0 on a majority's disks; the new leader keeps 0
+    15. the reader takes a snapshot ts from the TSO
+    16. the reader reads a: initial value
+MP  no rules                     txn1          452,525 states    25.3s  LOST 4
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+MP  no rules                     txn1-2r     2,591,367 states   165.1s  LOST 4, READBACK 13
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+  READBACK (allowed), shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A (memory) appends: prewrite c (txn 1, primary a), committed
+     5. T0 hears its prewrite of c: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A (memory) appends: commit a (txn 1 at ts 2), committed
+     9. the reader reads a: value of txn 1
+    10. A: a majority stops uncleanly: 3 entries, 0 on a majority's disks; the new leader keeps 0
+    11. the reader reads c: initial value
+    12. the reader takes a snapshot ts from the TSO
+    13. the reader reads a: initial value
+MP  no rules                     dedup          13,729 states     0.7s  LOST 4
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite x (txn 1, primary), committed
+     3. T0 hears its prewrite of x: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+MP  no rules                     lockAA         32,111 states     1.3s  LOST 4
+  LOST (allowed), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     3. h0 hears its claim: granted 2
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+MP  no rules                     lockBA          2,591 states     0.1s  LOST 7
+  LOST (allowed), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. B (persisted) appends: claim the lock (holder h0, attempt 1), committed
+     3. h0 hears its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A (memory) appends: protected write of x (holder h0, token 2), committed
+     6. h0 hears its write: ok
+     7. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+
+## MP, R1s+R3+R2.claim
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds
+MP  R1s+R3+R2.claim              txn1          757,957 states    43.0s  LOST 4
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+MP  R1s+R3+R2.claim              txn1-2r     3,000,001 states   179.0s  LOST 4, READBACK 16
+  LOST (allowed), shortest trace, 4 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+  READBACK (allowed), shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A (memory) appends: prewrite c (txn 1, primary a), committed
+     5. T0 hears its prewrite of c: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A (memory) appends: commit a (txn 1 at ts 2), committed
+     9. T0 hears the primary's commit: ok (told committed)
+    10. T0 sends the secondaries' commits and stops
+    11. the reader reads a: value of txn 1
+    12. A (memory) appends: commit c (txn 1 at ts 2), committed
+    13. the reader reads c: value of txn 1
+    14. A: a majority stops uncleanly: 4 entries, 0 on a majority's disks; the new leader keeps 0
+    15. the reader takes a snapshot ts from the TSO
+    16. the reader reads a: initial value
+MP  R1s+R3+R2.claim              dedup          17,814 states     0.9s  LOST 4
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.3s  LOST 7
+
+## MP, R2
+MP  R2                           txn                96 states     0.0s  holds
+MP  R2                           txnb               96 states     0.0s  holds
+MP  R2                           txn1               36 states     0.0s  holds
+MP  R2                           txn1-2r            96 states     0.0s  holds
+MP  R2                           dedup              18 states     0.0s  holds
+MP  R2                           lockAA             12 states     0.0s  holds
+MP  R2                           lockBA            363 states     0.0s  holds

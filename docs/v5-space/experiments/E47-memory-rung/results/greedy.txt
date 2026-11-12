@@ -1,0 +1,40 @@
+# E-47 greedy: run 5: E-17's greedy ablation over R1, R1s, R2, R3, R4 in three orders, then over R2's three parts and the rest in a fourth
+# 2026-11-12T06:46:26Z, Python 3.13.17, 4 vCPU, load ['1.00', '1.00', '1.00']
+
+## order R1, R1s, R2, R3, R4
+  start: R1+R1s+R2+R3+R4: holds
+  drop R1: holds without it -> dropped
+  drop R1s: holds without it -> dropped
+  drop R2: MP txn breaks (ATOMIC 14) -> kept
+  drop R3: holds without it -> dropped
+  drop R4: holds without it -> dropped
+  smallest set: R2; final pass: R2: needed (MP txn ATOMIC 14)
+
+## order R4, R3, R2, R1s, R1
+  start: R1+R1s+R2+R3+R4: holds
+  drop R4: holds without it -> dropped
+  drop R3: holds without it -> dropped
+  drop R2: MP txn1 breaks (ATOMIC 11) -> kept
+  drop R1s: holds without it -> dropped
+  drop R1: holds without it -> dropped
+  smallest set: R2; final pass: R2: needed (MP txn ATOMIC 14)
+
+## order R2, R1, R1s, R3, R4
+  start: R1+R1s+R2+R3+R4: holds
+  drop R2: MP lockAA breaks (HOLDERS 7) -> kept
+  drop R1: holds without it -> dropped
+  drop R1s: holds without it -> dropped
+  drop R3: holds without it -> dropped
+  drop R4: holds without it -> dropped
+  smallest set: R2; final pass: R2: needed (MP txn ATOMIC 14)
+
+## order R2.txn, R2.put, R1, R1s, R2.claim, R3, R4
+  start: R1+R1s+R2.txn+R2.claim+R2.put+R3+R4: holds
+  drop R2.txn: holds without it -> dropped
+  drop R2.put: holds without it -> dropped
+  drop R1: holds without it -> dropped
+  drop R1s: MP txn breaks (ATOMIC 14) -> kept
+  drop R2.claim: MP lockAA breaks (HOLDERS 7) -> kept
+  drop R3: MP txn1 breaks (ATOMIC 12) -> kept
+  drop R4: holds without it -> dropped
+  smallest set: R1s+R2.claim+R3; final pass: R1s: needed (MP txn ATOMIC 14); R2.claim: needed (MP lockAA HOLDERS 7); R3: needed (MP txn1 ATOMIC 11)
