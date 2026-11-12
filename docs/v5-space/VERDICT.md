@@ -47,6 +47,8 @@ Every number here comes from a file or a tool, and the text says which. "Compute
 
 ## 0. The answer
 
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading (item 15) and accepts a named test line as a loss when the trade buys something real (item 2). On that frame the arithmetic picks TiKV-persisted (0 / 5 / 233), and a `memory` option comes second, behind a timing gate ([MEMORY.md](MEMORY.md)). Section 11.6 has the detail. Sections 0 to 10 below still read on this page's own frame: the strict reading, no loss.
+
 1. **Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** (6b in section 9). MIN-P+par is COMP2 without that rung.
 2. **COMP2 in short:** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica (section 5.1).
 3. **It wins on the strict reading of DATA-01:** only `data`'s own code folds rows on writers and followers. Its score there: 3 novel mechanisms, 6 SHOULDs met, 277 pairs, no MUST failed, 99 open ([matrix.md](judging/closure/results/matrix.md)).
@@ -1208,6 +1210,38 @@ Writing [LAYERS.md](LAYERS.md) and the final [API.md](API.md) for COMP2 brought 
 - **What this page does with it.** The cell stays met until a test says otherwise. The kill table in section 9 now has a row for it ("6a, with L2 on the main thread").
 - **Who it hits.** Every row that judges writes on `data`'s rows, and the strict reading asks that of every row it keeps in. So on its own it moves no winner. If neither way back works, the strict reading has no row left in. TiKV's shape is not hit: its kernel judges writes in its own store (K `kern`), which is why it fails the strict reading in the first place.
 
+### 11.6 The owner's answers (2026-11-12)
+
+The owner answered two of section 8's bold items. Sections 0 to 10 are not rewritten; this section says what the answers change.
+
+**The answers, in the owner's words.**
+- **Item 15, DATA-01:** "it doesn't have to be the data code exactly, or even direct port". That is the loose reading (RR-07): a server may hold rows in another engine, once DATA-09's differential test proves its rows equal `data`'s.
+- **Item 2, PERF-01:** "I don't mind accepting some losses if it makes things better". So a named competitor test line may be lost when the trade buys something real. JetStream's one-client default line is the first such loss.
+- **The owner also asked** whether a `memory` option is still worth having, "if it introduces too much hassle ... that can be evaluated". [MEMORY.md](MEMORY.md) and [E-47] answer that.
+
+**What the arithmetic picks on that frame** (computed: `repro rank --loss`, 24 of 31 rows in).
+
+| Place | Row | Counts (novel / SHOULDs / pairs), open MUSTs |
+|---|---|---|
+| 1 | TiKV-persisted, tied with its TypeScript-first twin | 0 / 5 / 233, 121 open |
+| 2 | TiKV-TS (the same shape with the `memory` rung) | 0 / 4 / 244, 122 open |
+| 3 | PD+fix | 0 / 3 / 247, 122 open |
+| 4 | MIN-P+par | 3 / 6 / 264, 96 open |
+
+- TiKV-persisted and its twin stay unbeaten from 0 to 10 guessed cells ([the loss ladder](judging/closure/results/ladder-restated-PERF-01_losses.md); section 4.4).
+- **The warning of section 0 item 6 still holds.** No experiment ran TiKV's shape. It has 11 MUSTs met and 121 open, against MIN-P+par's 96 open. Rule 3 never counts open MUSTs (item 16). So MIN-P+par stays the fallback if the shape's own tests go badly.
+- **What the shape still owes** ([candidates/TiKV-persisted.md](candidates/TiKV-persisted.md)): `par` written inside raft-rs or etcd's Raft; DATA-09's differential test of its store against `data`; OPS-07's restore of the timestamp oracle; shipping its server through npm (DEP-20); and a WASM build of its kernel for TEST-01.
+
+**The `memory` option** ([MEMORY.md 0](MEMORY.md#0-the-recommendation)).
+- **The answer:** keep it, but build it second, after the `persisted` slice is timed. Build it only if waiting for the disk is at least half of a write's p99 there, and once the models MEMORY 6.1 lists pass.
+- **Its form:** chosen per resource. A memory resource takes one-row writes only. A transaction or a fenced write that touches it is refused `needs-persisted`. After a power cut, the operator's recovery restarts the group from the longest log any copy holds.
+- **It buys** single writes about 2 to 3 times faster (reasoned from E-02's measured 3.5 to 7.6 times), no waiting behind disk stalls, and about a third less CPU per write.
+- **It costs** 20 to 34 more interacting pairs (233 → 253 to 267, computed on copies of the units), a weaker "ok" on memory resources, an operator step after a power cut, and up to about 1 s of answered writes.
+- **Rule 3 never prefers it** on this frame: its speed is not counted once the loss is accepted. Choosing it is choosing speed over the count.
+- **How sure:** low to medium. [E-47] model-checked that, with no rules, transactions, fences and lock rows break, and that the refusals fix every break it found. What stays on a memory resource (plain writes, splits, merges, feeds) is reasoned only.
+- **Kill test 2b** (section 9), the rung's safety model, does not fire on TiKV's shape at E-47's bounds. Its splits, merges, feeds and recovery are still owed (MEMORY 6.1).
+
+[E-47]: experiments/E47-memory-rung/README.md
 [pairs.md]: experiments/E32-composition/pairs.md
 [crossing/README.md]: experiments/E32-composition/crossing/README.md
 [E-01]: experiments/E01-floors/README.md
