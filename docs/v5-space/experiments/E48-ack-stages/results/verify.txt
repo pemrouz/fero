@@ -1,0 +1,38 @@
+# E-48 verify: the sets that hold, on larger bounds (state limit 6 million)
+# 2026-11-12T11:11:00Z, Python 3.13.17, 4 vCPU, load ['0.76', '1.52', '2.06'], model bf201209be4f9408
+
+## S0 with O.seq
+S0             O.seq                        txn1-2r      405,372 states    34.5s  holds
+S0             O.seq                        dedup-v      743,220 states    64.5s  holds
+S0             O.seq                        lockAA-v      14,930 states     0.8s  holds
+S0             O.seq                        lockAB-v       5,838 states     0.3s  holds
+S0             O.seq                        pipe3          3,402 states     0.2s  holds
+  => holds on every bound
+
+## S1 with W1+O.seq+Y
+S1-recv        W1+O.seq+Y                   txn1-2r      454,446 states    35.4s  holds
+S1-recv        W1+O.seq+Y                   dedup-v      864,634 states    74.1s  holds
+S1-recv        W1+O.seq+Y                   lockAA-v      28,412 states     2.2s  holds
+S1-recv        W1+O.seq+Y                   lockAB-v       6,146 states     0.3s  holds
+S1-recv        W1+O.seq+Y                   pipe3         13,671 states     0.9s  holds
+S1-mixr        W1+O.seq+Y                   txn1-2r      405,372 states    31.7s  holds
+S1-mixr        W1+O.seq+Y                   dedup-v      743,220 states    68.7s  holds
+S1-mixr        W1+O.seq+Y                   lockAA-v      15,382 states     0.8s  holds
+S1-mixr        W1+O.seq+Y                   lockAB-v       6,146 states     0.3s  holds
+S1-mixr        W1+O.seq+Y                   pipe3         13,671 states     0.8s  holds
+  => holds on every bound
+
+## S1, no rules (the larger bounds still break)
+S1-recv        no rules                     txn1-2r       17,584 states     1.0s  OTHERS.txn 10
+S1-recv        no rules                     dedup-v    1,279,361 states   106.6s  holds
+S1-recv        no rules                     lockAA-v       2,503 states     0.1s  OTHERS.lock 8
+S1-recv        no rules                     lockAB-v         524 states     0.0s  OTHERS.lock 6
+S1-recv        no rules                     pipe3            683 states     0.0s  ORDER 7
+  shortest counterexample: S1-recv lockAB-v, OTHERS.lock, 6 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. B appends and commits: protected write of x (holder h0, token 2)
+  => breaks on S1-recv txn1-2r (OTHERS.txn 10), S1-recv lockAA-v (OTHERS.lock 8), S1-recv lockAB-v (OTHERS.lock 6), S1-recv pipe3 (ORDER 7)

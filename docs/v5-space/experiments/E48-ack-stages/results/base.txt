@@ -1,0 +1,1174 @@
+# E-48 base: no rules: every property, each with its shortest trace; S0 is the baseline
+# 2026-11-12T11:10:59Z, Python 3.13.17, 4 vCPU, load ['0.76', '1.52', '2.06'], model bf201209be4f9408
+
+## S0: persisted only (the baseline; E-47 run 1 with the memory point and the leader crash added)
+S0             no rules                     txn           98,084 states     8.1s  holds   (liveness: 0 of 98,084 states stuck)
+S0             no rules                     txnb          59,998 states     4.7s  holds   (liveness: 0 of 59,998 states stuck)
+S0             no rules                     txn1          82,732 states     5.9s  holds   (liveness: 0 of 82,732 states stuck)
+S0             no rules                     dedup          8,742 states     0.5s  holds   (liveness: 0 of 8,742 states stuck)
+S0             no rules                     lockAA        11,518 states     0.7s  holds   (liveness: 0 of 11,518 states stuck)
+S0             no rules                     lockBA         2,840 states     0.1s  holds   (liveness: 0 of 2,840 states stuck)
+S0             no rules                     lockAB         4,726 states     0.2s  holds   (liveness: 0 of 4,726 states stuck)
+S0             no rules                     pipe             228 states     0.0s  holds   (liveness: 0 of 228 states stuck)
+S0             no rules                     pipe-t         1,372 states     0.1s  ORDER 6   (liveness: 0 of 1,372 states stuck)
+  ORDER, shortest trace, 6 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+S0             no rules                     ryw               46 states     0.0s  holds   (liveness: 0 of 46 states stuck)
+S0             no rules                     pipe-s           426 states     0.0s  ORDER 7   (liveness: 0 of 426 states stuck)
+  ORDER, shortest trace, 7 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 2
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. A's leader appends: plain write 2 of p (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+  => breaks on S0 pipe-t (ORDER 6), S0 pipe-s (ORDER 7)
+
+## S1, every operation answered at stage map `recv`, results judged at the leader (spec)
+S1-recv        no rules                     txn          738,326 states    62.9s  ATOMIC 13, OTHERS.txn 16   (liveness: 0 of 738,326 states stuck)
+  ATOMIC, shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. T0 acts on the answer to its prewrite of b: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. the reader reads a: initial value
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. T0 acts on the answer to the primary's commit: ok (committed)
+    11. T0 sends the secondaries' commits and stops
+    12. B appends and commits: commit b (txn 1 at ts 2)
+    13. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    10. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    11. the reader sends: resolve b (txn 1: roll back)
+    12. A: an unclean stop (power loss): 2 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: a majority holds all 3 entries in memory
+    15. A: a majority has 3 entries on disk (committed, visible)
+    16. B appends and commits: resolve b (txn 1: roll back)
+S1-recv        no rules                     txnb         122,888 states    10.0s  ATOMIC 10, OTHERS.txn 8   (liveness: 0 of 122,888 states stuck)
+  ATOMIC, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. B appends and commits: prewrite b (txn 1, primary)
+     5. T0 acts on the answer to its prewrite of b: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. the reader reads a: initial value
+     9. B appends and commits: commit b (txn 1 at ts 2)
+    10. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. B appends and commits: prewrite b (txn 1, primary)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. B appends and commits: commit b (txn 1 at ts 2)
+S1-recv        no rules                     txn1         483,699 states    39.6s  ATOMIC 12, OTHERS.txn 10   (liveness: 0 of 483,699 states stuck)
+  ATOMIC, shortest trace, 12 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. T0 acts on the answer to its prewrite of c: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. the reader reads c: initial value
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: a majority has 3 entries on disk (committed, visible)
+    12. the reader reads a: value of txn 1
+  OTHERS.txn, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. T0 acts on the answer to its prewrite of c: ok
+     6. A: an unclean stop (power loss): 2 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 3 entries in memory
+    10. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        no rules                     dedup         16,858 states     1.0s  holds   (liveness: 0 of 16,858 states stuck)
+S1-recv        no rules                     lockAA        83,100 states     5.6s  OTHERS.lock 8   (liveness: 0 of 83,100 states stuck)
+  OTHERS.lock, shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        no rules                     lockBA         4,988 states     0.3s  holds   (liveness: 0 of 4,988 states stuck)
+S1-recv        no rules                     lockAB        23,086 states     1.5s  OTHERS.lock 6   (liveness: 0 of 23,086 states stuck)
+  OTHERS.lock, shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. B appends and commits: protected write of x (holder h0, token 2)
+S1-recv        no rules                     pipe             412 states     0.0s  ORDER 7   (liveness: 0 of 412 states stuck)
+  ORDER, shortest trace, 7 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. the plain writer sends plain write 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. A's leader appends: plain write 2 of p (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        no rules                     pipe-t         9,065 states     0.6s  ORDER 6   (liveness: 0 of 9,065 states stuck)
+  ORDER, shortest trace, 6 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        no rules                     ryw               85 states     0.0s  RYW 5   (liveness: 0 of 85 states stuck)
+  RYW, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer reads p: writes [] (its own write missing)
+     5. A: a majority has 1 entries on disk (committed, visible)
+  => breaks on S1-recv txn (ATOMIC 13, OTHERS.txn 16), S1-recv txnb (ATOMIC 10, OTHERS.txn 8), S1-recv txn1 (ATOMIC 12, OTHERS.txn 10), S1-recv lockAA (OTHERS.lock 8), S1-recv lockAB (OTHERS.lock 6), S1-recv pipe (ORDER 7), S1-recv pipe-t (ORDER 6), S1-recv ryw (RYW 5)
+
+## S1, every operation answered at stage map `repl`, results judged at the leader (spec)
+S1-repl        no rules                     txn          537,986 states    48.8s  ATOMIC 15, OTHERS.txn 17   (liveness: 0 of 537,986 states stuck)
+  ATOMIC, shortest trace, 15 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    11. A: a majority holds all 2 entries in memory
+    12. T0 acts on the answer to the primary's commit: ok (committed)
+    13. T0 sends the secondaries' commits and stops
+    14. B appends and commits: commit b (txn 1 at ts 2)
+    15. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 17 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     8. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory
+    10. T0 acts on the answer to its prewrite of a: ok
+    11. T0 takes a commit ts from the TSO and sends the primary's commit
+    12. the reader sends: resolve b (txn 1: roll back)
+    13. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    14. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+    17. B appends and commits: resolve b (txn 1: roll back)
+S1-repl        no rules                     txnb         103,386 states     9.4s  ATOMIC 11, OTHERS.txn 9   (liveness: 0 of 103,386 states stuck)
+  ATOMIC, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. B appends and commits: commit b (txn 1 at ts 2)
+    11. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 9 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. B appends and commits: prewrite b (txn 1, primary)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. B appends and commits: commit b (txn 1 at ts 2)
+S1-repl        no rules                     txn1         392,154 states    33.7s  ATOMIC 13, OTHERS.txn 11   (liveness: 0 of 392,154 states stuck)
+  ATOMIC, shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads c: initial value
+    10. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    11. A: a majority holds all 3 entries in memory
+    12. A: a majority has 3 entries on disk (committed, visible)
+    13. the reader reads a: value of txn 1
+  OTHERS.txn, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: a majority has 3 entries on disk (committed, visible)
+S1-repl        no rules                     dedup         15,817 states     1.1s  holds   (liveness: 0 of 15,817 states stuck)
+S1-repl        no rules                     lockAA        85,790 states     6.1s  OTHERS.lock 9   (liveness: 0 of 85,790 states stuck)
+  OTHERS.lock, shortest trace, 9 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory
+     9. A: a majority has 2 entries on disk (committed, visible)
+S1-repl        no rules                     lockBA         5,224 states     0.3s  holds   (liveness: 0 of 5,224 states stuck)
+S1-repl        no rules                     lockAB        23,284 states     1.4s  OTHERS.lock 7   (liveness: 0 of 23,284 states stuck)
+  OTHERS.lock, shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. B appends and commits: protected write of x (holder h0, token 2)
+S1-repl        no rules                     pipe             532 states     0.0s  ORDER 8   (liveness: 0 of 532 states stuck)
+  ORDER, shortest trace, 8 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer sends plain write 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. A's leader appends: plain write 2 of p (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-repl        no rules                     pipe-t         9,740 states     0.6s  ORDER 6   (liveness: 0 of 9,740 states stuck)
+  ORDER, shortest trace, 6 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+S1-repl        no rules                     ryw               97 states     0.0s  RYW 5   (liveness: 0 of 97 states stuck)
+  RYW, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer reads p: writes [] (its own write missing)
+     5. A: a majority has 1 entries on disk (committed, visible)
+  => breaks on S1-repl txn (ATOMIC 15, OTHERS.txn 17), S1-repl txnb (ATOMIC 11, OTHERS.txn 9), S1-repl txn1 (ATOMIC 13, OTHERS.txn 11), S1-repl lockAA (OTHERS.lock 9), S1-repl lockAB (OTHERS.lock 7), S1-repl pipe (ORDER 8), S1-repl pipe-t (ORDER 6), S1-repl ryw (RYW 5)
+
+## S1, every operation answered at stage map `mixr`, results judged at the leader (spec)
+S1-mixr        no rules                     txn          427,576 states    38.5s  ATOMIC 15, DURABLE 17, OTHERS.txn 16, REFUSED 19   (liveness: 0 of 427,576 states stuck)
+  ATOMIC, shortest trace, 15 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    11. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. the reader sends: resolve b (txn 1: commit at ts 2)
+    14. B appends and commits: resolve b (txn 1: commit at ts 2)
+    15. the reader reads b: value of txn 1
+  DURABLE, shortest trace, 17 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    10. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    11. the reader sends: resolve b (txn 1: roll back)
+    12. A: an unclean stop (power loss): 2 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: a majority holds all 3 entries in memory
+    15. A: a majority has 3 entries on disk (committed, visible)
+    16. T0 acts on the answer to the primary's commit: ok (committed)
+    17. B appends and commits: resolve b (txn 1: roll back)
+  OTHERS.txn, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    10. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    11. the reader sends: resolve b (txn 1: roll back)
+    12. A: an unclean stop (power loss): 2 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: a majority holds all 3 entries in memory
+    15. A: a majority has 3 entries on disk (committed, visible)
+    16. B appends and commits: resolve b (txn 1: roll back)
+  REFUSED, shortest trace, 19 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    10. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    11. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    12. the reader sends: resolve b (txn 1: commit at ts 3)
+    13. A: an unclean stop (power loss): 3 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    14. T0 sends the primary's commit again (timeout)
+    15. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    16. A: a majority holds all 2 entries in memory
+    17. A: a majority has 2 entries on disk (committed, visible)
+    18. T0 acts on the answer to the primary's commit: lock not found (aborted)
+    19. B appends and commits: resolve b (txn 1: commit at ts 3)
+S1-mixr        no rules                     txnb         120,308 states    10.7s  ATOMIC 10, OTHERS.txn 8   (liveness: 0 of 120,308 states stuck)
+  ATOMIC, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. B appends and commits: prewrite b (txn 1, primary)
+     5. T0 acts on the answer to its prewrite of b: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. the reader reads a: initial value
+     9. B appends and commits: commit b (txn 1 at ts 2)
+    10. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. B appends and commits: prewrite b (txn 1, primary)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. B appends and commits: commit b (txn 1 at ts 2)
+S1-mixr        no rules                     txn1         302,850 states    27.7s  ATOMIC 12, DURABLE 19, OTHERS.txn 10, REFUSED 21   (liveness: 0 of 302,850 states stuck)
+  ATOMIC, shortest trace, 12 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. T0 acts on the answer to its prewrite of c: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. the reader reads c: initial value
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: a majority has 3 entries on disk (committed, visible)
+    12. the reader reads a: value of txn 1
+  DURABLE, shortest trace, 19 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+     8. the TTL of txn 1's locks runs out (T0)
+     9. T0 acts on the answer to its prewrite of c: ok
+    10. T0 takes a commit ts from the TSO and sends the primary's commit
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. the reader sends: resolve c (txn 1: roll back)
+    14. A: an unclean stop (power loss): 3 entries, 2 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    15. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    16. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    17. A: a majority holds all 5 entries in memory
+    18. A: a majority has 5 entries on disk (committed, visible)
+    19. T0 acts on the answer to the primary's commit: ok (committed)
+  OTHERS.txn, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. T0 acts on the answer to its prewrite of a: ok
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. T0 acts on the answer to its prewrite of c: ok
+     6. A: an unclean stop (power loss): 2 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 3 entries in memory
+    10. A: a majority has 3 entries on disk (committed, visible)
+  REFUSED, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. the reader finds c locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     9. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+    10. T0 acts on the answer to its prewrite of a: ok
+    11. T0 takes a commit ts from the TSO and sends the primary's commit
+    12. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    13. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    14. the reader sends: resolve c (txn 1: commit at ts 3)
+    15. A: an unclean stop (power loss): 4 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. T0 sends the primary's commit again (timeout)
+    17. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    18. A's leader appends: resolve c (txn 1: commit at ts 3) (not yet held by a majority)
+    19. A: a majority holds all 4 entries in memory
+    20. A: a majority has 4 entries on disk (committed, visible)
+    21. T0 acts on the answer to the primary's commit: lock not found (aborted)
+S1-mixr        no rules                     dedup         10,491 states     0.8s  holds   (liveness: 0 of 10,491 states stuck)
+S1-mixr        no rules                     lockAA        46,418 states     3.3s  OTHERS.lock 8   (liveness: 0 of 46,418 states stuck)
+  OTHERS.lock, shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        no rules                     lockBA         2,840 states     0.2s  holds   (liveness: 0 of 2,840 states stuck)
+S1-mixr        no rules                     lockAB        23,086 states     1.8s  OTHERS.lock 6   (liveness: 0 of 23,086 states stuck)
+  OTHERS.lock, shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. B appends and commits: protected write of x (holder h0, token 2)
+S1-mixr        no rules                     pipe             412 states     0.0s  ORDER 7   (liveness: 0 of 412 states stuck)
+  ORDER, shortest trace, 7 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. the plain writer sends plain write 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. A's leader appends: plain write 2 of p (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        no rules                     pipe-t         9,065 states     0.6s  ORDER 6   (liveness: 0 of 9,065 states stuck)
+  ORDER, shortest trace, 6 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        no rules                     ryw               85 states     0.0s  RYW 5   (liveness: 0 of 85 states stuck)
+  RYW, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer reads p: writes [] (its own write missing)
+     5. A: a majority has 1 entries on disk (committed, visible)
+  => breaks on S1-mixr txn (ATOMIC 15, DURABLE 17, OTHERS.txn 16, REFUSED 19), S1-mixr txnb (ATOMIC 10, OTHERS.txn 8), S1-mixr txn1 (ATOMIC 12, DURABLE 19, OTHERS.txn 10, REFUSED 21), S1-mixr lockAA (OTHERS.lock 8), S1-mixr lockAB (OTHERS.lock 6), S1-mixr pipe (ORDER 7), S1-mixr pipe-t (ORDER 6), S1-mixr ryw (RYW 5)
+
+## S1, every operation answered at stage map `mixp`, results judged at the leader (spec)
+S1-mixp        no rules                     txn          328,653 states    28.5s  ATOMIC 16, DURABLE 18, OTHERS.txn 17, REFUSED 21   (liveness: 0 of 328,653 states stuck)
+  ATOMIC, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    11. A: a majority holds all 2 entries in memory
+    12. A: a majority has 2 entries on disk (committed, visible)
+    13. T0 acts on the answer to the primary's commit: ok (committed)
+    14. T0 sends the secondaries' commits and stops
+    15. B appends and commits: commit b (txn 1 at ts 2)
+    16. the reader reads b: value of txn 1
+  DURABLE, shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     8. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory
+    10. T0 acts on the answer to its prewrite of a: ok
+    11. T0 takes a commit ts from the TSO and sends the primary's commit
+    12. the reader sends: resolve b (txn 1: roll back)
+    13. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    14. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+    17. T0 acts on the answer to the primary's commit: ok (committed)
+    18. B appends and commits: resolve b (txn 1: roll back)
+  OTHERS.txn, shortest trace, 17 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     8. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory
+    10. T0 acts on the answer to its prewrite of a: ok
+    11. T0 takes a commit ts from the TSO and sends the primary's commit
+    12. the reader sends: resolve b (txn 1: roll back)
+    13. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    14. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+    17. B appends and commits: resolve b (txn 1: roll back)
+  REFUSED, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. the TTL of txn 1's locks runs out (T0)
+     8. T0 acts on the answer to its prewrite of b: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    11. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory
+    14. the reader sends: resolve b (txn 1: commit at ts 3)
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    16. T0 sends the primary's commit again (timeout)
+    17. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    18. A: a majority holds all 2 entries in memory
+    19. A: a majority has 2 entries on disk (committed, visible)
+    20. T0 acts on the answer to the primary's commit: lock not found (aborted)
+    21. B appends and commits: resolve b (txn 1: commit at ts 3)
+S1-mixp        no rules                     txnb         101,226 states     8.5s  ATOMIC 11, OTHERS.txn 9   (liveness: 0 of 101,226 states stuck)
+  ATOMIC, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. B appends and commits: commit b (txn 1 at ts 2)
+    11. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 9 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. B appends and commits: prewrite b (txn 1, primary)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. B appends and commits: commit b (txn 1 at ts 2)
+S1-mixp        no rules                     txn1         248,900 states    20.2s  ATOMIC 13, DURABLE 20, OTHERS.txn 11, REFUSED 23   (liveness: 0 of 248,900 states stuck)
+  ATOMIC, shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads c: initial value
+    10. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    11. A: a majority holds all 3 entries in memory
+    12. A: a majority has 3 entries on disk (committed, visible)
+    13. the reader reads a: value of txn 1
+  DURABLE, shortest trace, 20 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+     7. the TTL of txn 1's locks runs out (T0)
+     8. T0 acts on the answer to its prewrite of a: ok
+     9. T0 acts on the answer to its prewrite of c: ok
+    10. T0 takes a commit ts from the TSO and sends the primary's commit
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory
+    14. the reader sends: resolve c (txn 1: roll back)
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    17. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    18. A: a majority holds all 5 entries in memory
+    19. A: a majority has 5 entries on disk (committed, visible)
+    20. T0 acts on the answer to the primary's commit: ok (committed)
+  OTHERS.txn, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: a majority has 3 entries on disk (committed, visible)
+  REFUSED, shortest trace, 23 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. the reader finds c locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     9. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory
+    11. T0 acts on the answer to its prewrite of a: ok
+    12. T0 takes a commit ts from the TSO and sends the primary's commit
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    15. A: a majority holds all 4 entries in memory
+    16. the reader sends: resolve c (txn 1: commit at ts 3)
+    17. A: an unclean stop (power loss): 4 entries, 4 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    18. T0 sends the primary's commit again (timeout)
+    19. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    20. A's leader appends: resolve c (txn 1: commit at ts 3) (not yet held by a majority)
+    21. A: a majority holds all 4 entries in memory
+    22. A: a majority has 4 entries on disk (committed, visible)
+    23. T0 acts on the answer to the primary's commit: lock not found (aborted)
+S1-mixp        no rules                     dedup         10,211 states     0.6s  holds   (liveness: 0 of 10,211 states stuck)
+S1-mixp        no rules                     lockAA        51,640 states     3.6s  OTHERS.lock 9   (liveness: 0 of 51,640 states stuck)
+  OTHERS.lock, shortest trace, 9 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory
+     9. A: a majority has 2 entries on disk (committed, visible)
+S1-mixp        no rules                     lockBA         2,840 states     0.2s  holds   (liveness: 0 of 2,840 states stuck)
+S1-mixp        no rules                     lockAB        23,284 states     1.6s  OTHERS.lock 7   (liveness: 0 of 23,284 states stuck)
+  OTHERS.lock, shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. B appends and commits: protected write of x (holder h0, token 2)
+S1-mixp        no rules                     pipe             532 states     0.0s  ORDER 8   (liveness: 0 of 532 states stuck)
+  ORDER, shortest trace, 8 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer sends plain write 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. A's leader appends: plain write 2 of p (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-mixp        no rules                     pipe-t         9,740 states     0.7s  ORDER 6   (liveness: 0 of 9,740 states stuck)
+  ORDER, shortest trace, 6 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+S1-mixp        no rules                     ryw               97 states     0.0s  RYW 5   (liveness: 0 of 97 states stuck)
+  RYW, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. the plain writer reads p: writes [] (its own write missing)
+     5. A: a majority has 1 entries on disk (committed, visible)
+  => breaks on S1-mixp txn (ATOMIC 16, DURABLE 18, OTHERS.txn 17, REFUSED 21), S1-mixp txnb (ATOMIC 11, OTHERS.txn 9), S1-mixp txn1 (ATOMIC 13, DURABLE 20, OTHERS.txn 11, REFUSED 23), S1-mixp lockAA (OTHERS.lock 9), S1-mixp lockAB (OTHERS.lock 7), S1-mixp pipe (ORDER 8), S1-mixp pipe-t (ORDER 6), S1-mixp ryw (RYW 5)
+
+## S2, commit in memory, stage map `mem`
+S2-mem         no rules                     txn          529,291 states    44.1s  ATOMIC 16, OTHERS.read 16, OTHERS.txn 16   (liveness: 0 of 529,291 states stuck)
+  ATOMIC, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory (committed, visible)
+    11. T0 acts on the answer to the primary's commit: ok (committed)
+    12. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    13. T0 sends the secondaries' commits and stops
+    14. the reader reads a: initial value
+    15. B appends and commits: commit b (txn 1 at ts 2)
+    16. the reader reads b: value of txn 1
+  OTHERS.read, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory (committed, visible)
+    11. T0 acts on the answer to the primary's commit: ok (committed)
+    12. T0 sends the secondaries' commits and stops
+    13. the reader reads a: value of txn 1
+    14. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    15. B appends and commits: commit b (txn 1 at ts 2)
+    16. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. B appends and commits: prewrite b (txn 1, primary a)
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     8. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory (committed, visible)
+    10. T0 acts on the answer to its prewrite of a: ok
+    11. T0 takes a commit ts from the TSO and sends the primary's commit
+    12. the reader sends: resolve b (txn 1: roll back)
+    13. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+    14. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory (committed, visible)
+    16. B appends and commits: resolve b (txn 1: roll back)
+S2-mem         no rules                     txnb         133,362 states    10.4s  ATOMIC 12, OTHERS.txn 9   (liveness: 0 of 133,362 states stuck)
+  ATOMIC, shortest trace, 12 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. B appends and commits: prewrite b (txn 1, primary)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader takes a snapshot ts from the TSO
+    10. the reader reads a: initial value
+    11. B appends and commits: commit b (txn 1 at ts 2)
+    12. the reader reads b: value of txn 1
+  OTHERS.txn, shortest trace, 9 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. B appends and commits: prewrite b (txn 1, primary)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. B appends and commits: commit b (txn 1 at ts 2)
+S2-mem         no rules                     txn1         847,725 states    72.1s  ATOMIC 13, OTHERS.read 13, OTHERS.txn 10   (liveness: 0 of 847,725 states stuck)
+  ATOMIC, shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. the reader takes a snapshot ts from the TSO
+    10. the reader reads c: initial value
+    11. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    12. A: a majority holds all 3 entries in memory (committed, visible)
+    13. the reader reads a: value of txn 1
+  OTHERS.read, shortest trace, 13 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory (committed, visible)
+    11. the reader reads a: value of txn 1
+    12. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    13. the reader reads c: initial value
+  OTHERS.txn, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 1
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory (committed, visible)
+S2-mem         no rules                     dedup         23,114 states     1.7s  OTHERS.read 10   (liveness: 0 of 23,114 states stuck)
+  OTHERS.read, shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of x: ok
+     5. T0 takes a commit ts from the TSO and sends the primary's commit
+     6. the reader takes a snapshot ts from the TSO
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+     9. the reader reads x: value of txn 1
+    10. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-mem         no rules                     lockAA        76,211 states     5.2s  OTHERS.lock 8   (liveness: 0 of 76,211 states stuck)
+  OTHERS.lock, shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+S2-mem         no rules                     lockBA         4,035 states     0.3s  holds   (liveness: 0 of 4,035 states stuck)
+S2-mem         no rules                     lockAB        20,585 states     1.5s  OTHERS.lock 7   (liveness: 0 of 20,585 states stuck)
+  OTHERS.lock, shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. h0 acts on the answer to its claim: granted 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. h0 sends its protected write of x
+     7. B appends and commits: protected write of x (holder h0, token 2)
+S2-mem         no rules                     pipe             604 states     0.0s  ORDER 7, OTHERS.read 5   (liveness: 0 of 604 states stuck)
+  ORDER, shortest trace, 7 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. the plain writer sends plain write 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. A's leader appends: plain write 2 of p (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory (committed, visible)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-mem         no rules                     pipe-t        11,177 states     0.8s  ORDER 5, OTHERS.read 5   (liveness: 0 of 11,177 states stuck)
+  ORDER, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory (committed, visible)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-mem         no rules                     ryw               61 states     0.0s  holds   (liveness: 0 of 61 states stuck)
+  => breaks on S2-mem txn (ATOMIC 16, OTHERS.read 16, OTHERS.txn 16), S2-mem txnb (ATOMIC 12, OTHERS.txn 9), S2-mem txn1 (ATOMIC 13, OTHERS.read 13, OTHERS.txn 10), S2-mem dedup (OTHERS.read 10), S2-mem lockAA (OTHERS.lock 8), S2-mem lockAB (OTHERS.lock 7), S2-mem pipe (ORDER 7, OTHERS.read 5), S2-mem pipe-t (ORDER 5, OTHERS.read 5)
+
+## S2, commit in memory, stage map `disk`
+S2-disk        no rules                     txn           98,598 states     8.0s  ATOMIC 21, OTHERS.read 21   (liveness: 0 of 98,598 states stuck)
+  ATOMIC, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. B appends and commits: prewrite b (txn 1, primary a)
+     8. T0 acts on the answer to its prewrite of b: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory (committed, visible)
+    18. A: a majority has 3 entries on disk
+    19. the reader sends: resolve b (txn 1: roll back)
+    20. B appends and commits: resolve b (txn 1: roll back)
+    21. the reader reads b: initial value
+  OTHERS.read, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. B appends and commits: prewrite b (txn 1, primary a)
+     8. T0 acts on the answer to its prewrite of b: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory (committed, visible)
+    18. A: a majority has 3 entries on disk
+    19. the reader sends: resolve b (txn 1: roll back)
+    20. B appends and commits: resolve b (txn 1: roll back)
+    21. the reader reads b: initial value
+S2-disk        no rules                     txnb          77,995 states     6.5s  holds   (liveness: 0 of 77,995 states stuck)
+S2-disk        no rules                     txn1         113,923 states     9.6s  ATOMIC 22, OTHERS.read 22   (liveness: 0 of 113,923 states stuck)
+  ATOMIC, shortest trace, 22 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. A: a majority has 2 entries on disk
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. T0 acts on the answer to its prewrite of c: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory (committed, visible)
+    18. A: a majority has 4 entries on disk
+    19. the reader sends: resolve c (txn 1: roll back)
+    20. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    21. A: a majority holds all 5 entries in memory (committed, visible)
+    22. the reader reads c: initial value
+  OTHERS.read, shortest trace, 22 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. A: a majority has 2 entries on disk
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. T0 acts on the answer to its prewrite of c: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory (committed, visible)
+    18. A: a majority has 4 entries on disk
+    19. the reader sends: resolve c (txn 1: roll back)
+    20. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    21. A: a majority holds all 5 entries in memory (committed, visible)
+    22. the reader reads c: initial value
+S2-disk        no rules                     dedup          8,418 states     0.5s  OTHERS.read 11   (liveness: 0 of 8,418 states stuck)
+  OTHERS.read, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory (committed, visible)
+    10. the reader reads x: value of txn 1
+    11. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S2-disk        no rules                     lockAA         9,955 states     0.7s  holds   (liveness: 0 of 9,955 states stuck)
+S2-disk        no rules                     lockBA         2,239 states     0.1s  holds   (liveness: 0 of 2,239 states stuck)
+S2-disk        no rules                     lockAB         4,031 states     0.2s  holds   (liveness: 0 of 4,031 states stuck)
+S2-disk        no rules                     pipe             223 states     0.0s  OTHERS.read 5   (liveness: 0 of 223 states stuck)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-disk        no rules                     pipe-t         1,323 states     0.1s  ORDER 5, OTHERS.read 5   (liveness: 0 of 1,323 states stuck)
+  ORDER, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory (committed, visible)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-disk        no rules                     ryw               36 states     0.0s  holds   (liveness: 0 of 36 states stuck)
+  => breaks on S2-disk txn (ATOMIC 21, OTHERS.read 21), S2-disk txn1 (ATOMIC 22, OTHERS.read 22), S2-disk dedup (OTHERS.read 11), S2-disk pipe (OTHERS.read 5), S2-disk pipe-t (ORDER 5, OTHERS.read 5)
+
+## S2, commit in memory, stage map `e1`
+S2-e1          no rules                     txn           98,598 states     8.5s  ATOMIC 21, OTHERS.read 21   (liveness: 0 of 98,598 states stuck)
+  ATOMIC, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. B appends and commits: prewrite b (txn 1, primary a)
+     8. T0 acts on the answer to its prewrite of b: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory (committed, visible)
+    18. A: a majority has 3 entries on disk
+    19. the reader sends: resolve b (txn 1: roll back)
+    20. B appends and commits: resolve b (txn 1: roll back)
+    21. the reader reads b: initial value
+  OTHERS.read, shortest trace, 21 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. the TTL of txn 1's locks runs out (T0)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. B appends and commits: prewrite b (txn 1, primary a)
+     8. T0 acts on the answer to its prewrite of b: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory (committed, visible)
+    18. A: a majority has 3 entries on disk
+    19. the reader sends: resolve b (txn 1: roll back)
+    20. B appends and commits: resolve b (txn 1: roll back)
+    21. the reader reads b: initial value
+S2-e1          no rules                     txnb          77,995 states     6.2s  holds   (liveness: 0 of 77,995 states stuck)
+S2-e1          no rules                     txn1         113,923 states     8.1s  ATOMIC 22, OTHERS.read 22   (liveness: 0 of 113,923 states stuck)
+  ATOMIC, shortest trace, 22 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. A: a majority has 2 entries on disk
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. T0 acts on the answer to its prewrite of c: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory (committed, visible)
+    18. A: a majority has 4 entries on disk
+    19. the reader sends: resolve c (txn 1: roll back)
+    20. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    21. A: a majority holds all 5 entries in memory (committed, visible)
+    22. the reader reads c: initial value
+  OTHERS.read, shortest trace, 22 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. A: a majority has 2 entries on disk
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. T0 acts on the answer to its prewrite of c: ok
+     9. T0 takes a commit ts from the TSO and sends the primary's commit
+    10. the reader takes a snapshot ts from the TSO
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory (committed, visible)
+    14. the reader reads a: value of txn 1
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory (committed, visible)
+    18. A: a majority has 4 entries on disk
+    19. the reader sends: resolve c (txn 1: roll back)
+    20. A's leader appends: resolve c (txn 1: roll back) (not yet held by a majority)
+    21. A: a majority holds all 5 entries in memory (committed, visible)
+    22. the reader reads c: initial value
+S2-e1          no rules                     dedup          8,418 states     0.5s  OTHERS.read 11   (liveness: 0 of 8,418 states stuck)
+  OTHERS.read, shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: a majority has 1 entries on disk
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory (committed, visible)
+    10. the reader reads x: value of txn 1
+    11. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S2-e1          no rules                     lockAA         9,955 states     0.5s  holds   (liveness: 0 of 9,955 states stuck)
+S2-e1          no rules                     lockBA         2,239 states     0.1s  holds   (liveness: 0 of 2,239 states stuck)
+S2-e1          no rules                     lockAB         4,031 states     0.2s  holds   (liveness: 0 of 4,031 states stuck)
+S2-e1          no rules                     pipe             604 states     0.0s  ORDER 7, OTHERS.read 5   (liveness: 0 of 604 states stuck)
+  ORDER, shortest trace, 7 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. the plain writer sends plain write 2
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     6. A's leader appends: plain write 2 of p (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory (committed, visible)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-e1          no rules                     pipe-t        11,177 states     0.6s  ORDER 5, OTHERS.read 5   (liveness: 0 of 11,177 states stuck)
+  ORDER, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. the plain writer sends plain write 1 again (gone or refused)
+     3. A's leader appends: plain write 1 of p (not yet held by a majority)
+     4. A's leader appends: plain write 1 of p (copy 2) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory (committed, visible)
+  OTHERS.read, shortest trace, 5 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. a plain reader reads p: writes [1]
+     5. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-e1          no rules                     ryw               61 states     0.0s  holds   (liveness: 0 of 61 states stuck)
+  => breaks on S2-e1 txn (ATOMIC 21, OTHERS.read 21), S2-e1 txn1 (ATOMIC 22, OTHERS.read 22), S2-e1 dedup (OTHERS.read 11), S2-e1 pipe (ORDER 7, OTHERS.read 5), S2-e1 pipe-t (ORDER 5, OTHERS.read 5)
