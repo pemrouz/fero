@@ -1,0 +1,63 @@
+# E-48 raftcheck48, 2026-11-12T11:10:52Z, Python 3.13.17, 4 vCPU, load 0.73 1.53 2.06
+(A) S1 against persisted: memory reports change nothing in Raft
+ N  states P  states S1  projections equal  fault outcomes equal
+ 1        33        99  True   True    (0.0s)
+ 2       333     1,974  True   True    (0.1s)
+ 3     1,933    18,874  True   True    (0.9s)
+ 4     8,058   116,874  True   True    (5.9s)
+
+(B) the leader never over-counts: states with c > k or rp > m
+ 1 0
+ 2 0
+ 3 0
+ 4 0
+
+(C) S0/S1, copies that stopped uncleanly vote: outcomes (new leader, new log length) per fault, and how many
+    cut below the commit point c (must be 0), below `replicated` (rp) and below `received` (len)
+ N  fault   outcomes   below c  below rp  below len
+ 1  intact       101         0         0         2
+ 1  u1           322         0        10        26
+ 1  u2           497         0        68       116
+      one unclean stop: `replicated` lost 6 times when the stopped copy is the leader, 4 when it is a follower
+      variant `replicated to all three` (rp3 = min of h0, ma1, ma2): lost on intact 0, u1 0 (must be 0), u2 14
+ 2  intact     2,123         0         0       149
+ 2  u1         7,185         0       334     1,362
+ 2  u2        11,485         0     2,007     4,564
+      one unclean stop: `replicated` lost 192 times when the stopped copy is the leader, 142 when it is a follower
+      variant `replicated to all three` (rp3 = min of h0, ma1, ma2): lost on intact 0, u1 0 (must be 0), u2 369
+ 3  intact    21,523         0         0     2,649
+ 3  u1        74,876         0     3,880    20,228
+ 3  u2       119,172         0    22,797    59,204
+      one unclean stop: `replicated` lost 2,178 times when the stopped copy is the leader, 1,702 when it is a follower
+      variant `replicated to all three` (rp3 = min of h0, ma1, ma2): lost on intact 0, u1 0 (must be 0), u2 4,101
+ 4  intact   140,648         0         0    23,774
+ 4  u1       494,042         0    26,536   162,294
+ 4  u2       776,165         0   155,826   436,897
+      one unclean stop: `replicated` lost 14,664 times when the stopped copy is the leader, 11,872 when it is a follower
+      variant `replicated to all three` (rp3 = min of h0, ma1, ma2): lost on intact 0, u1 0 (must be 0), u2 27,988
+
+(D) the abstract steps are sound: outcomes outside [m, len] (intact) or [k, len] (unclean), and
+    (len, m, k) triples whose unclean cuts differ from [k, len]
+ 1  outside: intact 0, u1 0, u2 0;  triples differing: 0 of 4
+ 2  outside: intact 0, u1 0, u2 0;  triples differing: 0 of 10
+ 3  outside: intact 0, u1 0, u2 0;  triples differing: 0 of 20
+ 4  outside: intact 0, u1 0, u2 0;  triples differing: 0 of 35
+
+(E) S2, commit at rp (memory reports). With unclean voters: cuts below the commit point.
+    With cbn: below the commit point; faults with no voting majority (operator); the operator from the longest
+    log: below k / outside [k, len]; from the survivors alone: faults with a survivor / below k
+ N  fault   vote: below rp   cbn: below rp  no quorum  op longest: <k / outside  survivors: n / <k
+ 1  intact             0              0          0       0 /   0             0 /     0
+ 1  u1                10              0          0       0 /   0             0 /     0
+ 1  u2                68              0        396       0 /   0           297 /     8
+ 2  intact             0              0          0       0 /   0             0 /     0
+ 2  u1               334              0          0       0 /   0             0 /     0
+ 2  u2             2,007              0      7,896       0 /   0         5,922 /   192
+ 3  intact             0              0          0       0 /   0             0 /     0
+ 3  u1             3,880              0          0       0 /   0             0 /     0
+ 3  u2            22,797              0     75,496       0 /   0        56,622 / 1,986
+ 4  intact             0              0          0       0 /   0             0 /     0
+ 4  u1            26,536              0          0       0 /   0             0 /     0
+ 4  u2           155,826              0    467,496       0 /   0        350,622 / 12,870
+
+all checks hold

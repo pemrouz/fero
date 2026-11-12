@@ -1,0 +1,82 @@
+# E-48 greedy: E-17's greedy ablation for S1 over W1, O.seq, Y and E-47's R3 (an epoch after a power loss), on S1-recv and S1-mixr, every bound, power loss and leader crash
+# 2026-11-12T11:11:00Z, Python 3.13.17, 4 vCPU, load ['0.76', '1.52', '2.06'], model bf201209be4f9408
+
+## order R3, W1, O.seq, Y
+  start: R3+W1+O.seq+Y: holds
+  drop R3: holds without it -> dropped
+  drop W1: S1-recv txn breaks (ATOMIC 13) -> kept
+  drop O.seq: S1-recv pipe breaks (ORDER 7) -> kept
+  drop Y: S1-recv ryw breaks (RYW 5) -> kept
+  smallest set: W1+O.seq+Y; final pass: W1: needed (S1-recv txn ATOMIC 13); O.seq: needed (S1-recv pipe ORDER 7); Y: needed (S1-recv ryw RYW 5)
+
+## order Y, O.seq, W1, R3
+  start: R3+W1+O.seq+Y: holds
+  drop Y: S1-recv ryw breaks (RYW 5) -> kept
+  drop O.seq: S1-recv pipe breaks (ORDER 7) -> kept
+  drop W1: S1-recv txn breaks (ATOMIC 13) -> kept
+  drop R3: holds without it -> dropped
+  smallest set: W1+O.seq+Y; final pass: W1: needed (S1-recv txn ATOMIC 13); O.seq: needed (S1-recv pipe ORDER 7); Y: needed (S1-recv ryw RYW 5)
+
+## order R3.fence, R3.stale, R3.res, R3.read, W1.pw, W1.cm, W1.chk, W1.claim, O.seq, Y
+  start: R3.fence+R3.stale+R3.res+R3.read+W1.pw+W1.cm+W1.chk+W1.claim+O.seq+Y: holds
+  drop R3.fence: holds without it -> dropped
+  drop R3.stale: holds without it -> dropped
+  drop R3.res: holds without it -> dropped
+  drop R3.read: holds without it -> dropped
+  drop W1.pw: S1-recv txn breaks (ATOMIC 15) -> kept
+  drop W1.cm: S1-recv txn breaks (OTHERS.txn 19) -> kept
+  drop W1.chk: S1-recv txn breaks (OTHERS.txn 18) -> kept
+  drop W1.claim: S1-recv lockAA breaks (OTHERS.lock 8) -> kept
+  drop O.seq: S1-recv pipe breaks (ORDER 7) -> kept
+  drop Y: S1-recv ryw breaks (RYW 5) -> kept
+  smallest set: W1.pw+W1.cm+W1.chk+W1.claim+O.seq+Y; final pass: W1.pw: needed (S1-recv txn ATOMIC 15); W1.cm: needed (S1-recv txn OTHERS.txn 19); W1.chk: needed (S1-recv txn OTHERS.txn 18); W1.claim: needed (S1-recv lockAA OTHERS.lock 8); O.seq: needed (S1-recv pipe ORDER 7); Y: needed (S1-recv ryw RYW 5)
+
+## R3+O.seq+Y in place of W1 (an epoch after a power loss, no wait for disk in the library)
+S1-recv        R3+O.seq+Y                   txn           68,706 states     4.8s  ATOMIC 13
+S1-recv        R3+O.seq+Y                   txnb           4,699 states     0.2s  OTHERS.txn 8
+S1-recv        R3+O.seq+Y                   txn1          45,358 states     2.9s  ATOMIC 12
+S1-recv        R3+O.seq+Y                   dedup         19,872 states     1.2s  holds
+S1-recv        R3+O.seq+Y                   lockAA       100,938 states     6.8s  holds
+S1-recv        R3+O.seq+Y                   lockBA        11,248 states     0.7s  holds
+S1-recv        R3+O.seq+Y                   lockAB           715 states     0.0s  OTHERS.lock 6
+S1-recv        R3+O.seq+Y                   pipe             420 states     0.0s  holds
+S1-recv        R3+O.seq+Y                   pipe-t         8,245 states     0.5s  holds
+S1-recv        R3+O.seq+Y                   ryw               46 states     0.0s  holds
+S1-recv        R3+O.seq+Y                   txn-c         34,830 states     2.7s  ATOMIC 13
+S1-recv        R3+O.seq+Y                   txnb-c         2,693 states     0.1s  OTHERS.txn 8
+S1-recv        R3+O.seq+Y                   txn1-c        14,574 states     1.0s  OTHERS.txn 10
+S1-recv        R3+O.seq+Y                   dedup-c       18,592 states     1.4s  holds
+S1-recv        R3+O.seq+Y                   lockAA-c       2,696 states     0.1s  OTHERS.lock 8
+S1-recv        R3+O.seq+Y                   lockBA-c       5,196 states     0.3s  holds
+S1-recv        R3+O.seq+Y                   lockAB-c         551 states     0.0s  OTHERS.lock 6
+S1-recv        R3+O.seq+Y                   pipe-c           435 states     0.0s  holds
+S1-recv        R3+O.seq+Y                   pipe-t-c       9,277 states     0.7s  holds
+S1-recv        R3+O.seq+Y                   ryw-c             47 states     0.0s  holds
+S1-mixr        R3+O.seq+Y                   txn          127,646 states     9.6s  ATOMIC 15
+S1-mixr        R3+O.seq+Y                   txnb           4,699 states     0.3s  OTHERS.txn 8
+S1-mixr        R3+O.seq+Y                   txn1          41,523 states     2.9s  ATOMIC 12
+S1-mixr        R3+O.seq+Y                   dedup         13,254 states     0.8s  holds
+S1-mixr        R3+O.seq+Y                   lockAA        56,874 states     3.9s  holds
+S1-mixr        R3+O.seq+Y                   lockBA         6,924 states     0.4s  holds
+S1-mixr        R3+O.seq+Y                   lockAB           715 states     0.0s  OTHERS.lock 6
+S1-mixr        R3+O.seq+Y                   pipe             420 states     0.0s  holds
+S1-mixr        R3+O.seq+Y                   pipe-t         8,245 states     0.5s  holds
+S1-mixr        R3+O.seq+Y                   ryw               46 states     0.0s  holds
+S1-mixr        R3+O.seq+Y                   txn-c         64,556 states     4.9s  ATOMIC 15
+S1-mixr        R3+O.seq+Y                   txnb-c         2,693 states     0.2s  OTHERS.txn 8
+S1-mixr        R3+O.seq+Y                   txn1-c        14,360 states     0.8s  OTHERS.txn 10
+S1-mixr        R3+O.seq+Y                   dedup-c       11,545 states     1.0s  holds
+S1-mixr        R3+O.seq+Y                   lockAA-c       2,615 states     0.1s  OTHERS.lock 8
+S1-mixr        R3+O.seq+Y                   lockBA-c       2,924 states     0.2s  holds
+S1-mixr        R3+O.seq+Y                   lockAB-c         551 states     0.0s  OTHERS.lock 6
+S1-mixr        R3+O.seq+Y                   pipe-c           435 states     0.0s  holds
+S1-mixr        R3+O.seq+Y                   pipe-t-c       9,277 states     0.6s  holds
+S1-mixr        R3+O.seq+Y                   ryw-c             47 states     0.0s  holds
+  shortest counterexample: S1-recv lockAB, OTHERS.lock, 6 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. h0 acts on the answer to its claim: granted 2
+     4. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its protected write of x
+     6. B appends and commits: protected write of x (holder h0, token 2)
+  => breaks on S1-recv txn (ATOMIC 13), S1-recv txnb (OTHERS.txn 8), S1-recv txn1 (ATOMIC 12), S1-recv lockAB (OTHERS.lock 6), S1-recv txn-c (ATOMIC 13), S1-recv txnb-c (OTHERS.txn 8), S1-recv txn1-c (OTHERS.txn 10), S1-recv lockAA-c (OTHERS.lock 8), S1-recv lockAB-c (OTHERS.lock 6), S1-mixr txn (ATOMIC 15), S1-mixr txnb (OTHERS.txn 8), S1-mixr txn1 (ATOMIC 12), S1-mixr lockAB (OTHERS.lock 6), S1-mixr txn-c (ATOMIC 15), S1-mixr txnb-c (OTHERS.txn 8), S1-mixr txn1-c (OTHERS.txn 10), S1-mixr lockAA-c (OTHERS.lock 8), S1-mixr lockAB-c (OTHERS.lock 6)

@@ -1,0 +1,1039 @@
+# E-48 info: what an early answer's contract allows (EARLY-LOST, RESULT, EARLY-HOLDERS, READBACK), reported, not counted; with the rules S1 needs
+# 2026-11-12T11:10:59Z, Python 3.13.17, 4 vCPU, load ['0.76', '1.52', '2.06'], model bf201209be4f9408
+
+## S1-recv with W1+O.seq+Y
+S1-recv        W1+O.seq+Y                   txn          109,699 states     7.5s  EARLY-LOST 10, RESULT 18
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: an unclean stop (power loss): 2 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     9. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    10. B appends and commits: prewrite b (txn 1, primary a)
+    11. T0 acts on the answer to its prewrite of b: ok
+    12. T0 takes a commit ts from the TSO and sends the primary's commit
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: an unclean stop (power loss): 3 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    15. T0 sends the primary's commit again (timeout)
+    16. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory
+    18. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   txnb          61,288 states     4.0s  holds
+S1-recv        W1+O.seq+Y                   txn1          92,008 states     5.9s  EARLY-LOST 10, RESULT 18
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: an unclean stop (power loss): 3 entries, 2 held by a majority, 2 on a majority's disks; the new leader keeps 2
+  RESULT (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+     7. the TTL of txn 1's locks runs out (T0)
+     8. T0 acts on the answer to its prewrite of a: ok
+     9. T0 acts on the answer to its prewrite of c: ok
+    10. T0 takes a commit ts from the TSO and sends the primary's commit
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: an unclean stop (power loss): 4 entries, 2 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    15. T0 sends the primary's commit again (timeout)
+    16. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory
+    18. A: a majority has 4 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   dedup          9,094 states     0.5s  EARLY-LOST 8, RESULT 16
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: an unclean stop (power loss): 2 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of x: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. T0 sends the primary's commit again (timeout)
+    10. the reader finds x locked, its TTL run out; it sends: check txn 1 at its primary x (roll back if locked)
+    11. A's leader appends: check txn 1 at its primary x (roll back if locked) (not yet held by a majority)
+    12. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    13. A: an unclean stop (power loss): 3 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    14. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockAA        17,526 states     0.9s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockBA         4,988 states     0.3s  EARLY-LOST 6, RESULT 16
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 16 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     9. h0 sends its write again (no answer, no copy in flight)
+    10. B appends and commits: claim the lock (holder h1, attempt 3, taking over lapsed token 2)
+    11. h1 acts on the answer to its claim: granted 4
+    12. h1 sends its protected write of x
+    13. A's leader appends: protected write of x (holder h1, token 4) (not yet held by a majority)
+    14. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockAB         5,034 states     0.3s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   pipe             420 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv        W1+O.seq+Y                   pipe-t         8,245 states     0.5s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv        W1+O.seq+Y                   ryw               46 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv        W1+O.seq+Y                   txn-c        112,870 states     7.2s  EARLY-LOST 10, RESULT 18
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: the leader's process stops (page cache kept): 2 entries, 1 held by a majority; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     9. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    10. B appends and commits: prewrite b (txn 1, primary a)
+    11. T0 acts on the answer to its prewrite of b: ok
+    12. T0 takes a commit ts from the TSO and sends the primary's commit
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: the leader's process stops (page cache kept): 3 entries, 1 held by a majority; the new leader keeps 1
+    15. T0 sends the primary's commit again (timeout)
+    16. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    17. A: a majority holds all 3 entries in memory
+    18. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   txnb-c        63,040 states     4.0s  holds
+S1-recv        W1+O.seq+Y                   txn1-c        94,776 states     6.1s  EARLY-LOST 10, RESULT 18
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: the leader's process stops (page cache kept): 3 entries, 2 held by a majority; the new leader keeps 2
+  RESULT (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+     7. the TTL of txn 1's locks runs out (T0)
+     8. T0 acts on the answer to its prewrite of a: ok
+     9. T0 acts on the answer to its prewrite of c: ok
+    10. T0 takes a commit ts from the TSO and sends the primary's commit
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: the leader's process stops (page cache kept): 4 entries, 2 held by a majority; the new leader keeps 2
+    15. T0 sends the primary's commit again (timeout)
+    16. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    17. A: a majority holds all 4 entries in memory
+    18. A: a majority has 4 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   dedup-c        9,971 states     0.5s  EARLY-LOST 8, RESULT 16
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: the leader's process stops (page cache kept): 2 entries, 1 held by a majority; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of x: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. T0 sends the primary's commit again (timeout)
+    10. the reader finds x locked, its TTL run out; it sends: check txn 1 at its primary x (roll back if locked)
+    11. A's leader appends: check txn 1 at its primary x (roll back if locked) (not yet held by a majority)
+    12. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    13. A: the leader's process stops (page cache kept): 3 entries, 1 held by a majority; the new leader keeps 1
+    14. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockAA-c      18,170 states     1.0s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockBA-c       5,196 states     0.3s  EARLY-LOST 6, RESULT 16
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 16 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+     9. h0 sends its write again (no answer, no copy in flight)
+    10. B appends and commits: claim the lock (holder h1, attempt 3, taking over lapsed token 2)
+    11. h1 acts on the answer to its claim: granted 4
+    12. h1 sends its protected write of x
+    13. A's leader appends: protected write of x (holder h1, token 4) (not yet held by a majority)
+    14. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+    15. A: a majority holds all 3 entries in memory
+    16. A: a majority has 3 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   lockAB-c       5,140 states     0.3s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-recv        W1+O.seq+Y                   pipe-c           435 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv        W1+O.seq+Y                   pipe-t-c       9,277 states     0.6s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv        W1+O.seq+Y                   ryw-c             47 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  => breaks on S1-recv txn (EARLY-LOST 10, RESULT 18), S1-recv txn1 (EARLY-LOST 10, RESULT 18), S1-recv dedup (EARLY-LOST 8, RESULT 16), S1-recv lockAA (EARLY-LOST 3, RESULT 7), S1-recv lockBA (EARLY-LOST 6, RESULT 16), S1-recv lockAB (EARLY-LOST 3, RESULT 7), S1-recv pipe (EARLY-LOST 3), S1-recv pipe-t (EARLY-LOST 3), S1-recv ryw (EARLY-LOST 3), S1-recv txn-c (EARLY-LOST 10, RESULT 18), S1-recv txn1-c (EARLY-LOST 10, RESULT 18), S1-recv dedup-c (EARLY-LOST 8, RESULT 16), S1-recv lockAA-c (EARLY-LOST 3, RESULT 7), S1-recv lockBA-c (EARLY-LOST 6, RESULT 16), S1-recv lockAB-c (EARLY-LOST 3, RESULT 7), S1-recv pipe-c (EARLY-LOST 3), S1-recv pipe-t-c (EARLY-LOST 3), S1-recv ryw-c (EARLY-LOST 3)
+
+## S1-repl with W1+O.seq+Y
+S1-repl        W1+O.seq+Y                   txn          116,640 states     8.1s  EARLY-LOST 11, RESULT 19
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory
+    11. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 19 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of a: ok
+     8. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     9. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    10. B appends and commits: prewrite b (txn 1, primary a)
+    11. T0 acts on the answer to its prewrite of b: ok
+    12. T0 takes a commit ts from the TSO and sends the primary's commit
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: a majority holds all 3 entries in memory
+    15. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    16. T0 sends the primary's commit again (timeout)
+    17. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    18. A: a majority holds all 3 entries in memory
+    19. A: a majority has 3 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   txnb          61,288 states     4.5s  holds
+S1-repl        W1+O.seq+Y                   txn1          95,978 states     6.3s  EARLY-LOST 11, RESULT 19
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+  RESULT (allowed by the early answer's contract), shortest trace, 19 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     4. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     5. A: a majority holds all 2 entries in memory
+     6. A: a majority has 2 entries on disk (committed, visible)
+     7. the TTL of txn 1's locks runs out (T0)
+     8. T0 acts on the answer to its prewrite of a: ok
+     9. T0 acts on the answer to its prewrite of c: ok
+    10. T0 takes a commit ts from the TSO and sends the primary's commit
+    11. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    12. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+    13. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    14. A: a majority holds all 4 entries in memory
+    15. A: an unclean stop (power loss): 4 entries, 4 held by a majority, 2 on a majority's disks; the new leader keeps 2
+    16. T0 sends the primary's commit again (timeout)
+    17. A's leader appends: commit a (txn 1 at ts 3) (not yet held by a majority)
+    18. A: a majority holds all 4 entries in memory
+    19. A: a majority has 4 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   dedup          9,894 states     0.5s  EARLY-LOST 9, RESULT 17
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 9 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory
+     9. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+  RESULT (allowed by the early answer's contract), shortest trace, 17 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory
+     5. A: a majority has 1 entries on disk (committed, visible)
+     6. the TTL of txn 1's locks runs out (T0)
+     7. T0 acts on the answer to its prewrite of x: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. T0 sends the primary's commit again (timeout)
+    10. the reader finds x locked, its TTL run out; it sends: check txn 1 at its primary x (roll back if locked)
+    11. A's leader appends: check txn 1 at its primary x (roll back if locked) (not yet held by a majority)
+    12. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    13. A: a majority holds all 3 entries in memory
+    14. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 1 on a majority's disks; the new leader keeps 1
+    15. A's leader appends: commit x (txn 1 at ts 3) (not yet held by a majority)
+    16. A: a majority holds all 3 entries in memory
+    17. A: a majority has 3 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   lockAA        24,632 states     1.4s  EARLY-LOST 4, RESULT 8
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its claim again (no answer, no copy in flight)
+     6. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   lockBA         5,224 states     0.4s  EARLY-LOST 7, RESULT 17
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: a majority holds all 1 entries in memory
+     7. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 17 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: a majority holds all 1 entries in memory
+     9. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    10. h0 sends its write again (no answer, no copy in flight)
+    11. B appends and commits: claim the lock (holder h1, attempt 3, taking over lapsed token 2)
+    12. h1 acts on the answer to its claim: granted 4
+    13. h1 sends its protected write of x
+    14. A's leader appends: protected write of x (holder h1, token 4) (not yet held by a majority)
+    15. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+    16. A: a majority holds all 3 entries in memory
+    17. A: a majority has 3 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   lockAB         8,194 states     0.5s  EARLY-LOST 4, RESULT 8
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its claim again (no answer, no copy in flight)
+     6. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory
+     8. A: a majority has 2 entries on disk (committed, visible)
+S1-repl        W1+O.seq+Y                   pipe             540 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl        W1+O.seq+Y                   pipe-t         8,841 states     0.6s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl        W1+O.seq+Y                   ryw               61 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl        W1+O.seq+Y                   txn-c        106,171 states     7.3s  holds
+S1-repl        W1+O.seq+Y                   txnb-c        63,040 states     5.6s  holds
+S1-repl        W1+O.seq+Y                   txn1-c        90,436 states     6.8s  holds
+S1-repl        W1+O.seq+Y                   dedup-c        9,619 states     0.7s  holds
+S1-repl        W1+O.seq+Y                   lockAA-c      14,068 states     1.1s  holds
+S1-repl        W1+O.seq+Y                   lockBA-c       3,636 states     0.2s  holds
+S1-repl        W1+O.seq+Y                   lockAB-c       4,832 states     0.3s  holds
+S1-repl        W1+O.seq+Y                   pipe-c           283 states     0.0s  holds
+S1-repl        W1+O.seq+Y                   pipe-t-c       5,916 states     0.4s  holds
+S1-repl        W1+O.seq+Y                   ryw-c             47 states     0.0s  holds
+  => breaks on S1-repl txn (EARLY-LOST 11, RESULT 19), S1-repl txn1 (EARLY-LOST 11, RESULT 19), S1-repl dedup (EARLY-LOST 9, RESULT 17), S1-repl lockAA (EARLY-LOST 4, RESULT 8), S1-repl lockBA (EARLY-LOST 7, RESULT 17), S1-repl lockAB (EARLY-LOST 4, RESULT 8), S1-repl pipe (EARLY-LOST 4), S1-repl pipe-t (EARLY-LOST 4), S1-repl ryw (EARLY-LOST 4)
+
+## S1-mixr with W1+O.seq+Y
+S1-mixr        W1+O.seq+Y                   txn           98,084 states     7.6s  holds
+S1-mixr        W1+O.seq+Y                   txnb          59,998 states     4.5s  holds
+S1-mixr        W1+O.seq+Y                   txn1          82,732 states     5.4s  holds
+S1-mixr        W1+O.seq+Y                   dedup          8,742 states     0.5s  holds
+S1-mixr        W1+O.seq+Y                   lockAA        11,970 states     0.8s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        W1+O.seq+Y                   lockBA         2,840 states     0.2s  holds
+S1-mixr        W1+O.seq+Y                   lockAB         5,034 states     0.3s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        W1+O.seq+Y                   pipe             420 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-mixr        W1+O.seq+Y                   pipe-t         8,245 states     0.6s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-mixr        W1+O.seq+Y                   ryw               46 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-mixr        W1+O.seq+Y                   txn-c        100,828 states     7.5s  holds
+S1-mixr        W1+O.seq+Y                   txnb-c        61,730 states     4.1s  holds
+S1-mixr        W1+O.seq+Y                   txn1-c        85,202 states     6.5s  holds
+S1-mixr        W1+O.seq+Y                   dedup-c        9,619 states     0.7s  holds
+S1-mixr        W1+O.seq+Y                   lockAA-c      12,332 states     1.0s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        W1+O.seq+Y                   lockBA-c       2,924 states     0.2s  holds
+S1-mixr        W1+O.seq+Y                   lockAB-c       5,140 states     0.3s  EARLY-LOST 3, RESULT 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+     4. h0 sends its claim again (no answer, no copy in flight)
+     5. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     6. A: a majority holds all 2 entries in memory
+     7. A: a majority has 2 entries on disk (committed, visible)
+S1-mixr        W1+O.seq+Y                   pipe-c           435 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-mixr        W1+O.seq+Y                   pipe-t-c       9,277 states     0.7s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-mixr        W1+O.seq+Y                   ryw-c             47 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  => breaks on S1-mixr lockAA (EARLY-LOST 3, RESULT 7), S1-mixr lockAB (EARLY-LOST 3, RESULT 7), S1-mixr pipe (EARLY-LOST 3), S1-mixr pipe-t (EARLY-LOST 3), S1-mixr ryw (EARLY-LOST 3), S1-mixr lockAA-c (EARLY-LOST 3, RESULT 7), S1-mixr lockAB-c (EARLY-LOST 3, RESULT 7), S1-mixr pipe-c (EARLY-LOST 3), S1-mixr pipe-t-c (EARLY-LOST 3), S1-mixr ryw-c (EARLY-LOST 3)
+
+## S1-recv-blind with W1+O.seq+Y
+S1-recv-blind  W1+O.seq+Y                   txn          105,249 states     8.0s  EARLY-LOST 10
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: an unclean stop (power loss): 2 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S1-recv-blind  W1+O.seq+Y                   txnb          61,288 states     5.2s  holds
+S1-recv-blind  W1+O.seq+Y                   txn1          89,680 states     6.3s  EARLY-LOST 10
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: an unclean stop (power loss): 3 entries, 2 held by a majority, 2 on a majority's disks; the new leader keeps 2
+S1-recv-blind  W1+O.seq+Y                   dedup          8,742 states     0.5s  EARLY-LOST 8
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: an unclean stop (power loss): 2 entries, 1 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S1-recv-blind  W1+O.seq+Y                   lockAA        11,518 states     0.8s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   lockBA         2,840 states     0.2s  EARLY-LOST 6
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   lockAB         4,726 states     0.3s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   pipe             420 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   pipe-t         8,245 states     0.5s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   ryw               46 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: an unclean stop (power loss): 1 entries, 0 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   txn-c        108,420 states     7.6s  EARLY-LOST 10
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: the leader's process stops (page cache kept): 2 entries, 1 held by a majority; the new leader keeps 1
+S1-recv-blind  W1+O.seq+Y                   txnb-c        63,040 states     4.9s  holds
+S1-recv-blind  W1+O.seq+Y                   txn1-c        92,448 states     6.6s  EARLY-LOST 10
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: the leader's process stops (page cache kept): 3 entries, 2 held by a majority; the new leader keeps 2
+S1-recv-blind  W1+O.seq+Y                   dedup-c        9,619 states     0.6s  EARLY-LOST 8
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: the leader's process stops (page cache kept): 2 entries, 1 held by a majority; the new leader keeps 1
+S1-recv-blind  W1+O.seq+Y                   lockAA-c      11,880 states     0.8s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   lockBA-c       2,924 states     0.2s  EARLY-LOST 6
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 6 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   lockAB-c       4,832 states     0.3s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   pipe-c           435 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   pipe-t-c       9,277 states     0.7s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+S1-recv-blind  W1+O.seq+Y                   ryw-c             47 states     0.0s  EARLY-LOST 3
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 3 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: the leader's process stops (page cache kept): 1 entries, 0 held by a majority; the new leader keeps 0
+  => breaks on S1-recv-blind txn (EARLY-LOST 10), S1-recv-blind txn1 (EARLY-LOST 10), S1-recv-blind dedup (EARLY-LOST 8), S1-recv-blind lockAA (EARLY-LOST 3), S1-recv-blind lockBA (EARLY-LOST 6), S1-recv-blind lockAB (EARLY-LOST 3), S1-recv-blind pipe (EARLY-LOST 3), S1-recv-blind pipe-t (EARLY-LOST 3), S1-recv-blind ryw (EARLY-LOST 3), S1-recv-blind txn-c (EARLY-LOST 10), S1-recv-blind txn1-c (EARLY-LOST 10), S1-recv-blind dedup-c (EARLY-LOST 8), S1-recv-blind lockAA-c (EARLY-LOST 3), S1-recv-blind lockBA-c (EARLY-LOST 6), S1-recv-blind lockAB-c (EARLY-LOST 3), S1-recv-blind pipe-c (EARLY-LOST 3), S1-recv-blind pipe-t-c (EARLY-LOST 3), S1-recv-blind ryw-c (EARLY-LOST 3)
+
+## S1-repl-blind with W1+O.seq+Y
+S1-repl-blind  W1+O.seq+Y                   txn          111,560 states     7.5s  EARLY-LOST 11
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. B appends and commits: prewrite b (txn 1, primary a)
+     7. T0 acts on the answer to its prewrite of b: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory
+    11. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S1-repl-blind  W1+O.seq+Y                   txnb          61,288 states     3.7s  holds
+S1-repl-blind  W1+O.seq+Y                   txn1          93,262 states     6.2s  EARLY-LOST 11
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory
+     5. A: a majority has 2 entries on disk (committed, visible)
+     6. T0 acts on the answer to its prewrite of a: ok
+     7. T0 acts on the answer to its prewrite of c: ok
+     8. T0 takes a commit ts from the TSO and sends the primary's commit
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 3 entries in memory
+    11. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 2 on a majority's disks; the new leader keeps 2
+S1-repl-blind  W1+O.seq+Y                   dedup          9,510 states     0.6s  EARLY-LOST 9
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 9 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: a majority has 1 entries on disk (committed, visible)
+     5. T0 acts on the answer to its prewrite of x: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory
+     9. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 1 on a majority's disks; the new leader keeps 1
+S1-repl-blind  W1+O.seq+Y                   lockAA        17,012 states     0.9s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   lockBA         3,812 states     0.3s  EARLY-LOST 7
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: a majority holds all 1 entries in memory
+     7. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   lockAB         6,344 states     0.4s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   pipe             540 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   pipe-t         8,841 states     0.6s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   ryw               61 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S1-repl-blind  W1+O.seq+Y                   txn-c        106,171 states     8.1s  holds
+S1-repl-blind  W1+O.seq+Y                   txnb-c        63,040 states     4.6s  holds
+S1-repl-blind  W1+O.seq+Y                   txn1-c        90,436 states     5.6s  holds
+S1-repl-blind  W1+O.seq+Y                   dedup-c        9,619 states     0.6s  holds
+S1-repl-blind  W1+O.seq+Y                   lockAA-c      11,880 states     0.9s  holds
+S1-repl-blind  W1+O.seq+Y                   lockBA-c       2,924 states     0.2s  holds
+S1-repl-blind  W1+O.seq+Y                   lockAB-c       4,832 states     0.4s  holds
+S1-repl-blind  W1+O.seq+Y                   pipe-c           283 states     0.0s  holds
+S1-repl-blind  W1+O.seq+Y                   pipe-t-c       5,916 states     0.5s  holds
+S1-repl-blind  W1+O.seq+Y                   ryw-c             47 states     0.0s  holds
+  => breaks on S1-repl-blind txn (EARLY-LOST 11), S1-repl-blind txn1 (EARLY-LOST 11), S1-repl-blind dedup (EARLY-LOST 9), S1-repl-blind lockAA (EARLY-LOST 4), S1-repl-blind lockBA (EARLY-LOST 7), S1-repl-blind lockAB (EARLY-LOST 4), S1-repl-blind pipe (EARLY-LOST 4), S1-repl-blind pipe-t (EARLY-LOST 4), S1-repl-blind ryw (EARLY-LOST 4)
+
+## S2-mem, no rules (the memory rung's allowed losses)
+S2-mem         no rules                     txn          529,291 states    43.3s  EARLY-LOST 10, READBACK 18, RESULT 14
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. the reader takes a snapshot ts from the TSO
+     3. B appends and commits: prewrite b (txn 1, primary a)
+     4. the TTL of txn 1's locks runs out (T0)
+     5. the reader finds b locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+     6. A's leader appends: check txn 1 at its primary a (roll back if locked) (not yet held by a majority)
+     7. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+     9. T0 acts on the answer to its prewrite of a: rolledback
+    10. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  READBACK (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    10. A: a majority holds all 2 entries in memory (committed, visible)
+    11. T0 acts on the answer to the primary's commit: ok (committed)
+    12. T0 sends the secondaries' commits and stops
+    13. the reader reads a: value of txn 1
+    14. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    15. B appends and commits: commit b (txn 1 at ts 2)
+    16. the reader reads b: value of txn 1
+    17. the reader takes a snapshot ts from the TSO
+    18. the reader reads a: initial value
+  RESULT (allowed by the early answer's contract), shortest trace, 14 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary a)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 2 entries in memory (committed, visible)
+    10. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    11. T0 sends the primary's commit again (timeout)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. A: a majority has 2 entries on disk
+S2-mem         no rules                     txnb         133,362 states     9.2s  READBACK 18
+  READBACK (allowed by the early answer's contract), shortest trace, 18 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary b) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of a: ok
+     5. B appends and commits: prewrite b (txn 1, primary)
+     6. T0 acts on the answer to its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. B appends and commits: commit b (txn 1 at ts 2)
+    10. T0 acts on the answer to the primary's commit: ok (committed)
+    11. T0 sends the secondaries' commits and stops
+    12. the reader reads b: value of txn 1
+    13. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    14. A: a majority holds all 2 entries in memory (committed, visible)
+    15. the reader reads a: value of txn 1
+    16. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    17. the reader takes a snapshot ts from the TSO
+    18. the reader reads a: initial value
+S2-mem         no rules                     txn1         847,725 states    65.3s  EARLY-LOST 10, RESULT 14
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 10 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 3 entries in memory (committed, visible)
+    10. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 14 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite a (txn 1, primary) (not yet held by a majority)
+     3. A's leader appends: prewrite c (txn 1, primary a) (not yet held by a majority)
+     4. A: a majority holds all 2 entries in memory (committed, visible)
+     5. T0 acts on the answer to its prewrite of a: ok
+     6. T0 acts on the answer to its prewrite of c: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+     9. A: a majority holds all 3 entries in memory (committed, visible)
+    10. A: an unclean stop (power loss): 3 entries, 3 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    11. T0 sends the primary's commit again (timeout)
+    12. A's leader appends: commit a (txn 1 at ts 2) (not yet held by a majority)
+    13. A: a majority holds all 2 entries in memory (committed, visible)
+    14. A: a majority has 2 entries on disk
+S2-mem         no rules                     dedup         23,114 states     1.4s  EARLY-LOST 8, RESULT 12
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of x: ok
+     5. T0 takes a commit ts from the TSO and sends the primary's commit
+     6. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory (committed, visible)
+     8. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 12 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A's leader appends: prewrite x (txn 1, primary) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. T0 acts on the answer to its prewrite of x: ok
+     5. T0 takes a commit ts from the TSO and sends the primary's commit
+     6. T0 sends the primary's commit again (timeout)
+     7. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+     9. A: an unclean stop (power loss): 2 entries, 2 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    10. A's leader appends: commit x (txn 1 at ts 2) (not yet held by a majority)
+    11. A: a majority holds all 2 entries in memory (committed, visible)
+    12. A: a majority has 2 entries on disk
+S2-mem         no rules                     lockAA        76,211 states     5.1s  EARLY-HOLDERS 9, EARLY-LOST 4, RESULT 8
+  EARLY-HOLDERS (allowed by the early answer's contract), shortest trace, 9 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory (committed, visible)
+     5. h0 acts on the answer to its claim: granted 3
+     6. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     7. A's leader appends: claim the lock (holder h1, attempt 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+     9. h1 acts on the answer to its claim: granted 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its claim again (no answer, no copy in flight)
+     6. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory (committed, visible)
+     8. A: a majority has 2 entries on disk
+S2-mem         no rules                     lockBA         4,035 states     0.3s  EARLY-LOST 7, RESULT 17
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 7 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0 sends its protected write of x
+     5. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     6. A: a majority holds all 1 entries in memory (committed, visible)
+     7. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 17 steps:
+     1. h0 sends a claim of the lock
+     2. B appends and commits: claim the lock (holder h0, attempt 1)
+     3. h0 acts on the answer to its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+     8. A: a majority holds all 1 entries in memory (committed, visible)
+     9. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+    10. h0 sends its write again (no answer, no copy in flight)
+    11. B appends and commits: claim the lock (holder h1, attempt 3, taking over lapsed token 2)
+    12. h1 acts on the answer to its claim: granted 4
+    13. h1 sends its protected write of x
+    14. A's leader appends: protected write of x (holder h1, token 4) (not yet held by a majority)
+    15. A's leader appends: protected write of x (holder h0, token 2) (not yet held by a majority)
+    16. A: a majority holds all 3 entries in memory (committed, visible)
+    17. A: a majority has 3 entries on disk
+S2-mem         no rules                     lockAB        20,585 states     1.3s  EARLY-HOLDERS 9, EARLY-LOST 4, RESULT 8
+  EARLY-HOLDERS (allowed by the early answer's contract), shortest trace, 9 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     4. A: a majority holds all 1 entries in memory (committed, visible)
+     5. h0 acts on the answer to its claim: granted 3
+     6. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     7. A's leader appends: claim the lock (holder h1, attempt 2) (not yet held by a majority)
+     8. A: a majority holds all 2 entries in memory (committed, visible)
+     9. h1 acts on the answer to its claim: granted 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  RESULT (allowed by the early answer's contract), shortest trace, 8 steps:
+     1. h0 sends a claim of the lock
+     2. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+     5. h0 sends its claim again (no answer, no copy in flight)
+     6. A's leader appends: claim the lock (holder h0, attempt 1) (not yet held by a majority)
+     7. A: a majority holds all 2 entries in memory (committed, visible)
+     8. A: a majority has 2 entries on disk
+S2-mem         no rules                     pipe             604 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-mem         no rules                     pipe-t        11,177 states     0.6s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+S2-mem         no rules                     ryw               61 states     0.0s  EARLY-LOST 4
+  EARLY-LOST (allowed by the early answer's contract), shortest trace, 4 steps:
+     1. the plain writer sends plain write 1
+     2. A's leader appends: plain write 1 of p (not yet held by a majority)
+     3. A: a majority holds all 1 entries in memory (committed, visible)
+     4. A: an unclean stop (power loss): 1 entries, 1 held by a majority, 0 on a majority's disks; the new leader keeps 0
+  => breaks on S2-mem txn (EARLY-LOST 10, READBACK 18, RESULT 14), S2-mem txnb (READBACK 18), S2-mem txn1 (EARLY-LOST 10, RESULT 14), S2-mem dedup (EARLY-LOST 8, RESULT 12), S2-mem lockAA (EARLY-HOLDERS 9, EARLY-LOST 4, RESULT 8), S2-mem lockBA (EARLY-LOST 7, RESULT 17), S2-mem lockAB (EARLY-HOLDERS 9, EARLY-LOST 4, RESULT 8), S2-mem pipe (EARLY-LOST 4), S2-mem pipe-t (EARLY-LOST 4), S2-mem ryw (EARLY-LOST 4)
