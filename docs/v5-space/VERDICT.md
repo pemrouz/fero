@@ -47,7 +47,7 @@ Every number here comes from a file or a tool, and the text says which. "Compute
 
 ## 0. The answer
 
-> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading (item 15) and accepts a named test line as a loss when the trade buys something real (item 2). On that frame the arithmetic picks TiKV-persisted (0 / 5 / 233), answer stages per call come second, and a `memory` option third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md), [E-48]). Section 11.6 has the detail. Sections 0 to 10 below still read on this page's own frame: the strict reading, no loss.
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading (item 15) and accepts a named test line as a loss when the trade buys something real (item 2). On that frame the arithmetic picks TiKV-persisted (0 / 5 / 233), answer stages per call come second, and a `memory` option third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md), [E-48]). Section 11.6 has the detail. **The owner then chose the log-first shape instead** of that pick, judged by simplicity rather than by rule 3: each resource is its own cluster whose truth is its log (section 11.7; [DECISIONS V5-1 to V5-6](../DECISIONS.md)). Sections 0 to 10 below still read on this page's own frame: the strict reading, no loss.
 
 1. **Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** (6b in section 9). MIN-P+par is COMP2 without that rung.
 2. **COMP2 in short:** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica (section 5.1).
@@ -1247,6 +1247,22 @@ The owner answered two of section 8's bold items. Sections 0 to 10 are not rewri
 - **Rule 3 never prefers it** on this frame: its speed is not counted once the loss is accepted. Choosing it is choosing speed over the count.
 - **How sure:** low to medium. [E-47] model-checked that, with no rules, transactions, fences and lock rows break, and that the refusals fix every break it found. What stays on a memory resource (plain writes, splits, merges, feeds) is reasoned only.
 - **Kill test 2b** (section 9), the rung's safety model, does not fire on TiKV's shape at E-47's bounds. Its splits, merges, feeds and recovery are still owed (MEMORY 6.1).
+
+### 11.7 The owner's design decisions (2026-11-12)
+
+After 11.6, the owner set the arithmetic's pick aside and chose by judgement. The full records, with what each rejects, are [DECISIONS V5-1 to V5-6](../DECISIONS.md); STATUS has one line for each.
+
+- **Why not TiKV's shape.** Its lasting state is a store sorted by key, with old versions kept for a window. The Raft log is cut soon after it is applied. So each use a log gives for free (live feeds, replay, history, tapes, read-your-writes by position) needs its own answer there. Rule 3 never saw that cost: it shows up only as open cells (P-07, P-16, PERF-11, TEST-05, TEST-07, PERF-13), and "novel" counts borrowed machinery as free, whatever its size.
+- **V5-1, the log is the truth.** Each resource's state is the fold of its log of change records from a snapshot. Every mechanism writes records to that log or reads them.
+- **V5-2, a resource is its own cluster.** Keys hash into fixed slots, as v4's ring did. Each resource has its own Raft groups, keeps its settings and slot table in its own log, and heals its own copies (E-16 found that smaller and safer than `#meta`'s loop). A derived resource is a client of its sources. SC-13's 100,000 resources gives way to a stated cost per resource, still to be discussed.
+- **V5-3, discovery.** A directory that only helps clients find things, as v4's `#directory` does: servers announce, any machine serves it, and a client asks once.
+- **V5-4, one timeline.** The resources' logs merged by the writer time each batch already carries; no cross-resource coordination.
+- **V5-5, acks.** Every write commits on disk at a majority. Answer stages per call come second and the `memory` rung third ([MEMORY.md 0](MEMORY.md#0-the-recommendation)).
+- **V5-6, the base.** The study's MIN row with per-resource healing and `par`, TypeScript first. Designs are compared by simplicity: every rule a builder must get right, borrowed or not.
+
+**What this gives up**, against TiKV's shape: true transactions across partitions (sagas instead; a reader can see half a saga) and key-ordered scans across partitions. Against MIN-P+par: many tiny resources cost a group each.
+
+**Next, all without code:** a re-rank of the study's rows by simplicity; how overhead grows per resource; the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one.
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md
