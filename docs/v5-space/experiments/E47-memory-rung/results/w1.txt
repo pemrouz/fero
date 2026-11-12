@@ -1,0 +1,28 @@
+# E-47 w1: R4 with the tightest window (W = 1: sync before the next append)
+# 2026-11-12T06:46:18Z, Python 3.13.17, 4 vCPU, load ['1.00', '1.00', '1.00']
+
+## R4 alone, W = 1
+MP  R4                           txn            41,774 states     2.3s  DURABLE 17
+MP  R4                           txnb            9,500 states     0.4s  ATOMIC 11
+MP  R4                           txn1           15,416 states     0.6s  ATOMIC 13
+MP  R4                           dedup           5,142 states     0.2s  holds
+MP  R4                           lockAA            673 states     0.0s  HOLDERS 8
+MP  R4                           lockBA          1,640 states     0.1s  FENCE 14
+MP  R4                           lockAB            734 states     0.0s  HOLDERS 8
+MM  R4                           txn            49,515 states     2.6s  ATOMIC 18
+MM  R4                           txnb            9,500 states     0.4s  ATOMIC 11
+MM  R4                           txn1           15,416 states     0.7s  ATOMIC 13
+MM  R4                           dedup           5,142 states     0.2s  holds
+MM  R4                           lockAA            673 states     0.0s  HOLDERS 8
+MM  R4                           lockBA          1,640 states     0.1s  FENCE 14
+MM  R4                           lockAB            734 states     0.0s  HOLDERS 8
+  shortest counterexample: MP lockAA, HOLDERS, 8 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 3
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A: a majority's disks catch up (a majority has all 1 entries on disk)
+     7. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     8. h1 hears its claim: granted 4
+  => breaks on MP txn (DURABLE 17), MP txnb (ATOMIC 11), MP txn1 (ATOMIC 13), MP lockAA (HOLDERS 8), MP lockBA (FENCE 14), MP lockAB (HOLDERS 8), MM txn (ATOMIC 18), MM txnb (ATOMIC 11), MM txn1 (ATOMIC 13), MM lockAA (HOLDERS 8), MM lockBA (FENCE 14), MM lockAB (HOLDERS 8)

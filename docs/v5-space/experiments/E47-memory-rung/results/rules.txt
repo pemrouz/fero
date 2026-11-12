@@ -1,0 +1,95 @@
+# E-47 rules: run 5: the four candidate rules together, then each one dropped (DEV-10 ablation)
+# 2026-11-12T06:32:58Z, Python 3.13.17, 4 vCPU, load ['1.00', '1.00', '1.00']
+
+## R1+R2+R3+R4 (all four)
+MP  R1+R2+R3+R4                  txn               272 states     0.0s  holds
+MP  R1+R2+R3+R4                  txnb              272 states     0.0s  holds
+MP  R1+R2+R3+R4                  txn1               96 states     0.0s  holds
+MP  R1+R2+R3+R4                  dedup              30 states     0.0s  holds
+MP  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds
+MP  R1+R2+R3+R4                  lockBA          1,195 states     0.1s  holds
+MP  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds
+MM  R1+R2+R3+R4                  txn               272 states     0.0s  holds
+MM  R1+R2+R3+R4                  txnb              272 states     0.0s  holds
+MM  R1+R2+R3+R4                  txn1               96 states     0.0s  holds
+MM  R1+R2+R3+R4                  dedup              30 states     0.0s  holds
+MM  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds
+MM  R1+R2+R3+R4                  lockBA             12 states     0.0s  holds
+MM  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds
+  => holds on every bound
+
+## all four, without R1
+MP  R1+R2+R3+R4                  txn               272 states     0.0s  holds   (drop R1)
+MP  R1+R2+R3+R4                  txnb              272 states     0.0s  holds   (drop R1)
+MP  R1+R2+R3+R4                  txn1               96 states     0.0s  holds   (drop R1)
+MP  R1+R2+R3+R4                  dedup              30 states     0.0s  holds   (drop R1)
+MP  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R1)
+MP  R1+R2+R3+R4                  lockBA          1,195 states     0.1s  holds   (drop R1)
+MP  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  txn               272 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  txnb              272 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  txn1               96 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  dedup              30 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  lockBA             12 states     0.0s  holds   (drop R1)
+MM  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R1)
+  => holds on every bound
+
+## all four, without R2
+MP  R1+R2+R3+R4                  txn               272 states     0.0s  holds   (drop R2)
+MP  R1+R2+R3+R4                  txnb              272 states     0.0s  holds   (drop R2)
+MP  R1+R2+R3+R4                  txn1          339,371 states    18.7s  holds   (drop R2)
+MP  R1+R2+R3+R4                  dedup          12,482 states     0.5s  holds   (drop R2)
+MP  R1+R2+R3+R4                  lockAA            957 states     0.0s  HOLDERS 7   (drop R2)
+MP  R1+R2+R3+R4                  lockBA          5,739 states     0.2s  holds   (drop R2)
+MP  R1+R2+R3+R4                  lockAB            973 states     0.0s  HOLDERS 7   (drop R2)
+MM  R1+R2+R3+R4                  txn            78,627 states     3.7s  ATOMIC 14   (drop R2)
+MM  R1+R2+R3+R4                  txnb           25,120 states     1.0s  ATOMIC 11   (drop R2)
+MM  R1+R2+R3+R4                  txn1          339,371 states    18.4s  holds   (drop R2)
+MM  R1+R2+R3+R4                  dedup          12,482 states     0.6s  holds   (drop R2)
+MM  R1+R2+R3+R4                  lockAA            957 states     0.0s  HOLDERS 7   (drop R2)
+MM  R1+R2+R3+R4                  lockBA          5,739 states     0.2s  holds   (drop R2)
+MM  R1+R2+R3+R4                  lockAB            973 states     0.0s  HOLDERS 7   (drop R2)
+  shortest counterexample: MP lockAA, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 3
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 4
+  => breaks on MP lockAA (HOLDERS 7), MP lockAB (HOLDERS 7), MM txn (ATOMIC 14), MM txnb (ATOMIC 11), MM lockAA (HOLDERS 7), MM lockAB (HOLDERS 7)
+
+## all four, without R3
+MP  R1+R2+R3+R4                  txn                96 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  txnb               96 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  txn1               36 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  dedup              18 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  lockBA            363 states     0.0s  holds   (drop R3)
+MP  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  txn                96 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  txnb               96 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  txn1               36 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  dedup              18 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  lockBA             12 states     0.0s  holds   (drop R3)
+MM  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R3)
+  => holds on every bound
+
+## all four, without R4
+MP  R1+R2+R3+R4                  txn               272 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  txnb              272 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  txn1               96 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  dedup              30 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  lockBA          1,195 states     0.0s  holds   (drop R4)
+MP  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  txn               272 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  txnb              272 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  txn1               96 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  dedup              30 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  lockAA             12 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  lockBA             12 states     0.0s  holds   (drop R4)
+MM  R1+R2+R3+R4                  lockAB             12 states     0.0s  holds   (drop R4)
+  => holds on every bound

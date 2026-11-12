@@ -1,0 +1,264 @@
+# E-47 subs: run 5: which part of each rule is needed (sub-rules dropped from the two smallest sets)
+# 2026-11-12T06:40:29Z, Python 3.13.17, 4 vCPU, load ['1.00', '1.00', '1.00']
+
+## R2 without R2.txn
+MP  R2                           txn            41,209 states     2.1s  ATOMIC 14   (drop R2.txn)
+MP  R2                           txnb           11,661 states     0.5s  ATOMIC 11   (drop R2.txn)
+MP  R2                           txn1           28,240 states     1.2s  ATOMIC 11   (drop R2.txn)
+MP  R2                           dedup           7,156 states     0.3s  REFUSED 13   (drop R2.txn)
+MP  R2                           lockAA             12 states     0.0s  holds   (drop R2.txn)
+MP  R2                           lockBA            363 states     0.0s  holds   (drop R2.txn)
+MP  R2                           lockAB             12 states     0.0s  holds   (drop R2.txn)
+MM  R2                           txn            41,209 states     2.2s  ATOMIC 14   (drop R2.txn)
+MM  R2                           txnb           11,661 states     0.5s  ATOMIC 11   (drop R2.txn)
+MM  R2                           txn1           28,240 states     1.2s  ATOMIC 11   (drop R2.txn)
+MM  R2                           dedup           7,156 states     0.3s  REFUSED 13   (drop R2.txn)
+MM  R2                           lockAA             12 states     0.0s  holds   (drop R2.txn)
+MM  R2                           lockBA             12 states     0.0s  holds   (drop R2.txn)
+MM  R2                           lockAB             12 states     0.0s  holds   (drop R2.txn)
+  shortest counterexample: MP txnb, ATOMIC, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary b), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     5. B (persisted) appends: prewrite b (txn 1, primary), committed
+     6. T0 hears its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. B (persisted) appends: commit b (txn 1 at ts 2), committed
+    11. the reader reads b: value of txn 1
+  => breaks on MP txn (ATOMIC 14), MP txnb (ATOMIC 11), MP txn1 (ATOMIC 11), MP dedup (REFUSED 13), MM txn (ATOMIC 14), MM txnb (ATOMIC 11), MM txn1 (ATOMIC 11), MM dedup (REFUSED 13)
+
+## R2 without R2.claim
+MP  R2                           txn                96 states     0.0s  holds   (drop R2.claim)
+MP  R2                           txnb               96 states     0.0s  holds   (drop R2.claim)
+MP  R2                           txn1               36 states     0.0s  holds   (drop R2.claim)
+MP  R2                           dedup              18 states     0.0s  holds   (drop R2.claim)
+MP  R2                           lockAA            756 states     0.0s  HOLDERS 7   (drop R2.claim)
+MP  R2                           lockBA            363 states     0.0s  holds   (drop R2.claim)
+MP  R2                           lockAB            793 states     0.0s  HOLDERS 7   (drop R2.claim)
+MM  R2                           txn                96 states     0.0s  holds   (drop R2.claim)
+MM  R2                           txnb               96 states     0.0s  holds   (drop R2.claim)
+MM  R2                           txn1               36 states     0.0s  holds   (drop R2.claim)
+MM  R2                           dedup              18 states     0.0s  holds   (drop R2.claim)
+MM  R2                           lockAA            756 states     0.0s  HOLDERS 7   (drop R2.claim)
+MM  R2                           lockBA            363 states     0.0s  holds   (drop R2.claim)
+MM  R2                           lockAB            756 states     0.0s  HOLDERS 7   (drop R2.claim)
+  shortest counterexample: MP lockAA, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 3
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 4
+  => breaks on MP lockAA (HOLDERS 7), MP lockAB (HOLDERS 7), MM lockAA (HOLDERS 7), MM lockAB (HOLDERS 7)
+
+## R2 without R2.put
+MP  R2                           txn                96 states     0.0s  holds   (drop R2.put)
+MP  R2                           txnb               96 states     0.0s  holds   (drop R2.put)
+MP  R2                           txn1               36 states     0.0s  holds   (drop R2.put)
+MP  R2                           dedup              18 states     0.0s  holds   (drop R2.put)
+MP  R2                           lockAA             12 states     0.0s  holds   (drop R2.put)
+MP  R2                           lockBA          1,843 states     0.1s  FENCE 13   (drop R2.put)
+MP  R2                           lockAB             12 states     0.0s  holds   (drop R2.put)
+MM  R2                           txn                96 states     0.0s  holds   (drop R2.put)
+MM  R2                           txnb               96 states     0.0s  holds   (drop R2.put)
+MM  R2                           txn1               36 states     0.0s  holds   (drop R2.put)
+MM  R2                           dedup              18 states     0.0s  holds   (drop R2.put)
+MM  R2                           lockAA             12 states     0.0s  holds   (drop R2.put)
+MM  R2                           lockBA             12 states     0.0s  holds   (drop R2.put)
+MM  R2                           lockAB             12 states     0.0s  holds   (drop R2.put)
+  shortest counterexample: MP lockBA, FENCE, 13 steps:
+     1. h0 sends a claim of the lock
+     2. B (persisted) appends: claim the lock (holder h0, attempt 1), committed
+     3. h0 hears its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. B (persisted) appends: claim the lock (holder h1, attempt 3, taking over lapsed token 2), committed
+     8. h1 hears its claim: granted 4
+     9. h1 sends its protected write of x
+    10. A (memory) appends: protected write of x (holder h1, token 4), committed
+    11. h1 hears its write: ok
+    12. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+    13. A (memory) appends: protected write of x (holder h0, token 2), committed
+  => breaks on MP lockBA (FENCE 13)
+
+## R1s+R3+R2.claim without R1s
+MP  R1s+R3+R2.claim              txn            87,057 states     4.4s  ATOMIC 14   (drop R1s)
+MP  R1s+R3+R2.claim              txnb           25,254 states     1.2s  ATOMIC 11   (drop R1s)
+MP  R1s+R3+R2.claim              txn1          757,957 states    47.7s  holds   (drop R1s)
+MP  R1s+R3+R2.claim              dedup          17,814 states     0.9s  holds   (drop R1s)
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R1s)
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.2s  holds   (drop R1s)
+MP  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R1s)
+MM  R1s+R3+R2.claim              txn            87,057 states     4.4s  ATOMIC 14   (drop R1s)
+MM  R1s+R3+R2.claim              txnb           25,254 states     1.0s  ATOMIC 11   (drop R1s)
+MM  R1s+R3+R2.claim              txn1          757,957 states    47.1s  holds   (drop R1s)
+MM  R1s+R3+R2.claim              dedup          17,814 states     0.8s  holds   (drop R1s)
+MM  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R1s)
+MM  R1s+R3+R2.claim              lockBA             12 states     0.0s  holds   (drop R1s)
+MM  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R1s)
+  shortest counterexample: MP txnb, ATOMIC, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary b), committed
+     3. T0 hears its prewrite of a: ok
+     4. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     5. B (persisted) appends: prewrite b (txn 1, primary), committed
+     6. T0 hears its prewrite of b: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads a: initial value
+    10. B (persisted) appends: commit b (txn 1 at ts 2), committed
+    11. the reader reads b: value of txn 1
+  => breaks on MP txn (ATOMIC 14), MP txnb (ATOMIC 11), MM txn (ATOMIC 14), MM txnb (ATOMIC 11)
+
+## R1s+R3+R2.claim without R3.fence
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.fence)
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.fence)
+MP  R1s+R3+R2.claim              txn1          757,957 states    46.7s  holds   (drop R3.fence)
+MP  R1s+R3+R2.claim              dedup          17,814 states     1.4s  holds   (drop R3.fence)
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.fence)
+MP  R1s+R3+R2.claim              lockBA          4,628 states     0.2s  FENCE 13   (drop R3.fence)
+MP  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              txn1          757,957 states    47.4s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              dedup          17,814 states     0.9s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              lockBA             12 states     0.0s  holds   (drop R3.fence)
+MM  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.fence)
+  shortest counterexample: MP lockBA, FENCE, 13 steps:
+     1. h0 sends a claim of the lock
+     2. B (persisted) appends: claim the lock (holder h0, attempt 1), committed
+     3. h0 hears its claim: granted 2
+     4. h0's lease lapses (token 2); h0 is paused and does not know
+     5. h1 sends a claim of the lock
+     6. h0 sends its protected write of x
+     7. B (persisted) appends: claim the lock (holder h1, attempt 3, taking over lapsed token 2), committed
+     8. h1 hears its claim: granted 4
+     9. h1 sends its protected write of x
+    10. A (memory) appends: protected write of x (holder h1, token 4), committed
+    11. h1 hears its write: ok
+    12. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+    13. A (memory) appends: protected write of x (holder h0, token 2), committed
+  => breaks on MP lockBA (FENCE 13)
+
+## R1s+R3+R2.claim without R3.stale
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.stale)
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.stale)
+MP  R1s+R3+R2.claim              txn1           58,553 states     2.6s  ATOMIC 11   (drop R3.stale)
+MP  R1s+R3+R2.claim              dedup          13,322 states     0.6s  REFUSED 13   (drop R3.stale)
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.stale)
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.3s  holds   (drop R3.stale)
+MP  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.stale)
+MM  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.stale)
+MM  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.stale)
+MM  R1s+R3+R2.claim              txn1           58,553 states     2.6s  ATOMIC 11   (drop R3.stale)
+MM  R1s+R3+R2.claim              dedup          13,322 states     0.5s  REFUSED 13   (drop R3.stale)
+MM  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.stale)
+MM  R1s+R3+R2.claim              lockBA             12 states     0.0s  holds   (drop R3.stale)
+MM  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.stale)
+  shortest counterexample: MP txn1, ATOMIC, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A (memory) appends: prewrite c (txn 1, primary a), committed
+     5. T0 hears its prewrite of c: ok
+     6. A: a majority stops uncleanly: 2 entries, 0 on a majority's disks; the new leader keeps 1
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader reads c: initial value
+    10. A (memory) appends: commit a (txn 1 at ts 2), committed
+    11. the reader reads a: value of txn 1
+  => breaks on MP txn1 (ATOMIC 11), MP dedup (REFUSED 13), MM txn1 (ATOMIC 11), MM dedup (REFUSED 13)
+
+## R1s+R3+R2.claim without R3.res
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.res)
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.res)
+MP  R1s+R3+R2.claim              txn1          242,713 states    12.9s  ATOMIC 16   (drop R3.res)
+MP  R1s+R3+R2.claim              dedup          17,814 states     0.8s  holds   (drop R3.res)
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.res)
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.2s  holds   (drop R3.res)
+MP  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              txn1          242,713 states    12.1s  ATOMIC 16   (drop R3.res)
+MM  R1s+R3+R2.claim              dedup          17,814 states     0.8s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              lockBA             12 states     0.0s  holds   (drop R3.res)
+MM  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.res)
+  shortest counterexample: MP txn1, ATOMIC, 16 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite c (txn 1, primary a), committed
+     3. the TTL of txn 1's locks runs out (T0)
+     4. T0 hears its prewrite of c: ok
+     5. A (memory) appends: prewrite a (txn 1, primary), committed
+     6. T0 hears its prewrite of a: ok
+     7. T0 takes a commit ts from the TSO and sends the primary's commit
+     8. the reader takes a snapshot ts from the TSO
+     9. the reader finds a locked, its TTL run out; it sends: check txn 1 at its primary a (roll back if locked)
+    10. A (memory) appends: commit a (txn 1 at ts 2), committed
+    11. A (memory) appends: check txn 1 at its primary a (roll back if locked), committed
+    12. the reader sends: resolve c (txn 1: commit at ts 2)
+    13. A: a majority stops uncleanly: 4 entries, 0 on a majority's disks; the new leader keeps 1
+    14. the reader reads a: initial value
+    15. A (memory) appends: resolve c (txn 1: commit at ts 2), committed
+    16. the reader reads c: value of txn 1
+  => breaks on MP txn1 (ATOMIC 16), MM txn1 (ATOMIC 16)
+
+## R1s+R3+R2.claim without R3.read
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.read)
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.read)
+MP  R1s+R3+R2.claim              txn1           44,040 states     1.7s  ATOMIC 11   (drop R3.read)
+MP  R1s+R3+R2.claim              dedup          17,814 states     0.7s  holds   (drop R3.read)
+MP  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.read)
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.2s  holds   (drop R3.read)
+MP  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              txn1           44,040 states     1.9s  ATOMIC 11   (drop R3.read)
+MM  R1s+R3+R2.claim              dedup          17,814 states     0.9s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              lockAA             12 states     0.0s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              lockBA             12 states     0.0s  holds   (drop R3.read)
+MM  R1s+R3+R2.claim              lockAB             12 states     0.0s  holds   (drop R3.read)
+  shortest counterexample: MP txn1, ATOMIC, 11 steps:
+     1. T0 begins: a start ts from the TSO; it sends its prewrites
+     2. A (memory) appends: prewrite a (txn 1, primary), committed
+     3. T0 hears its prewrite of a: ok
+     4. A (memory) appends: prewrite c (txn 1, primary a), committed
+     5. T0 hears its prewrite of c: ok
+     6. T0 takes a commit ts from the TSO and sends the primary's commit
+     7. the reader takes a snapshot ts from the TSO
+     8. A (memory) appends: commit a (txn 1 at ts 2), committed
+     9. the reader reads a: value of txn 1
+    10. A: a majority stops uncleanly: 3 entries, 0 on a majority's disks; the new leader keeps 0
+    11. the reader reads c: initial value
+  => breaks on MP txn1 (ATOMIC 11), MM txn1 (ATOMIC 11)
+
+## R1s+R3+R2.claim without R2.claim
+MP  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R2.claim)
+MP  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R2.claim)
+MP  R1s+R3+R2.claim              txn1          757,957 states    43.4s  holds   (drop R2.claim)
+MP  R1s+R3+R2.claim              dedup          17,814 states     0.7s  holds   (drop R2.claim)
+MP  R1s+R3+R2.claim              lockAA          1,133 states     0.0s  HOLDERS 7   (drop R2.claim)
+MP  R1s+R3+R2.claim              lockBA          5,947 states     0.2s  holds   (drop R2.claim)
+MP  R1s+R3+R2.claim              lockAB          1,122 states     0.0s  HOLDERS 7   (drop R2.claim)
+MM  R1s+R3+R2.claim              txn               272 states     0.0s  holds   (drop R2.claim)
+MM  R1s+R3+R2.claim              txnb              272 states     0.0s  holds   (drop R2.claim)
+MM  R1s+R3+R2.claim              txn1          757,957 states    45.3s  holds   (drop R2.claim)
+MM  R1s+R3+R2.claim              dedup          17,814 states     0.9s  holds   (drop R2.claim)
+MM  R1s+R3+R2.claim              lockAA          1,133 states     0.0s  HOLDERS 7   (drop R2.claim)
+MM  R1s+R3+R2.claim              lockBA          5,947 states     0.2s  holds   (drop R2.claim)
+MM  R1s+R3+R2.claim              lockAB          1,122 states     0.0s  HOLDERS 7   (drop R2.claim)
+  shortest counterexample: MP lockAA, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 3
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 4
+  => breaks on MP lockAA (HOLDERS 7), MP lockAB (HOLDERS 7), MM lockAA (HOLDERS 7), MM lockAB (HOLDERS 7)

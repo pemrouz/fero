@@ -1,0 +1,56 @@
+# E-47 row: tokens from a counter in the lock row (tok=row) instead of TSO timestamps
+# 2026-11-12T06:49:25Z, Python 3.13.17, 4 vCPU, load ['1.00', '1.00', '1.00']
+
+## no rules
+MP  no rules                     lockAA-row        605 states     0.0s  HOLDERS 7, TOKEN 7
+MP  no rules                     lockBA-row      1,428 states     0.1s  FENCE 13
+MP  no rules                     lockAB-row        595 states     0.0s  HOLDERS 7, TOKEN 7
+  shortest counterexample: MP lockAA-row, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 1
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 1
+  => breaks on MP lockAA-row (HOLDERS 7, TOKEN 7), MP lockBA-row (FENCE 13), MP lockAB-row (HOLDERS 7, TOKEN 7)
+
+## R2
+MP  R2                           lockAA-row         12 states     0.0s  holds
+MP  R2                           lockBA-row        273 states     0.0s  holds
+MP  R2                           lockAB-row         12 states     0.0s  holds
+  => holds on every bound
+
+## R1s+R3
+MP  R1s+R3                       lockAA-row        605 states     0.0s  HOLDERS 7, TOKEN 7
+MP  R1s+R3                       lockBA-row      4,061 states     0.2s  holds
+MP  R1s+R3                       lockAB-row        595 states     0.0s  HOLDERS 7, TOKEN 7
+  shortest counterexample: MP lockAA-row, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 1
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 1
+  => breaks on MP lockAA-row (HOLDERS 7, TOKEN 7), MP lockAB-row (HOLDERS 7, TOKEN 7)
+
+## R2 without R2.claim
+MP  R2                           lockAA-row        562 states     0.0s  HOLDERS 7, TOKEN 7   (drop R2.claim)
+MP  R2                           lockBA-row        273 states     0.0s  holds   (drop R2.claim)
+MP  R2                           lockAB-row        595 states     0.0s  HOLDERS 7, TOKEN 7   (drop R2.claim)
+  shortest counterexample: MP lockAA-row, HOLDERS, 7 steps:
+     1. h0 sends a claim of the lock
+     2. h1 sends a claim of the lock
+     3. A (memory) appends: claim the lock (holder h0, attempt 1), committed
+     4. h0 hears its claim: granted 1
+     5. A: a majority stops uncleanly: 1 entries, 0 on a majority's disks; the new leader keeps 0
+     6. A (memory) appends: claim the lock (holder h1, attempt 2), committed
+     7. h1 hears its claim: granted 1
+  => breaks on MP lockAA-row (HOLDERS 7, TOKEN 7), MP lockAB-row (HOLDERS 7, TOKEN 7)
+
+## R1s+R3+R2.claim
+MP  R1s+R3+R2.claim              lockAA-row         12 states     0.0s  holds
+MP  R1s+R3+R2.claim              lockBA-row      4,061 states     0.2s  holds
+MP  R1s+R3+R2.claim              lockAB-row         12 states     0.0s  holds
+  => holds on every bound

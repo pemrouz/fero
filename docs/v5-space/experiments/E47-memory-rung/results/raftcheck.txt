@@ -1,0 +1,25 @@
+# E-47 raftcheck, 2026-11-12T06:23:44Z, Python 3.13.17, 4 vCPU, load 0.77 0.93 0.98
+rung  N  states  stop+election outcomes  (1) cut below k  (2) (len,k) pairs whose cuts differ from [k,len]  (4) elections with no stopped voter  (3) P: acked entry lost / M: acked entry lost
+P     1      19          483       0     0 of   3       0  0 (must be 0)
+P     2     127        2,811       0     0 of   6       0  0 (must be 0)
+P     3     527       10,821       0     0 of  10       0  0 (must be 0)
+P     4   1,652       32,361       0     0 of  15       0  0 (must be 0)
+P     5   4,298       81,522       0     0 of  21       0  0 (must be 0)
+P     6   9,786      181,314       0     0 of  28       0  0 (must be 0)
+M     1      19          483       0     0 of   3       0  95 (must be > 0 for N >= 1)
+M     2     127        2,811       0     0 of   6       0  815 (must be > 0 for N >= 1)
+M     3     527       10,821       0     0 of  10       0  3723 (must be > 0 for N >= 1)
+M     4   1,652       32,361       0     0 of  15       0  12271 (must be > 0 for N >= 1)
+M     5   4,298       81,522       0     0 of  21       0  32914 (must be > 0 for N >= 1)
+M     6   9,786      181,314       0     0 of  28       0  76482 (must be > 0 for N >= 1)
+abstraction holds (elections by vote)
+
+The operator's recovery, M only: unclean replicas do not vote (the settled memory-rung unit)
+rung  N  majority stops  (5) leaving a voting majority  (6) recovery rule: l < k / l outside [k,len]  (6b) one stopped disk lost: l < k  (7) rebuild from the survivor: stops with a survivor / l < k / acked lost
+M     1             76       0       0 /    0       0            57 /      2 /      8
+M     2            508       0       0 /    0       0           381 /     18 /     74
+M     3          2,108       0       0 /    0       0         1,581 /     84 /    354
+M     4          6,608       0       0 /    0       0         4,956 /    280 /  1,204
+M     5         17,192       0       0 /    0       0        12,894 /    756 /  3,304
+M     6         39,144       0       0 /    0       0        29,358 /  1,764 /  7,812
+recovery rule stays inside [k, len]; rebuild from the survivor cuts below k
