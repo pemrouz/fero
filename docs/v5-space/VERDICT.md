@@ -47,7 +47,7 @@ Every number here comes from a file or a tool, and the text says which. "Compute
 
 ## 0. The answer
 
-> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading (item 15) and accepts a named test line as a loss when the trade buys something real (item 2). On that frame the arithmetic picks TiKV-persisted (0 / 5 / 233), and a `memory` option comes second, behind a timing gate ([MEMORY.md](MEMORY.md)). Section 11.6 has the detail. Sections 0 to 10 below still read on this page's own frame: the strict reading, no loss.
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading (item 15) and accepts a named test line as a loss when the trade buys something real (item 2). On that frame the arithmetic picks TiKV-persisted (0 / 5 / 233), answer stages per call come second, and a `memory` option third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md), [E-48]). Section 11.6 has the detail. Sections 0 to 10 below still read on this page's own frame: the strict reading, no loss.
 
 1. **Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** (6b in section 9). MIN-P+par is COMP2 without that rung.
 2. **COMP2 in short:** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica (section 5.1).
@@ -1218,6 +1218,7 @@ The owner answered two of section 8's bold items. Sections 0 to 10 are not rewri
 - **Item 15, DATA-01:** "it doesn't have to be the data code exactly, or even direct port". That is the loose reading (RR-07): a server may hold rows in another engine, once DATA-09's differential test proves its rows equal `data`'s.
 - **Item 2, PERF-01:** "I don't mind accepting some losses if it makes things better". So a named competitor test line may be lost when the trade buys something real. JetStream's one-client default line is the first such loss.
 - **The owner also asked** whether a `memory` option is still worth having, "if it introduces too much hassle ... that can be evaluated". [MEMORY.md](MEMORY.md) and [E-47] answer that.
+- **The owner then asked** whether guarantees per operation were ruled out: "wait till server received it, wait till replicated, wait till on disk". [MEMORY.md 9](MEMORY.md#9-per-operation-acks) and [E-48] answer that.
 
 **What the arithmetic picks on that frame** (computed: `repro rank --loss`, 24 of 31 rows in).
 
@@ -1232,8 +1233,14 @@ The owner answered two of section 8's bold items. Sections 0 to 10 are not rewri
 - **The warning of section 0 item 6 still holds.** No experiment ran TiKV's shape. It has 11 MUSTs met and 121 open, against MIN-P+par's 96 open. Rule 3 never counts open MUSTs (item 16). So MIN-P+par stays the fallback if the shape's own tests go badly.
 - **What the shape still owes** ([candidates/TiKV-persisted.md](candidates/TiKV-persisted.md)): `par` written inside raft-rs or etcd's Raft; DATA-09's differential test of its store against `data`; OPS-07's restore of the timestamp oracle; shipping its server through npm (DEP-20); and a WASM build of its kernel for TEST-01.
 
+**Answer stages per call** ([MEMORY.md 9](MEMORY.md#9-per-operation-acks)).
+- **Not ruled out, never weighed.** Footnote 13 rules out a commit level per write, where many resources share one group. Answer stages keep one commit point: every write still commits on disk at a majority, and only the caller's own answer may come earlier, at `received` or `replicated`.
+- **They come second**, before the `memory` option. They give the writer about the rung's answer time (reasoned from E-02), and only the writer can be misled (model-checked in [E-48], with three client-side rules). They cost 0 to 8 more pairs (233 → 233 to 241, computed), against the rung's 20 to 34.
+- **They do not buy** faster readers or subscribers, less CPU or a higher top speed. An early answer is weaker than the rung's "ok": one power cut can lose `replicated`.
+- **Rulings they need:** whether an answer stage counts as PERF-01's "matching rung", that F-01's "acknowledged" means the committed answer, and a referee's acceptance of the change to TiKV-persisted's card (RR-14's second ground).
+
 **The `memory` option** ([MEMORY.md 0](MEMORY.md#0-the-recommendation)).
-- **The answer:** keep it, but build it second, after the `persisted` slice is timed. Build it only if waiting for the disk is at least half of a write's p99 there, and once the models MEMORY 6.1 lists pass.
+- **The answer:** keep it, but build it third, after answer stages, and only for a timed need they cannot meet (fast visibility, CPU, top speed). Build it only if waiting for the disk is at least half of a write's p99 there, and once the models MEMORY 6.1 lists pass.
 - **Its form:** chosen per resource. A memory resource takes one-row writes only. A transaction or a fenced write that touches it is refused `needs-persisted`. After a power cut, the operator's recovery restarts the group from the longest log any copy holds.
 - **It buys** single writes about 2 to 3 times faster (reasoned from E-02's measured 3.5 to 7.6 times), no waiting behind disk stalls, and about a third less CPU per write.
 - **It costs** 20 to 34 more interacting pairs (233 → 253 to 267, computed on copies of the units), a weaker "ok" on memory resources, an operator step after a power cut, and up to about 1 s of answered writes.
@@ -1242,6 +1249,7 @@ The owner answered two of section 8's bold items. Sections 0 to 10 are not rewri
 - **Kill test 2b** (section 9), the rung's safety model, does not fire on TiKV's shape at E-47's bounds. Its splits, merges, feeds and recovery are still owed (MEMORY 6.1).
 
 [E-47]: experiments/E47-memory-rung/README.md
+[E-48]: experiments/E48-ack-stages/README.md
 [pairs.md]: experiments/E32-composition/pairs.md
 [crossing/README.md]: experiments/E32-composition/crossing/README.md
 [E-01]: experiments/E01-floors/README.md

@@ -10,7 +10,7 @@ Start here. This folder asks one question: which design should fero v5 be? The s
 
 **Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** ([VERDICT 0](VERDICT.md#0-the-answer)). [API.md](API.md) is its API as first built, and [LAYERS.md](LAYERS.md) its layers.
 
-> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. A `memory` option comes second, behind a timing gate, for one-row writes only ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. The rest of Part 1 still reads on VERDICT's own frame.
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. Second come answer stages per call: every write still commits on disk, and only its own caller may hear earlier that it was received or replicated ([E-48](experiments/E48-ack-stages/README.md)). A `memory` option comes third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. The rest of Part 1 still reads on VERDICT's own frame.
 
 - **COMP2 in short.** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica. (A **group** is one Raft log with one leader. A **slot** is a fixed share of a resource's keys. `#meta` is the project's own system group. To **fold** is to turn the log's change records into rows.)
 - **MIN-P+par is COMP2 without the `memory` rung.** A **rung** is what a commit means: `persisted` is on disk at a majority, `memory` is in memory at a majority. So the first build always commits to disk.
@@ -85,13 +85,13 @@ Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer), the [COMP
 | 10 | [LAYERS.md](LAYERS.md) | what each layer, L0 to L5, keeps, does and still owes, with walk-throughs | to see how the design works inside |
 | 11 | [MEMORY.md](MEMORY.md) | whether to offer a `memory` option on TiKV's shape: what it buys, what a lost tail breaks, the forms, the rules and the API | after the owner's answers, to see the speed trade |
 | 12 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
-| 13 | [experiments/](#experiments) | 58 experiment folders, listed below | to check a measurement or a model |
+| 13 | [experiments/](#experiments) | 59 experiment folders, listed below | to check a measurement or a model |
 | 14 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
 | 15 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
 
 ### experiments/
 
-Each folder's README asks one question and has a verdict line ("Q-nn: the answer. Moves: ..."). E-41's README adds a price re-check after its verdict line. All but E-32 have a `run.sh` and a `results/` folder, and 51 have a `fetch.sh`. [TOOLS.md](experiments/TOOLS.md) lists the benchmark tools on the study box; [tools-fetch.sh](experiments/tools-fetch.sh) fetches them again, and [tools/](experiments/tools) holds their smoke test (`smoke.sh`), its sources and its output.
+Each folder's README asks one question and has a verdict line ("Q-nn: the answer. Moves: ..."). E-41's README adds a price re-check after its verdict line. All but E-32 have a `run.sh` and a `results/` folder, and 52 have a `fetch.sh`. [TOOLS.md](experiments/TOOLS.md) lists the benchmark tools on the study box; [tools-fetch.sh](experiments/tools-fetch.sh) fetches them again, and [tools/](experiments/tools) holds their smoke test (`smoke.sh`), its sources and its output.
 
 **Floors, language and the fold**
 - [E-01 floors](experiments/E01-floors/README.md): this box's fsync and round-trip times. The study's commit bar C is 0.73 ms: a three-writer fsync p99 of 676 µs plus a round-trip p99 of 58 µs (a sum of two p99s, not a floor).
@@ -145,6 +145,7 @@ Each folder's README asks one question and has a verdict line ("Q-nn: the answer
 - [E-30 derived-once](experiments/E30-derived-once/README.md): derived outputs exactly once across a long restart. No dedup option alone does it; the cursor kept beside the outputs does (5 rules).
 - [E-31 subscribe](experiments/E31-subscribe/README.md): the subscribe protocol across failover, slot moves and relays. Yes, after one rule change.
 - [E-47 memory-rung](experiments/E47-memory-rung/README.md): the `memory` rung losing its unsynced tail, on TiKV's shape. Without rules it breaks P-15, P-10 and F-02. Two rule sets fix every break at the model's bounds: refusing transactions, fenced writes and lock rows on memory resources ({R2}), or {R1s, R3, R2.claim}.
+- [E-48 ack-stages](experiments/E48-ack-stages/README.md): answer stages per call (received, replicated, committed) over a fixed on-disk commit, on TiKV's shape. Raft's commit, election and recovery rules stay `persisted`'s. With three client-side rules (the libraries' own steps wait for the commit, each writer numbers its writes, a read waits for its own writes), only the writer can be told something that later vanishes. A commit in memory with a per-write answer breaks through readers.
 
 **Scale, hosting and client links**
 - [E-08 relay-fanout](experiments/E08-relay-fanout/README.md): deliveries a second from one relay core. 0.57-1.50 million in Node with no added wait, and 20.6-32.3 million with 10 ms rounds, against core NATS's 5.8 million per core.
