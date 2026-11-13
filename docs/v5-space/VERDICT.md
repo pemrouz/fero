@@ -1268,7 +1268,9 @@ After 11.6, the owner set the arithmetic's pick aside and chose by judgement. Th
 
 **Every path stepped through** ([PATHS.md](PATHS.md), with [E-50](experiments/E50-path-costs/README.md)). Built well, the design sits about 1.2-1.5 times above its lower bound on a small write, and at it on round trips once writes go straight to the leader. The largest gains: direct routing, one native checksum per batch, a byte-rate cap on bulk work, and byte-only work off the main thread. All the design changes together add about 14 to 25 rules, so each is for the owner to weigh alone.
 
-**Next, all without code:** the owner's reading of DEP-13's empty copy, and which of PATHS 7.1's changes to take; a model of the per-resource pieces (genesis per resource, the home log, healing with a stored placement, the soft directory); the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
+**Then settled** ([DECISIONS V5-7 to V5-9](../DECISIONS.md)): leaders keep Raft's random timers, with a hand-back capped by transfers in flight; DEP-13's empty copy holds no resources, and an idle resource has its own budget; direct routing, one native checksum per batch and a byte-rate cap on bulk work are taken now, the rest of PATHS 7.1 after the first build slice.
+
+**Next, all without code:** a model of the per-resource pieces (genesis per resource, the home log, healing with a stored placement, the soft directory); the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md

@@ -3053,3 +3053,33 @@ Decision: Build from the study's MIN row with V5-1 to V5-5: groups and healing p
 REJECTED: TiKV-persisted and ranking by novel mechanisms first (V5-1). MIN-P+par's project groups and `#meta` loop (V5-2).
 
 Consequences: API.md and LAYERS.md describe COMP2's shape (project groups, `#meta`'s loop) and are redone for this one. The study's other files stay as the record.
+
+## V5-7 — Leaders: Raft's random timers, and a hand-back capped by transfers in flight (2026-11-13; recommended to the owner, who approved it)
+
+Context: Decision 21a (DESIGN-V5 12) cut ranked candidacy, three rules for who stands first (a rank per group, a step so a warm copy wins, a clock-skew rank), for Raft's random timers and PreVote, with leaders spread afterwards by a hand-back after `settle.ms` at most ten a second per member. With a group per resource (V5-2), E-49 measured two costs. A whole-project cold boot by random timers takes 3-5 s at 1,000 resources per process and 7 s at 10,000 (a preferred-leader start: 0.6-2.2 s) and leaves about two thirds of leaders off their preferred member. And every member restart, under either rule, owes the hand-back of a third of its groups: at ten a second, leaders stay uneven for 30 s + R/30 s, about 6 min at 10,000 and 56 min at 100,000. A handover pauses only its own group, by about 4 ms (E-13).
+
+Decision: Keep Raft's random timers and PreVote; 21a stands. The hand-back's pace becomes a cap on transfers in flight per member (a setting, a few dozen), busiest groups first by recent writes, in place of ten a second. `settle.ms` stays. No campaign at boot.
+
+REJECTED: Ranked candidacy again (three rules to model, for who tries first). A preferred-leader campaign at cold start (+1 rule; it partly reverses 21a and speeds only a whole-project cold boot, which is rare, since a roll restarts one member at a time). Ten a second (minutes of uneven leaders after every restart).
+
+Consequences: No rule is added: the pace is a setting of the existing hand-back, and its order a policy. That the cap evens a restart in seconds is reasoned, not measured; the model of the per-resource pieces and the first build slice check it. A copy whose fold is behind can still win an election and answer late, which the cut step used to prevent; PATHS PA-16 (vote before the fold) is the deferred answer (V5-9).
+
+## V5-8 — DEP-13's empty copy holds no resources; an idle resource has its own budget (2026-11-13; recommended to the owner, who approved it)
+
+Context: DEP-13 says "an empty copy ≤ 100 MB; ≤ 2 KB per small row", written when a copy meant one cluster (v4 measured 70-100 MB empty). With a group per resource, E-49 measured a TypeScript process holding only quiet groups pass 100 MB at about 250-500 resources for 20-50 s after a boot, and at about 2,000 once V8 has collected (between 1,000 and 2,000 in decimal megabytes). Read as "no rows, whatever its resources", the bar would force dormant groups (+4 rules) at a few hundred resources.
+
+Decision: An empty copy is a process holding no resources, and stays ≤ 100 MB. Each idle resource gets its own stated budget per member: about 8 KB resident once V8 has collected (E-49: 6-8 KB), and about 2.5 KB dormant (E-49: 1.2-2.4 KB). E-49's peak of about 30 KB per resource in the first minute after a boot is stated beside it.
+
+REJECTED: The plain reading (no rows, any number of resources): it would force dormant groups at a few hundred resources per process from an ambiguity, not a need.
+
+Consequences: REQUIREMENTS.md keeps DEP-13's text; this record is its reading. The memory pins gain one per idle resource. Dormant groups stay a choice for a process past about 10,000 resources (E-49).
+
+## V5-9 — From PATHS 7.1, three changes now and the rest after the first build slice (2026-11-13; recommended to the owner, who approved it)
+
+Context: PATHS.md stepped through every path of the chosen design. Built well, a small write costs about 1.2-1.5 times the least work any correct design must do. Section 7.1 lists the changes that would close the rest: about +14 to +25 rules together, most with reasoned gains and models to run again.
+
+Decision: Take three now. (1) Direct routing: a client sends a write to its slot's leader, and the forward path stays for one-link clients (PA-4, 0 to +1 rule). (2) One native checksum per batch (CRC-32/IEEE, Node's `zlib.crc32`) covering the term, base offset and group, with the journal row header carrying its own (PA-1a, +1). (3) A byte-rate cap on bulk work, on both the link and the disk (PA-6, about +1). Every build note of PATHS 7.2 is taken, including the build traps of PATHS 0; they cost no rule. The rest of 7.1 (deltas from committed bytes, the JSON value with its escape, voting before the fold, one shared log, a short retry-after, renewals in memory, validation at the writer, parked takes, a move by reference) waits for the first build slice's measurements (PATHS 7.3).
+
+REJECTED: All of 7.1 now (+14 to +25 rules, past every judged row, on reasoned gains). None of it (a round trip left on two writes in three, checksums at 2-3 ns a byte in JavaScript, and bulk work able to stall live commits).
+
+Consequences: The base comes to about 407-408 rules (405 plus 2 to 3, by PATHS 7.1's counts; reasoned). The checksum is a format change from v4's crc32c. SIMPLICITY's records are updated when the model of the per-resource pieces lands.
