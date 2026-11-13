@@ -1,0 +1,12 @@
+{"bench":"sys2","mode":"inplace","n":1500,"cpu_us":30.3,"p50_us":109.2,"p99_us":288.1}
+{"bench":"sys2","mode":"inplacef","n":1500,"cpu_us":34.2,"p50_us":92.1,"p99_us":250.4}
+{"bench":"sys2","mode":"a1","n":1500,"cpu_us":80.2,"p50_us":180.7,"p99_us":552.3}
+{"bench":"sys2","mode":"a1f","n":1500,"cpu_us":90.1,"p50_us":175.5,"p99_us":610.3}
+{"bench":"sys2","mode":"a2d","n":1500,"cpu_us":102,"p50_us":205.7,"p99_us":785.6}
+{"bench":"sys2","mode":"a2","n":1500,"cpu_us":111,"p50_us":202.5,"p99_us":733.6}
+{"bench":"sys2","mode":"inplace","n":1500,"cpu_us":38,"p50_us":117.5,"p99_us":396.9}
+{"bench":"sys2","mode":"inplacef","n":1500,"cpu_us":30,"p50_us":81,"p99_us":209}
+{"bench":"sys2","mode":"a1","n":1500,"cpu_us":110.9,"p50_us":216.3,"p99_us":773}
+{"bench":"sys2","mode":"a1f","n":1500,"cpu_us":80.7,"p50_us":173.6,"p99_us":598.6}
+{"bench":"sys2","mode":"a2d","n":1500,"cpu_us":126,"p50_us":247.6,"p99_us":772.3}
+{"bench":"sys2","mode":"a2","n":1500,"cpu_us":149.5,"p50_us":248.9,"p99_us":1085.9}

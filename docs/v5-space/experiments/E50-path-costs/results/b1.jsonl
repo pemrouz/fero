@@ -1,0 +1,36 @@
+0.62 1.40 1.09 3/121 7220
+{"bench":"b1","run":1,"case":"v4-js-crc32c/record","load":0.62,"mb":32,"ns_per_byte":2.0257,"ns_per_100B_record":202.6,"cpu_ns_per_byte":2.0241,"mb_per_s":471}
+{"bench":"b1","run":1,"case":"v4-js-crc32c/batch","load":0.62,"mb":32,"ns_per_byte":2.2112,"ns_per_100B_record":221.1,"cpu_ns_per_byte":2.2,"mb_per_s":431}
+{"bench":"b1","run":1,"case":"zlib-crc32/record","load":0.62,"mb":32,"ns_per_byte":2.1333,"ns_per_100B_record":213.3,"cpu_ns_per_byte":2.1352,"mb_per_s":447}
+{"bench":"b1","run":1,"case":"zlib-crc32/batch","load":0.62,"mb":32,"ns_per_byte":0.4512,"ns_per_100B_record":45.1,"cpu_ns_per_byte":0.4475,"mb_per_s":2114}
+{"bench":"b1","run":1,"case":"zlib-crc32/1MiB","load":0.62,"mb":32,"ns_per_byte":0.4736,"ns_per_100B_record":47.4,"cpu_ns_per_byte":0.4732,"mb_per_s":2014}
+{"bench":"b1","run":1,"case":"zlib-crc32/batch-cached","load":0.62,"mb":32,"ns_per_byte":0.1746,"ns_per_100B_record":17.5,"cpu_ns_per_byte":0.1759,"mb_per_s":5462}
+{"bench":"b1","run":1,"case":"v4-js-crc32c/batch-cached","load":0.62,"mb":32,"ns_per_byte":2.4893,"ns_per_100B_record":248.9,"cpu_ns_per_byte":2.4887,"mb_per_s":383}
+{"bench":"b1","run":1,"case":"copy-set/batch","load":0.62,"mb":32,"ns_per_byte":0.0505,"ns_per_100B_record":5,"cpu_ns_per_byte":0.0503,"mb_per_s":18893}
+{"bench":"b1","run":1,"case":"copy-slice/batch","load":0.62,"mb":32,"ns_per_byte":0.2263,"ns_per_100B_record":22.6,"cpu_ns_per_byte":0.2678,"mb_per_s":4213}
+{"bench":"b1","run":1,"case":"copy-slice/record","load":0.62,"mb":32,"ns_per_byte":9.1345,"ns_per_100B_record":913.4,"cpu_ns_per_byte":13.6833,"mb_per_s":104}
+{"bench":"b1","run":1,"case":"copy-set/1MiB","load":0.62,"mb":32,"ns_per_byte":0.055,"ns_per_100B_record":5.5,"cpu_ns_per_byte":0.0548,"mb_per_s":17352}
+0.79 1.36 1.08 1/117 7248
+{"bench":"b1","run":2,"case":"v4-js-crc32c/record","load":0.79,"mb":32,"ns_per_byte":2.1725,"ns_per_100B_record":217.3,"cpu_ns_per_byte":2.158,"mb_per_s":439}
+{"bench":"b1","run":2,"case":"v4-js-crc32c/batch","load":0.79,"mb":32,"ns_per_byte":2.2251,"ns_per_100B_record":222.5,"cpu_ns_per_byte":2.2215,"mb_per_s":429}
+{"bench":"b1","run":2,"case":"zlib-crc32/record","load":0.79,"mb":32,"ns_per_byte":2.0706,"ns_per_100B_record":207.1,"cpu_ns_per_byte":2.1313,"mb_per_s":461}
+{"bench":"b1","run":2,"case":"zlib-crc32/batch","load":0.79,"mb":32,"ns_per_byte":0.4572,"ns_per_100B_record":45.7,"cpu_ns_per_byte":0.457,"mb_per_s":2086}
+{"bench":"b1","run":2,"case":"zlib-crc32/1MiB","load":0.79,"mb":32,"ns_per_byte":0.4873,"ns_per_100B_record":48.7,"cpu_ns_per_byte":0.4855,"mb_per_s":1957}
+{"bench":"b1","run":2,"case":"zlib-crc32/batch-cached","load":0.79,"mb":32,"ns_per_byte":0.1965,"ns_per_100B_record":19.7,"cpu_ns_per_byte":0.198,"mb_per_s":4853}
+{"bench":"b1","run":2,"case":"v4-js-crc32c/batch-cached","load":0.79,"mb":32,"ns_per_byte":2.2332,"ns_per_100B_record":223.3,"cpu_ns_per_byte":2.2324,"mb_per_s":427}
+{"bench":"b1","run":2,"case":"copy-set/batch","load":0.79,"mb":32,"ns_per_byte":0.0462,"ns_per_100B_record":4.6,"cpu_ns_per_byte":0.046,"mb_per_s":20649}
+{"bench":"b1","run":2,"case":"copy-slice/batch","load":0.79,"mb":32,"ns_per_byte":0.1827,"ns_per_100B_record":18.3,"cpu_ns_per_byte":0.2224,"mb_per_s":5221}
+{"bench":"b1","run":2,"case":"copy-slice/record","load":0.79,"mb":32,"ns_per_byte":9.2135,"ns_per_100B_record":921.3,"cpu_ns_per_byte":14.0328,"mb_per_s":104}
+{"bench":"b1","run":2,"case":"copy-set/1MiB","load":0.79,"mb":32,"ns_per_byte":0.0645,"ns_per_100B_record":6.4,"cpu_ns_per_byte":0.0643,"mb_per_s":14794}
+1.19 1.39 1.10 1/117 7286
+{"bench":"b1","run":3,"case":"v4-js-crc32c/record","load":1.19,"mb":32,"ns_per_byte":2.3005,"ns_per_100B_record":230.1,"cpu_ns_per_byte":2.2948,"mb_per_s":415}
+{"bench":"b1","run":3,"case":"v4-js-crc32c/batch","load":1.19,"mb":32,"ns_per_byte":2.1648,"ns_per_100B_record":216.5,"cpu_ns_per_byte":2.163,"mb_per_s":441}
+{"bench":"b1","run":3,"case":"zlib-crc32/record","load":1.19,"mb":32,"ns_per_byte":2.2095,"ns_per_100B_record":220.9,"cpu_ns_per_byte":2.2042,"mb_per_s":432}
+{"bench":"b1","run":3,"case":"zlib-crc32/batch","load":1.19,"mb":32,"ns_per_byte":0.4469,"ns_per_100B_record":44.7,"cpu_ns_per_byte":0.4466,"mb_per_s":2134}
+{"bench":"b1","run":3,"case":"zlib-crc32/1MiB","load":1.19,"mb":32,"ns_per_byte":0.4758,"ns_per_100B_record":47.6,"cpu_ns_per_byte":0.4747,"mb_per_s":2004}
+{"bench":"b1","run":3,"case":"zlib-crc32/batch-cached","load":1.19,"mb":32,"ns_per_byte":0.1969,"ns_per_100B_record":19.7,"cpu_ns_per_byte":0.1975,"mb_per_s":4842}
+{"bench":"b1","run":3,"case":"v4-js-crc32c/batch-cached","load":1.19,"mb":32,"ns_per_byte":2.3604,"ns_per_100B_record":236,"cpu_ns_per_byte":2.36,"mb_per_s":404}
+{"bench":"b1","run":3,"case":"copy-set/batch","load":1.19,"mb":32,"ns_per_byte":0.0566,"ns_per_100B_record":5.7,"cpu_ns_per_byte":0.0575,"mb_per_s":16853}
+{"bench":"b1","run":3,"case":"copy-slice/batch","load":1.19,"mb":32,"ns_per_byte":0.2688,"ns_per_100B_record":26.9,"cpu_ns_per_byte":0.2975,"mb_per_s":3548}
+{"bench":"b1","run":3,"case":"copy-slice/record","load":1.19,"mb":32,"ns_per_byte":9.0811,"ns_per_100B_record":908.1,"cpu_ns_per_byte":14.0527,"mb_per_s":105}
+{"bench":"b1","run":3,"case":"copy-set/1MiB","load":1.19,"mb":32,"ns_per_byte":0.0662,"ns_per_100B_record":6.6,"cpu_ns_per_byte":0.066,"mb_per_s":14406}

@@ -1,0 +1,6 @@
+0.89 0.53 0.37 1/122 13325
+{"bench":"field","ok":true,"v4_encode_ns":339.7,"rec_encode_ns":312.3,"v4_decode_ns":406.4,"rec_decode_ns":384,"v4_bytes":24.1,"rec_bytes":16.4,"node":"v22.22.0"}
+1.39 1.21 1.09 2/120 18176
+{"bench":"field","ok":true,"v4_encode_ns":329.6,"rec_encode_ns":313.7,"v4_decode_ns":409.2,"rec_decode_ns":365.2,"v4_bytes":24.1,"rec_bytes":16.4,"node":"v22.22.0"}
+2.42 1.74 1.30 1/118 18925
+{"bench":"field","ok":true,"v4_encode_ns":333.4,"rec_encode_ns":272,"v4_decode_ns":392.1,"rec_decode_ns":377.3,"v4_bytes":24.1,"rec_bytes":16.4,"node":"v22.22.0"}

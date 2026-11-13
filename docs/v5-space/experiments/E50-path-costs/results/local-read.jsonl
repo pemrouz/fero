@@ -1,0 +1,18 @@
+1.34 1.01 0.60 1/114 6649
+{"bench":"local-read","rows":1000,"ns":{"snapshot.k":86538.1625,"lens.k":572.11095,"handle.k":180.78324,"map.get":63.862115,"snapshot":80380.8325,"idx.only":21.3017765},"sink":true}
+1.34 1.01 0.60 1/114 6659
+{"bench":"local-read","rows":100000,"ns":{"snapshot.k":32481155,"lens.k":3187.735895,"handle.k":2125.04683,"map.get":637.443672,"snapshot":32192072,"idx.only":40.9806855},"sink":true}
+1.24 1.01 0.61 1/110 6670
+{"bench":"local-read","rows":1000000,"ns":{"snapshot.k":531550414,"lens.k":5283.49919,"handle.k":3914.04293,"map.get":1264.470014,"snapshot":537208219.6666666,"idx.only":55.9154},"sink":true}
+1.58 1.37 0.83 1/114 6846
+{"bench":"local-read","rows":1000,"ns":{"snapshot.k":103406.645,"lens.k":616.170805,"handle.k":201.65433,"map.get":62.773236,"snapshot":89335.825,"idx.only":21.699084},"sink":true}
+1.54 1.37 0.83 1/115 6857
+{"bench":"local-read","rows":100000,"ns":{"snapshot.k":38944350.75,"lens.k":3379.57435,"handle.k":2174.64608,"map.get":606.438674,"snapshot":30149533,"idx.only":40.24583},"sink":true}
+1.69 1.41 0.85 1/111 6867
+{"bench":"local-read","rows":1000000,"ns":{"snapshot.k":551460165.6666666,"lens.k":5526.66548,"handle.k":4161.45326,"map.get":1317.8386775,"snapshot":539695433,"idx.only":59.0429175},"sink":true}
+1.33 1.41 0.95 1/113 6963
+{"bench":"local-read","rows":1000,"ns":{"snapshot.k":86772.145,"lens.k":623.371255,"handle.k":206.6322,"map.get":64.7943335,"snapshot":81978.3025,"idx.only":22.1215345},"sink":true}
+1.30 1.41 0.95 1/116 6976
+{"bench":"local-read","rows":100000,"ns":{"snapshot.k":31924443.75,"lens.k":3080.942455,"handle.k":1992.94643,"map.get":612.2890635,"snapshot":31946268.25,"idx.only":36.731265},"sink":true}
+1.57 1.47 0.98 1/110 6986
+{"bench":"local-read","rows":1000000,"ns":{"snapshot.k":532177953.3333333,"lens.k":5207.54101,"handle.k":3934.66441,"map.get":1224.456609,"snapshot":540062210.6666666,"idx.only":51.436878},"sink":true}

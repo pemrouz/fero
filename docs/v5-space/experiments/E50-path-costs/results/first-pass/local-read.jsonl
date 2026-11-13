@@ -1,0 +1,9 @@
+{"load":0.66} {"bench":"local-read","rows":1000,"ns":{"snapshot.k":89500.8225,"lens.k":563.410535,"handle.k":217.940515,"map.get":74.008149,"snapshot":83702.52,"idx.only":23.440412},"sink":true}
+{"load":0.69} {"bench":"local-read","rows":100000,"ns":{"snapshot.k":34033545.75,"lens.k":3222.90245,"handle.k":2233.905025,"map.get":530.3860095,"snapshot":28315735,"idx.only":45.633113},"sink":true}
+{"load":0.82} {"bench":"local-read","rows":1000000,"ns":{"snapshot.k":500604563.6666667,"lens.k":4300.29664,"handle.k":2822.607625,"map.get":1018.4200405,"snapshot":510826187.6666667,"idx.only":55.8875605},"sink":true}
+{"load":2.06} {"bench":"local-read","rows":1000,"ns":{"snapshot.k":89499.0875,"lens.k":562.84954,"handle.k":223.54304,"map.get":77.3171545,"snapshot":85082.185,"idx.only":24.643914},"sink":true}
+{"load":2.06} {"bench":"local-read","rows":100000,"ns":{"snapshot.k":29637241.75,"lens.k":3058.809615,"handle.k":2065.173685,"map.get":497.673895,"snapshot":28851019.75,"idx.only":44.936018},"sink":true}
+{"load":1.90} {"bench":"local-read","rows":1000000,"ns":{"snapshot.k":468173418.6666667,"lens.k":4094.55665,"handle.k":2978.737175,"map.get":980.653509,"snapshot":497169146.6666667,"idx.only":52.4273185},"sink":true}
+{"load":1.42} {"bench":"local-read","rows":1000,"ns":{"snapshot.k":86762.4175,"lens.k":535.6254,"handle.k":210.988365,"map.get":74.937202,"snapshot":83157.1075,"idx.only":23.881643},"sink":true}
+{"load":1.42} {"bench":"local-read","rows":100000,"ns":{"snapshot.k":30359227.25,"lens.k":3024.51418,"handle.k":2073.141175,"map.get":486.3889225,"snapshot":28663186,"idx.only":44.877125},"sink":true}
+{"load":1.33} {"bench":"local-read","rows":1000000,"ns":{"snapshot.k":472682399.6666667,"lens.k":4238.58956,"handle.k":3001.24506,"map.get":960.399924,"snapshot":457921591,"idx.only":51.1327355},"sink":true}

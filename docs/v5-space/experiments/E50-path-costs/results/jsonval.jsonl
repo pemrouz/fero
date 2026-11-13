@@ -1,0 +1,6 @@
+1.17 1.35 1.11 1/113 7686
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":539.3,"decode_ns":964.5},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":366.4,"decode_ns":620.7},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1631.6,"decode_ns":2727.3}}
+1.09 1.30 1.10 1/115 8114
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":483.8,"decode_ns":885},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":347.4,"decode_ns":622.7},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1700,"decode_ns":2760.7}}
+1.08 1.26 1.10 1/116 8463
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":548.4,"decode_ns":841.5},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":362,"decode_ns":617.4},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1573.6,"decode_ns":2763}}

@@ -1,0 +1,6 @@
+0.07 0.44 0.38 1/114 4514
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":538.9,"decode_ns":974.2},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":354.1,"decode_ns":597.1},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1578.2,"decode_ns":2697.3}}
+0.28 0.47 0.39 1/111 4524
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":541.9,"decode_ns":973.5},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":367.7,"decode_ns":611.7},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1628.8,"decode_ns":2712.3}}
+0.39 0.48 0.40 1/112 4540
+{"bench":"jsonval","node":"v22.22.0","rec":{"ok":true,"bytes_per_record":137.9,"encode_ns":536.1,"decode_ns":929.5},"batch":{"ok":true,"bytes_per_record":136.9,"encode_ns":362.9,"decode_ns":596},"v4":{"ok":true,"bytes_per_record":139,"encode_ns":1702.6,"decode_ns":2632.3}}

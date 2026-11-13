@@ -1,0 +1,6 @@
+{"load":2.77} {"bench":"snapshot-serve","rows":100000,"rowsPerRoom":100,"us":{"scan":2967.9,"index":497.8,"encode":251.7,"shared, 100 subscribers":4.98,"shared, 1000 subscribers":0.498},"sink":true}
+{"load":2.49} {"bench":"snapshot-serve","rows":1000000,"rowsPerRoom":100,"us":{"scan":25842.6,"index":750.1,"encode":277,"shared, 100 subscribers":7.5,"shared, 1000 subscribers":0.75},"sink":true}
+{"load":1.81} {"bench":"snapshot-serve","rows":100000,"rowsPerRoom":100,"us":{"scan":2835.6,"index":465.5,"encode":239.2,"shared, 100 subscribers":4.66,"shared, 1000 subscribers":0.466},"sink":true}
+{"load":1.74} {"bench":"snapshot-serve","rows":1000000,"rowsPerRoom":100,"us":{"scan":30173.6,"index":700.5,"encode":271.3,"shared, 100 subscribers":7,"shared, 1000 subscribers":0.7},"sink":true}
+{"load":1.32} {"bench":"snapshot-serve","rows":100000,"rowsPerRoom":100,"us":{"scan":2596.1,"index":482.9,"encode":240.7,"shared, 100 subscribers":4.83,"shared, 1000 subscribers":0.483},"sink":true}
+{"load":1.34} {"bench":"snapshot-serve","rows":1000000,"rowsPerRoom":100,"us":{"scan":25434.6,"index":691.3,"encode":261.7,"shared, 100 subscribers":6.91,"shared, 1000 subscribers":0.691},"sink":true}

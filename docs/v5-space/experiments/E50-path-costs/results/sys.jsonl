@@ -1,0 +1,66 @@
+1.40 1.42 1.12 1/112 7439
+{"bench":"sys","mode":"fsync-grow","node":"v22.22.0","n":1500,"wall_us_per_op":160.75,"cpu_us_per_op":44.21,"user_us_per_op":6.36,"sys_us_per_op":37.85,"vol_ctx_per_op":3.01,"invol_ctx_per_op":0,"p50_us":140.7,"p99_us":485.9}
+1.40 1.42 1.12 1/112 7449
+{"bench":"sys","mode":"fsync-over","node":"v22.22.0","n":1500,"wall_us_per_op":151.99,"cpu_us_per_op":37.82,"user_us_per_op":15.46,"sys_us_per_op":22.36,"vol_ctx_per_op":2.05,"invol_ctx_per_op":0,"p50_us":138.3,"p99_us":483.3}
+1.37 1.41 1.12 1/112 7472
+{"bench":"sys","mode":"a1","node":"v22.22.0","n":1500,"wall_us_per_op":191.3,"cpu_us_per_op":66.86,"user_us_per_op":25.29,"sys_us_per_op":41.57,"vol_ctx_per_op":4.06,"invol_ctx_per_op":0,"p50_us":166.7,"p99_us":570}
+1.37 1.41 1.12 1/112 7486
+{"bench":"sys","mode":"a2","node":"v22.22.0","n":1500,"wall_us_per_op":246.11,"cpu_us_per_op":104.49,"user_us_per_op":42.48,"sys_us_per_op":62.01,"vol_ctx_per_op":6.07,"invol_ctx_per_op":0,"p50_us":194.2,"p99_us":731.4}
+1.37 1.41 1.12 1/112 7500
+{"bench":"sys","mode":"jthread","node":"v22.22.0","n":1500,"wall_us_per_op":167.24,"cpu_us_per_op":67.66,"user_us_per_op":38.91,"sys_us_per_op":28.75,"vol_ctx_per_op":4.05,"p50_us":149.8,"p99_us":452.6}
+1.37 1.41 1.12 1/113 7512
+{"bench":"sys","mode":"hop","node":"v22.22.0","n":20000,"wall_us_per_op":41.63,"cpu_us_per_op":42.52,"user_us_per_op":21.54,"sys_us_per_op":20.98,"vol_ctx_per_op":2}
+1.37 1.41 1.12 1/113 7523
+{"bench":"sys","mode":"write","node":"v22.22.0","n":200000,"wall_us_per_op":0.6,"cpu_us_per_op":0.63,"user_us_per_op":0.29,"sys_us_per_op":0.34,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.37 1.41 1.12 1/113 7533
+{"bench":"sys","mode":"writev","node":"v22.22.0","n":200000,"wall_us_per_op":0.67,"cpu_us_per_op":0.7,"user_us_per_op":0.38,"sys_us_per_op":0.32,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.37 1.41 1.12 1/113 7543
+{"bench":"sys","mode":"imm","node":"v22.22.0","n":200000,"wall_us_per_op":0.84,"cpu_us_per_op":0.91,"user_us_per_op":0.81,"sys_us_per_op":0.11,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.37 1.41 1.12 1/113 7553
+{"bench":"sys","mode":"tick1","node":"v22.22.0","seconds":3,"ticks":2658,"cpu_share_of_core":0.0538,"cpu_us_per_tick":60.78,"vol_ctx_per_s":880}
+1.26 1.39 1.12 1/113 7563
+{"bench":"sys","mode":"idle","node":"v22.22.0","seconds":3,"ticks":0,"cpu_share_of_core":0.0008,"cpu_us_per_tick":null,"vol_ctx_per_s":0}
+1.11 1.33 1.11 1/116 7818
+{"bench":"sys","mode":"fsync-grow","node":"v22.22.0","n":1500,"wall_us_per_op":168.96,"cpu_us_per_op":43.48,"user_us_per_op":9.39,"sys_us_per_op":34.08,"vol_ctx_per_op":3,"invol_ctx_per_op":0,"p50_us":143.4,"p99_us":541.5}
+1.11 1.33 1.11 1/116 7828
+{"bench":"sys","mode":"fsync-over","node":"v22.22.0","n":1500,"wall_us_per_op":126.52,"cpu_us_per_op":32.74,"user_us_per_op":12.91,"sys_us_per_op":19.84,"vol_ctx_per_op":2.05,"invol_ctx_per_op":0,"p50_us":112.5,"p99_us":303}
+1.11 1.33 1.11 1/116 7838
+{"bench":"sys","mode":"a1","node":"v22.22.0","n":1500,"wall_us_per_op":176.53,"cpu_us_per_op":66.93,"user_us_per_op":21.12,"sys_us_per_op":45.81,"vol_ctx_per_op":4.05,"invol_ctx_per_op":0,"p50_us":155.9,"p99_us":613}
+1.11 1.33 1.11 1/116 7852
+{"bench":"sys","mode":"a2","node":"v22.22.0","n":1500,"wall_us_per_op":361.22,"cpu_us_per_op":120.79,"user_us_per_op":22.21,"sys_us_per_op":98.58,"vol_ctx_per_op":6.07,"invol_ctx_per_op":0.002,"p50_us":249.9,"p99_us":913.3}
+1.11 1.33 1.11 1/116 7866
+{"bench":"sys","mode":"jthread","node":"v22.22.0","n":1500,"wall_us_per_op":177.86,"cpu_us_per_op":71.9,"user_us_per_op":17.25,"sys_us_per_op":54.66,"vol_ctx_per_op":4.07,"p50_us":158.2,"p99_us":429.6}
+1.11 1.33 1.11 1/116 7877
+{"bench":"sys","mode":"hop","node":"v22.22.0","n":20000,"wall_us_per_op":41.8,"cpu_us_per_op":42.82,"user_us_per_op":21.72,"sys_us_per_op":21.1,"vol_ctx_per_op":2}
+1.11 1.33 1.11 1/116 7888
+{"bench":"sys","mode":"write","node":"v22.22.0","n":200000,"wall_us_per_op":0.62,"cpu_us_per_op":0.66,"user_us_per_op":0.36,"sys_us_per_op":0.29,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.10 1.32 1.11 1/116 7898
+{"bench":"sys","mode":"writev","node":"v22.22.0","n":200000,"wall_us_per_op":0.68,"cpu_us_per_op":0.7,"user_us_per_op":0.33,"sys_us_per_op":0.37,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.10 1.32 1.11 1/116 7908
+{"bench":"sys","mode":"imm","node":"v22.22.0","n":200000,"wall_us_per_op":1.17,"cpu_us_per_op":1.23,"user_us_per_op":1.07,"sys_us_per_op":0.16,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.10 1.32 1.11 1/116 7918
+{"bench":"sys","mode":"tick1","node":"v22.22.0","seconds":3,"ticks":2618,"cpu_share_of_core":0.0577,"cpu_us_per_tick":66.15,"vol_ctx_per_s":868}
+1.10 1.32 1.11 1/116 7978
+{"bench":"sys","mode":"idle","node":"v22.22.0","seconds":3,"ticks":0,"cpu_share_of_core":0.0006,"cpu_us_per_tick":null,"vol_ctx_per_s":0}
+1.14 1.29 1.10 1/116 8213
+{"bench":"sys","mode":"fsync-grow","node":"v22.22.0","n":1500,"wall_us_per_op":153.8,"cpu_us_per_op":42.47,"user_us_per_op":7.53,"sys_us_per_op":34.94,"vol_ctx_per_op":3,"invol_ctx_per_op":0,"p50_us":140.2,"p99_us":363.3}
+1.14 1.29 1.10 1/116 8223
+{"bench":"sys","mode":"fsync-over","node":"v22.22.0","n":1500,"wall_us_per_op":112.45,"cpu_us_per_op":28.7,"user_us_per_op":5.3,"sys_us_per_op":23.4,"vol_ctx_per_op":2.04,"invol_ctx_per_op":0,"p50_us":104.2,"p99_us":215}
+1.14 1.29 1.10 1/116 8233
+{"bench":"sys","mode":"a1","node":"v22.22.0","n":1500,"wall_us_per_op":232.81,"cpu_us_per_op":87.93,"user_us_per_op":28.38,"sys_us_per_op":59.55,"vol_ctx_per_op":4.06,"invol_ctx_per_op":0,"p50_us":207.5,"p99_us":573.7}
+1.14 1.29 1.10 1/116 8247
+{"bench":"sys","mode":"a2","node":"v22.22.0","n":1500,"wall_us_per_op":195.28,"cpu_us_per_op":99.59,"user_us_per_op":21.4,"sys_us_per_op":78.19,"vol_ctx_per_op":6.06,"invol_ctx_per_op":0.001,"p50_us":179.1,"p99_us":425.4}
+1.14 1.29 1.10 1/116 8261
+{"bench":"sys","mode":"jthread","node":"v22.22.0","n":1500,"wall_us_per_op":206.69,"cpu_us_per_op":77.87,"user_us_per_op":26.75,"sys_us_per_op":51.12,"vol_ctx_per_op":4.06,"p50_us":176.5,"p99_us":534.5}
+1.14 1.29 1.10 1/116 8272
+{"bench":"sys","mode":"hop","node":"v22.22.0","n":20000,"wall_us_per_op":39.86,"cpu_us_per_op":40.79,"user_us_per_op":18.71,"sys_us_per_op":22.08,"vol_ctx_per_op":2}
+1.14 1.29 1.10 1/116 8283
+{"bench":"sys","mode":"write","node":"v22.22.0","n":200000,"wall_us_per_op":0.67,"cpu_us_per_op":0.57,"user_us_per_op":0.25,"sys_us_per_op":0.32,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.14 1.29 1.10 1/116 8293
+{"bench":"sys","mode":"writev","node":"v22.22.0","n":200000,"wall_us_per_op":0.69,"cpu_us_per_op":0.69,"user_us_per_op":0.27,"sys_us_per_op":0.42,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.14 1.29 1.10 1/116 8303
+{"bench":"sys","mode":"imm","node":"v22.22.0","n":200000,"wall_us_per_op":0.85,"cpu_us_per_op":0.9,"user_us_per_op":0.82,"sys_us_per_op":0.08,"vol_ctx_per_op":0,"invol_ctx_per_op":0}
+1.14 1.29 1.10 1/116 8313
+{"bench":"sys","mode":"tick1","node":"v22.22.0","seconds":3,"ticks":2657,"cpu_share_of_core":0.0518,"cpu_us_per_tick":58.44,"vol_ctx_per_s":883}
+1.13 1.29 1.10 1/116 8323
+{"bench":"sys","mode":"idle","node":"v22.22.0","seconds":3,"ticks":0,"cpu_share_of_core":0.0005,"cpu_us_per_tick":null,"vol_ctx_per_s":0}

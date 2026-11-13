@@ -1,0 +1,6 @@
+0.42 0.34 0.14 3/116 2490
+{"bench":"strdec","node":"v22.22.0","unit":"ns per string","strings":13,"td":127.1,"ascii":62,"intern":59.1}
+1.08 0.97 0.72 2/119 5176
+{"bench":"strdec","node":"v22.22.0","unit":"ns per string","strings":13,"td":130.9,"ascii":71,"intern":63.7}
+0.45 0.86 0.77 1/124 6101
+{"bench":"strdec","node":"v22.22.0","unit":"ns per string","strings":13,"td":121.8,"ascii":66.3,"intern":61.3}
