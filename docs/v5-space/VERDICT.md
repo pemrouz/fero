@@ -1264,7 +1264,11 @@ After 11.6, the owner set the arithmetic's pick aside and chose by judgement. Th
 
 **The re-rank by simplicity** ([SIMPLICITY.md](SIMPLICITY.md), the same day). The base has 405 rules, 22nd of the 24 rows that fail no MUST (393 and 14th without answer stages, which no study row priced). It has more rules than MIN-P's plain family at every bound, by 22 to 24, and each rule of that gap comes from one of the owner's choices: `par`, the soft directory, answer stages. Against the other rows the count is not sure enough to order them. TiKV-persisted is 5th, 3 rules behind MIN-P, so counting borrowed rules neither sinks TiKV's shape nor backs V5-1 alone; V5-1 rests on what the log gives for free (121 MUSTs open there against 97).
 
-**Next, all without code:** how overhead grows per resource; the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one.
+**Cost per resource** ([E-49](experiments/E49-per-resource-cost/README.md), 2026-11-13). Idle, a resource costs each member about 5.4 KB of live memory, 0 frames and no measurable CPU; dormant, 1.2-2.4 KB. Inside the likely range (tens to low thousands per process) two costs show: DEP-13's 100 MB empty copy is passed at a few hundred to about 2,000 resources if it counts resources (a question for the owner), and the base's random-timer boot leaves leaders uneven for minutes after each boot or restart. The rest bends at about 10,000 per process; 100,000 needs dormant groups (+4 rules).
+
+**Every path stepped through** ([PATHS.md](PATHS.md), with [E-50](experiments/E50-path-costs/README.md)). Built well, the design sits about 1.2-1.5 times above its lower bound on a small write, and at it on round trips once writes go straight to the leader. The largest gains: direct routing, one native checksum per batch, a byte-rate cap on bulk work, and byte-only work off the main thread. All the design changes together add about 14 to 25 rules, so each is for the owner to weigh alone.
+
+**Next, all without code:** the owner's reading of DEP-13's empty copy, and which of PATHS 7.1's changes to take; a model of the per-resource pieces (genesis per resource, the home log, healing with a stored placement, the soft directory); the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md
