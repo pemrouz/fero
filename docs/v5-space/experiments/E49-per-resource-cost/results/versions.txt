@@ -1,0 +1,7 @@
+fero cab0913 (api/substrate.ts, api/directory.ts, kernel/env.ts, kernel/codec.ts, kernel/door.ts copied)
+data 63fea66
+v22.22.0
+6.18.44-fc-v378
+4
+               total        used        free      shared  buff/cache   available
+Mem:              15           0          15           0           0          15
