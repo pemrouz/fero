@@ -1,0 +1,2 @@
+{"bench":"field","ok":true,"v4_encode_ns":317.2,"rec_encode_ns":311.8,"v4_decode_ns":406.1,"rec_decode_ns":376.6,"v4_bytes":24.1,"rec_bytes":16.4,"node":"v22.22.0"}
+{"bench":"field","ok":true,"v4_encode_ns":330.2,"rec_encode_ns":326.6,"v4_decode_ns":410,"rec_decode_ns":401.2,"v4_bytes":24.1,"rec_bytes":16.4,"node":"v22.22.0"}

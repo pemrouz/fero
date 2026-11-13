@@ -1,0 +1,24 @@
+0.75 0.69 0.43 1/117 4095
+{"bench":"alloc","mode":"alloc-write-num","n":5000,"rounds_clean":7,"bytes_per_op":4821,"all":[5643,4821,4699,4716,4925,4675,4944]}
+0.75 0.69 0.43 1/117 4105
+{"bench":"alloc","mode":"alloc-write-row","n":5000,"rounds_clean":7,"bytes_per_op":8085,"all":[8895,8085,8004,8005,8178,7963,8148]}
+1.09 0.77 0.46 1/117 4115
+{"bench":"alloc","mode":"alloc-inbound-num","n":5000,"rounds_clean":7,"bytes_per_op":2401,"all":[2854,2430,2384,2381,2401,2346,2433]}
+1.09 0.77 0.46 1/117 4125
+{"bench":"alloc","mode":"alloc-inbound-row","n":5000,"rounds_clean":7,"bytes_per_op":7053,"all":[7466,7053,7045,7043,7064,7002,7083]}
+1.09 0.77 0.46 1/117 4157
+{"bench":"alloc","mode":"alloc-write-num","n":5000,"rounds_clean":7,"bytes_per_op":4834,"all":[5713,4834,4699,4716,4879,4675,4946]}
+1.09 0.77 0.46 1/117 4167
+{"bench":"alloc","mode":"alloc-write-row","n":5000,"rounds_clean":7,"bytes_per_op":8090,"all":[8898,8090,8004,8004,8191,7963,8166]}
+1.00 0.75 0.45 1/117 4177
+{"bench":"alloc","mode":"alloc-inbound-num","n":5000,"rounds_clean":7,"bytes_per_op":2397,"all":[2853,2420,2396,2379,2397,2355,2428]}
+1.00 0.75 0.45 1/117 4187
+{"bench":"alloc","mode":"alloc-inbound-row","n":5000,"rounds_clean":7,"bytes_per_op":7054,"all":[7462,7054,7048,7041,7060,6997,7081]}
+1.00 0.75 0.45 1/119 4222
+{"bench":"alloc","mode":"alloc-write-num","n":5000,"rounds_clean":7,"bytes_per_op":4826,"all":[5714,4826,4699,4716,4917,4675,4943]}
+1.00 0.75 0.45 1/119 4232
+{"bench":"alloc","mode":"alloc-write-row","n":5000,"rounds_clean":7,"bytes_per_op":8084,"all":[8927,8084,8004,8004,8164,7963,8140]}
+1.00 0.76 0.46 2/119 4242
+{"bench":"alloc","mode":"alloc-inbound-num","n":5000,"rounds_clean":7,"bytes_per_op":2390,"all":[2855,2442,2379,2385,2390,2356,2422]}
+1.00 0.76 0.46 1/120 4253
+{"bench":"alloc","mode":"alloc-inbound-row","n":5000,"rounds_clean":7,"bytes_per_op":7042,"all":[7466,7042,7036,7038,7057,7003,7077]}

@@ -1,0 +1,24 @@
+1.43 1.42 1.12 1/116 7348
+{"bench":"api","mode":"write-num","n":20000,"rounds":7,"ns_per_op":4704,"min":4164,"max":5924}
+1.43 1.42 1.12 1/116 7358
+{"bench":"api","mode":"write-row","n":20000,"rounds":7,"ns_per_op":7729,"min":7300,"max":10006}
+1.43 1.42 1.12 1/116 7368
+{"bench":"api","mode":"inbound-num","n":20000,"rounds":7,"ns_per_op":2647,"min":2452,"max":3702}
+1.43 1.42 1.12 1/116 7378
+{"bench":"api","mode":"inbound-row","n":20000,"rounds":7,"ns_per_op":7563,"min":6803,"max":9071}
+1.14 1.34 1.11 1/112 7696
+{"bench":"api","mode":"write-num","n":20000,"rounds":7,"ns_per_op":4677,"min":4032,"max":6153}
+1.14 1.34 1.11 1/116 7721
+{"bench":"api","mode":"write-row","n":20000,"rounds":7,"ns_per_op":7714,"min":7452,"max":12749}
+1.21 1.35 1.11 1/116 7731
+{"bench":"api","mode":"inbound-num","n":20000,"rounds":7,"ns_per_op":2491,"min":2318,"max":3110}
+1.21 1.35 1.11 1/116 7755
+{"bench":"api","mode":"inbound-row","n":20000,"rounds":7,"ns_per_op":7567,"min":6666,"max":8081}
+1.07 1.28 1.10 1/116 8129
+{"bench":"api","mode":"write-num","n":20000,"rounds":7,"ns_per_op":4830,"min":4008,"max":5945}
+1.07 1.28 1.10 1/116 8139
+{"bench":"api","mode":"write-row","n":20000,"rounds":7,"ns_per_op":7458,"min":7306,"max":10967}
+1.07 1.28 1.10 1/117 8150
+{"bench":"api","mode":"inbound-num","n":20000,"rounds":7,"ns_per_op":2414,"min":2142,"max":2853}
+1.07 1.28 1.10 1/114 8160
+{"bench":"api","mode":"inbound-row","n":20000,"rounds":7,"ns_per_op":7964,"min":6868,"max":9797}

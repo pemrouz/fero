@@ -1,0 +1,96 @@
+{
+ "total_ms": 783.9,
+ "areas": {
+  "fero api/data.ts (Bind: issue, outcome, settle)": 36.5,
+  "gc": 23.9,
+  "data (fold, views)": 15.5,
+  "fero kernel other (node, write, link, journal)": 14.6,
+  "bench driver": 8.7,
+  "fero api/substrate.ts (lens, applyRec)": 0.6,
+  "fero kernel/codec.ts": 0.1,
+  "node internals": 0.1,
+  "native/builtins": 0
+ },
+ "top": [
+  [
+   "(garbage collector) :0",
+   23.9
+  ],
+  [
+   "apply fero:kernel/node.ts:2813",
+   10.2
+  ],
+  [
+   "#issue fero:api/data.ts:501",
+   9.9
+  ],
+  [
+   "run core-bench/api.ts:53",
+   8.7
+  ],
+  [
+   "cellOf fero:api/data.ts:283",
+   7.7
+  ],
+  [
+   "#forget fero:api/data.ts:607",
+   7.4
+  ],
+  [
+   "commitOnce data:kernel/runtime.ts:222",
+   4.9
+  ],
+  [
+   "settle data:kernel/node.ts:664",
+   4.2
+  ],
+  [
+   "#outcome fero:api/data.ts:389",
+   2.6
+  ],
+  [
+   "#fromLens fero:api/data.ts:725",
+   2.6
+  ],
+  [
+   "(anon) fero:api/data.ts:550",
+   2.4
+  ],
+  [
+   "flush data:kernel/runtime.ts:181",
+   2.4
+  ],
+  [
+   "resolve fero:api/data.ts:555",
+   1.8
+  ],
+  [
+   "commit fero:kernel/node.ts:1175",
+   1.5
+  ],
+  [
+   "slotOf data:kernel/store.ts:157",
+   1.2
+  ],
+  [
+   "fnv fero:kernel/node.ts:3102",
+   1.1
+  ],
+  [
+   "batch data:kernel/runtime.ts:138",
+   1
+  ],
+  [
+   "for fero:kernel/streams.ts:61",
+   0.9
+  ],
+  [
+   "#onApply fero:api/data.ts:623",
+   0.8
+  ],
+  [
+   "#apply fero:api/data.ts:707",
+   0.8
+  ]
+ ]
+}

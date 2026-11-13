@@ -1,0 +1,54 @@
+1.26 1.39 1.12 1/113 7573
+{"bench":"link","mode":"tcp-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":5.89,"cpu_us_per_op":6.349,"user_us_per_op":3.805,"sys_us_per_op":2.544,"vol_ctx_per_op":0.037,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.24 1.38 1.11 1/113 7584
+{"bench":"link","mode":"tls-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":8.19,"cpu_us_per_op":8.703,"user_us_per_op":6.355,"sys_us_per_op":2.348,"vol_ctx_per_op":0.068,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.24 1.38 1.11 1/113 7595
+{"bench":"link","mode":"tcp-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.28,"cpu_us_per_op":0.478,"user_us_per_op":0.381,"sys_us_per_op":0.097,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.24 1.38 1.11 1/113 7606
+{"bench":"link","mode":"tcp-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.27,"cpu_us_per_op":0.419,"user_us_per_op":0.331,"sys_us_per_op":0.088,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.24 1.38 1.11 1/113 7617
+{"bench":"link","mode":"tls-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.39,"cpu_us_per_op":0.629,"user_us_per_op":0.506,"sys_us_per_op":0.122,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.24 1.38 1.11 1/113 7628
+{"bench":"link","mode":"tls-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.31,"cpu_us_per_op":0.512,"user_us_per_op":0.443,"sys_us_per_op":0.069,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.24 1.38 1.11 1/113 7639
+{"bench":"link","mode":"hs-tcp","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":72.44,"cpu_us_per_op":100.283,"user_us_per_op":62.707,"sys_us_per_op":37.577,"vol_ctx_per_op":0.06}
+1.24 1.38 1.11 1/113 7650
+{"bench":"link","mode":"hs-tls","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":1982.49,"cpu_us_per_op":2106.413,"user_us_per_op":1944.363,"sys_us_per_op":162.05,"vol_ctx_per_op":0.307}
+1.24 1.38 1.11 1/113 7661
+{"bench":"link","mode":"crypto","node":"v22.22.0","openssl":"3.5.4","hmac_sha256_us":2.534,"ed25519_verify_us":104.195,"es256_verify_us":77.351,"ok":true}
+1.02 1.30 1.10 1/113 8002
+{"bench":"link","mode":"tcp-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":5.75,"cpu_us_per_op":6.204,"user_us_per_op":3.385,"sys_us_per_op":2.819,"vol_ctx_per_op":0.04,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.02 1.30 1.10 1/113 8013
+{"bench":"link","mode":"tls-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":8.27,"cpu_us_per_op":8.861,"user_us_per_op":6.342,"sys_us_per_op":2.519,"vol_ctx_per_op":0.071,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.02 1.30 1.10 1/113 8024
+{"bench":"link","mode":"tcp-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.29,"cpu_us_per_op":0.468,"user_us_per_op":0.337,"sys_us_per_op":0.13,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.02 1.30 1.10 1/113 8035
+{"bench":"link","mode":"tcp-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.22,"cpu_us_per_op":0.36,"user_us_per_op":0.275,"sys_us_per_op":0.085,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.02 1.30 1.10 1/113 8046
+{"bench":"link","mode":"tls-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.34,"cpu_us_per_op":0.525,"user_us_per_op":0.421,"sys_us_per_op":0.104,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.02 1.30 1.10 1/113 8057
+{"bench":"link","mode":"tls-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.27,"cpu_us_per_op":0.428,"user_us_per_op":0.342,"sys_us_per_op":0.086,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.02 1.30 1.10 1/113 8068
+{"bench":"link","mode":"hs-tcp","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":66.07,"cpu_us_per_op":89.313,"user_us_per_op":69.807,"sys_us_per_op":19.507,"vol_ctx_per_op":0.053}
+1.02 1.30 1.10 2/113 8079
+{"bench":"link","mode":"hs-tls","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":1887.86,"cpu_us_per_op":2007.847,"user_us_per_op":1904.633,"sys_us_per_op":103.213,"vol_ctx_per_op":0.257}
+1.01 1.30 1.10 1/113 8090
+{"bench":"link","mode":"crypto","node":"v22.22.0","openssl":"3.5.4","hmac_sha256_us":2.454,"ed25519_verify_us":105.103,"es256_verify_us":80.92,"ok":true}
+1.13 1.29 1.10 1/116 8333
+{"bench":"link","mode":"tcp-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":5.38,"cpu_us_per_op":5.924,"user_us_per_op":3.362,"sys_us_per_op":2.562,"vol_ctx_per_op":0.045,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.12 1.28 1.10 1/113 8344
+{"bench":"link","mode":"tls-each","node":"v22.22.0","openssl":"3.5.4","n":100000,"wall_us_per_op":8.04,"cpu_us_per_op":8.652,"user_us_per_op":5.782,"sys_us_per_op":2.87,"vol_ctx_per_op":0.064,"msg_bytes":150,"per_turn":1,"reads_per_msg":1}
+1.12 1.28 1.10 1/113 8355
+{"bench":"link","mode":"tcp-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.27,"cpu_us_per_op":0.452,"user_us_per_op":0.36,"sys_us_per_op":0.092,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.12 1.28 1.10 1/113 8366
+{"bench":"link","mode":"tcp-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.2,"cpu_us_per_op":0.351,"user_us_per_op":0.279,"sys_us_per_op":0.072,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.12 1.28 1.10 1/113 8377
+{"bench":"link","mode":"tls-cork64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.37,"cpu_us_per_op":0.58,"user_us_per_op":0.518,"sys_us_per_op":0.062,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.12 1.28 1.10 1/113 8388
+{"bench":"link","mode":"tls-cat64","node":"v22.22.0","openssl":"3.5.4","n":400000,"wall_us_per_op":0.24,"cpu_us_per_op":0.399,"user_us_per_op":0.325,"sys_us_per_op":0.074,"vol_ctx_per_op":0.001,"msg_bytes":150,"per_turn":64,"reads_per_msg":0.0156}
+1.12 1.28 1.10 1/113 8399
+{"bench":"link","mode":"hs-tcp","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":79.62,"cpu_us_per_op":103.533,"user_us_per_op":102.623,"sys_us_per_op":0.91,"vol_ctx_per_op":0.067}
+1.12 1.28 1.10 1/113 8410
+{"bench":"link","mode":"hs-tls","node":"v22.22.0","openssl":"3.5.4","n":300,"wall_us_per_op":1626.09,"cpu_us_per_op":1735.48,"user_us_per_op":1628.89,"sys_us_per_op":106.59,"vol_ctx_per_op":0.313}
+1.12 1.28 1.10 1/114 8439
+{"bench":"link","mode":"crypto","node":"v22.22.0","openssl":"3.5.4","hmac_sha256_us":2.521,"ed25519_verify_us":87.183,"es256_verify_us":73.906,"ok":true}
