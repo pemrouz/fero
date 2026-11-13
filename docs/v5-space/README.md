@@ -85,14 +85,15 @@ Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer), the [COMP
 | 10 | [LAYERS.md](LAYERS.md) | what each layer, L0 to L5, keeps, does and still owes, with walk-throughs | to see how the design works inside |
 | 11 | [MEMORY.md](MEMORY.md) | whether to offer a `memory` option on TiKV's shape: what it buys, what a lost tail breaks, the forms, the rules and the API | after the owner's answers, to see the speed trade |
 | 12 | [SIMPLICITY.md](SIMPLICITY.md) | the rows re-ranked by every rule a builder must get right, borrowed or not (V5-6): where the owner's base lands, and how sure the count is | after DECISIONS V5-1 to V5-6, to see what each design costs in rules |
-| 13 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
-| 14 | [experiments/](#experiments) | 59 experiment folders, listed below | to check a measurement or a model |
-| 15 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
-| 16 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
+| 13 | [PATHS.md](PATHS.md) | every path of the chosen design stepped through (writes, reads and flow, upkeep, and the costs every op pays): each step's work, whether it is needed, the least work any correct design must do, and what would close the gap, design or build | before building, to see where the time and bytes go |
+| 14 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
+| 15 | [experiments/](#experiments) | 61 experiment folders, listed below | to check a measurement or a model |
+| 16 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
+| 17 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
 
 ### experiments/
 
-Each folder's README asks one question and has a verdict line ("Q-nn: the answer. Moves: ..."). E-41's README adds a price re-check after its verdict line. All but E-32 have a `run.sh` and a `results/` folder, and 52 have a `fetch.sh`. [TOOLS.md](experiments/TOOLS.md) lists the benchmark tools on the study box; [tools-fetch.sh](experiments/tools-fetch.sh) fetches them again, and [tools/](experiments/tools) holds their smoke test (`smoke.sh`), its sources and its output.
+Each folder's README asks one question and has a verdict line ("Q-nn: the answer. Moves: ..."). E-41's README adds a price re-check after its verdict line. All but E-32 have a `run.sh` and a `results/` folder, and 53 have a `fetch.sh`. [TOOLS.md](experiments/TOOLS.md) lists the benchmark tools on the study box; [tools-fetch.sh](experiments/tools-fetch.sh) fetches them again, and [tools/](experiments/tools) holds their smoke test (`smoke.sh`), its sources and its output.
 
 **Floors, language and the fold**
 - [E-01 floors](experiments/E01-floors/README.md): this box's fsync and round-trip times. The study's commit bar C is 0.73 ms: a three-writer fsync p99 of 676 µs plus a round-trip p99 of 58 µs (a sum of two p99s, not a floor).
@@ -147,6 +148,8 @@ Each folder's README asks one question and has a verdict line ("Q-nn: the answer
 - [E-31 subscribe](experiments/E31-subscribe/README.md): the subscribe protocol across failover, slot moves and relays. Yes, after one rule change.
 - [E-47 memory-rung](experiments/E47-memory-rung/README.md): the `memory` rung losing its unsynced tail, on TiKV's shape. Without rules it breaks P-15, P-10 and F-02. Two rule sets fix every break at the model's bounds: refusing transactions, fenced writes and lock rows on memory resources ({R2}), or {R1s, R3, R2.claim}.
 - [E-48 ack-stages](experiments/E48-ack-stages/README.md): answer stages per call (received, replicated, committed) over a fixed on-disk commit, on TiKV's shape. Raft's commit, election and recovery rules stay `persisted`'s. With three client-side rules (the libraries' own steps wait for the commit, each writer numbers its writes, a read waits for its own writes), only the writer can be told something that later vanishes. A commit in memory with a per-write answer breaks through readers.
+- [E-49 per-resource-cost](experiments/E49-per-resource-cost/README.md): how the overhead of a resource grows in the chosen design, from 1 to 100,000 resources per process, on real code. Idle, a resource costs each member about 5.4 KB of live memory, 0 frames and no measurable CPU; the knees are DEP-13's 100 MB empty copy (a few hundred to about 2,000 resources, if it counts resources), the base's random-timer boot and its hand-back, and about 10,000 per process for the rest.
+- [E-50 path-costs](experiments/E50-path-costs/README.md): the micro-benchmarks behind [PATHS.md](PATHS.md): checksums per byte and per call, decode by row shape with the rows kept, thread crossings, the flush's thread, TLS alone and batched, `f.snapshot`, and E-10's Raft port at 10,000 and 50,000 writes a second.
 
 **Scale, hosting and client links**
 - [E-08 relay-fanout](experiments/E08-relay-fanout/README.md): deliveries a second from one relay core. 0.57-1.50 million in Node with no added wait, and 20.6-32.3 million with 10 ms rounds, against core NATS's 5.8 million per core.
