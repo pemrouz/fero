@@ -1,0 +1,10 @@
+# open files: this process, a node process started from a shell whose soft limit is 1,024, the kernel ceilings
+Max open files            20000                20000                files     
+Max open files            20000                20000                files      (node, soft limit 1024 before it started)
+raise to 30000: run.sh: 98: ulimit: error setting limit (Operation not permitted)
+fs.nr_open 1048576
+fs.file-max 1643940
+# kernel objects per cached inode, dentry and open file (name, active, total, object size B)
+ext4_inode_cache 12006 12006 1128
+filp 525 525 192
+dentry 17850 17850 192

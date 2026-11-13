@@ -1,0 +1,166 @@
+{"loadavg":"0.33 0.56 0.30 1/120 3002","part":"base","R":1000,"marker":1}
+{"exp":"E-49","part":"base","R":1000,"note":"nothing (the control)","node":"v22.22.0","heap_B_per_res":104,"rss_B_per_res":393,"heap_MB":9.8,"rss_MB":95.1,"build_ms":0.2,"build_us_per_res":0.25,"build_cpu_us_per_res":3.49}
+{"loadavg":"0.33 0.56 0.30 1/120 3010","part":"raft-founded","R":1000,"marker":1}
+{"exp":"E-49","part":"raft-founded","R":1000,"note":"home group founded in-process: 3 replicas (1 leader, 2 followers), founding batch committed, logs compacted; per member = /3","node":"v22.22.0","heap_B_per_res":10675,"rss_B_per_res":40763,"heap_MB":19.8,"rss_MB":131.7,"build_ms":248.8,"build_us_per_res":248.79,"build_cpu_us_per_res":540.31,"heap_B_per_replica":3558,"rss_B_per_replica":13588}
+{"loadavg":"0.33 0.56 0.30 1/120 3018","part":"raft-member","R":1000,"marker":1}
+{"exp":"E-49","part":"raft-member","R":1000,"note":"one member's copy: founded as above, this member keeps replica i % 3 (it leads a third of the groups), the other two are dropped","node":"v22.22.0","heap_B_per_res":4424,"rss_B_per_res":31670,"heap_MB":13.9,"rss_MB":125.1,"build_ms":243.9,"build_us_per_res":243.9,"build_cpu_us_per_res":573.86}
+{"loadavg":"0.33 0.56 0.30 1/120 3026","part":"raft-open","R":1000,"marker":1}
+{"exp":"E-49","part":"raft-open","R":1000,"note":"a follower opened from stored hard state (the boot path, E-26 makeGroup)","node":"v22.22.0","heap_B_per_res":3514,"rss_B_per_res":10748,"heap_MB":13,"rss_MB":102.9,"build_ms":47.8,"build_us_per_res":47.83,"build_cpu_us_per_res":94.26}
+{"loadavg":"0.33 0.56 0.30 1/120 3034","part":"settings","R":1000,"marker":1}
+{"exp":"E-49","part":"settings","R":1000,"note":"the settings record as an object (was the #meta catalog row)","node":"v22.22.0","heap_B_per_res":335,"rss_B_per_res":524,"heap_MB":10,"rss_MB":95.2,"build_ms":0.6,"build_us_per_res":0.63,"build_cpu_us_per_res":4}
+{"loadavg":"0.33 0.56 0.30 1/120 3042","part":"group-record","R":1000,"marker":1}
+{"exp":"E-49","part":"group-record","R":1000,"note":"the group record (slots, replicas, leader hint) as an object","node":"v22.22.0","heap_B_per_res":275,"rss_B_per_res":393,"heap_MB":9.9,"rss_MB":95,"build_ms":0.5,"build_us_per_res":0.46,"build_cpu_us_per_res":3.67}
+{"loadavg":"0.33 0.56 0.30 1/120 3050","part":"slot-rle","R":1000,"marker":1}
+{"exp":"E-49","part":"slot-rle","R":1000,"note":"slot table: run-length, one run","node":"v22.22.0","heap_B_per_res":217,"rss_B_per_res":393,"heap_MB":9.9,"rss_MB":94.9,"build_ms":0.4,"build_us_per_res":0.36,"build_cpu_us_per_res":3.62}
+{"loadavg":"0.33 0.56 0.30 1/120 3058","part":"perslot-map-1","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-map-1","R":1000,"note":"per-slot state: Map of touched slots, 1 touched","node":"v22.22.0","heap_B_per_res":341,"rss_B_per_res":393,"heap_MB":10,"rss_MB":93.9,"build_ms":0.6,"build_us_per_res":0.65,"build_cpu_us_per_res":3.81}
+{"loadavg":"0.33 0.56 0.30 1/120 3066","part":"perslot-map-10","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-map-10","R":1000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":1112,"rss_B_per_res":3146,"heap_MB":10.7,"rss_MB":95.3,"build_ms":3.6,"build_us_per_res":3.61,"build_cpu_us_per_res":8.07}
+{"loadavg":"0.33 0.56 0.30 1/120 3074","part":"perslot-map-100","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-map-100","R":1000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":8573,"rss_B_per_res":18481,"heap_MB":17.8,"rss_MB":110.3,"build_ms":30.5,"build_us_per_res":30.5,"build_cpu_us_per_res":41.2}
+{"loadavg":"0.33 0.56 0.30 1/120 3082","part":"perslot-packed-1","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-1","R":1000,"note":"per-slot state packed: one sorted byte array, 18 B per touched slot; 1 touched","node":"v22.22.0","heap_B_per_res":312,"rss_B_per_res":524,"heap_MB":10,"rss_MB":85.2,"build_ms":1.1,"build_us_per_res":1.08,"build_cpu_us_per_res":4.21}
+{"loadavg":"0.33 0.56 0.30 1/120 3090","part":"perslot-packed-10","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-10","R":1000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":477,"rss_B_per_res":786,"heap_MB":10.1,"rss_MB":95.3,"build_ms":12.6,"build_us_per_res":12.62,"build_cpu_us_per_res":9.92}
+{"loadavg":"0.33 0.56 0.30 1/120 3098","part":"perslot-packed-100","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-100","R":1000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":2097,"rss_B_per_res":4719,"heap_MB":11.7,"rss_MB":99.3,"build_ms":18.6,"build_us_per_res":18.64,"build_cpu_us_per_res":24.6}
+{"loadavg":"0.33 0.56 0.30 1/120 3106","part":"fold-empty","R":1000,"marker":1}
+{"exp":"E-49","part":"fold-empty","R":1000,"note":"an empty data source through the seam (S.proxy)","node":"v22.22.0","heap_B_per_res":1367,"rss_B_per_res":524,"heap_MB":11,"rss_MB":95.5,"build_ms":1.9,"build_us_per_res":1.86,"build_cpu_us_per_res":5.33}
+{"loadavg":"0.38 0.57 0.31 1/120 3114","part":"fold-10","R":1000,"marker":1}
+{"exp":"E-49","part":"fold-10","R":1000,"note":"a data source with 10 rows of about 100 B (E-05 rows)","node":"v22.22.0","heap_B_per_res":4541,"rss_B_per_res":7733,"heap_MB":14,"rss_MB":102.4,"build_ms":21.6,"build_us_per_res":21.56,"build_cpu_us_per_res":47.59}
+{"loadavg":"0.38 0.57 0.31 1/120 3122","part":"dir-host-indexed","R":1000,"marker":1}
+{"exp":"E-49","part":"dir-host-indexed","R":1000,"note":"v4's registry and owner maps with an index of names in place of the snapshot read (the one-line fix)","node":"v22.22.0","heap_B_per_res":1670,"rss_B_per_res":5243,"heap_MB":11.3,"rss_MB":92.4,"build_ms":18.1,"build_us_per_res":18.08,"build_cpu_us_per_res":30.69,"v4_snapshot_us_at_R":524.2,"call_B":140,"result_B":32,"batch_B":18015,"batch_encode_ms":1.83,"register_us":18.08,"entries":3000,"register_us_per_entry":6.03}
+{"loadavg":"0.38 0.57 0.31 1/117 3130","part":"dir-names","R":1000,"marker":1}
+{"exp":"E-49","part":"dir-names","R":1000,"note":"a server's own list of the names it announces (a string per resource)","node":"v22.22.0","heap_B_per_res":172,"rss_B_per_res":524,"heap_MB":9.8,"rss_MB":95.2,"build_ms":0.4,"build_us_per_res":0.38,"build_cpu_us_per_res":3.69}
+{"loadavg":"0.38 0.57 0.31 1/117 3138","part":"client-source","R":1000,"marker":1}
+{"exp":"E-49","part":"client-source","R":1000,"note":"a client's state per followed source: members, slot table (one run), leader, a cursor of 10 touched slots, the subscription","node":"v22.22.0","heap_B_per_res":1352,"rss_B_per_res":2753,"heap_MB":11,"rss_MB":96.8,"build_ms":5.4,"build_us_per_res":5.37,"build_cpu_us_per_res":11.44}
+{"loadavg":"0.38 0.57 0.31 1/117 3146","part":"client-source-off","R":1000,"marker":1}
+{"exp":"E-49","part":"client-source-off","R":1000,"note":"the same with an implicit table and a one-number cursor (one group, no moves)","node":"v22.22.0","heap_B_per_res":487,"rss_B_per_res":524,"heap_MB":10.1,"rss_MB":95.2,"build_ms":0.7,"build_us_per_res":0.69,"build_cpu_us_per_res":3.94}
+{"loadavg":"0.38 0.57 0.31 1/117 3154","part":"timers","R":1000,"marker":1}
+{"exp":"E-49","part":"timers","R":1000,"note":"one setInterval(500 ms) per resource","node":"v22.22.0","heap_B_per_res":334,"rss_B_per_res":524,"heap_MB":10,"rss_MB":87.6,"build_ms":1.8,"build_us_per_res":1.83,"build_cpu_us_per_res":6.51,"idle_cores":0.0069}
+{"loadavg":"0.35 0.56 0.31 1/117 3163","part":"dormant","R":1000,"marker":1}
+{"exp":"E-49","part":"dormant","R":1000,"note":"group id -> store offset (Map) plus name -> id (Map)","node":"v22.22.0","heap_B_per_res":228,"rss_B_per_res":393,"heap_MB":9.9,"rss_MB":94.6,"build_ms":0.6,"build_us_per_res":0.61,"build_cpu_us_per_res":3.85}
+{"loadavg":"0.35 0.56 0.31 1/117 3171","part":"asm-cheap","R":1000,"marker":1}
+{"exp":"E-49","part":"asm-cheap","R":1000,"note":"assembled, cheap form: member copy of the home group + settings + group record + one-run slot table + packed per-slot state (10 touched) + empty fold + announced name","node":"v22.22.0","heap_B_per_res":6746,"rss_B_per_res":40370,"heap_MB":16.1,"rss_MB":133.4,"build_ms":260.1,"build_us_per_res":260.1,"build_cpu_us_per_res":607.05}
+{"loadavg":"0.35 0.56 0.31 1/117 3179","part":"base","R":10000,"marker":1}
+{"exp":"E-49","part":"base","R":10000,"note":"nothing (the control)","node":"v22.22.0","heap_B_per_res":10,"rss_B_per_res":39,"heap_MB":9.8,"rss_MB":94.8,"build_ms":0.5,"build_us_per_res":0.05,"build_cpu_us_per_res":0.38}
+{"loadavg":"0.35 0.56 0.31 1/117 3187","part":"raft-founded","R":10000,"marker":1}
+{"exp":"E-49","part":"raft-founded","R":10000,"note":"home group founded in-process: 3 replicas (1 leader, 2 followers), founding batch committed, logs compacted; per member = /3","node":"v22.22.0","heap_B_per_res":9504,"rss_B_per_res":12648,"heap_MB":100.4,"rss_MB":215.7,"build_ms":1189.7,"build_us_per_res":118.97,"build_cpu_us_per_res":186.77,"heap_B_per_replica":3168,"rss_B_per_replica":4216}
+{"loadavg":"0.35 0.56 0.31 1/122 3203","part":"raft-member","R":10000,"marker":1}
+{"exp":"E-49","part":"raft-member","R":10000,"note":"one member's copy: founded as above, this member keeps replica i % 3 (it leads a third of the groups), the other two are dropped","node":"v22.22.0","heap_B_per_res":3253,"rss_B_per_res":6619,"heap_MB":40.8,"rss_MB":165.7,"build_ms":1221.7,"build_us_per_res":122.17,"build_cpu_us_per_res":181.83}
+{"loadavg":"0.48 0.58 0.32 1/122 3211","part":"raft-open","R":10000,"marker":1}
+{"exp":"E-49","part":"raft-open","R":10000,"note":"a follower opened from stored hard state (the boot path, E-26 makeGroup)","node":"v22.22.0","heap_B_per_res":3137,"rss_B_per_res":5990,"heap_MB":39.7,"rss_MB":152,"build_ms":233.8,"build_us_per_res":23.38,"build_cpu_us_per_res":49.96}
+{"loadavg":"0.48 0.58 0.32 1/122 3219","part":"settings","R":10000,"marker":1}
+{"exp":"E-49","part":"settings","R":10000,"note":"the settings record as an object (was the #meta catalog row)","node":"v22.22.0","heap_B_per_res":236,"rss_B_per_res":341,"heap_MB":12,"rss_MB":96.8,"build_ms":3.2,"build_us_per_res":0.32,"build_cpu_us_per_res":0.95}
+{"loadavg":"0.48 0.58 0.32 1/122 3227","part":"group-record","R":10000,"marker":1}
+{"exp":"E-49","part":"group-record","R":10000,"note":"the group record (slots, replicas, leader hint) as an object","node":"v22.22.0","heap_B_per_res":179,"rss_B_per_res":79,"heap_MB":11.4,"rss_MB":95.7,"build_ms":1.9,"build_us_per_res":0.19,"build_cpu_us_per_res":0.72}
+{"loadavg":"0.48 0.58 0.32 1/122 3235","part":"slot-rle","R":10000,"marker":1}
+{"exp":"E-49","part":"slot-rle","R":10000,"note":"slot table: run-length, one run","node":"v22.22.0","heap_B_per_res":123,"rss_B_per_res":52,"heap_MB":10.9,"rss_MB":92.9,"build_ms":1.3,"build_us_per_res":0.13,"build_cpu_us_per_res":0.5}
+{"loadavg":"0.48 0.58 0.32 1/122 3243","part":"perslot-map-1","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-map-1","R":10000,"note":"per-slot state: Map of touched slots, 1 touched","node":"v22.22.0","heap_B_per_res":244,"rss_B_per_res":472,"heap_MB":12.1,"rss_MB":99.2,"build_ms":6.8,"build_us_per_res":0.68,"build_cpu_us_per_res":1.63}
+{"loadavg":"0.48 0.58 0.32 1/122 3251","part":"perslot-map-10","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-map-10","R":10000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":1012,"rss_B_per_res":2136,"heap_MB":19.4,"rss_MB":115.1,"build_ms":32.6,"build_us_per_res":3.26,"build_cpu_us_per_res":5.05}
+{"loadavg":"0.48 0.58 0.32 1/122 3259","part":"perslot-map-100","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-map-100","R":10000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":8468,"rss_B_per_res":11102,"heap_MB":90.5,"rss_MB":198.5,"build_ms":265.9,"build_us_per_res":26.59,"build_cpu_us_per_res":39.57}
+{"loadavg":"0.48 0.58 0.32 1/122 3267","part":"perslot-packed-1","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-1","R":10000,"note":"per-slot state packed: one sorted byte array, 18 B per touched slot; 1 touched","node":"v22.22.0","heap_B_per_res":215,"rss_B_per_res":511,"heap_MB":11.8,"rss_MB":99.2,"build_ms":8.4,"build_us_per_res":0.84,"build_cpu_us_per_res":1.97}
+{"loadavg":"0.48 0.58 0.32 1/122 3275","part":"perslot-packed-10","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-10","R":10000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":377,"rss_B_per_res":734,"heap_MB":13.3,"rss_MB":99.6,"build_ms":22.2,"build_us_per_res":2.22,"build_cpu_us_per_res":3.55}
+{"loadavg":"0.48 0.58 0.32 1/122 3283","part":"perslot-packed-100","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-100","R":10000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":1997,"rss_B_per_res":2386,"heap_MB":28.8,"rss_MB":116.8,"build_ms":143.9,"build_us_per_res":14.39,"build_cpu_us_per_res":15.81}
+{"loadavg":"0.48 0.58 0.32 1/122 3291","part":"fold-empty","R":10000,"marker":1}
+{"exp":"E-49","part":"fold-empty","R":10000,"note":"an empty data source through the seam (S.proxy)","node":"v22.22.0","heap_B_per_res":1291,"rss_B_per_res":1421,"heap_MB":22,"rss_MB":108.8,"build_ms":21.4,"build_us_per_res":2.14,"build_cpu_us_per_res":4.83}
+{"loadavg":"0.48 0.58 0.32 1/122 3299","part":"fold-10","R":10000,"marker":1}
+{"exp":"E-49","part":"fold-10","R":10000,"note":"a data source with 10 rows of about 100 B (E-05 rows)","node":"v22.22.0","heap_B_per_res":4367,"rss_B_per_res":6083,"heap_MB":51.4,"rss_MB":152.2,"build_ms":102.6,"build_us_per_res":10.26,"build_cpu_us_per_res":22.08}
+{"loadavg":"0.48 0.58 0.32 1/122 3307","part":"dir-host-indexed","R":10000,"marker":1}
+{"exp":"E-49","part":"dir-host-indexed","R":10000,"note":"v4's registry and owner maps with an index of names in place of the snapshot read (the one-line fix)","node":"v22.22.0","heap_B_per_res":1525,"rss_B_per_res":4713,"heap_MB":24.3,"rss_MB":139.6,"build_ms":163.4,"build_us_per_res":16.34,"build_cpu_us_per_res":26.73,"v4_snapshot_us_at_R":3751.6,"call_B":140,"result_B":33,"batch_B":179086,"batch_encode_ms":9.09,"register_us":16.34,"entries":30000,"register_us_per_entry":5.45}
+{"loadavg":"0.48 0.58 0.32 1/122 3315","part":"dir-names","R":10000,"marker":1}
+{"exp":"E-49","part":"dir-names","R":10000,"note":"a server's own list of the names it announces (a string per resource)","node":"v22.22.0","heap_B_per_res":75,"rss_B_per_res":52,"heap_MB":10.5,"rss_MB":94.1,"build_ms":1.6,"build_us_per_res":0.16,"build_cpu_us_per_res":0.64}
+{"loadavg":"0.48 0.58 0.32 1/122 3323","part":"client-source","R":10000,"marker":1}
+{"exp":"E-49","part":"client-source","R":10000,"note":"a client's state per followed source: members, slot table (one run), leader, a cursor of 10 touched slots, the subscription","node":"v22.22.0","heap_B_per_res":1245,"rss_B_per_res":2412,"heap_MB":21.6,"rss_MB":115.9,"build_ms":34.3,"build_us_per_res":3.43,"build_cpu_us_per_res":5.87}
+{"loadavg":"0.48 0.58 0.32 1/122 3331","part":"client-source-off","R":10000,"marker":1}
+{"exp":"E-49","part":"client-source-off","R":10000,"note":"the same with an implicit table and a one-number cursor (one group, no moves)","node":"v22.22.0","heap_B_per_res":388,"rss_B_per_res":498,"heap_MB":13.4,"rss_MB":99.5,"build_ms":5.5,"build_us_per_res":0.55,"build_cpu_us_per_res":1.5}
+{"loadavg":"0.48 0.58 0.32 1/122 3339","part":"timers","R":10000,"marker":1}
+{"exp":"E-49","part":"timers","R":10000,"note":"one setInterval(500 ms) per resource","node":"v22.22.0","heap_B_per_res":230,"rss_B_per_res":301,"heap_MB":11.9,"rss_MB":97.2,"build_ms":8.3,"build_us_per_res":0.83,"build_cpu_us_per_res":2.23,"idle_cores":0.0127}
+{"loadavg":"0.48 0.58 0.32 1/118 3347","part":"dormant","R":10000,"marker":1}
+{"exp":"E-49","part":"dormant","R":10000,"note":"group id -> store offset (Map) plus name -> id (Map)","node":"v22.22.0","heap_B_per_res":167,"rss_B_per_res":193,"heap_MB":11.3,"rss_MB":96.8,"build_ms":4.5,"build_us_per_res":0.45,"build_cpu_us_per_res":0.84}
+{"loadavg":"0.48 0.58 0.32 1/121 3358","part":"asm-cheap","R":10000,"marker":1}
+{"exp":"E-49","part":"asm-cheap","R":10000,"note":"assembled, cheap form: member copy of the home group + settings + group record + one-run slot table + packed per-slot state (10 touched) + empty fold + announced name","node":"v22.22.0","heap_B_per_res":5572,"rss_B_per_res":8961,"heap_MB":62.9,"rss_MB":180.3,"build_ms":1179.4,"build_us_per_res":117.94,"build_cpu_us_per_res":183.56}
+{"loadavg":"0.48 0.58 0.32 1/121 3366","part":"base","R":100000,"marker":1}
+{"exp":"E-49","part":"base","R":100000,"note":"nothing (the control)","node":"v22.22.0","heap_B_per_res":1,"rss_B_per_res":3,"heap_MB":10.5,"rss_MB":95.7,"build_ms":3.3,"build_us_per_res":0.03,"build_cpu_us_per_res":0.07}
+{"loadavg":"0.48 0.58 0.32 1/121 3374","part":"raft-founded","R":100000,"marker":1}
+{"exp":"E-49","part":"raft-founded","R":100000,"note":"home group founded in-process: 3 replicas (1 leader, 2 followers), founding batch committed, logs compacted; per member = /3","node":"v22.22.0","heap_B_per_res":9360,"rss_B_per_res":10150,"heap_MB":903.1,"rss_MB":1061.9,"build_ms":11307.2,"build_us_per_res":113.07,"build_cpu_us_per_res":145.71,"heap_B_per_replica":3120,"rss_B_per_replica":3383}
+{"loadavg":"0.56 0.60 0.33 1/118 3382","part":"raft-member","R":100000,"marker":1}
+{"exp":"E-49","part":"raft-member","R":100000,"note":"one member's copy: founded as above, this member keeps replica i % 3 (it leads a third of the groups), the other two are dropped","node":"v22.22.0","heap_B_per_res":3107,"rss_B_per_res":3464,"heap_MB":306.7,"rss_MB":426.1,"build_ms":10337.6,"build_us_per_res":103.38,"build_cpu_us_per_res":118.71}
+{"loadavg":"1.05 0.70 0.36 1/111 3403","part":"raft-open","R":100000,"marker":1}
+{"exp":"E-49","part":"raft-open","R":100000,"note":"a follower opened from stored hard state (the boot path, E-26 makeGroup)","node":"v22.22.0","heap_B_per_res":3064,"rss_B_per_res":3400,"heap_MB":302.6,"rss_MB":419.8,"build_ms":1503.6,"build_us_per_res":15.04,"build_cpu_us_per_res":22.98}
+{"loadavg":"1.05 0.70 0.36 1/111 3424","part":"settings","R":100000,"marker":1}
+{"exp":"E-49","part":"settings","R":100000,"note":"the settings record as an object (was the #meta catalog row)","node":"v22.22.0","heap_B_per_res":225,"rss_B_per_res":366,"heap_MB":31.9,"rss_MB":130.4,"build_ms":52.1,"build_us_per_res":0.52,"build_cpu_us_per_res":0.8}
+{"loadavg":"1.05 0.70 0.36 1/111 3432","part":"group-record","R":100000,"marker":1}
+{"exp":"E-49","part":"group-record","R":100000,"note":"the group record (slots, replicas, leader hint) as an object","node":"v22.22.0","heap_B_per_res":169,"rss_B_per_res":254,"heap_MB":26.5,"rss_MB":119,"build_ms":21.6,"build_us_per_res":0.22,"build_cpu_us_per_res":0.45}
+{"loadavg":"1.05 0.70 0.36 1/111 3440","part":"slot-rle","R":100000,"marker":1}
+{"exp":"E-49","part":"slot-rle","R":100000,"note":"slot table: run-length, one run","node":"v22.22.0","heap_B_per_res":113,"rss_B_per_res":128,"heap_MB":21.2,"rss_MB":107,"build_ms":11.2,"build_us_per_res":0.11,"build_cpu_us_per_res":0.23}
+{"loadavg":"1.05 0.70 0.36 1/111 3448","part":"perslot-map-1","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-map-1","R":100000,"note":"per-slot state: Map of touched slots, 1 touched","node":"v22.22.0","heap_B_per_res":233,"rss_B_per_res":468,"heap_MB":32.7,"rss_MB":140.1,"build_ms":40.5,"build_us_per_res":0.4,"build_cpu_us_per_res":0.69}
+{"loadavg":"1.05 0.70 0.36 1/111 3456","part":"perslot-map-10","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-map-10","R":100000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":1001,"rss_B_per_res":1277,"heap_MB":105.9,"rss_MB":217.2,"build_ms":247.5,"build_us_per_res":2.47,"build_cpu_us_per_res":3.96}
+{"loadavg":"1.05 0.70 0.36 1/111 3464","part":"perslot-map-100","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-map-100","R":100000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":8457,"rss_B_per_res":8850,"heap_MB":817,"rss_MB":939.2,"build_ms":2496,"build_us_per_res":24.96,"build_cpu_us_per_res":36.2}
+{"loadavg":"1.45 0.79 0.39 1/114 3488","part":"perslot-packed-1","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-1","R":100000,"note":"per-slot state packed: one sorted byte array, 18 B per touched slot; 1 touched","node":"v22.22.0","heap_B_per_res":203,"rss_B_per_res":620,"heap_MB":29.8,"rss_MB":152.7,"build_ms":83.9,"build_us_per_res":0.84,"build_cpu_us_per_res":1.13}
+{"loadavg":"1.45 0.79 0.39 1/114 3496","part":"perslot-packed-10","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-10","R":100000,"note":"10 touched","node":"v22.22.0","heap_B_per_res":365,"rss_B_per_res":800,"heap_MB":45.3,"rss_MB":169.3,"build_ms":245.2,"build_us_per_res":2.45,"build_cpu_us_per_res":2.79}
+{"loadavg":"1.45 0.79 0.39 1/114 3504","part":"perslot-packed-100","R":100000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-100","R":100000,"note":"100 touched","node":"v22.22.0","heap_B_per_res":1942,"rss_B_per_res":2403,"heap_MB":195.6,"rss_MB":323.6,"build_ms":1619,"build_us_per_res":16.19,"build_cpu_us_per_res":17.8}
+{"loadavg":"1.45 0.79 0.39 1/114 3512","part":"fold-empty","R":100000,"marker":1}
+{"exp":"E-49","part":"fold-empty","R":100000,"note":"an empty data source through the seam (S.proxy)","node":"v22.22.0","heap_B_per_res":1262,"rss_B_per_res":1499,"heap_MB":130.8,"rss_MB":231.2,"build_ms":173.5,"build_us_per_res":1.73,"build_cpu_us_per_res":4.51}
+{"loadavg":"1.73 0.86 0.42 1/114 3520","part":"fold-10","R":100000,"marker":1}
+{"exp":"E-49","part":"fold-10","R":100000,"note":"a data source with 10 rows of about 100 B (E-05 rows)","node":"v22.22.0","heap_B_per_res":4687,"rss_B_per_res":5013,"heap_MB":457.4,"rss_MB":573.7,"build_ms":1017.8,"build_us_per_res":10.18,"build_cpu_us_per_res":25.03}
+{"loadavg":"1.73 0.86 0.42 1/114 3528","part":"dir-host-indexed","R":100000,"marker":1}
+{"exp":"E-49","part":"dir-host-indexed","R":100000,"note":"v4's registry and owner maps with an index of names in place of the snapshot read (the one-line fix)","node":"v22.22.0","heap_B_per_res":1499,"rss_B_per_res":2182,"heap_MB":153.4,"rss_MB":303.6,"build_ms":1072.4,"build_us_per_res":10.72,"build_cpu_us_per_res":17.53,"v4_snapshot_us_at_R":43770.4,"call_B":141,"result_B":33,"batch_B":1789816,"batch_encode_ms":43.61,"register_us":10.72,"entries":300000,"register_us_per_entry":3.57}
+{"loadavg":"1.73 0.86 0.42 1/114 3536","part":"dir-names","R":100000,"marker":1}
+{"exp":"E-49","part":"dir-names","R":100000,"note":"a server's own list of the names it announces (a string per resource)","node":"v22.22.0","heap_B_per_res":65,"rss_B_per_res":107,"heap_MB":16.6,"rss_MB":95.6,"build_ms":17.9,"build_us_per_res":0.18,"build_cpu_us_per_res":0.27}
+{"loadavg":"1.73 0.86 0.42 1/114 3544","part":"client-source","R":100000,"marker":1}
+{"exp":"E-49","part":"client-source","R":100000,"note":"a client's state per followed source: members, slot table (one run), leader, a cursor of 10 touched slots, the subscription","node":"v22.22.0","heap_B_per_res":1233,"rss_B_per_res":1519,"heap_MB":128,"rss_MB":238.3,"build_ms":284.6,"build_us_per_res":2.85,"build_cpu_us_per_res":5.02}
+{"loadavg":"1.73 0.86 0.42 1/114 3552","part":"client-source-off","R":100000,"marker":1}
+{"exp":"E-49","part":"client-source-off","R":100000,"note":"the same with an implicit table and a one-number cursor (one group, no moves)","node":"v22.22.0","heap_B_per_res":377,"rss_B_per_res":555,"heap_MB":46.4,"rss_MB":148.1,"build_ms":56,"build_us_per_res":0.56,"build_cpu_us_per_res":1.07}
+{"loadavg":"1.73 0.86 0.42 1/114 3560","part":"timers","R":100000,"marker":1}
+{"exp":"E-49","part":"timers","R":100000,"note":"one setInterval(500 ms) per resource","node":"v22.22.0","heap_B_per_res":218,"rss_B_per_res":273,"heap_MB":31.2,"rss_MB":121,"build_ms":30.2,"build_us_per_res":0.3,"build_cpu_us_per_res":0.63,"idle_cores":0.036}
+{"loadavg":"1.60 0.84 0.42 1/113 3568","part":"dormant","R":100000,"marker":1}
+{"exp":"E-49","part":"dormant","R":100000,"note":"group id -> store offset (Map) plus name -> id (Map)","node":"v22.22.0","heap_B_per_res":138,"rss_B_per_res":176,"heap_MB":23.6,"rss_MB":112.3,"build_ms":65.4,"build_us_per_res":0.65,"build_cpu_us_per_res":0.89}
+{"loadavg":"1.55 0.85 0.42 1/113 3576","part":"asm-cheap","R":100000,"marker":1}
+{"exp":"E-49","part":"asm-cheap","R":100000,"note":"assembled, cheap form: member copy of the home group + settings + group record + one-run slot table + packed per-slot state (10 touched) + empty fold + announced name","node":"v22.22.0","heap_B_per_res":5404,"rss_B_per_res":6179,"heap_MB":525.8,"rss_MB":684.8,"build_ms":11424.6,"build_us_per_res":114.25,"build_cpu_us_per_res":138.83}
+{"loadavg":"1.46 0.85 0.43 1/110 3584","part":"slot-dense","R":1000,"marker":1}
+{"exp":"E-49","part":"slot-dense","R":1000,"note":"slot table: 4,096 x (group u32, epoch u32) typed arrays","node":"v22.22.0","heap_B_per_res":33281,"rss_B_per_res":29884,"heap_MB":41.4,"rss_MB":114.4,"build_ms":15.4,"build_us_per_res":15.4,"build_cpu_us_per_res":18.75}
+{"loadavg":"1.46 0.85 0.43 1/110 3592","part":"perslot-dense","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-dense","R":1000,"note":"per-slot state dense: seq f64, epoch i32, fence f64 x 4,096","node":"v22.22.0","heap_B_per_res":82626,"rss_B_per_res":71041,"heap_MB":88.5,"rss_MB":162.6,"build_ms":41,"build_us_per_res":40.97,"build_cpu_us_per_res":54.43}
+{"loadavg":"1.46 0.85 0.43 1/110 3600","part":"perslot-packed-4096","R":1000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-4096","R":1000,"note":"every slot touched","node":"v22.22.0","heap_B_per_res":74025,"rss_B_per_res":87032,"heap_MB":80.3,"rss_MB":175.5,"build_ms":739.9,"build_us_per_res":739.86,"build_cpu_us_per_res":774.22}
+{"loadavg":"1.46 0.85 0.43 1/110 3608","part":"fold-100","R":1000,"marker":1}
+{"exp":"E-49","part":"fold-100","R":1000,"note":"a data source with 100 rows","node":"v22.22.0","heap_B_per_res":31987,"rss_B_per_res":57016,"heap_MB":40.2,"rss_MB":147.1,"build_ms":75.3,"build_us_per_res":75.35,"build_cpu_us_per_res":140.7}
+{"loadavg":"1.46 0.85 0.43 1/110 3616","part":"asm-drafted","R":1000,"marker":1}
+{"exp":"E-49","part":"asm-drafted","R":1000,"note":"assembled, drafted form: the same with a dense 4,096-slot table and dense per-slot state","node":"v22.22.0","heap_B_per_res":121952,"rss_B_per_res":141951,"heap_MB":126,"rss_MB":228.4,"build_ms":331.1,"build_us_per_res":331.09,"build_cpu_us_per_res":699.73}
+{"loadavg":"1.46 0.85 0.43 1/110 3624","part":"slot-dense","R":10000,"marker":1}
+{"exp":"E-49","part":"slot-dense","R":10000,"note":"slot table: 4,096 x (group u32, epoch u32) typed arrays","node":"v22.22.0","heap_B_per_res":32755,"rss_B_per_res":31602,"heap_MB":322.1,"rss_MB":394.5,"build_ms":224.9,"build_us_per_res":22.49,"build_cpu_us_per_res":27.46}
+{"loadavg":"1.43 0.85 0.43 1/110 3632","part":"perslot-dense","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-dense","R":10000,"note":"per-slot state dense: seq f64, epoch i32, fence f64 x 4,096","node":"v22.22.0","heap_B_per_res":82099,"rss_B_per_res":72392,"heap_MB":792.7,"rss_MB":785.5,"build_ms":445.6,"build_us_per_res":44.56,"build_cpu_us_per_res":56.64}
+{"loadavg":"1.43 0.85 0.43 1/113 3643","part":"perslot-packed-4096","R":10000,"marker":1}
+{"exp":"E-49","part":"perslot-packed-4096","R":10000,"note":"every slot touched","node":"v22.22.0","heap_B_per_res":73493,"rss_B_per_res":76625,"heap_MB":710.6,"rss_MB":825.7,"build_ms":7376.3,"build_us_per_res":737.63,"build_cpu_us_per_res":746.26}
+{"loadavg":"1.39 0.86 0.43 1/113 3652","part":"fold-100","R":10000,"marker":1}
+{"exp":"E-49","part":"fold-100","R":10000,"note":"a data source with 100 rows","node":"v22.22.0","heap_B_per_res":31791,"rss_B_per_res":35426,"heap_MB":312.9,"rss_MB":432.6,"build_ms":728.7,"build_us_per_res":72.87,"build_cpu_us_per_res":190.25}
+{"loadavg":"1.39 0.86 0.43 1/113 3660","part":"asm-drafted","R":10000,"marker":1}
+{"exp":"E-49","part":"asm-drafted","R":10000,"note":"assembled, drafted form: the same with a dense 4,096-slot table and dense per-slot state","node":"v22.22.0","heap_B_per_res":120363,"rss_B_per_res":114807,"heap_MB":1157.6,"rss_MB":1189.5,"build_ms":2330,"build_us_per_res":233,"build_cpu_us_per_res":375.36}
+{"loadavg":"1.68 0.93 0.46 1/110 3669","part":"slot-rows","R":1000,"marker":1}
+{"exp":"E-49","part":"slot-rows","R":1000,"note":"slot table: 4,096 row objects","node":"v22.22.0","heap_B_per_res":196762,"rss_B_per_res":232522,"heap_MB":197.3,"rss_MB":316.8,"build_ms":560.6,"build_us_per_res":560.64,"build_cpu_us_per_res":715.52}
+{"loadavg":"1.68 0.93 0.46 1/110 3677","part":"dir-host","R":100,"marker":1}
+{"exp":"E-49","part":"dir-host","R":100,"note":"v4's #directory host (api/directory.ts hostMethods): 3 entries per resource, one per copy's server","node":"v22.22.0","heap_B_per_res":3470,"rss_B_per_res":48497,"heap_MB":10,"rss_MB":97,"build_ms":12.5,"build_us_per_res":125.11,"build_cpu_us_per_res":224.04,"call_B":139,"result_B":32,"batch_B":1911,"batch_encode_ms":0.24,"register_us":125.11,"entries":300,"register_us_per_entry":41.7}
+{"loadavg":"1.68 0.93 0.46 1/110 3685","part":"dir-host","R":1000,"marker":1}
+{"exp":"E-49","part":"dir-host","R":1000,"note":"v4's #directory host (api/directory.ts hostMethods): 3 entries per resource, one per copy's server","node":"v22.22.0","heap_B_per_res":1554,"rss_B_per_res":15466,"heap_MB":11.2,"rss_MB":109.8,"build_ms":196.3,"build_us_per_res":196.32,"build_cpu_us_per_res":229.61,"call_B":140,"result_B":32,"batch_B":18015,"batch_encode_ms":1.57,"register_us":196.32,"entries":3000,"register_us_per_entry":65.44}
+{"loadavg":"1.68 0.93 0.46 1/110 3693","part":"dir-host","R":3000,"marker":1}
+{"exp":"E-49","part":"dir-host","R":3000,"note":"v4's #directory host (api/directory.ts hostMethods): 3 entries per resource, one per copy's server","node":"v22.22.0","heap_B_per_res":1472,"rss_B_per_res":12857,"heap_MB":13.9,"rss_MB":131.4,"build_ms":1750.7,"build_us_per_res":583.56,"build_cpu_us_per_res":613.26,"call_B":140,"result_B":32,"batch_B":53815,"batch_encode_ms":4.58,"register_us":583.56,"entries":9000,"register_us_per_entry":194.52}
+{"loadavg":"1.63 0.93 0.46 1/110 3701","part":"dir-host","R":10000,"marker":1}
+{"exp":"E-49","part":"dir-host","R":10000,"note":"v4's #directory host (api/directory.ts hostMethods): 3 entries per resource, one per copy's server","node":"v22.22.0","heap_B_per_res":890,"rss_B_per_res":4322,"heap_MB":18.2,"rss_MB":135.8,"build_ms":29863.6,"build_us_per_res":2986.36,"build_cpu_us_per_res":3033,"call_B":140,"result_B":33,"batch_B":179086,"batch_encode_ms":12.75,"register_us":2986.36,"entries":30000,"register_us_per_entry":995.45}
+{"loadavg":"0.37 0.72 0.44 1/145 3965","part":"listen","R":1000,"marker":1}
+{"exp":"E-49","part":"listen","R":1000,"note":"one listening TCP socket per resource (v4: a port per resource)","node":"v22.22.0","heap_B_per_res":1096,"rss_B_per_res":3793,"heap_MB":10.7,"rss_MB":98,"build_ms":5.9,"build_us_per_res":5.86,"build_cpu_us_per_res":9.41}
+{"loadavg":"0.80 0.76 0.50 2/127 4132","part":"listen","R":10000,"marker":1}
+{"exp":"E-49","part":"listen","R":10000,"note":"one listening TCP socket per resource (v4: a port per resource)","node":"v22.22.0","heap_B_per_res":646,"rss_B_per_res":2614,"heap_MB":15.9,"rss_MB":117.6,"build_ms":37.6,"build_us_per_res":3.76,"build_cpu_us_per_res":8.2}
