@@ -1,0 +1,4 @@
+design roll: 560 states, 0.0s: all hold
+    ROLL: 560 judged states, 0 cannot reach the goal
+design keys2: 252 states, 0.0s: all hold
+    ROLL: 252 judged states, 0 cannot reach the goal

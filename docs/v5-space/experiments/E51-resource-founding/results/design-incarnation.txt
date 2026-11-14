@@ -1,0 +1,6 @@
+design data2: 39 states, 0.0s: all hold
+    INC: 23 judged states, 0 cannot reach the goal
+design home3: 121 states, 0.0s: all hold
+    INC: 58 judged states, 0 cannot reach the goal
+design data3: 121 states, 0.0s: all hold
+    INC: 67 judged states, 0 cannot reach the goal

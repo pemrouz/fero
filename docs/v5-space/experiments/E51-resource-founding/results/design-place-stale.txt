@@ -1,0 +1,12 @@
+stale p1: 13,507 states, 0.4s: all hold
+    HEAL: 3,428 judged states, 0 cannot reach the goal
+    LEAVE: 5,084 judged states, 0 cannot reach the goal
+stale p1n: 8,226 states, 0.2s: all hold
+    HEAL: 708 judged states, 0 cannot reach the goal
+    LEAVE: 1,446 judged states, 0 cannot reach the goal
+stale p2: 123,872 states, 5.1s: all hold
+    HEAL: 37,424 judged states, 0 cannot reach the goal
+    LEAVE: 29,758 judged states, 0 cannot reach the goal
+stale p2n: 158,601 states, 6.4s: all hold
+    HEAL: 6,790 judged states, 0 cannot reach the goal
+    LEAVE: 7,930 judged states, 0 cannot reach the goal

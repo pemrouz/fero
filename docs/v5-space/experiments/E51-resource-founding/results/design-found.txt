@@ -1,0 +1,15 @@
+objcas one1: 2,371 states, 0.2s: all hold
+    G2.0: 1,111 judged states, 0 cannot reach the goal
+objcas two0: 33,314 states, 3.2s: all hold
+    G2.0: 33,314 judged states, 0 cannot reach the goal
+    G2.1: 33,314 judged states, 0 cannot reach the goal
+objcas diff1: 1,923 states, 0.1s: all hold
+    G2.0: 843 judged states, 0 cannot reach the goal
+objcas one2: 10,767 states, 0.6s: all hold
+    G2.0: 3,181 judged states, 0 cannot reach the goal
+objcas two1: 766,314 states, 73.2s: all hold
+    G2.0: 464,070 judged states, 0 cannot reach the goal
+    G2.1: 464,070 judged states, 0 cannot reach the goal
+objcas two2: 4,050,927 states, 401.5s: all hold
+    G2.0: 1,483,872 judged states, 0 cannot reach the goal
+    G2.1: 1,526,849 judged states, 0 cannot reach the goal

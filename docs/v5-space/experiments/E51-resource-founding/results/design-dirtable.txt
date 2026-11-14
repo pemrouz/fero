@@ -1,0 +1,16 @@
+design r1: 2,296 states, 0.1s: all hold
+    FIND.0: 1,941 judged states, 0 cannot reach the goal
+    REBUILD: 2,296 judged states, 0 cannot reach the goal
+design r2: 1,856 states, 0.1s: all hold
+    FIND.0: 1,176 judged states, 0 cannot reach the goal
+    REBUILD: 1,856 judged states, 0 cannot reach the goal
+design n2: 7,282 states, 0.5s: all hold
+    FIND.0: 5,723 judged states, 0 cannot reach the goal
+    FIND.1: 5,723 judged states, 0 cannot reach the goal
+    REBUILD: 7,282 judged states, 0 cannot reach the goal
+design r2m: 16,722 states, 1.3s: all hold
+    FIND.0: 12,760 judged states, 0 cannot reach the goal
+    REBUILD: 16,722 judged states, 0 cannot reach the goal
+design d2: 170,709 states, 19.0s: all hold
+    FIND.0: 170,709 judged states, 0 cannot reach the goal
+    REBUILD: 170,709 judged states, 0 cannot reach the goal

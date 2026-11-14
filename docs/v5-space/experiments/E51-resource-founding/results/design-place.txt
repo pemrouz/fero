@@ -1,0 +1,12 @@
+design p1: 2,004 states, 0.1s: all hold
+    HEAL: 564 judged states, 0 cannot reach the goal
+    LEAVE: 688 judged states, 0 cannot reach the goal
+design p1n: 1,124 states, 0.0s: all hold
+    HEAL: 112 judged states, 0 cannot reach the goal
+    LEAVE: 166 judged states, 0 cannot reach the goal
+design p2: 13,902 states, 0.4s: all hold
+    HEAL: 4,568 judged states, 0 cannot reach the goal
+    LEAVE: 2,856 judged states, 0 cannot reach the goal
+design p2n: 14,989 states, 0.4s: all hold
+    HEAL: 720 judged states, 0 cannot reach the goal
+    LEAVE: 673 judged states, 0 cannot reach the goal
