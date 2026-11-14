@@ -1,0 +1,91 @@
+pass1: 87 tasks, 3 workers
+  5/87
+  10/87
+  15/87
+  20/87
+  25/87
+  30/87
+  35/87
+  40/87
+  45/87
+  50/87
+  55/87
+  60/87
+  65/87
+  70/87
+  75/87
+  80/87
+  85/87
+  87/87
+verify1: 47 tasks, 3 workers
+  5/47
+  10/47
+verify1: 39 tasks, 3 workers
+  5/39
+  10/39
+verify1: 32 tasks, 3 workers
+  5/32
+  10/32
+verify1: 25 tasks, 3 workers
+  5/25
+  10/25
+verify1: 18 tasks, 3 workers
+  5/18
+pass1: 39 tasks, 3 workers
+  5/39
+  10/39
+  15/39
+  20/39
+  25/39
+  30/39
+  35/39
+  39/39
+verify1: 16 tasks, 3 workers
+  5/16
+  10/16
+verify1: 10 tasks, 3 workers
+  5/10
+  10/10
+mirrored 90 verify results
+  pass 1: 43 of 92 rules necessary alone
+mirrored 0 verify results
+  pass 1: 43 of 92 rules necessary alone
+mirrored 0 verify results
+  pass 1: 43 of 92 rules necessary alone
+mirrored 0 verify results
+  pass 1: 43 of 92 rules necessary alone
+mirrored 0 verify results
+  pass 1: 43 of 92 rules necessary alone
+Terminated
+mirrored 1 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+mirrored 3 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+mirrored 1 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+mirrored 4 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+mirrored 5 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+mirrored 1 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+res: 49 rules kept of 92; error: None
+mutants (sweep): 4 tasks, 3 workers
+  4/4
+mutants (verify): 2 tasks, 3 workers
+mutants (sweep): 0 tasks, 3 workers
+mutants (verify): 2 tasks, 3 workers
+mutants (sweep): 0 tasks, 3 workers
+mutants (verify): 2 tasks, 3 workers
+  2/2
+mirrored 5 verify results
+  pass 1: 43 of 92 rules necessary alone
+  verify pass 1: 4 put back, 2 undecided
+  mutants: 48; caught 46; equivalent 0; undecided 2; survived 0
+res: 49 rules kept of 92; error: None

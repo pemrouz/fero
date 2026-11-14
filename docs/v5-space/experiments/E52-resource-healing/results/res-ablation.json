@@ -1,0 +1,6470 @@
+{
+ "bounds": [
+  "hl0",
+  "hln",
+  "hp0",
+  "hd0",
+  "l1",
+  "hgn",
+  "four1",
+  "f1",
+  "ll2",
+  "hg1",
+  "lh1"
+ ],
+ "verify": [
+  "h1",
+  "lf1"
+ ],
+ "pinned": [
+  "leave.start",
+  "drain.start",
+  "lead.budget",
+  "place.budget",
+  "gone.budget"
+ ],
+ "base": {
+  "hl0": {
+   "states": 15,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    15,
+    20,
+    1028319859303298443
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     0,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     15,
+     0
+    ],
+    "P8": [
+     15,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "hln": {
+   "states": 15,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    15,
+    20,
+    1028319859303298443
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     0,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     15,
+     0
+    ],
+    "P8": [
+     15,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "hp0": {
+   "states": 186,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    186,
+    349,
+    6474737703010800613
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     18,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     155,
+     0
+    ],
+    "P8": [
+     155,
+     0
+    ],
+    "PE": [
+     72,
+     0
+    ],
+    "PR": [
+     14,
+     0
+    ],
+    "SWAP": [
+     31,
+     0
+    ]
+   }
+  },
+  "hd0": {
+   "states": 78,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    78,
+    173,
+    9838131928235325286
+   ],
+   "judged": {
+    "DR": [
+     1,
+     0
+    ],
+    "LB": [
+     8,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     78,
+     0
+    ],
+    "P8": [
+     78,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "l1": {
+   "states": 1006,
+   "secs": 0.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1006,
+    2701,
+    4505644372761546473
+   ],
+   "judged": {
+    "DR": [
+     14,
+     0
+    ],
+    "LB": [
+     80,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     890,
+     0
+    ],
+    "P8": [
+     890,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     124,
+     0
+    ],
+    "SWAP": [
+     116,
+     0
+    ]
+   }
+  },
+  "hgn": {
+   "states": 6308,
+   "secs": 0.83,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    6308,
+    16472,
+    11998961286754082084
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     754,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     5082,
+     0
+    ],
+    "P8": [
+     4111,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     478,
+     0
+    ],
+    "SWAP": [
+     1226,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 13726,
+   "secs": 1.66,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    13726,
+    34425,
+    17009613411889835254
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     1566,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     12006,
+     0
+    ],
+    "P8": [
+     12006,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     1255,
+     0
+    ],
+    "SWAP": [
+     1720,
+     0
+    ]
+   }
+  },
+  "f1": {
+   "states": 21359,
+   "secs": 2.75,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    21359,
+    54202,
+    11119222149258765574
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     2422,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     17514,
+     0
+    ],
+    "P8": [
+     17514,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     1976,
+     0
+    ],
+    "SWAP": [
+     3845,
+     0
+    ]
+   }
+  },
+  "ll2": {
+   "states": 18164,
+   "secs": 2.74,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    18164,
+    56945,
+    17108388354820059169
+   ],
+   "judged": {
+    "DR": [
+     836,
+     0
+    ],
+    "LB": [
+     722,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     16540,
+     0
+    ],
+    "P8": [
+     16540,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     2027,
+     0
+    ],
+    "SWAP": [
+     1624,
+     0
+    ]
+   }
+  },
+  "hg1": {
+   "states": 54547,
+   "secs": 7.32,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    54547,
+    155667,
+    6525738027953513206
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     6280,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     44532,
+     0
+    ],
+    "P8": [
+     44532,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     5075,
+     0
+    ],
+    "SWAP": [
+     10015,
+     0
+    ]
+   }
+  },
+  "lh1": {
+   "states": 109071,
+   "secs": 16.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    109071,
+    329427,
+    5503187139055576183
+   ],
+   "judged": {
+    "DR": [
+     3365,
+     0
+    ],
+    "LB": [
+     8278,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     97265,
+     0
+    ],
+    "P8": [
+     97265,
+     0
+    ],
+    "PE": [
+     1433,
+     0
+    ],
+    "PR": [
+     9253,
+     0
+    ],
+    "SWAP": [
+     11806,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [
+  [
+   "dropl.learner",
+   [
+    "h1",
+    "LIMIT",
+    5000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  ],
+  [
+   "dropl.gone",
+   [
+    "h1",
+    "LIMIT",
+    5000003,
+    [
+     "LIMIT"
+    ]
+   ]
+  ]
+ ],
+ "verify_undecided": [
+  "lf1",
+  "LIMIT",
+  5000001,
+  [
+   "LIMIT"
+  ]
+ ],
+ "greedy": [
+  [
+   "add.leader",
+   "dropped"
+  ],
+  [
+   "add.idle",
+   "dropped"
+  ],
+  [
+   "add.need",
+   "dropped"
+  ],
+  [
+   "add.placed",
+   "dropped"
+  ],
+  [
+   "promote.leader",
+   "dropped"
+  ],
+  [
+   "promote.idle",
+   "dropped"
+  ],
+  [
+   "promote.live",
+   "dropped"
+  ],
+  [
+   "promote.need",
+   "dropped"
+  ],
+  [
+   "promote.odd",
+   "dropped"
+  ],
+  [
+   "promote.placed",
+   "kept: with the others dropped it breaks P9 on l1 in 23 steps"
+  ],
+  [
+   "remove.leader",
+   "dropped"
+  ],
+  [
+   "remove.idle",
+   "dropped"
+  ],
+  [
+   "remove.voter",
+   "dropped"
+  ],
+  [
+   "remove.newok",
+   "dropped"
+  ],
+  [
+   "surplus.leader",
+   "dropped"
+  ],
+  [
+   "surplus.idle",
+   "dropped"
+  ],
+  [
+   "surplus.voter",
+   "dropped"
+  ],
+  [
+   "surplus.nogone",
+   "dropped"
+  ],
+  [
+   "dropl.leader",
+   "dropped"
+  ],
+  [
+   "dropl.idle",
+   "dropped"
+  ],
+  [
+   "dropl.append",
+   "dropped"
+  ],
+  [
+   "dial.leader",
+   "dropped"
+  ],
+  [
+   "pick.leader",
+   "dropped"
+  ],
+  [
+   "pick.idle",
+   "dropped"
+  ],
+  [
+   "leave.unlist",
+   "dropped"
+  ],
+  [
+   "handover.leader",
+   "dropped"
+  ],
+  [
+   "handover.notme",
+   "dropped"
+  ],
+  [
+   "handover.live",
+   "dropped"
+  ],
+  [
+   "handover.caught",
+   "dropped"
+  ],
+  [
+   "lead.leader",
+   "dropped"
+  ],
+  [
+   "lead.stale",
+   "dropped"
+  ],
+  [
+   "lead.voter",
+   "dropped"
+  ],
+  [
+   "lead.notme",
+   "dropped"
+  ],
+  [
+   "lead.live",
+   "dropped"
+  ],
+  [
+   "lead.caught",
+   "kept: with the others dropped it breaks LD on lh1 in 2 steps"
+  ],
+  [
+   "place.leader",
+   "dropped"
+  ],
+  [
+   "place.idle",
+   "dropped"
+  ],
+  [
+   "place.stale",
+   "dropped"
+  ],
+  [
+   "place.reach",
+   "dropped"
+  ],
+  [
+   "handback.leader",
+   "dropped"
+  ],
+  [
+   "handback.notme",
+   "dropped"
+  ],
+  [
+   "handback.voter",
+   "dropped"
+  ],
+  [
+   "handback.live",
+   "dropped"
+  ],
+  [
+   "handback.caught",
+   "dropped"
+  ],
+  [
+   "handback.settle",
+   "kept: with the others dropped it breaks P9L on hl0 in 5 steps"
+  ],
+  [
+   "repref.leader",
+   "dropped"
+  ],
+  [
+   "repref.first",
+   "dropped"
+  ],
+  [
+   "dropl.learner",
+   "dropped in the final pass"
+  ],
+  [
+   "dropl.gone",
+   "dropped in the final pass"
+  ],
+  [
+   "gone.leader",
+   "dropped in the final pass"
+  ],
+  [
+   "promote.live",
+   "put back: alone on h1 it breaks P2C in 14 steps"
+  ],
+  [
+   "promote.odd",
+   "put back: alone on h1 it breaks P3 in 15 steps"
+  ],
+  [
+   "remove.voter",
+   "put back: alone on h1 it breaks P9 in 36 steps"
+  ],
+  [
+   "handback.voter",
+   "put back: alone on h1 it breaks LD in 21 steps"
+  ]
+ ],
+ "removed": [
+  "add.leader",
+  "add.idle",
+  "add.need",
+  "add.placed",
+  "promote.leader",
+  "promote.idle",
+  "promote.need",
+  "remove.leader",
+  "remove.idle",
+  "remove.newok",
+  "surplus.leader",
+  "surplus.idle",
+  "surplus.voter",
+  "surplus.nogone",
+  "dropl.leader",
+  "dropl.idle",
+  "dropl.append",
+  "dial.leader",
+  "pick.leader",
+  "pick.idle",
+  "leave.unlist",
+  "handover.leader",
+  "handover.notme",
+  "handover.live",
+  "handover.caught",
+  "lead.leader",
+  "lead.stale",
+  "lead.voter",
+  "lead.notme",
+  "lead.live",
+  "place.leader",
+  "place.idle",
+  "place.stale",
+  "place.reach",
+  "handback.leader",
+  "handback.notme",
+  "handback.live",
+  "handback.caught",
+  "repref.leader",
+  "repref.first",
+  "dropl.learner",
+  "dropl.gone",
+  "gone.leader"
+ ],
+ "put_back": [
+  [
+   "promote.live",
+   "put back: alone on h1 it breaks P2C in 14 steps"
+  ],
+  [
+   "promote.odd",
+   "put back: alone on h1 it breaks P3 in 15 steps"
+  ],
+  [
+   "remove.voter",
+   "put back: alone on h1 it breaks P9 in 36 steps"
+  ],
+  [
+   "handback.voter",
+   "put back: alone on h1 it breaks LD in 21 steps"
+  ]
+ ],
+ "minimal": {
+  "hl0": {
+   "states": 22,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    22,
+    30,
+    13062011582122637718
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     0,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     22,
+     0
+    ],
+    "P8": [
+     22,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "hln": {
+   "states": 22,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    22,
+    30,
+    13062011582122637718
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     0,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     22,
+     0
+    ],
+    "P8": [
+     22,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "hp0": {
+   "states": 408,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    408,
+    891,
+    12136442898914516655
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     46,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     351,
+     0
+    ],
+    "P8": [
+     351,
+     0
+    ],
+    "PE": [
+     146,
+     0
+    ],
+    "PR": [
+     14,
+     0
+    ],
+    "SWAP": [
+     57,
+     0
+    ]
+   }
+  },
+  "hd0": {
+   "states": 82,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    82,
+    186,
+    17767865833787705001
+   ],
+   "judged": {
+    "DR": [
+     1,
+     0
+    ],
+    "LB": [
+     8,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     82,
+     0
+    ],
+    "P8": [
+     82,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ]
+   }
+  },
+  "l1": {
+   "states": 2882,
+   "secs": 0.51,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2882,
+    9382,
+    13080397026100086350
+   ],
+   "judged": {
+    "DR": [
+     35,
+     0
+    ],
+    "LB": [
+     306,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     2639,
+     0
+    ],
+    "P8": [
+     2639,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     152,
+     0
+    ],
+    "SWAP": [
+     243,
+     0
+    ]
+   }
+  },
+  "hgn": {
+   "states": 21837,
+   "secs": 3.59,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    21837,
+    70819,
+    15143834426116189910
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     2564,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     16056,
+     0
+    ],
+    "P8": [
+     12441,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     784,
+     0
+    ],
+    "SWAP": [
+     5781,
+     0
+    ]
+   }
+  },
+  "four1": {
+   "states": 35857,
+   "secs": 5.39,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    35857,
+    110128,
+    202525778499363676
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     4224,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     31362,
+     0
+    ],
+    "P8": [
+     31362,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     1420,
+     0
+    ],
+    "SWAP": [
+     4495,
+     0
+    ]
+   }
+  },
+  "f1": {
+   "states": 62092,
+   "secs": 10.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    62092,
+    194389,
+    11432920150889515204
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     6966,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     51279,
+     0
+    ],
+    "P8": [
+     51279,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     2443,
+     0
+    ],
+    "SWAP": [
+     10813,
+     0
+    ]
+   }
+  },
+  "ll2": {
+   "states": 82294,
+   "secs": 18.94,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    82294,
+    328526,
+    16485331833960612502
+   ],
+   "judged": {
+    "DR": [
+     3279,
+     0
+    ],
+    "LB": [
+     4398,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     79045,
+     0
+    ],
+    "P8": [
+     79045,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     3798,
+     0
+    ],
+    "SWAP": [
+     3249,
+     0
+    ]
+   }
+  },
+  "hg1": {
+   "states": 180902,
+   "secs": 31.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    180902,
+    612940,
+    15322730853657781070
+   ],
+   "judged": {
+    "DR": [
+     0,
+     0
+    ],
+    "LB": [
+     21164,
+     0
+    ],
+    "LE": [
+     0,
+     0
+    ],
+    "P5": [
+     148160,
+     0
+    ],
+    "P8": [
+     148160,
+     0
+    ],
+    "PE": [
+     0,
+     0
+    ],
+    "PR": [
+     7447,
+     0
+    ],
+    "SWAP": [
+     32742,
+     0
+    ]
+   }
+  },
+  "lh1": {
+   "states": 430436,
+   "secs": 94.41,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    430436,
+    1760059,
+    1716773704514358555
+   ],
+   "judged": {
+    "DR": [
+     10517,
+     0
+    ],
+    "LB": [
+     31216,
+     0
+    ],
+    "LE": [
+     604,
+     0
+    ],
+    "P5": [
+     396673,
+     0
+    ],
+    "P8": [
+     396673,
+     0
+    ],
+    "PE": [
+     3700,
+     0
+    ],
+    "PR": [
+     18406,
+     0
+    ],
+    "SWAP": [
+     33763,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "h1": {
+   "states": 3033232,
+   "secs": 590.4,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3033232,
+    12546524,
+    13066979239489435739
+   ],
+   "judged": {
+    "DR": [
+     20237,
+     0
+    ],
+    "LB": [
+     248750,
+     0
+    ],
+    "LE": [
+     7072,
+     0
+    ],
+    "P5": [
+     2625337,
+     0
+    ],
+    "P8": [
+     2625337,
+     0
+    ],
+    "PE": [
+     193602,
+     0
+    ],
+    "PR": [
+     98409,
+     0
+    ],
+    "SWAP": [
+     407895,
+     0
+    ]
+   }
+  },
+  "lf1": {
+   "states": 5000001,
+   "secs": 1020.56,
+   "complete": false,
+   "fail": {},
+   "digest": [
+    5000001,
+    20456350,
+    1861236847530326570
+   ],
+   "judged": {}
+  }
+ },
+ "rules": [
+  {
+   "id": "add.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "only a working leader proposes",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "one change at a time (etcd)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.cand",
+   "kind": "guard",
+   "role": "target",
+   "note": "E-16's add.cand: a live machine the leader's own link reaches now",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "h1",
+    "LIMIT",
+    5000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "add.new",
+   "kind": "guard",
+   "role": "target",
+   "note": "this replica is not already in the config",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "add.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "a voter is gone, or the stored placement leaves a voter out",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.placed",
+   "kind": "guard",
+   "role": "place",
+   "note": "add only a machine the stored placement names (rule 15: the pick is written first)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.notret",
+   "kind": "guard",
+   "role": "retire",
+   "note": "never a machine that said it is retiring (meta-members@per-resource rule 2)",
+   "cmp": null,
+   "alone": [
+    "ll2",
+    "P7",
+    6,
+    [
+     "P7"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "ll2",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "add.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "promote.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.live",
+   "kind": "guard",
+   "role": "target",
+   "note": "the learner answers the leader now (E-16: \"not gone\"; that reading breaks P2C, probe resgone)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "h1",
+    "P2C",
+    11,
+    [
+     "P2C"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "cut",
+     "0"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "heal",
+     "0"
+    ],
+    [
+     "send",
+     "(1, 0)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.caught",
+   "kind": "guard",
+   "role": "swap",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P2C",
+    12,
+    [
+     "P2C"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P2C",
+    12,
+    [
+     "P2C"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.need",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "promote.odd",
+   "kind": "guard",
+   "role": "target",
+   "note": "promote only from three voters (to four, for the swap)",
+   "cmp": "<",
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "h1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "place",
+     "(('e', 2), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.placed",
+   "kind": "guard",
+   "role": "place",
+   "note": "promote only a machine the stored placement names",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "l1",
+    "P9",
+    23,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "promote.notret",
+   "kind": "guard",
+   "role": "retire",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "ll2",
+    "P7",
+    9,
+    [
+     "P7"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "ll2",
+    "P7",
+    9,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "promote.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "remove.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "h1",
+    "P9",
+    36,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "lose-disk",
+     "3"
+    ],
+    [
+     "recover",
+     "3"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (3, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 1)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "remove.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "gone to the leader's own links (or by a gone hint it took)",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "remove.four",
+   "kind": "guard",
+   "role": "swap",
+   "note": "",
+   "cmp": ">=",
+   "alone": [
+    "hgn",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hgn",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "gone",
+     "(('m', 1),)"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "remove.newok",
+   "kind": "guard",
+   "role": "swap",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "remove.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "four1",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "0"
+    ],
+    [
+     "recover",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.voter",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.four",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": ">=",
+   "alone": [
+    "hp0",
+    "P2",
+    3,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P2",
+    3,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.nogone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "surplus.last",
+   "kind": "guard",
+   "role": "target",
+   "note": "the voter the stored placement leaves out (read from the log)",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    22,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P9",
+    22,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 1),)"
+    ],
+    [
+     "add",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 1),)"
+    ],
+    [
+     "add",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.allheld",
+   "kind": "guard",
+   "role": "swap",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "surplus.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "P8",
+     "PE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "P8",
+     "PE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "dropl.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.learner",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P9",
+    20,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.gone",
+   "kind": "guard",
+   "role": "target",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    22,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dropl.append",
+   "kind": "update",
+   "role": "step",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dial.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "dial.link",
+   "kind": "update",
+   "role": "dir",
+   "note": "the leader dials a machine the directory lists, so its own link can reach it",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "pick.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "pick.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "pick.need",
+   "kind": "guard",
+   "role": "place",
+   "note": "re-pick only a placed machine that is gone to the leader or retiring",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 2), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "pick.cand",
+   "kind": "guard",
+   "role": "target",
+   "note": "the high-bound add.cand: a machine the leader's own link reached within evict.after",
+   "cmp": null,
+   "alone": [
+    "hg1",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hg1",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "gone",
+     "(('m', 3),)"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "pick.new",
+   "kind": "guard",
+   "role": "place",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "l1",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "l1",
+    "P8",
+    3,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "pick.notret",
+   "kind": "guard",
+   "role": "retire",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "ll2",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "ll2",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "leave",
+     "(('m', 1),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "id": "pick.append",
+   "kind": "update",
+   "role": "place",
+   "note": "write the pick into the group's log as the placement (rule 15)",
+   "cmp": null,
+   "alone": [
+    "l1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "l1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "leave.mark",
+   "kind": "update",
+   "role": "retire",
+   "note": "marks itself retiring first: says it in its pings",
+   "cmp": null,
+   "alone": [
+    "l1",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "l1",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "leave.unlist",
+   "kind": "update",
+   "role": "retire",
+   "note": "takes its machine entry out of the directory",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "leave.start",
+   "kind": "update",
+   "role": "pin",
+   "note": "the leave starts (world)",
+   "cmp": null,
+   "alone": [
+    "l1",
+    "LB",
+    7,
+    [
+     "LB"
+    ]
+   ],
+   "kept": true,
+   "pinned": true
+  },
+  {
+   "id": "drain.mark",
+   "kind": "update",
+   "role": "hint",
+   "note": "a draining process says so in its pings",
+   "cmp": null,
+   "alone": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "drain.start",
+   "kind": "update",
+   "role": "pin",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "lh1",
+    "LB",
+    5,
+    [
+     "LB"
+    ]
+   ],
+   "kept": true,
+   "pinned": true
+  },
+  {
+   "id": "handover.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handover.self",
+   "kind": "guard",
+   "role": "hint",
+   "note": "a draining or leaving process hands over every group it leads",
+   "cmp": null,
+   "alone": [
+    "hl0",
+    "P9L",
+    5,
+    [
+     "P9L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "P9L",
+    5,
+    [
+     "P9L"
+    ]
+   ],
+   "final_trace": [
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "handover.voter",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "l1",
+    "P9L",
+    20,
+    [
+     "P9L"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "l1",
+    "P9L",
+    17,
+    [
+     "P9L"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "handover.notme",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handover.live",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handover.caught",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handover.notdrn",
+   "kind": "guard",
+   "role": "hint",
+   "note": "never to a member that says it is draining or retiring",
+   "cmp": null,
+   "alone": [
+    "ll2",
+    "LD",
+    3,
+    [
+     "LD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hd0",
+    "P9L",
+    6,
+    [
+     "P9L"
+    ]
+   ],
+   "final_trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "handover.transfer",
+   "kind": "update",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hd0",
+    "DR",
+    1,
+    [
+     "DR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hd0",
+    "DR",
+    1,
+    [
+     "DR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "lead.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lead.stale",
+   "kind": "guard",
+   "role": "hint",
+   "note": "stale-plan: applied only if the config it read is still current",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lead.voter",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lead.notme",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lead.live",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lead.caught",
+   "kind": "guard",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lh1",
+    "LD",
+    2,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "lead",
+     "(('e', 0), ('m', 3))"
+    ]
+   ]
+  },
+  {
+   "id": "lead.notdrn",
+   "kind": "guard",
+   "role": "hint",
+   "note": "a drained or retiring member is never made leader or preferred",
+   "cmp": null,
+   "alone": [
+    "lh1",
+    "LD",
+    2,
+    [
+     "LD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "lh1",
+    "LD",
+    2,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "leave",
+     "(('m', 1),)"
+    ],
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "lead.transfer",
+   "kind": "update",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hln",
+    "LE",
+    1,
+    [
+     "LE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hln",
+    "LE",
+    1,
+    [
+     "LE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "lead.pref",
+   "kind": "update",
+   "role": "hint",
+   "note": "also sets the group's preferred leader",
+   "cmp": null,
+   "alone": [
+    "hl0",
+    "LH",
+    3,
+    [
+     "LH"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "LH",
+    3,
+    [
+     "LH"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "lead.budget",
+   "kind": "update",
+   "role": "pin",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true
+  },
+  {
+   "id": "place.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "place.idle",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "place.stale",
+   "kind": "guard",
+   "role": "hint",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "place.reach",
+   "kind": "guard",
+   "role": "hint",
+   "note": "a new machine the hint names must be one the leader's own links reach (dialing it if the directory lists it)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "place.append",
+   "kind": "update",
+   "role": "hint",
+   "note": "writes the hint's placement into the group's log (rule 15's record)",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PE",
+    1,
+    [
+     "PE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PE",
+    1,
+    [
+     "PE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ]
+   ]
+  },
+  {
+   "id": "place.budget",
+   "kind": "update",
+   "role": "pin",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": true
+  },
+  {
+   "id": "gone.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "gone.link",
+   "kind": "guard",
+   "role": "hint",
+   "note": "ignored while the leader's own link to that member is up",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P2",
+    9,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hgn",
+    "P2",
+    9,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "gone",
+     "(('m', 0),)"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "id": "gone.mark",
+   "kind": "update",
+   "role": "hint",
+   "note": "the leader treats the member as gone now",
+   "cmp": null,
+   "alone": [
+    "hgn",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hgn",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "gone",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gone.budget",
+   "kind": "update",
+   "role": "pin",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true
+  },
+  {
+   "id": "handback.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handback.notme",
+   "kind": "guard",
+   "role": "hand",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handback.voter",
+   "kind": "guard",
+   "role": "hand",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "h1",
+    "LD",
+    18,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "stepdown",
+     "(0, 0)"
+    ],
+    [
+     "elect",
+     "(1, 0)"
+    ],
+    [
+     "evict",
+     "0",
+     "0"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 0))"
+    ],
+    [
+     "recover",
+     "0"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "handback.live",
+   "kind": "guard",
+   "role": "hand",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handback.caught",
+   "kind": "guard",
+   "role": "hand",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "handback.settle",
+   "kind": "guard",
+   "role": "hand",
+   "note": "back and caught up for settle.ms",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "P9L",
+    5,
+    [
+     "P9L"
+    ]
+   ],
+   "final_trace": [
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "handback.notdrn",
+   "kind": "guard",
+   "role": "hint",
+   "note": "no hand-back to a member that says it is draining or retiring",
+   "cmp": null,
+   "alone": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "handback.transfer",
+   "kind": "update",
+   "role": "xfer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "LB",
+    14,
+    [
+     "LB"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "LB",
+    14,
+    [
+     "LB"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "elect",
+     "(1, 0)"
+    ],
+    [
+     "send",
+     "(2, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "repref",
+     "(('m', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "repref.leader",
+   "kind": "guard",
+   "role": "raft",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "repref.need",
+   "kind": "guard",
+   "role": "pref",
+   "note": "only when the preferred member is out of the stored placement",
+   "cmp": null,
+   "alone": [
+    "hl0",
+    "LH",
+    4,
+    [
+     "LH"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hl0",
+    "LH",
+    4,
+    [
+     "LH"
+    ]
+   ],
+   "final_trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 0))"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "repref.first",
+   "kind": "guard",
+   "role": "pref",
+   "note": "the new preferred member is the first voter the stored placement names",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "repref.set",
+   "kind": "update",
+   "role": "pref",
+   "note": "the group's preferred leader becomes that machine (DESIGN-V5 4.2: the ring's first; with no ring, a placed machine)",
+   "cmp": null,
+   "alone": [
+    "hp0",
+    "PR",
+    2,
+    [
+     "PR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "hp0",
+    "PR",
+    2,
+    [
+     "PR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "add.cand",
+   "caught": null,
+   "undecided": [
+    "h1",
+    "LIMIT",
+    5000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.new",
+   "caught": [
+    "hl0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "add",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.notret",
+   "caught": [
+    "ll2",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.append",
+   "caught": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.learner",
+   "caught": [
+    "hl0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.live",
+   "caught": [
+    "h1",
+    "P2C",
+    11,
+    [
+     "P2C"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.caught",
+   "caught": [
+    "hp0",
+    "P2C",
+    12,
+    [
+     "P2C"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.odd",
+   "caught": [
+    "h1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.placed",
+   "caught": [
+    "l1",
+    "P9",
+    23,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.notret",
+   "caught": [
+    "ll2",
+    "P7",
+    9,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "promote.append",
+   "caught": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.voter",
+   "caught": [
+    "h1",
+    "P9",
+    36,
+    [
+     "P9"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.gone",
+   "caught": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.four",
+   "caught": [
+    "hgn",
+    "P3",
+    4,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "gone",
+     "(('m', 1),)"
+    ],
+    [
+     "remove",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "remove.append",
+   "caught": [
+    "four1",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "0"
+    ],
+    [
+     "recover",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.four",
+   "caught": [
+    "hp0",
+    "P2",
+    3,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "surplus",
+     "(('r', (2, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.last",
+   "caught": [
+    "hp0",
+    "P9",
+    22,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 1),)"
+    ],
+    [
+     "add",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "dial",
+     "(('m', 1),)"
+    ],
+    [
+     "add",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "promote",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.allheld",
+   "caught": [
+    "hp0",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "send",
+     "(0, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "surplus.append",
+   "caught": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "P8",
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "dial.link",
+   "caught": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pick.need",
+   "caught": [
+    "hp0",
+    "P9",
+    18,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 2), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pick.cand",
+   "caught": [
+    "hg1",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "evict",
+     "0",
+     "1"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "gone",
+     "(('m', 3),)"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 3))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pick.new",
+   "caught": [
+    "l1",
+    "P8",
+    3,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pick.notret",
+   "caught": [
+    "ll2",
+    "P9",
+    21,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "leave",
+     "(('m', 1),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "pick",
+     "(('c', 3), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 1), ('x', 0))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "pick",
+     "(('c', 0), ('x', 1))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pick.append",
+   "caught": [
+    "l1",
+    "P8",
+    1,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "leave.mark",
+   "caught": [
+    "l1",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "drain.mark",
+   "caught": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.self",
+   "caught": [
+    "hl0",
+    "P9L",
+    5,
+    [
+     "P9L"
+    ]
+   ],
+   "trace": [
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.voter",
+   "caught": [
+    "l1",
+    "P9L",
+    17,
+    [
+     "P9L"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "stepdown",
+     "(3, 0)"
+    ],
+    [
+     "elect",
+     "(0, 0)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.notdrn",
+   "caught": [
+    "hd0",
+    "P9L",
+    6,
+    [
+     "P9L"
+    ]
+   ],
+   "trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "handover",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handover.transfer",
+   "caught": [
+    "hd0",
+    "DR",
+    1,
+    [
+     "DR"
+    ]
+   ],
+   "trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "lead.caught",
+   "caught": [
+    "lh1",
+    "LD",
+    2,
+    [
+     "LD"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 3),)"
+    ],
+    [
+     "lead",
+     "(('e', 0), ('m', 3))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "lead.notdrn",
+   "caught": [
+    "lh1",
+    "LD",
+    2,
+    [
+     "LD"
+    ]
+   ],
+   "trace": [
+    [
+     "leave",
+     "(('m', 1),)"
+    ],
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "lead.transfer",
+   "caught": [
+    "hln",
+    "LE",
+    1,
+    [
+     "LE"
+    ]
+   ],
+   "trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "lead.pref",
+   "caught": [
+    "hl0",
+    "LH",
+    3,
+    [
+     "LH"
+    ]
+   ],
+   "trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 1))"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "place.append",
+   "caught": [
+    "hp0",
+    "PE",
+    1,
+    [
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gone.link",
+   "caught": [
+    "hgn",
+    "P2",
+    9,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "1"
+    ],
+    [
+     "recover",
+     "1"
+    ],
+    [
+     "add",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(1, 1)"
+    ],
+    [
+     "promote",
+     "(('r', (1, 1)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "gone",
+     "(('m', 0),)"
+    ],
+    [
+     "remove",
+     "(('r', (0, 0)),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gone.mark",
+   "caught": [
+    "hgn",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "gone",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handback.voter",
+   "caught": [
+    "h1",
+    "LD",
+    18,
+    [
+     "LD"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handback.settle",
+   "caught": [
+    "hl0",
+    "P9L",
+    5,
+    [
+     "P9L"
+    ]
+   ],
+   "trace": [
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handback.notdrn",
+   "caught": [
+    "hd0",
+    "LD",
+    4,
+    [
+     "LD"
+    ]
+   ],
+   "trace": [
+    [
+     "drain",
+     "(('m', 0),)"
+    ],
+    [
+     "handover",
+     "(('r', (1, 0)),)"
+    ],
+    [
+     "settle",
+     "0"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "handback.transfer",
+   "caught": [
+    "hp0",
+    "LB",
+    14,
+    [
+     "LB"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ],
+    [
+     "dial",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "catchup",
+     "(3, 0)"
+    ],
+    [
+     "promote",
+     "(('r', (3, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "surplus",
+     "(('r', (0, 0)),)"
+    ],
+    [
+     "commit",
+     "cfg"
+    ],
+    [
+     "elect",
+     "(1, 0)"
+    ],
+    [
+     "send",
+     "(2, 0)"
+    ],
+    [
+     "commit",
+     "noop"
+    ],
+    [
+     "repref",
+     "(('m', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "repref.need",
+   "caught": [
+    "hl0",
+    "LH",
+    4,
+    [
+     "LH"
+    ]
+   ],
+   "trace": [
+    [
+     "lead",
+     "(('e', 0), ('m', 0))"
+    ],
+    [
+     "repref",
+     "(('m', 1),)"
+    ],
+    [
+     "settle",
+     "1"
+    ],
+    [
+     "handback",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "repref.set",
+   "caught": [
+    "hp0",
+    "PR",
+    2,
+    [
+     "PR"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({1, 2, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "promote.odd",
+   "caught": [
+    "h1",
+    "P3",
+    15,
+    [
+     "P3"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "remove.four",
+   "caught": [
+    "four1",
+    "P8",
+    2,
+    [
+     "P8"
+    ]
+   ],
+   "trace": [
+    [
+     "lose-disk",
+     "0"
+    ],
+    [
+     "recover",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "surplus.four",
+   "caught": [
+    "hp0",
+    "PE",
+    2,
+    [
+     "P8",
+     "PE"
+    ]
+   ],
+   "trace": [
+    [
+     "place",
+     "(('e', 0), ('p', frozenset({0, 1, 3})))"
+    ],
+    [
+     "commit",
+     "place"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "lead: transfer <-> pref",
+   "caught": null,
+   "undecided": [
+    "lf1",
+    "LIMIT",
+    5000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  }
+ ],
+ "option": "res",
+ "secs": 0,
+ "driver": "models/finish.py (E-16 engine.Ablation.run with four small changes)"
+}

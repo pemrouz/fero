@@ -1,0 +1,1280 @@
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 1,022 states, 0.1s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 82 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 906 judged states, 0 cannot reach the goal
+    P8: 906 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 125 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 5,851 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 700 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 4,737 judged states, 0 cannot reach the goal
+    P8: 4,002 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 520 judged states, 0 cannot reach the goal
+    SWAP: 1,114 judged states, 0 cannot reach the goal
+resopen four1: 13,726 states, 1.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+resopen f1: 21,927 states, 2.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,612 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18,082 judged states, 0 cannot reach the goal
+    P8: 18,082 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,130 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+resopen ll2: 18,131 states, 2.7s: all hold
+    DR: 881 judged states, 0 cannot reach the goal
+    LB: 736 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 16,507 judged states, 0 cannot reach the goal
+    P8: 16,507 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,052 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+resopen hg1: 48,532 states, 5.8s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 5,680 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 39,653 judged states, 0 cannot reach the goal
+    P8: 39,653 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 4,716 judged states, 0 cannot reach the goal
+    SWAP: 8,879 judged states, 0 cannot reach the goal
+resopen lh1: 112,807 states, 15.6s: all hold
+    DR: 3,793 judged states, 0 cannot reach the goal
+    LB: 8,770 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 101,001 judged states, 0 cannot reach the goal
+    P8: 101,001 judged states, 0 cannot reach the goal
+    PE: 1,403 judged states, 0 cannot reach the goal
+    PR: 9,564 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+resopen h1: 926,876 states, 127.3s: all hold
+    DR: 8,932 judged states, 0 cannot reach the goal
+    LB: 85,958 judged states, 0 cannot reach the goal
+    LE: 352 judged states, 0 cannot reach the goal
+    P5: 791,860 judged states, 0 cannot reach the goal
+    P8: 791,860 judged states, 0 cannot reach the goal
+    PE: 77,718 judged states, 0 cannot reach the goal
+    PR: 63,113 judged states, 0 cannot reach the goal
+    SWAP: 135,016 judged states, 0 cannot reach the goal
+res hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+res hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res l1: 1,215 states, 0.2s: all hold
+    DR: 14 judged states, 0 cannot reach the goal
+    LB: 108 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,099 judged states, 0 cannot reach the goal
+    P8: 1,099 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 151 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+res hgn: 6,308 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 754 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 5,082 judged states, 0 cannot reach the goal
+    P8: 4,111 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 478 judged states, 0 cannot reach the goal
+    SWAP: 1,226 judged states, 0 cannot reach the goal
+res four1: 13,726 states, 1.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+res f1: 21,359 states, 2.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,422 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 17,514 judged states, 0 cannot reach the goal
+    P8: 17,514 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,976 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+res ll2: 33,752 states, 5.5s: all hold
+    DR: 1,539 judged states, 0 cannot reach the goal
+    LB: 1,472 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 31,836 judged states, 0 cannot reach the goal
+    P8: 31,836 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 3,671 judged states, 0 cannot reach the goal
+    SWAP: 1,916 judged states, 0 cannot reach the goal
+res hg1: 54,547 states, 7.2s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 6,280 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 44,532 judged states, 0 cannot reach the goal
+    P8: 44,532 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 5,075 judged states, 0 cannot reach the goal
+    SWAP: 10,015 judged states, 0 cannot reach the goal
+res lh1: 129,504 states, 20.1s: all hold
+    DR: 3,574 judged states, 0 cannot reach the goal
+    LB: 10,890 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 117,595 judged states, 0 cannot reach the goal
+    P8: 117,595 judged states, 0 cannot reach the goal
+    PE: 1,778 judged states, 0 cannot reach the goal
+    PR: 10,731 judged states, 0 cannot reach the goal
+    SWAP: 11,909 judged states, 0 cannot reach the goal
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 1,231 states, 0.2s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 110 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,115 judged states, 0 cannot reach the goal
+    P8: 1,115 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 152 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 5,851 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 700 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 4,737 judged states, 0 cannot reach the goal
+    P8: 4,002 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 520 judged states, 0 cannot reach the goal
+    SWAP: 1,114 judged states, 0 cannot reach the goal
+resopen four1: 13,726 states, 1.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+resopen f1: 21,927 states, 2.4s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,612 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18,082 judged states, 0 cannot reach the goal
+    P8: 18,082 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,130 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+resopen ll2: 33,560 states, 5.3s: all hold
+    DR: 1,589 judged states, 0 cannot reach the goal
+    LB: 1,486 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 31,644 judged states, 0 cannot reach the goal
+    P8: 31,644 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 3,690 judged states, 0 cannot reach the goal
+    SWAP: 1,916 judged states, 0 cannot reach the goal
+resopen hg1: 48,532 states, 6.1s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 5,680 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 39,653 judged states, 0 cannot reach the goal
+    P8: 39,653 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 4,716 judged states, 0 cannot reach the goal
+    SWAP: 8,879 judged states, 0 cannot reach the goal
+resopen lh1: 131,022 states, 18.6s: all hold
+    DR: 4,002 judged states, 0 cannot reach the goal
+    LB: 11,122 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 119,113 judged states, 0 cannot reach the goal
+    P8: 119,113 judged states, 0 cannot reach the goal
+    PE: 1,718 judged states, 0 cannot reach the goal
+    PR: 10,933 judged states, 0 cannot reach the goal
+    SWAP: 11,909 judged states, 0 cannot reach the goal
+res hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+res hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res l1: 1,006 states, 0.1s: all hold
+    DR: 14 judged states, 0 cannot reach the goal
+    LB: 80 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 890 judged states, 0 cannot reach the goal
+    P8: 890 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 124 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+res hgn: 6,308 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 754 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 5,082 judged states, 0 cannot reach the goal
+    P8: 4,111 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 478 judged states, 0 cannot reach the goal
+    SWAP: 1,226 judged states, 0 cannot reach the goal
+res four1: 13,726 states, 1.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+res f1: 21,359 states, 2.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,422 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 17,514 judged states, 0 cannot reach the goal
+    P8: 17,514 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,976 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+res ll2: 50,852 states, 6.9s: P9 (21 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 21 steps
+     1. leave (('m', 0),)
+     2. dial (('m', 3),)
+     3. pick (('c', 3), ('x', 0))
+     4. leave (('m', 1),)
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. pick (('c', 0), ('x', 1))
+     9. commit place
+    10. pick (('c', 1), ('x', 0))
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res hg1: 54,547 states, 6.9s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 6,280 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 44,532 judged states, 0 cannot reach the goal
+    P8: 44,532 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 5,075 judged states, 0 cannot reach the goal
+    SWAP: 10,015 judged states, 0 cannot reach the goal
+res lh1: 109,397 states, 15.6s: all hold
+    DR: 3,365 judged states, 0 cannot reach the goal
+    LB: 8,302 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 97,552 judged states, 0 cannot reach the goal
+    P8: 97,552 judged states, 0 cannot reach the goal
+    PE: 1,433 judged states, 0 cannot reach the goal
+    PR: 9,275 judged states, 0 cannot reach the goal
+    SWAP: 11,845 judged states, 0 cannot reach the goal
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 1,022 states, 0.1s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 82 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 906 judged states, 0 cannot reach the goal
+    P8: 906 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 125 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 5,851 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 700 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 4,737 judged states, 0 cannot reach the goal
+    P8: 4,002 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 520 judged states, 0 cannot reach the goal
+    SWAP: 1,114 judged states, 0 cannot reach the goal
+resopen four1: 13,726 states, 1.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+resopen f1: 21,927 states, 2.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,612 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18,082 judged states, 0 cannot reach the goal
+    P8: 18,082 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,130 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+resopen ll2: 51,566 states, 6.5s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. leave (('m', 0),)
+     2. pick (('c', 3), ('x', 0))
+     3. leave (('m', 1),)
+     4. commit place
+     5. add (('r', (3, 0)),)
+     6. commit cfg
+     7. pick (('c', 0), ('x', 1))
+     8. commit place
+     9. pick (('c', 1), ('x', 0))
+    10. commit place
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen hg1: 48,532 states, 6.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 5,680 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 39,653 judged states, 0 cannot reach the goal
+    P8: 39,653 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 4,716 judged states, 0 cannot reach the goal
+    SWAP: 8,879 judged states, 0 cannot reach the goal
+resopen lh1: 112,807 states, 15.9s: all hold
+    DR: 3,793 judged states, 0 cannot reach the goal
+    LB: 8,770 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 101,001 judged states, 0 cannot reach the goal
+    P8: 101,001 judged states, 0 cannot reach the goal
+    PE: 1,403 judged states, 0 cannot reach the goal
+    PR: 9,564 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+res hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hp0: 18 states, 0.0s: PE (2 steps)
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18 judged states, 0 cannot reach the goal
+    P8: 18 judged states, 0 cannot reach the goal
+    PE: 9 judged states, 8 cannot reach the goal
+    PR: 1 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+  PE: shortest trace, 2 steps
+     1. place (('e', 0), ('p', frozenset({0, 1, 3})))
+     2. commit place
+res hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res l1: 35 states, 0.0s: P8 (1 steps)
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 35 judged states, 0 cannot reach the goal
+    P8: 35 judged states, 31 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+  P8: shortest trace, 1 steps
+     1. leave (('m', 0),)
+res hgn: 1,028 states, 0.1s: P8 (2 steps)
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 136 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 878 judged states, 0 cannot reach the goal
+    P8: 514 judged states, 40 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 150 judged states, 0 cannot reach the goal
+  P8: shortest trace, 2 steps
+     1. crash 1
+     2. gone (('m', 1),)
+res four1: 13,726 states, 1.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+res f1: 867 states, 0.1s: P8 (1 steps)
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 88 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 829 judged states, 0 cannot reach the goal
+    P8: 829 judged states, 240 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 38 judged states, 0 cannot reach the goal
+  P8: shortest trace, 1 steps
+     1. crash 0
+res ll2: 323 states, 0.0s: P8 (1 steps)
+    DR: 14 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 323 judged states, 0 cannot reach the goal
+    P8: 323 judged states, 142 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+  P8: shortest trace, 1 steps
+     1. leave (('m', 0),)
+res hg1: 2,768 states, 0.3s: P8 (1 steps)
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 304 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 2,618 judged states, 0 cannot reach the goal
+    P8: 2,618 judged states, 816 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 150 judged states, 0 cannot reach the goal
+  P8: shortest trace, 1 steps
+     1. crash 0
+res lh1: 2,443 states, 0.3s: P8 (1 steps), PE (2 steps)
+    DR: 77 judged states, 0 cannot reach the goal
+    LB: 122 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 2,443 judged states, 0 cannot reach the goal
+    P8: 2,443 judged states, 1,775 cannot reach the goal
+    PE: 96 judged states, 89 cannot reach the goal
+    PR: 106 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+  P8: shortest trace, 1 steps
+     1. leave (('m', 0),)
+  PE: shortest trace, 2 steps
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 174 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 16 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 143 judged states, 0 cannot reach the goal
+    P8: 143 judged states, 0 cannot reach the goal
+    PE: 64 judged states, 0 cannot reach the goal
+    PR: 13 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 909 states, 0.1s: all hold
+    DR: 13 judged states, 0 cannot reach the goal
+    LB: 76 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 793 judged states, 0 cannot reach the goal
+    P8: 793 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 112 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 5,152 states, 0.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 586 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 4,114 judged states, 0 cannot reach the goal
+    P8: 3,554 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 466 judged states, 0 cannot reach the goal
+    SWAP: 1,038 judged states, 0 cannot reach the goal
+resopen four1: 13,726 states, 1.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+resopen f1: 19,958 states, 2.2s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,262 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 16,151 judged states, 0 cannot reach the goal
+    P8: 16,151 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,922 judged states, 0 cannot reach the goal
+    SWAP: 3,807 judged states, 0 cannot reach the goal
+resopen ll2: 17,153 states, 2.6s: all hold
+    DR: 801 judged states, 0 cannot reach the goal
+    LB: 694 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15,529 judged states, 0 cannot reach the goal
+    P8: 15,529 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,911 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+resopen hg1: 44,143 states, 5.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 4,932 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 35,340 judged states, 0 cannot reach the goal
+    P8: 35,340 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 4,252 judged states, 0 cannot reach the goal
+    SWAP: 8,803 judged states, 0 cannot reach the goal
+resopen lh1: 98,684 states, 13.8s: all hold
+    DR: 2,999 judged states, 0 cannot reach the goal
+    LB: 7,984 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 86,878 judged states, 0 cannot reach the goal
+    P8: 86,878 judged states, 0 cannot reach the goal
+    PE: 1,313 judged states, 0 cannot reach the goal
+    PR: 8,297 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+res hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+res hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res l1: 1,022 states, 0.1s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 82 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 906 judged states, 0 cannot reach the goal
+    P8: 906 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 125 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+res hgn: 6,477 states, 0.8s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 804 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 5,251 judged states, 0 cannot reach the goal
+    P8: 4,246 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 520 judged states, 0 cannot reach the goal
+    SWAP: 1,226 judged states, 0 cannot reach the goal
+res four1: 13,726 states, 1.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+res f1: 21,927 states, 2.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,612 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18,082 judged states, 0 cannot reach the goal
+    P8: 18,082 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,130 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+res ll2: 18,754 states, 2.8s: all hold
+    DR: 888 judged states, 0 cannot reach the goal
+    LB: 772 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 17,130 judged states, 0 cannot reach the goal
+    P8: 17,130 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,150 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+res hg1: 50,240 states, 6.0s: P9 (21 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 21 steps
+     1. crash 1
+     2. evict 0 1
+     3. pick (('c', 3), ('x', 1))
+     4. gone (('m', 3),)
+     5. commit place
+     6. pick (('c', 1), ('x', 3))
+     7. commit place
+     8. pick (('c', 3), ('x', 1))
+     9. commit place
+    10. pick (('c', 1), ('x', 3))
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res lh1: 111,366 states, 16.2s: all hold
+    DR: 3,800 judged states, 0 cannot reach the goal
+    LB: 8,562 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 99,560 judged states, 0 cannot reach the goal
+    P8: 99,560 judged states, 0 cannot reach the goal
+    PE: 1,433 judged states, 0 cannot reach the goal
+    PR: 9,567 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 1,022 states, 0.1s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 82 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 906 judged states, 0 cannot reach the goal
+    P8: 906 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 125 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 5,851 states, 0.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 700 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 4,737 judged states, 0 cannot reach the goal
+    P8: 4,002 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 520 judged states, 0 cannot reach the goal
+    SWAP: 1,114 judged states, 0 cannot reach the goal
+resopen four1: 13,726 states, 1.6s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 1,566 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 12,006 judged states, 0 cannot reach the goal
+    P8: 12,006 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 1,255 judged states, 0 cannot reach the goal
+    SWAP: 1,720 judged states, 0 cannot reach the goal
+resopen f1: 21,927 states, 2.5s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 2,612 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 18,082 judged states, 0 cannot reach the goal
+    P8: 18,082 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,130 judged states, 0 cannot reach the goal
+    SWAP: 3,845 judged states, 0 cannot reach the goal
+resopen ll2: 18,131 states, 2.5s: all hold
+    DR: 881 judged states, 0 cannot reach the goal
+    LB: 736 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 16,507 judged states, 0 cannot reach the goal
+    P8: 16,507 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,052 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+resopen hg1: 48,532 states, 5.9s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 5,680 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 39,653 judged states, 0 cannot reach the goal
+    P8: 39,653 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 4,716 judged states, 0 cannot reach the goal
+    SWAP: 8,879 judged states, 0 cannot reach the goal
+resopen lh1: 112,807 states, 15.6s: all hold
+    DR: 3,793 judged states, 0 cannot reach the goal
+    LB: 8,770 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 101,001 judged states, 0 cannot reach the goal
+    P8: 101,001 judged states, 0 cannot reach the goal
+    PE: 1,403 judged states, 0 cannot reach the goal
+    PR: 9,564 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+res hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+res hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+res l1: 1,006 states, 0.1s: all hold
+    DR: 14 judged states, 0 cannot reach the goal
+    LB: 80 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 890 judged states, 0 cannot reach the goal
+    P8: 890 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 124 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+res hgn: 9,197 states, 0.9s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. gone (('m', 1),)
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res four1: 14,731 states, 1.4s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res f1: 17,517 states, 1.8s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res ll2: 18,164 states, 2.7s: all hold
+    DR: 836 judged states, 0 cannot reach the goal
+    LB: 722 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 16,540 judged states, 0 cannot reach the goal
+    P8: 16,540 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,027 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+res hg1: 50,737 states, 5.2s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+res lh1: 109,071 states, 16.4s: all hold
+    DR: 3,365 judged states, 0 cannot reach the goal
+    LB: 8,278 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 97,265 judged states, 0 cannot reach the goal
+    P8: 97,265 judged states, 0 cannot reach the goal
+    PE: 1,433 judged states, 0 cannot reach the goal
+    PR: 9,253 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal
+resopen hl0: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hln: 15 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 0 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 15 judged states, 0 cannot reach the goal
+    P8: 15 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen hp0: 186 states, 0.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 18 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 155 judged states, 0 cannot reach the goal
+    P8: 155 judged states, 0 cannot reach the goal
+    PE: 72 judged states, 0 cannot reach the goal
+    PR: 14 judged states, 0 cannot reach the goal
+    SWAP: 31 judged states, 0 cannot reach the goal
+resopen hd0: 78 states, 0.0s: all hold
+    DR: 1 judged states, 0 cannot reach the goal
+    LB: 8 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 78 judged states, 0 cannot reach the goal
+    P8: 78 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+resopen l1: 1,022 states, 0.1s: all hold
+    DR: 17 judged states, 0 cannot reach the goal
+    LB: 82 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 906 judged states, 0 cannot reach the goal
+    P8: 906 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 125 judged states, 0 cannot reach the goal
+    SWAP: 116 judged states, 0 cannot reach the goal
+resopen hgn: 10,327 states, 1.0s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. gone (('m', 1),)
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen four1: 14,731 states, 1.4s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen f1: 20,882 states, 2.0s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen ll2: 18,131 states, 2.5s: all hold
+    DR: 881 judged states, 0 cannot reach the goal
+    LB: 736 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 16,507 judged states, 0 cannot reach the goal
+    P8: 16,507 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 2,052 judged states, 0 cannot reach the goal
+    SWAP: 1,624 judged states, 0 cannot reach the goal
+resopen hg1: 51,385 states, 5.4s: P9 (20 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 20 steps
+     1. lose-disk 1
+     2. evict 0 1
+     3. add (('r', (1, 1)),)
+     4. commit cfg
+     5. dropl (('r', (1, 1)),)
+     6. commit cfg
+     7. add (('r', (1, 1)),)
+     8. commit cfg
+     9. dropl (('r', (1, 1)),)
+    10. commit cfg
+Traceback (most recent call last):
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 88, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/fero/docs/v5-space/experiments/E52-resource-healing/../E16-controller-loop/engine/cli.py", line 84, in main
+    engine.show_trace(tr)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/user/fero/docs/v5-space/experiments/E16-controller-loop/engine/engine.py", line 529, in show_trace
+    print(f'{indent}{k:2}. {lab}', file=out)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+resopen lh1: 112,807 states, 15.6s: all hold
+    DR: 3,793 judged states, 0 cannot reach the goal
+    LB: 8,770 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 101,001 judged states, 0 cannot reach the goal
+    P8: 101,001 judged states, 0 cannot reach the goal
+    PE: 1,403 judged states, 0 cannot reach the goal
+    PR: 9,564 judged states, 0 cannot reach the goal
+    SWAP: 11,806 judged states, 0 cannot reach the goal

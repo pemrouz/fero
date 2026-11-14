@@ -1,0 +1,57 @@
+# models/checks.py cover 5000000: covering pairs on the sweep and h1 (run 2026-11-14 with the same runs as checks.py's cover group; sweep runs at a 900,000 limit, all complete)
+smallest, hand-back Raft guards back, without handback.settle | hl0: 22 states, 0.0s: all hold
+smallest, hand-back Raft guards back, without handback.settle | hln: 22 states, 0.0s: all hold
+smallest, hand-back Raft guards back, without handback.settle | hp0: 396 states, 0.1s: all hold
+smallest, hand-back Raft guards back, without handback.settle | hd0: 78 states, 0.0s: all hold
+smallest, hand-back Raft guards back, without handback.settle | l1: 2,690 states, 0.5s: all hold
+smallest, hand-back Raft guards back, without handback.settle | hgn: 19,977 states, 3.4s: all hold
+smallest, hand-back Raft guards back, without handback.settle | four1: 31,729 states, 5.5s: all hold
+smallest, hand-back Raft guards back, without handback.settle | f1: 53,878 states, 9.1s: all hold
+smallest, hand-back Raft guards back, without handback.settle | ll2: 78,058 states, 18.0s: all hold
+smallest, hand-back Raft guards back, without handback.settle | hg1: 151,985 states, 27.4s: all hold
+smallest, hand-back Raft guards back, without handback.settle | lh1: 395,779 states, 87.7s: all hold
+smallest, hand-back Raft guards back, without handback.settle | h1: 2,601,142 states, 514.7s: all hold
+smallest, handback.caught back, without handback.voter | hl0: 22 states, 0.0s: all hold
+smallest, handback.caught back, without handback.voter | hln: 22 states, 0.0s: all hold
+smallest, handback.caught back, without handback.voter | hp0: 396 states, 0.1s: all hold
+smallest, handback.caught back, without handback.voter | hd0: 78 states, 0.0s: all hold
+smallest, handback.caught back, without handback.voter | l1: 2,690 states, 0.5s: all hold
+smallest, handback.caught back, without handback.voter | hgn: 20,857 states, 3.4s: all hold
+smallest, handback.caught back, without handback.voter | four1: 34,699 states, 5.4s: all hold
+smallest, handback.caught back, without handback.voter | f1: 57,838 states, 9.5s: all hold
+smallest, handback.caught back, without handback.voter | ll2: 78,058 states, 18.0s: all hold
+smallest, handback.caught back, without handback.voter | hg1: 163,577 states, 28.3s: all hold
+smallest, handback.caught back, without handback.voter | lh1: 412,917 states, 91.2s: all hold
+smallest, handback.caught back, without handback.voter | h1: 1,108,767 states, 181.5s: LD (19 steps) (STOPPED AT THE STATE LIMIT)
+    LD: 19 steps
+        1. crash 0
+        2. stepdown (0, 0)
+        3. elect (1, 0)
+        4. evict 0 0
+        5. dial (('m', 3),)
+        6. add (('r', (3, 0)),)
+        7. commit cfg
+        8. catchup (3, 0)
+        9. pick (('c', 3), ('x', 0))
+       10. commit place
+       11. recover 0
+       12. catchup (0, 0)
+       13. settle 0
+       14. promote (('r', (3, 0)),)
+       15. commit cfg
+       16. surplus (('r', (0, 0)),)
+       17. commit cfg
+       18. drain (('m', 0),)
+       19. handback ()
+smallest, handback.notme back, without handback.settle | hl0: 22 states, 0.0s: all hold
+smallest, handback.notme back, without handback.settle | hln: 22 states, 0.0s: all hold
+smallest, handback.notme back, without handback.settle | hp0: 408 states, 0.1s: all hold
+smallest, handback.notme back, without handback.settle | hd0: 82 states, 0.0s: all hold
+smallest, handback.notme back, without handback.settle | l1: 2,882 states, 0.5s: all hold
+smallest, handback.notme back, without handback.settle | hgn: 23,951 states, 4.1s: all hold
+smallest, handback.notme back, without handback.settle | four1: 40,618 states, 6.7s: all hold
+smallest, handback.notme back, without handback.settle | f1: 71,605 states, 12.0s: all hold
+smallest, handback.notme back, without handback.settle | ll2: 82,426 states, 18.5s: all hold
+smallest, handback.notme back, without handback.settle | hg1: 194,978 states, 34.8s: all hold
+smallest, handback.notme back, without handback.settle | lh1: 432,218 states, 95.7s: all hold
+smallest, handback.notme back, without handback.settle | h1: 3,155,450 states, 625.9s: all hold
