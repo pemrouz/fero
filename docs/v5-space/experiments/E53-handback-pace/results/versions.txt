@@ -1,0 +1,8 @@
+node v22.22.0
+kernel 6.18.44-fc-v445
+cpus 4
+               total        used        free      shared  buff/cache   available
+Mem:              15           1          13           0           0          14
+E-10 port: ../E10-raft-port/port/src (etcd raft c51f010, per its index.ts)
+E-26 host: ../E26-dormant-groups/host.ts sha256 cbbdf8b1d1c74ccc
+resumed 2026-11-14 after a machine restart: node v22.22.0, kernel 6.18.44-fc-v470, cpus 4
