@@ -1,0 +1,36 @@
+res hh0: 22,719 states, 2.8s: all hold
+    DR: 307 judged states, 0 cannot reach the goal
+    LB: 1,760 judged states, 0 cannot reach the goal
+    LE: 16 judged states, 0 cannot reach the goal
+    P5: 20,085 judged states, 0 cannot reach the goal
+    P8: 20,085 judged states, 0 cannot reach the goal
+    PE: 6,667 judged states, 0 cannot reach the goal
+    PR: 1,459 judged states, 0 cannot reach the goal
+    SWAP: 2,634 judged states, 0 cannot reach the goal
+res lhh: 1,436,967 states, 234.3s: all hold
+    DR: 58,254 judged states, 0 cannot reach the goal
+    LB: 95,206 judged states, 0 cannot reach the goal
+    LE: 1,888 judged states, 0 cannot reach the goal
+    P5: 1,296,177 judged states, 0 cannot reach the goal
+    P8: 1,296,177 judged states, 0 cannot reach the goal
+    PE: 30,815 judged states, 0 cannot reach the goal
+    PR: 94,641 judged states, 0 cannot reach the goal
+    SWAP: 140,790 judged states, 0 cannot reach the goal
+res hpl0: 7,517 states, 0.9s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 768 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 6,442 judged states, 0 cannot reach the goal
+    P8: 6,442 judged states, 0 cannot reach the goal
+    PE: 2,523 judged states, 0 cannot reach the goal
+    PR: 466 judged states, 0 cannot reach the goal
+    SWAP: 1,075 judged states, 0 cannot reach the goal
+res hd2: 756 states, 0.1s: all hold
+    DR: 27 judged states, 0 cannot reach the goal
+    LB: 48 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 756 judged states, 0 cannot reach the goal
+    P8: 756 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 0 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal

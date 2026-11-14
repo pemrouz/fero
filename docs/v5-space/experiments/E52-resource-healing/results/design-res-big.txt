@@ -1,0 +1,10 @@
+res f2: 3,704,723 states, 511.7s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 390,470 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 2,901,938 judged states, 0 cannot reach the goal
+    P8: 2,901,938 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 216,381 judged states, 0 cannot reach the goal
+    SWAP: 707,995 judged states, 2,885 cannot reach the goal
+res ll2f: 6,000,002 states, 968.0s: all hold (STOPPED AT THE STATE LIMIT)

@@ -1,0 +1,2 @@
+the smallest model | f2: 6,000,003 states, 958.1s: all hold (STOPPED AT THE STATE LIMIT) (961s)
+the smallest model | ll2f: 6,000,003 states, 1203.8s: all hold (STOPPED AT THE STATE LIMIT) (1207s)

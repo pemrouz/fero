@@ -1,0 +1,193 @@
+res lf1p7: 1,629,572 states, 240.9s: all hold
+    DR: 41,242 judged states, 0 cannot reach the goal
+    LB: 131,074 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,413,937 judged states, 0 cannot reach the goal
+    P8: 1,413,937 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 131,541 judged states, 0 cannot reach the goal
+    SWAP: 215,635 judged states, 0 cannot reach the goal
+res lf1swap: 1,629,572 states, 242.5s: all hold
+    DR: 41,242 judged states, 0 cannot reach the goal
+    LB: 131,074 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,413,937 judged states, 0 cannot reach the goal
+    P8: 1,413,937 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 131,541 judged states, 0 cannot reach the goal
+    SWAP: 215,635 judged states, 0 cannot reach the goal
+resgone lf1p7: 1,633,670 states, 243.8s: P2C (13 steps)
+    DR: 41,341 judged states, 0 cannot reach the goal
+    LB: 131,284 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,416,146 judged states, 0 cannot reach the goal
+    P8: 1,416,146 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 132,082 judged states, 0 cannot reach the goal
+    SWAP: 217,524 judged states, 0 cannot reach the goal
+  P2C: shortest trace, 13 steps
+     1. leave (('m', 0),)
+     2. dial (('m', 3),)
+     3. pick (('c', 3), ('x', 0))
+     4. commit place
+     5. add (('r', (3, 0)),)
+     6. commit cfg
+     7. handover (('r', (1, 0)),)
+     8. send (0, 0)
+     9. commit noop
+    10. catchup (3, 0)
+    11. crash 3
+    12. promote (('r', (3, 0)),)
+    13. commit cfg
+resgone lf1swap: 1,633,670 states, 242.8s: P2C (13 steps)
+    DR: 41,341 judged states, 0 cannot reach the goal
+    LB: 131,284 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,416,146 judged states, 0 cannot reach the goal
+    P8: 1,416,146 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 132,082 judged states, 0 cannot reach the goal
+    SWAP: 217,524 judged states, 0 cannot reach the goal
+  P2C: shortest trace, 13 steps
+     1. leave (('m', 0),)
+     2. dial (('m', 3),)
+     3. pick (('c', 3), ('x', 0))
+     4. commit place
+     5. add (('r', (3, 0)),)
+     6. commit cfg
+     7. handover (('r', (1, 0)),)
+     8. send (0, 0)
+     9. commit noop
+    10. catchup (3, 0)
+    11. crash 3
+    12. promote (('r', (3, 0)),)
+    13. commit cfg
+resnow lf1p7: 1,627,952 states, 244.3s: all hold
+    DR: 41,242 judged states, 0 cannot reach the goal
+    LB: 131,002 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,412,397 judged states, 0 cannot reach the goal
+    P8: 1,412,397 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 131,541 judged states, 0 cannot reach the goal
+    SWAP: 215,555 judged states, 0 cannot reach the goal
+resnow lf1swap: 1,627,952 states, 244.9s: all hold
+    DR: 41,242 judged states, 0 cannot reach the goal
+    LB: 131,002 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,412,397 judged states, 0 cannot reach the goal
+    P8: 1,412,397 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 131,541 judged states, 0 cannot reach the goal
+    SWAP: 215,555 judged states, 0 cannot reach the goal
+resgonenow lf1p7: 1,643,405 states, 244.9s: P2C (12 steps), P7 (11 steps)
+    DR: 41,341 judged states, 0 cannot reach the goal
+    LB: 132,602 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,422,829 judged states, 0 cannot reach the goal
+    P8: 1,422,829 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 132,685 judged states, 0 cannot reach the goal
+    SWAP: 219,777 judged states, 336 cannot reach the goal
+  P2C: shortest trace, 12 steps
+     1. crash 1
+     2. evict 0 1
+     3. dial (('m', 3),)
+     4. pick (('c', 3), ('x', 1))
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. catchup (3, 0)
+     9. leave (('m', 3),)
+    10. exit 3
+    11. promote (('r', (3, 0)),)
+    12. commit cfg
+  P7: shortest trace, 11 steps
+     1. crash 1
+     2. evict 0 1
+     3. dial (('m', 3),)
+     4. pick (('c', 3), ('x', 1))
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. catchup (3, 0)
+     9. leave (('m', 3),)
+    10. exit 3
+    11. promote (('r', (3, 0)),)
+resgonenow lf1swap: 1,643,405 states, 249.3s: P2C (12 steps), P7 (11 steps), SWAP (11 steps)
+    DR: 41,341 judged states, 0 cannot reach the goal
+    LB: 132,602 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,422,829 judged states, 0 cannot reach the goal
+    P8: 1,422,829 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 132,685 judged states, 0 cannot reach the goal
+    SWAP: 219,777 judged states, 336 cannot reach the goal
+  P2C: shortest trace, 12 steps
+     1. crash 1
+     2. evict 0 1
+     3. dial (('m', 3),)
+     4. pick (('c', 3), ('x', 1))
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. catchup (3, 0)
+     9. leave (('m', 3),)
+    10. exit 3
+    11. promote (('r', (3, 0)),)
+    12. commit cfg
+  P7: shortest trace, 11 steps
+     1. crash 1
+     2. evict 0 1
+     3. dial (('m', 3),)
+     4. pick (('c', 3), ('x', 1))
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. catchup (3, 0)
+     9. leave (('m', 3),)
+    10. exit 3
+    11. promote (('r', (3, 0)),)
+  SWAP: shortest trace, 11 steps
+     1. crash 1
+     2. evict 0 1
+     3. dial (('m', 3),)
+     4. pick (('c', 3), ('x', 1))
+     5. commit place
+     6. add (('r', (3, 0)),)
+     7. commit cfg
+     8. catchup (3, 0)
+     9. leave (('m', 3),)
+    10. exit 3
+    11. promote (('r', (3, 0)),)
+resgone h1: 189,109 states, 19.5s: P2C (14 steps) (STOPPED AT THE STATE LIMIT)
+  P2C: shortest trace, 14 steps
+     1. place (('e', 0), ('p', frozenset({1, 2, 3})))
+     2. commit place
+     3. dial (('m', 3),)
+     4. add (('r', (3, 0)),)
+     5. commit cfg
+     6. repref (('m', 1),)
+     7. settle 1
+     8. handback ()
+     9. send (0, 0)
+    10. commit noop
+    11. catchup (3, 0)
+    12. crash 3
+    13. promote (('r', (3, 0)),)
+    14. commit cfg
+resgone lf1: 178,590 states, 18.9s: P2C (13 steps) (STOPPED AT THE STATE LIMIT)
+  P2C: shortest trace, 13 steps
+     1. leave (('m', 0),)
+     2. dial (('m', 3),)
+     3. pick (('c', 3), ('x', 0))
+     4. commit place
+     5. add (('r', (3, 0)),)
+     6. commit cfg
+     7. handover (('r', (1, 0)),)
+     8. send (0, 0)
+     9. commit noop
+    10. catchup (3, 0)
+    11. crash 3
+    12. promote (('r', (3, 0)),)
+    13. commit cfg

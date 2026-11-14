@@ -1,0 +1,27 @@
+free f2: 2,962,422 states, 389.0s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 311,024 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 2,155,449 judged states, 0 cannot reach the goal
+    P8: 2,155,449 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 134,167 judged states, 0 cannot reach the goal
+    SWAP: 668,025 judged states, 3,904 cannot reach the goal
+ring f2: 2,109,347 states, 263.8s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 217,444 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 1,464,930 judged states, 0 cannot reach the goal
+    P8: 1,464,930 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 86,442 judged states, 0 cannot reach the goal
+    SWAP: 505,469 judged states, 3,904 cannot reach the goal
+retfirst f2: 2,962,422 states, 392.3s: all hold
+    DR: 0 judged states, 0 cannot reach the goal
+    LB: 311,024 judged states, 0 cannot reach the goal
+    LE: 0 judged states, 0 cannot reach the goal
+    P5: 2,155,449 judged states, 0 cannot reach the goal
+    P8: 2,155,449 judged states, 0 cannot reach the goal
+    PE: 0 judged states, 0 cannot reach the goal
+    PR: 134,167 judged states, 0 cannot reach the goal
+    SWAP: 668,025 judged states, 3,904 cannot reach the goal
