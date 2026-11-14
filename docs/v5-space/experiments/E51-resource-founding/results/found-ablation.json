@@ -1,0 +1,1467 @@
+{
+ "bounds": [
+  "one1",
+  "two0",
+  "diff1"
+ ],
+ "verify": [
+  "one2",
+  "two1"
+ ],
+ "pinned": [
+  "join.add"
+ ],
+ "base": {
+  "one1": {
+   "states": 2371,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2371,
+    8301,
+    7382186886619113146
+   ],
+   "judged": {
+    "G2.0": [
+     1111,
+     0
+    ]
+   }
+  },
+  "two0": {
+   "states": 33314,
+   "secs": 3.28,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    33314,
+    175632,
+    12099868706370592065
+   ],
+   "judged": {
+    "G2.0": [
+     33314,
+     0
+    ],
+    "G2.1": [
+     33314,
+     0
+    ]
+   }
+  },
+  "diff1": {
+   "states": 1923,
+   "secs": 0.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1923,
+    7016,
+    4770031425804938492
+   ],
+   "judged": {
+    "G2.0": [
+     843,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "reseed.rows",
+   "dropped"
+  ],
+  [
+   "reseed.mark",
+   "dropped"
+  ],
+  [
+   "first.mark",
+   "dropped in the final pass"
+  ],
+  [
+   "reseed.unseeded",
+   "dropped in the final pass"
+  ],
+  [
+   "first.mark",
+   "put back: alone on one2 it breaks SEED in 5 steps"
+  ],
+  [
+   "reseed.unseeded",
+   "put back: alone on one2 it breaks SEED in 5 steps"
+  ],
+  [
+   "first.mark",
+   "dropped in the final pass after the verify"
+  ],
+  [
+   "reseed.unseeded",
+   "dropped in the final pass after the verify"
+  ]
+ ],
+ "removed": [
+  "reseed.rows",
+  "reseed.mark",
+  "first.mark",
+  "reseed.unseeded"
+ ],
+ "put_back": [
+  [
+   "first.mark",
+   "put back: alone on one2 it breaks SEED in 5 steps"
+  ],
+  [
+   "reseed.unseeded",
+   "put back: alone on one2 it breaks SEED in 5 steps"
+  ]
+ ],
+ "minimal": {
+  "one1": {
+   "states": 2371,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2371,
+    8301,
+    14238984346507643443
+   ],
+   "judged": {
+    "G2.0": [
+     1111,
+     0
+    ]
+   }
+  },
+  "two0": {
+   "states": 33314,
+   "secs": 3.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    33314,
+    175632,
+    14158713885946816668
+   ],
+   "judged": {
+    "G2.0": [
+     33314,
+     0
+    ],
+    "G2.1": [
+     33314,
+     0
+    ]
+   }
+  },
+  "diff1": {
+   "states": 1923,
+   "secs": 0.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1923,
+    7016,
+    18403437238230116740
+   ],
+   "judged": {
+    "G2.0": [
+     843,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "one2": {
+   "states": 10767,
+   "secs": 0.54,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    10767,
+    49013,
+    6929298124445683637
+   ],
+   "judged": {
+    "G2.0": [
+     3181,
+     0
+    ]
+   }
+  },
+  "two1": {
+   "states": 766314,
+   "secs": 77.85,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    766314,
+    4173106,
+    15627432455849022508
+   ],
+   "judged": {
+    "G2.0": [
+     464070,
+     0
+    ],
+    "G2.1": [
+     464070,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "cand.noid",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "an opener makes a candidate only while its dir holds no id for this name",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "cand.keep",
+   "kind": "update",
+   "role": "genesis",
+   "note": "the opener writes a fresh candidate id to its disk BEFORE it asks the store to create it",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "put.absent",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "If-None-Match: the create succeeds only while no id is stored under the project and this name",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 1), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 2), ('m', 1), ('r', 0))"
+    ],
+    [
+     "write",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "put.create",
+   "kind": "update",
+   "role": "genesis",
+   "note": "the store keeps the candidate as the resource id",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "first.mine",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "it founds only if the stored id is its own candidate (from the create's answer, or read back after a restart)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "first",
+     "(('c', 0), ('m', 1), ('r', 0))"
+    ],
+    [
+     "write",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "first.group",
+   "kind": "update",
+   "role": "genesis",
+   "note": "found the home group as its only voter, the id in its first entry (found.create)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "SEED",
+    5,
+    [
+     "SEED"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "SEED",
+    5,
+    [
+     "SEED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "first.settings",
+   "kind": "update",
+   "role": "catalog",
+   "note": "the first entry carries the settings record (the first open's options)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "first.seed",
+   "kind": "update",
+   "role": "catalog",
+   "note": "the first entry applies the seed rows",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "first.mark",
+   "kind": "update",
+   "role": "catalog",
+   "note": "the settings record marks the seed applied, in the same entry",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "SEED",
+    5,
+    [
+     "SEED"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "drop.other",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "a stored id that is not its candidate: it lost the race",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "drop",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "drop.drop",
+   "kind": "update",
+   "role": "genesis",
+   "note": "it drops its candidate (and adopts the stored id: adopt)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    4,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    4,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.noid",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.key",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "it reads the id under its own project and name, not another key",
+   "cmp": null,
+   "alone": [
+    "two0",
+    "ISO",
+    3,
+    [
+     "ISO"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "two0",
+    "ISO",
+    3,
+    [
+     "ISO"
+    ]
+   ],
+   "final_trace": [
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.stored",
+   "kind": "guard",
+   "role": "genesis",
+   "note": "an id is stored there",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    3,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    3,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "adopt.adopt",
+   "kind": "update",
+   "role": "genesis",
+   "note": "keep the stored id in its dir (adopt.adopt)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "join.same",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "a later open whose options differ from the settings record is refused",
+   "cmp": null,
+   "alone": [
+    "diff1",
+    "CAT1",
+    7,
+    [
+     "CAT1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "diff1",
+    "CAT1",
+    7,
+    [
+     "CAT1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 2), ('r', 0))"
+    ],
+    [
+     "join",
+     "(('c', 1), ('m', 2), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "id": "join.add",
+   "kind": "update",
+   "role": "heal",
+   "note": "healing adds it as a copy, a learner (E-16's rules; pinned)",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "reseed.unseeded",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "a copy that opens with a seed applies it only if the record says it is not applied",
+   "cmp": null,
+   "alone": [
+    "one1",
+    "SEED",
+    5,
+    [
+     "SEED"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "reseed.rows",
+   "kind": "update",
+   "role": "catalog",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "reseed.mark",
+   "kind": "update",
+   "role": "catalog",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "cand.noid",
+   "caught": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "cand.keep",
+   "caught": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "put.absent",
+   "caught": [
+    "one1",
+    "G1",
+    10,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 1), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 2), ('m', 1), ('r', 0))"
+    ],
+    [
+     "write",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "put.create",
+   "caught": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "first.mine",
+   "caught": [
+    "one1",
+    "G1",
+    8,
+    [
+     "G1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "write",
+     "1"
+    ],
+    [
+     "first",
+     "(('c', 0), ('m', 1), ('r', 0))"
+    ],
+    [
+     "write",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "first.group",
+   "caught": [
+    "one1",
+    "SEED",
+    5,
+    [
+     "SEED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "first.settings",
+   "caught": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "first.seed",
+   "caught": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "drop.other",
+   "caught": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "drop",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "drop.drop",
+   "caught": [
+    "one1",
+    "G2.0",
+    4,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "cand",
+     "(('m', 1), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.noid",
+   "caught": [
+    "one1",
+    "G2.0",
+    5,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.key",
+   "caught": [
+    "two0",
+    "ISO",
+    3,
+    [
+     "ISO"
+    ]
+   ],
+   "trace": [
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.stored",
+   "caught": [
+    "one1",
+    "G2.0",
+    3,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 0), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "adopt.adopt",
+   "caught": [
+    "one1",
+    "G2.0",
+    2,
+    [
+     "G2.0"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "join.same",
+   "caught": [
+    "diff1",
+    "CAT1",
+    7,
+    [
+     "CAT1"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "0"
+    ],
+    [
+     "start",
+     "2"
+    ],
+    [
+     "cand",
+     "(('m', 0), ('r', 0))"
+    ],
+    [
+     "put",
+     "(('c', 0), ('m', 0), ('r', 0))"
+    ],
+    [
+     "first",
+     "(('c', 1), ('m', 0), ('r', 0))"
+    ],
+    [
+     "adopt",
+     "(('k', 0), ('m', 2), ('r', 0))"
+    ],
+    [
+     "join",
+     "(('c', 1), ('m', 2), ('r', 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "first: group <-> settings",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "first: group <-> seed",
+   "caught": null,
+   "equivalent": true
+  },
+  {
+   "kind": "swap",
+   "rule": "first: settings <-> seed",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "objcas",
+ "secs": 769
+}

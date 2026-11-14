@@ -1,0 +1,6 @@
+design e2: 626 states, 0.0s: all hold
+    REC: 626 judged states, 0 cannot reach the goal
+design m2: 385 states, 0.0s: all hold
+    REC: 385 judged states, 0 cannot reach the goal
+design e2m2: 9,519 states, 0.3s: all hold
+    REC: 9,519 judged states, 0 cannot reach the goal

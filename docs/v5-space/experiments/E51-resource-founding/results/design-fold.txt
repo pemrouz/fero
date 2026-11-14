@@ -1,0 +1,6 @@
+v4 f1: 54 states, 0.0s: all hold
+    REBUILD: 54 judged states, 0 cannot reach the goal
+v4 f2: 87 states, 0.0s: all hold
+    REBUILD: 87 judged states, 0 cannot reach the goal
+v4 f3: 120 states, 0.0s: all hold
+    REBUILD: 120 judged states, 0 cannot reach the goal

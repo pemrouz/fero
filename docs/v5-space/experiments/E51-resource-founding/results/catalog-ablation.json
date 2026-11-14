@@ -1,0 +1,462 @@
+{
+ "bounds": [
+  "roll"
+ ],
+ "verify": [
+  "keys2"
+ ],
+ "pinned": [
+  "join.serve",
+  "alterrm.stopold",
+  "write.w",
+  "alterkey.entry"
+ ],
+ "base": {
+  "roll": {
+   "states": 560,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    560,
+    1740,
+    48048838777330656
+   ],
+   "judged": {
+    "ROLL": [
+     560,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "alterrm.after",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "alterrm.after"
+ ],
+ "put_back": [],
+ "minimal": {
+  "roll": {
+   "states": 560,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    560,
+    1740,
+    48048838777330656
+   ],
+   "judged": {
+    "ROLL": [
+     560,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "keys2": {
+   "states": 252,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    252,
+    650,
+    13136619190016900911
+   ],
+   "judged": {
+    "ROLL": [
+     252,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "join.code",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "a server becomes a full copy only if it runs an allowed code hash (rule 3; rule 1's code part)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "CAT3",
+    2,
+    [
+     "CAT3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "CAT3",
+    2,
+    [
+     "CAT3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "roll",
+     "0"
+    ],
+    [
+     "join",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "join.serve",
+   "kind": "update",
+   "role": "world",
+   "note": "it joins and serves (pinned)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "alteradd.entry",
+   "kind": "update",
+   "role": "catalog",
+   "note": "an alter adds the new code hash by an entry in the home log (rule 2)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "alterrm.after",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "the old hash is removed only after the new one is in (rule 2)",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "alterrm.rolled",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "... and after the roll: no serving copy runs it (rule 2)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "AVAIL",
+    2,
+    [
+     "AVAIL"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "AVAIL",
+    1,
+    [
+     "AVAIL"
+    ]
+   ],
+   "final_trace": [
+    [
+     "alterrm",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "alterrm.entry",
+   "kind": "update",
+   "role": "catalog",
+   "note": "the removal is an entry in the home log (rule 2)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "alterrm.stopold",
+   "kind": "update",
+   "role": "world",
+   "note": "a copy whose hash is no longer allowed is refused at its next HELLO (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "write.gate",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "while the write gate is read-only, every group refuses every write (rule 5)",
+   "cmp": null,
+   "alone": [
+    "roll",
+    "GATE",
+    3,
+    [
+     "GATE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "GATE",
+    3,
+    [
+     "GATE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "close"
+    ],
+    [
+     "follow",
+     "H"
+    ],
+    [
+     "write",
+     "(('g', 'H'),)"
+    ]
+   ]
+  },
+  {
+   "id": "write.w",
+   "kind": "update",
+   "role": "world",
+   "note": "a client write commits (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "alterkey.consistent",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "an alter's keys are checked against each other: standbys >= copies (high rule 6)",
+   "cmp": ">=",
+   "alone": [
+    "roll",
+    "KEYS",
+    1,
+    [
+     "KEYS"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "roll",
+    "KEYS",
+    1,
+    [
+     "KEYS"
+    ]
+   ],
+   "final_trace": [
+    [
+     "alterkey",
+     "(('k', 1), ('v', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "alterkey.entry",
+   "kind": "update",
+   "role": "world",
+   "note": "the key change, an entry in the home log (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "join.code",
+   "caught": [
+    "roll",
+    "CAT3",
+    2,
+    [
+     "CAT3"
+    ]
+   ],
+   "trace": [
+    [
+     "roll",
+     "0"
+    ],
+    [
+     "join",
+     "(('m', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "alteradd.entry",
+   "caught": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "alterrm.rolled",
+   "caught": [
+    "roll",
+    "AVAIL",
+    1,
+    [
+     "AVAIL"
+    ]
+   ],
+   "trace": [
+    [
+     "alterrm",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "alterrm.entry",
+   "caught": [
+    "roll",
+    "ROLL",
+    0,
+    [
+     "ROLL"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "write.gate",
+   "caught": [
+    "roll",
+    "GATE",
+    3,
+    [
+     "GATE"
+    ]
+   ],
+   "trace": [
+    [
+     "close"
+    ],
+    [
+     "follow",
+     "H"
+    ],
+    [
+     "write",
+     "(('g', 'H'),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "alterkey.consistent",
+   "caught": [
+    "roll",
+    "KEYS",
+    1,
+    [
+     "KEYS"
+    ]
+   ],
+   "trace": [
+    [
+     "alterkey",
+     "(('k', 1), ('v', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "alterkey.consistent",
+   "caught": null,
+   "equivalent": false
+  }
+ ],
+ "option": "design",
+ "secs": 0
+}

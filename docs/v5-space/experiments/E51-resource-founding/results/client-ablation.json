@@ -1,0 +1,859 @@
+{
+ "bounds": [
+  "c1",
+  "c2"
+ ],
+ "verify": [
+  "c2m"
+ ],
+ "pinned": [
+  "lookup.pick",
+  "miss.fail",
+  "redial.pick",
+  "hello.conn",
+  "hello.tell",
+  "reject.wrong",
+  "dialfail.back",
+  "refresh.tell"
+ ],
+ "base": {
+  "c1": {
+   "states": 3202,
+   "secs": 0.08,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3202,
+    11979,
+    7657150094344044086
+   ],
+   "judged": {
+    "CONN": [
+     20,
+     0
+    ],
+    "FIND": [
+     3171,
+     0
+    ]
+   }
+  },
+  "c2": {
+   "states": 2031,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2031,
+    8280,
+    11498830694769973808
+   ],
+   "judged": {
+    "CONN": [
+     49,
+     0
+    ],
+    "FIND": [
+     1597,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "lookup.first",
+   "dropped"
+  ],
+  [
+   "refresh.learn",
+   "dropped"
+  ],
+  [
+   "dialfail.mark",
+   "dropped in the final pass"
+  ],
+  [
+   "refresh.learn",
+   "put back: alone on c2m it breaks CONN in 7 steps"
+  ],
+  [
+   "dialfail.mark",
+   "put back: alone on c2m it breaks FIND in 5 steps"
+  ],
+  [
+   "dialfail.mark",
+   "dropped in the final pass after the verify"
+  ]
+ ],
+ "removed": [
+  "lookup.first",
+  "dialfail.mark"
+ ],
+ "put_back": [
+  [
+   "refresh.learn",
+   "put back: alone on c2m it breaks CONN in 7 steps"
+  ],
+  [
+   "dialfail.mark",
+   "put back: alone on c2m it breaks FIND in 5 steps"
+  ]
+ ],
+ "minimal": {
+  "c1": {
+   "states": 2320,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2320,
+    9583,
+    5021714291151748808
+   ],
+   "judged": {
+    "CONN": [
+     26,
+     0
+    ],
+    "FIND": [
+     2283,
+     0
+    ]
+   }
+  },
+  "c2": {
+   "states": 979,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    979,
+    4214,
+    6405492495326938658
+   ],
+   "judged": {
+    "CONN": [
+     31,
+     0
+    ],
+    "FIND": [
+     809,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "c2m": {
+   "states": 11251,
+   "secs": 0.29,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    11251,
+    59920,
+    7299236633720263316
+   ],
+   "judged": {
+    "CONN": [
+     223,
+     0
+    ],
+    "FIND": [
+     9585,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "lookup.first",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "it asks the directory only while no member it knows has answered since it last connected (rule 9, first half)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "lookup.pick",
+   "kind": "update",
+   "role": "world",
+   "note": "dial an address the directory gave (pinned)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    0,
+    [
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "c1",
+    "FIND",
+    0,
+    [
+     "FIND"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "miss.fail",
+   "kind": "update",
+   "role": "world",
+   "note": "a lookup that finds nothing fails (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "miss.again",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a lookup that fails or finds nothing is asked again later, never given up (rule 10)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    1,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c1",
+    "FIND",
+    1,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "final_trace": [
+    [
+     "miss",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "redial.pick",
+   "kind": "update",
+   "role": "world",
+   "note": "dial a member the resource told it of (pinned)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    4,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "c1",
+    "CONN",
+    5,
+    [
+     "CONN"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "blackout"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "hello.proj",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "the HELLO names the same project (rule 8)",
+   "cmp": null,
+   "alone": [
+    "c2",
+    "D1",
+    5,
+    [
+     "D1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c2",
+    "D1",
+    5,
+    [
+     "D1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "reuse",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "hello.res",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "the HELLO names the same resource: the server holds a copy of it (rule 8)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "D1",
+    4,
+    [
+     "D1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c1",
+    "D1",
+    4,
+    [
+     "D1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "hello.conn",
+   "kind": "update",
+   "role": "world",
+   "note": "connected (pinned)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    0,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "c1",
+    "FIND",
+    0,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "hello.tell",
+   "kind": "update",
+   "role": "world",
+   "note": "the resource tells it the members (a ghost; pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "hello.learn",
+   "kind": "update",
+   "role": "softdir",
+   "note": "it keeps the members the resource tells it (rule 9, second half)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "CONN",
+    5,
+    [
+     "CONN"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c1",
+    "CONN",
+    5,
+    [
+     "CONN"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "blackout"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "reject.wrong",
+   "kind": "guard",
+   "role": "world",
+   "note": "any other answer (pinned)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "CONN",
+    8,
+    [
+     "CONN"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "c1",
+    "CONN",
+    8,
+    [
+     "CONN"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "blackout"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ],
+    [
+     "lost",
+     "0"
+    ],
+    [
+     "redial",
+     "(('a', 1),)"
+    ],
+    [
+     "reject",
+     "(('a', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "reject.drop",
+   "kind": "update",
+   "role": "softdir",
+   "note": "drops the address and tries the next (rule 8)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    3,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c1",
+    "FIND",
+    3,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "dialfail.back",
+   "kind": "update",
+   "role": "world",
+   "note": "a dial that finds nothing there fails (pinned)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    3,
+    [
+     "FIND"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "c1",
+    "FIND",
+    3,
+    [
+     "FIND"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "dialfail.mark",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a failed dial marks that member failed (still retried), so once every member it knows has failed the client asks the directory again (new)",
+   "cmp": null,
+   "alone": [
+    "c1",
+    "FIND",
+    5,
+    [
+     "FIND"
+    ]
+   ],
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "refresh.tell",
+   "kind": "update",
+   "role": "world",
+   "note": "the resource tells it the new members (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "refresh.learn",
+   "kind": "update",
+   "role": "softdir",
+   "note": "rule 9, when members change",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "c2m",
+    "CONN",
+    7,
+    [
+     "CONN"
+    ]
+   ],
+   "final_trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "blackout"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ],
+    [
+     "move",
+     "1",
+     "2"
+    ],
+    [
+     "refresh",
+     "(('a', 0),)"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "miss.again",
+   "caught": [
+    "c1",
+    "FIND",
+    1,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "trace": [
+    [
+     "miss",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "hello.proj",
+   "caught": [
+    "c2",
+    "D1",
+    5,
+    [
+     "D1"
+    ]
+   ],
+   "trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "reuse",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "hello.res",
+   "caught": [
+    "c1",
+    "D1",
+    4,
+    [
+     "D1"
+    ]
+   ],
+   "trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "hello.learn",
+   "caught": [
+    "c1",
+    "CONN",
+    5,
+    [
+     "CONN"
+    ]
+   ],
+   "trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ],
+    [
+     "blackout"
+    ],
+    [
+     "hello",
+     "(('a', 0),)"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "reject.drop",
+   "caught": [
+    "c1",
+    "FIND",
+    3,
+    [
+     "CONN",
+     "FIND"
+    ]
+   ],
+   "trace": [
+    [
+     "announce",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "2"
+    ],
+    [
+     "lookup",
+     "(('a', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refresh.learn",
+   "caught": [
+    "c2m",
+    "CONN",
+    7,
+    [
+     "CONN"
+    ]
+   ]
+  }
+ ],
+ "option": "design",
+ "secs": 11
+}

@@ -1,0 +1,12 @@
+design c1: 3,202 states, 0.1s: all hold
+    CONN: 20 judged states, 0 cannot reach the goal
+    FIND: 3,171 judged states, 0 cannot reach the goal
+design c2: 2,031 states, 0.0s: all hold
+    CONN: 49 judged states, 0 cannot reach the goal
+    FIND: 1,597 judged states, 0 cannot reach the goal
+design c2m: 22,051 states, 0.6s: all hold
+    CONN: 263 judged states, 0 cannot reach the goal
+    FIND: 18,467 judged states, 0 cannot reach the goal
+design c3m: 93,416 states, 3.0s: all hold
+    CONN: 1,251 judged states, 0 cannot reach the goal
+    FIND: 63,399 judged states, 0 cannot reach the goal

@@ -1,0 +1,393 @@
+{
+ "bounds": [
+  "f1",
+  "f2"
+ ],
+ "verify": [
+  "f3"
+ ],
+ "pinned": [
+  "register.entry",
+  "fold.publish",
+  "fold.clean",
+  "forget.drop"
+ ],
+ "base": {
+  "f1": {
+   "states": 54,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    54,
+    96,
+    1940992843615454445
+   ],
+   "judged": {
+    "REBUILD": [
+     54,
+     0
+    ]
+   }
+  },
+  "f2": {
+   "states": 87,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    87,
+    158,
+    11773704960411157069
+   ],
+   "judged": {
+    "REBUILD": [
+     87,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [],
+ "removed": [],
+ "put_back": [],
+ "minimal": {
+  "f1": {
+   "states": 54,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    54,
+    96,
+    1940992843615454445
+   ],
+   "judged": {
+    "REBUILD": [
+     54,
+     0
+    ]
+   }
+  },
+  "f2": {
+   "states": 87,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    87,
+    158,
+    11773704960411157069
+   ],
+   "judged": {
+    "REBUILD": [
+     87,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "f3": {
+   "states": 120,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    120,
+    220,
+    9919879750989479620
+   ],
+   "judged": {
+    "REBUILD": [
+     120,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "register.entry",
+   "kind": "update",
+   "role": "world",
+   "note": "the host stores the entry (pinned)",
+   "cmp": null,
+   "alone": [
+    "f1",
+    "REBUILD",
+    1,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "f1",
+    "REBUILD",
+    1,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "dial",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "register.pass",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a register runs a cleanup pass at once, so its caller is seen from its first entry (rule 12)",
+   "cmp": null,
+   "alone": [
+    "f1",
+    "REBUILD",
+    4,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "f1",
+    "REBUILD",
+    4,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "fold",
+     "()"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "close",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "fold.publish",
+   "kind": "update",
+   "role": "world",
+   "note": "the host's fold publishes the peer table (pinned)",
+   "cmp": null,
+   "alone": [
+    "f1",
+    "REBUILD",
+    5,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "f1",
+    "REBUILD",
+    5,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "fold",
+     "()"
+    ],
+    [
+     "fold",
+     "()"
+    ],
+    [
+     "forget",
+     "(('r', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "fold.clean",
+   "kind": "update",
+   "role": "world",
+   "note": "the cleanup pass on every fold (pinned)",
+   "cmp": null,
+   "alone": [
+    "f1",
+    "REBUILD",
+    4,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "f1",
+    "REBUILD",
+    4,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "fold",
+     "()"
+    ],
+    [
+     "close",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "forget.grace",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "a registrant never published as up survives GRACE passes before it is dropped (high rule 14)",
+   "cmp": ">=",
+   "alone": [
+    "f1",
+    "REBUILD",
+    3,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "f1",
+    "REBUILD",
+    3,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "forget",
+     "(('r', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "forget.drop",
+   "kind": "update",
+   "role": "world",
+   "note": "its entries go (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "register.pass",
+   "caught": [
+    "f1",
+    "REBUILD",
+    4,
+    [
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "fold",
+     "()"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "close",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "forget.grace",
+   "caught": [
+    "f1",
+    "REBUILD",
+    3,
+    [
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "dial",
+     "0"
+    ],
+    [
+     "register",
+     "(('r', 0),)"
+    ],
+    [
+     "forget",
+     "(('r', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "forget.grace",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "v4",
+ "secs": 0
+}

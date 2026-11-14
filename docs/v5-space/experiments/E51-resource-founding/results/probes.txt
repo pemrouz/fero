@@ -1,0 +1,188 @@
+# the opener keeps its candidate, and the id the store took, only in memory (E-33 took create and first entry as one step)
+objcas-mem one1: 2,276 states, 0.1s: G2.0 (6 steps)
+    G2.0: 1,087 judged states, 54 cannot reach the goal
+  G2.0: shortest trace, 6 steps
+     1. start 0
+     2. start 1
+     3. start 2
+     4. cand (('m', 0), ('r', 0))
+     5. put (('c', 0), ('m', 0), ('r', 0))
+     6. crash 0
+
+# the first fix as a builder would write it: create, and write the created id to disk when the create answers
+objcas-after one1: 2,612 states, 0.1s: G2.0 (6 steps)
+    G2.0: 1,294 judged states, 54 cannot reach the goal
+  G2.0: shortest trace, 6 steps
+     1. start 0
+     2. start 1
+     3. start 2
+     4. cand (('m', 0), ('r', 0))
+     5. put (('c', 0), ('m', 0), ('r', 0))
+     6. crash 0
+
+# rule 9 as written: a client asks the directory only for a first address (no failed-member mark)
+design c1: 1,948 states, 0.0s: FIND (5 steps)
+    CONN: 20 judged states, 0 cannot reach the goal
+    FIND: 1,917 judged states, 216 cannot reach the goal
+  FIND: shortest trace, 5 steps
+     1. crash 0
+     2. announce 1
+     3. lookup (('a', 1),)
+     4. hello (('a', 1),)
+     5. move 1 2
+
+# the home group recovered: judged even while the recovered copy is down (the residual case)
+design home3s: 121 states, 0.0s: INC (5 steps)
+    INC: 67 judged states, 5 cannot reach the goal
+  INC: shortest trace, 5 steps
+     1. crash 1
+     2. crash 2
+     3. recover ()
+     4. crash 0
+     5. start 1
+
+# ... judged only where two old copies are up together and the recovered copy is down: the home group, then a data group
+design home3e: 121 states, 0.0s: INC (6 steps)
+    INC: 1 judged states, 1 cannot reach the goal
+  INC: shortest trace, 6 steps
+     1. crash 1
+     2. crash 2
+     3. recover ()
+     4. crash 0
+     5. start 1
+     6. start 2
+design data3e: 121 states, 0.0s: all hold
+    INC: 1 judged states, 0 cannot reach the goal
+
+# meta-directory rules 1 to 8 as first written (no write-again) when a record write can be lost
+noresend e2: 482 states, 0.0s: REC (5 steps)
+    REC: 482 judged states, 20 cannot reach the goal
+  REC: shortest trace, 5 steps
+     1. propose 1
+     2. commit (('e', 1),)
+     3. propose 2
+     4. commit (('e', 2),)
+     5. lose 2
+noresend m2: 295 states, 0.0s: REC (3 steps)
+    REC: 295 judged states, 12 cannot reach the goal
+  REC: shortest trace, 3 steps
+     1. propose 1
+     2. commit (('e', 1),)
+     3. lose 1
+
+# write again only until the record is once shown (retry until acknowledged)
+ack e2m2: 16,587 states, 0.5s: REC (9 steps)
+    REC: 16,587 judged states, 162 cannot reach the goal
+  REC: shortest trace, 9 steps
+     1. propose 1
+     2. commit (('e', 1),)
+     3. propose 2
+     4. commit (('e', 2),)
+     5. setrec (('e', 2),)
+     6. shown
+     7. hrecover
+     8. rewrite ()
+     9. lose 2
+
+# the leader reads the directory and adds later (a stale read): the leaver exit and never-re-announce without the refusal
+stale p1: 621 states, 0.0s: P7 (5 steps) (STOPPED AT THE STATE LIMIT)
+  P7: shortest trace, 5 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. read
+     4. leave (('m', 2),)
+     5. add (('m', 2), ('old', 0), ('why', 'heal'))
+stale p1n: 624 states, 0.0s: P7 (5 steps) (STOPPED AT THE STATE LIMIT)
+  P7: shortest trace, 5 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. read
+     4. leave (('m', 2),)
+     5. add (('m', 2), ('old', 0), ('why', 'heal'))
+stale p2: 999 states, 0.0s: P7 (5 steps) (STOPPED AT THE STATE LIMIT)
+  P7: shortest trace, 5 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. read
+     4. leave (('m', 2),)
+     5. add (('m', 2), ('old', 0), ('why', 'heal'))
+stale p2n: 1,256 states, 0.0s: P7 (5 steps) (STOPPED AT THE STATE LIMIT)
+  P7: shortest trace, 5 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. read
+     4. leave (('m', 2),)
+     5. add (('m', 2), ('old', 0), ('why', 'heal'))
+
+# ... and the same drop where the leader reads the live table in the add step itself
+design p1: 2,620 states, 0.1s: all hold
+    HEAL: 728 judged states, 0 cannot reach the goal
+    LEAVE: 960 judged states, 0 cannot reach the goal
+design p1n: 1,344 states, 0.0s: all hold
+    HEAL: 120 judged states, 0 cannot reach the goal
+    LEAVE: 212 judged states, 0 cannot reach the goal
+design p2: 15,106 states, 0.4s: all hold
+    HEAL: 4,808 judged states, 0 cannot reach the goal
+    LEAVE: 3,356 judged states, 0 cannot reach the goal
+design p2n: 15,981 states, 0.4s: all hold
+    HEAL: 728 judged states, 0 cannot reach the goal
+    LEAVE: 806 judged states, 0 cannot reach the goal
+
+# healing adds a machine its own link has not reached (a stale machine entry), P9 at 6 changes (this model) and 8 (E-16)
+design p1: 2,907 states, 0.1s: P9 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 12 steps
+     1. mannounce (('m', 0),)
+     2. crash 0
+     3. mannounce (('m', 2),)
+     4. mannounce (('m', 3),)
+     5. leave (('m', 1),)
+     6. add (('m', 2), ('old', 0), ('why', 'heal'))
+     7. remove 0
+     8. add (('m', 0), ('old', 1), ('why', 'leave'))
+     9. remove 0
+    10. lremove 1
+    11. add (('m', 0), ('old', None), ('why', 'heal'))
+    12. add (('m', 3), ('old', 0), ('why', 'heal'))
+design p1c8: 3,084 states, 0.1s: all hold
+    HEAL: 1,108 judged states, 0 cannot reach the goal
+    LEAVE: 992 judged states, 0 cannot reach the goal
+design p1nc8: 1,604 states, 0.0s: all hold
+    HEAL: 112 judged states, 0 cannot reach the goal
+    LEAVE: 190 judged states, 0 cannot reach the goal
+design p2c8: 21,941 states, 0.5s: P9 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 12 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. crash 2
+     4. add (('m', 2), ('old', 0), ('why', 'heal'))
+     5. remove 2
+     6. add (('m', 2), ('old', 0), ('why', 'heal'))
+     7. remove 2
+     8. add (('m', 2), ('old', 0), ('why', 'heal'))
+     9. remove 2
+    10. add (('m', 2), ('old', 0), ('why', 'heal'))
+    11. remove 2
+    12. add (('m', 2), ('old', 0), ('why', 'heal'))
+design p2nc8: 23,058 states, 0.6s: P9 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P9: shortest trace, 12 steps
+     1. crash 0
+     2. mannounce (('m', 2),)
+     3. crash 2
+     4. add (('m', 2), ('old', 0), ('why', 'heal'))
+     5. remove 2
+     6. add (('m', 2), ('old', 0), ('why', 'heal'))
+     7. remove 2
+     8. add (('m', 2), ('old', 0), ('why', 'heal'))
+     9. remove 2
+    10. add (('m', 2), ('old', 0), ('why', 'heal'))
+    11. remove 2
+    12. add (('m', 2), ('old', 0), ('why', 'heal'))
+
+# v4 without the pass on register (I-34)
+v4 f1: 146 states, 0.0s: REBUILD (4 steps)
+    REBUILD: 146 judged states, 26 cannot reach the goal
+  REBUILD: shortest trace, 4 steps
+     1. dial 0
+     2. fold ()
+     3. register (('r', 0),)
+     4. close 0

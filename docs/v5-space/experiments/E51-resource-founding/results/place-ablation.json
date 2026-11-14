@@ -1,0 +1,680 @@
+{
+ "bounds": [
+  "p1",
+  "p1n"
+ ],
+ "verify": [
+  "p2",
+  "p2n"
+ ],
+ "pinned": [
+  "leave.count",
+  "add.put"
+ ],
+ "base": {
+  "p1": {
+   "states": 2004,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2004,
+    6108,
+    9003271569197640150
+   ],
+   "judged": {
+    "HEAL": [
+     564,
+     0
+    ],
+    "LEAVE": [
+     688,
+     0
+    ]
+   }
+  },
+  "p1n": {
+   "states": 1124,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1124,
+    3552,
+    8131868456826984363
+   ],
+   "judged": {
+    "HEAL": [
+     112,
+     0
+    ],
+    "LEAVE": [
+     166,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "mannounce.notret",
+   "dropped"
+  ],
+  [
+   "leave.exit",
+   "dropped"
+  ],
+  [
+   "add.refuse",
+   "kept: with the others dropped it breaks P7 on p1 in 4 steps"
+  ],
+  [
+   "add.own",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "mannounce.notret",
+  "leave.exit",
+  "add.own"
+ ],
+ "put_back": [],
+ "minimal": {
+  "p1": {
+   "states": 4500,
+   "secs": 0.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4500,
+    14964,
+    2229532023256036875
+   ],
+   "judged": {
+    "HEAL": [
+     1312,
+     0
+    ],
+    "LEAVE": [
+     1624,
+     0
+    ]
+   }
+  },
+  "p1n": {
+   "states": 2344,
+   "secs": 0.06,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2344,
+    7792,
+    13455554062453693133
+   ],
+   "judged": {
+    "HEAL": [
+     192,
+     0
+    ],
+    "LEAVE": [
+     388,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "p2": {
+   "states": 25062,
+   "secs": 0.81,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    25062,
+    107370,
+    11878299757255784490
+   ],
+   "judged": {
+    "HEAL": [
+     7956,
+     0
+    ],
+    "LEAVE": [
+     5604,
+     0
+    ]
+   }
+  },
+  "p2n": {
+   "states": 43904,
+   "secs": 1.35,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    43904,
+    197368,
+    8439122108920303086
+   ],
+   "judged": {
+    "HEAL": [
+     1400,
+     0
+    ],
+    "LEAVE": [
+     1960,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "mannounce.notret",
+   "kind": "guard",
+   "role": "members",
+   "note": "a retiring machine never announces itself again (rule 1: its machine entry stays out)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "mannounce.add",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a server announces itself as a machine, with the code it can run (rule 2)",
+   "cmp": null,
+   "alone": [
+    "p1",
+    "HEAL",
+    1,
+    [
+     "HEAL",
+     "LEAVE"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "p1",
+    "HEAL",
+    1,
+    [
+     "HEAL",
+     "LEAVE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "leave.mark",
+   "kind": "update",
+   "role": "members",
+   "note": "a leaving server marks itself retiring first (rule 1)",
+   "cmp": null,
+   "alone": [
+    "p1",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "p1",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "leave",
+     "(('m', 2),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "id": "leave.exit",
+   "kind": "update",
+   "role": "members",
+   "note": "it takes its machine entry out of the directory (rule 1)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "leave.count",
+   "kind": "update",
+   "role": "world",
+   "note": "the leave starts (a ghost) and a bound on leaves (pinned)",
+   "cmp": null,
+   "alone": [
+    "p1",
+    "HEAL",
+    3,
+    [
+     "HEAL"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "p1",
+    "P9",
+    9,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "surplus",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "surplus",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "surplus",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "id": "add.live",
+   "kind": "guard",
+   "role": "heal",
+   "note": "add only a machine the leader's own link reaches (healing-self's high rule add.cand)",
+   "cmp": null,
+   "alone": [
+    "p1",
+    "P9",
+    12,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "p1",
+    "P9",
+    10,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "id": "add.code",
+   "kind": "guard",
+   "role": "catalog",
+   "note": "a server becomes a copy only if it can run one of the resource's allowed code hashes (rule 3)",
+   "cmp": null,
+   "alone": [
+    "p1n",
+    "CAT3",
+    3,
+    [
+     "CAT3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "p1n",
+    "CAT3",
+    3,
+    [
+     "CAT3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('m', 3), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "id": "add.refuse",
+   "kind": "guard",
+   "role": "members",
+   "note": "a retiring server refuses to become a new copy (rule 1; healing never adds it, rule 2)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "p1",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "leave",
+     "(('m', 2),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "id": "add.own",
+   "kind": "guard",
+   "role": "members",
+   "note": "a live retiring copy is left to its own leave (high rule 3)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "add.put",
+   "kind": "update",
+   "role": "heal",
+   "note": "the add, a config entry (pinned: E-16)",
+   "cmp": null,
+   "alone": [
+    "p1",
+    "HEAL",
+    1,
+    [
+     "HEAL",
+     "LEAVE"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "p1",
+    "HEAL",
+    1,
+    [
+     "HEAL",
+     "LEAVE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "mannounce.add",
+   "caught": [
+    "p1",
+    "HEAL",
+    1,
+    [
+     "HEAL",
+     "LEAVE"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "leave.mark",
+   "caught": [
+    "p1",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "leave",
+     "(('m', 2),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.live",
+   "caught": [
+    "p1",
+    "P9",
+    10,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "leave",
+     "(('m', 0),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ],
+    [
+     "remove",
+     "2"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.code",
+   "caught": [
+    "p1n",
+    "CAT3",
+    3,
+    [
+     "CAT3"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 3),)"
+    ],
+    [
+     "add",
+     "(('m', 3), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "add.refuse",
+   "caught": [
+    "p1",
+    "P7",
+    4,
+    [
+     "P7"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "mannounce",
+     "(('m', 2),)"
+    ],
+    [
+     "leave",
+     "(('m', 2),)"
+    ],
+    [
+     "add",
+     "(('m', 2), ('old', 0), ('why', 'heal'))"
+    ]
+   ]
+  }
+ ],
+ "option": "design",
+ "secs": 9
+}

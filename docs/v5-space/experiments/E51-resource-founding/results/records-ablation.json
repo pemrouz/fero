@@ -1,0 +1,518 @@
+{
+ "bounds": [
+  "e2",
+  "m2"
+ ],
+ "verify": [
+  "e2m2"
+ ],
+ "pinned": [
+  "commit.apply",
+  "setrec.set",
+  "gc.delete",
+  "delete.drop",
+  "rewrite.seen"
+ ],
+ "base": {
+  "e2": {
+   "states": 626,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    626,
+    2053,
+    12583959662769148929
+   ],
+   "judged": {
+    "REC": [
+     626,
+     0
+    ]
+   }
+  },
+  "m2": {
+   "states": 385,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    385,
+    1182,
+    13605362267564660547
+   ],
+   "judged": {
+    "REC": [
+     385,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "commit.record",
+   "dropped"
+  ],
+  [
+   "setrec.newer",
+   "dropped"
+  ],
+  [
+   "delete.settled",
+   "dropped"
+  ],
+  [
+   "rewrite.again",
+   "dropped"
+  ],
+  [
+   "resend.differs",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "commit.record",
+  "setrec.newer",
+  "delete.settled",
+  "rewrite.again",
+  "resend.differs"
+ ],
+ "put_back": [],
+ "minimal": {
+  "e2": {
+   "states": 2176,
+   "secs": 0.07,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2176,
+    11366,
+    10752721929690861159
+   ],
+   "judged": {
+    "REC": [
+     2176,
+     0
+    ]
+   }
+  },
+  "m2": {
+   "states": 1090,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1090,
+    5367,
+    4912043905974177998
+   ],
+   "judged": {
+    "REC": [
+     1090,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "e2m2": {
+   "states": 28198,
+   "secs": 1.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    28198,
+    193001,
+    110954229742523994
+   ],
+   "judged": {
+    "REC": [
+     28198,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "commit.apply",
+   "kind": "update",
+   "role": "world",
+   "note": "G's config entry commits (Raft, pinned)",
+   "cmp": null,
+   "alone": [
+    "e2",
+    "DUR",
+    5,
+    [
+     "DUR"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "commit.record",
+   "kind": "update",
+   "role": "records",
+   "note": "after each config change, G's leader writes G's record into the home log (rule 1)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "setrec.newer",
+   "kind": "guard",
+   "role": "records",
+   "note": "a record names its config; an older config never overwrites a newer (rule 2)",
+   "cmp": ">",
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "setrec.set",
+   "kind": "update",
+   "role": "world",
+   "note": "H's leader applies the record write (pinned)",
+   "cmp": null,
+   "alone": [
+    "e2",
+    "REC",
+    2,
+    [
+     "REC"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "e2",
+    "REC",
+    2,
+    [
+     "REC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "(('e', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gc.shown",
+   "kind": "guard",
+   "role": "records",
+   "note": "a removed copy deletes its data only once G's record shows the config without it (rule 5)",
+   "cmp": null,
+   "alone": [
+    "e2",
+    "DUR",
+    3,
+    [
+     "DUR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "e2",
+    "DUR",
+    3,
+    [
+     "DUR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "refuse",
+     "2"
+    ],
+    [
+     "gc",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gc.delete",
+   "kind": "update",
+   "role": "world",
+   "note": "the copy deletes its log (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "delete.noslots",
+   "kind": "guard",
+   "role": "records",
+   "note": "a group's record is deleted only once the slot table shows none of its slots (rule 6)",
+   "cmp": null,
+   "alone": [
+    "e2",
+    "SLOT",
+    2,
+    [
+     "SLOT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "e2",
+    "SLOT",
+    2,
+    [
+     "SLOT"
+    ]
+   ],
+   "final_trace": [
+    [
+     "tier"
+    ],
+    [
+     "delete",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "delete.settled",
+   "kind": "guard",
+   "role": "records",
+   "note": "... and has shown none for settle.ms (rule 6)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "delete.safe",
+   "kind": "guard",
+   "role": "records",
+   "note": "a group's record is deleted only once its history is safe (rule 7)",
+   "cmp": null,
+   "alone": [
+    "m2",
+    "HIST",
+    3,
+    [
+     "HIST"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "m2",
+    "HIST",
+    2,
+    [
+     "HIST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "move",
+     "H"
+    ],
+    [
+     "delete",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "delete.drop",
+   "kind": "update",
+   "role": "world",
+   "note": "the home leader deletes G's record; G's copies stop (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "rewrite.again",
+   "kind": "update",
+   "role": "records",
+   "note": "after H is recovered from a copy that was behind, G's leader writes its record again (rule 8)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "rewrite.seen",
+   "kind": "update",
+   "role": "world",
+   "note": "G's leader saw H's new incarnation (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "resend.differs",
+   "kind": "guard",
+   "role": "records",
+   "note": "G's leader sees the home log's record of G differ from G's committed config ...",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "resend.again",
+   "kind": "update",
+   "role": "records",
+   "note": "... and writes its record again, until the home log shows it (new: a record write can be lost)",
+   "cmp": null,
+   "alone": [
+    "e2",
+    "REC",
+    5,
+    [
+     "REC"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "e2",
+    "REC",
+    2,
+    [
+     "REC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "(('e', 1),)"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "gc.shown",
+   "caught": [
+    "e2",
+    "DUR",
+    3,
+    [
+     "DUR"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "refuse",
+     "2"
+    ],
+    [
+     "gc",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "delete.noslots",
+   "caught": [
+    "e2",
+    "SLOT",
+    2,
+    [
+     "SLOT"
+    ]
+   ],
+   "trace": [
+    [
+     "tier"
+    ],
+    [
+     "delete",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "delete.safe",
+   "caught": [
+    "m2",
+    "HIST",
+    2,
+    [
+     "HIST"
+    ]
+   ],
+   "trace": [
+    [
+     "move",
+     "H"
+    ],
+    [
+     "delete",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resend.again",
+   "caught": [
+    "e2",
+    "REC",
+    2,
+    [
+     "REC"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "(('e', 1),)"
+    ]
+   ]
+  }
+ ],
+ "option": "design",
+ "secs": 6
+}

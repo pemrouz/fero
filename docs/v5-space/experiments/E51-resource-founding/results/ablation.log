@@ -1,0 +1,36 @@
+  pass 1: 5 of 6 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 3; caught 2; equivalent 1; undecided 0; survived 0
+v4: 6 rules kept of 6; error: None
+  pass 1: 5 of 7 rules necessary alone
+  verify pass 1: 3 put back, 0 undecided
+  mutants: 9; caught 8; equivalent 1; undecided 0; survived 0
+design: 7 rules kept of 7; error: None
+  pass 1: 7 of 11 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 7; caught 6; equivalent 0; undecided 0; survived 1
+design: 10 rules kept of 11; error: None
+  pass 1: 6 of 14 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 4; caught 4; equivalent 0; undecided 0; survived 0
+design: 9 rules kept of 14; error: None
+  pass 1: 6 of 10 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 5; caught 5; equivalent 0; undecided 0; survived 0
+design: 7 rules kept of 10; error: None
+  pass 1: 7 of 10 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 5; caught 5; equivalent 0; undecided 0; survived 0
+stale: 7 rules kept of 10; error: None
+  pass 1: 11 of 16 rules necessary alone
+  verify pass 1: 2 put back, 0 undecided
+  mutants: 6; caught 6; equivalent 0; undecided 0; survived 0
+design: 14 rules kept of 16; error: None
+  pass 1: 11 of 14 rules necessary alone
+  verify pass 1: 0 put back, 0 undecided
+  mutants: 12; caught 11; equivalent 1; undecided 0; survived 0
+design: 12 rules kept of 14; error: None
+  pass 1: 18 of 20 rules necessary alone
+  verify pass 1: 2 put back, 0 undecided
+  mutants: 18; caught 15; equivalent 3; undecided 0; survived 0
+objcas: 16 rules kept of 20; error: None

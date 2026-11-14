@@ -1,0 +1,588 @@
+{
+ "bounds": [
+  "data2",
+  "home3"
+ ],
+ "verify": [
+  "data3"
+ ],
+ "pinned": [
+  "recover.force"
+ ],
+ "base": {
+  "data2": {
+   "states": 39,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    39,
+    94,
+    14780067409776834676
+   ],
+   "judged": {
+    "INC": [
+     23,
+     0
+    ]
+   }
+  },
+  "home3": {
+   "states": 121,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    121,
+    358,
+    11563804652518905349
+   ],
+   "judged": {
+    "INC": [
+     58,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "recover.record",
+   "dropped"
+  ],
+  [
+   "logstop.stop",
+   "dropped"
+  ],
+  [
+   "logstop.higher",
+   "dropped in the final pass"
+  ],
+  [
+   "recover.record",
+   "put back: alone on data3 it breaks INC in 5 steps"
+  ],
+  [
+   "logstop.stop",
+   "put back: alone on data3 it breaks INC in 5 steps"
+  ],
+  [
+   "logstop.higher",
+   "put back: alone on data3 it breaks INC in 1 steps"
+  ]
+ ],
+ "removed": [],
+ "put_back": [
+  [
+   "recover.record",
+   "put back: alone on data3 it breaks INC in 5 steps"
+  ],
+  [
+   "logstop.stop",
+   "put back: alone on data3 it breaks INC in 5 steps"
+  ],
+  [
+   "logstop.higher",
+   "put back: alone on data3 it breaks INC in 1 steps"
+  ]
+ ],
+ "minimal": {
+  "data2": {
+   "states": 39,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    39,
+    94,
+    14780067409776834676
+   ],
+   "judged": {
+    "INC": [
+     23,
+     0
+    ]
+   }
+  },
+  "home3": {
+   "states": 121,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    121,
+    358,
+    11563804652518905349
+   ],
+   "judged": {
+    "INC": [
+     58,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "data3": {
+   "states": 121,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    121,
+    388,
+    9620499705172284755
+   ],
+   "judged": {
+    "INC": [
+     67,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "recover.force",
+   "kind": "update",
+   "role": "world",
+   "note": "the operator forces X onto copy 0 (pinned)",
+   "cmp": null,
+   "alone": [
+    "data2",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "data2",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "start",
+     "1"
+    ],
+    [
+     "logstop",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "recover.raise",
+   "kind": "update",
+   "role": "records",
+   "note": "the recovery raises X's incarnation, which X's HELLO carries (rule 3)",
+   "cmp": null,
+   "alone": [
+    "data2",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "data2",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "logstop",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "recover.record",
+   "kind": "update",
+   "role": "records",
+   "note": "... and in X's record in the home log (rule 3; the home group has no other log)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "data3",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "logstop.higher",
+   "kind": "guard",
+   "role": "records",
+   "note": "a copy that sees a higher incarnation for its group in the home log ... (rule 4)",
+   "cmp": ">",
+   "alone": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "logstop",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "logstop.stop",
+   "kind": "update",
+   "role": "records",
+   "note": "... stops and comes back as a new copy (rule 4)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "data3",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "hellostop.higher",
+   "kind": "guard",
+   "role": "records",
+   "note": "a copy that sees a higher incarnation in a peer's HELLO ... (rule 4)",
+   "cmp": ">",
+   "alone": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "hellostop",
+     "(('x', 0), ('y', 1))"
+    ]
+   ]
+  },
+  {
+   "id": "hellostop.stop",
+   "kind": "update",
+   "role": "records",
+   "note": "... stops and comes back as a new copy (rule 4)",
+   "cmp": null,
+   "alone": [
+    "home3",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "home3",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "recover.raise",
+   "caught": [
+    "data2",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "logstop",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "recover.record",
+   "caught": [
+    "data3",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "logstop.higher",
+   "caught": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "logstop",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "logstop.stop",
+   "caught": [
+    "data3",
+    "INC",
+    5,
+    [
+     "INC"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "hellostop.higher",
+   "caught": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "hellostop",
+     "(('x', 0), ('y', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "hellostop.stop",
+   "caught": [
+    "home3",
+    "INC",
+    4,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "crash",
+     "1"
+    ],
+    [
+     "crash",
+     "2"
+    ],
+    [
+     "recover",
+     "()"
+    ],
+    [
+     "start",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "logstop.higher",
+   "caught": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "logstop",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "hellostop.higher",
+   "caught": [
+    "data2",
+    "INC",
+    1,
+    [
+     "INC"
+    ]
+   ],
+   "trace": [
+    [
+     "hellostop",
+     "(('x', 0), ('y', 1))"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "recover: raise <-> record",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "design",
+ "secs": 0
+}

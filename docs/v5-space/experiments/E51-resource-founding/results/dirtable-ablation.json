@@ -1,0 +1,902 @@
+{
+ "bounds": [
+  "r1",
+  "r2",
+  "n2"
+ ],
+ "verify": [
+  "r2m",
+  "d2"
+ ],
+ "pinned": [
+  "connect.open",
+  "announce.clear",
+  "notice.close"
+ ],
+ "base": {
+  "r1": {
+   "states": 2296,
+   "secs": 0.16,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2296,
+    9315,
+    16246856313115248417
+   ],
+   "judged": {
+    "FIND.0": [
+     1941,
+     0
+    ],
+    "REBUILD": [
+     2296,
+     0
+    ]
+   }
+  },
+  "r2": {
+   "states": 1856,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1856,
+    9019,
+    12701623087157698544
+   ],
+   "judged": {
+    "FIND.0": [
+     1176,
+     0
+    ],
+    "REBUILD": [
+     1856,
+     0
+    ]
+   }
+  },
+  "n2": {
+   "states": 7282,
+   "secs": 0.52,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    7282,
+    33840,
+    1485605629852024002
+   ],
+   "judged": {
+    "FIND.0": [
+     5723,
+     0
+    ],
+    "FIND.1": [
+     5723,
+     0
+    ],
+    "REBUILD": [
+     7282,
+     0
+    ]
+   }
+  }
+ },
+ "verify_pass1_undecided": [],
+ "greedy": [
+  [
+   "connect.take",
+   "dropped"
+  ],
+  [
+   "takeback.owner",
+   "dropped"
+  ]
+ ],
+ "removed": [
+  "connect.take",
+  "takeback.owner"
+ ],
+ "put_back": [],
+ "minimal": {
+  "r1": {
+   "states": 2296,
+   "secs": 0.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2296,
+    9475,
+    16246856313115248417
+   ],
+   "judged": {
+    "FIND.0": [
+     1941,
+     0
+    ],
+    "REBUILD": [
+     2296,
+     0
+    ]
+   }
+  },
+  "r2": {
+   "states": 1856,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1856,
+    9019,
+    12701623087157698544
+   ],
+   "judged": {
+    "FIND.0": [
+     1176,
+     0
+    ],
+    "REBUILD": [
+     1856,
+     0
+    ]
+   }
+  },
+  "n2": {
+   "states": 7282,
+   "secs": 0.49,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    7282,
+    34156,
+    1485605629852024002
+   ],
+   "judged": {
+    "FIND.0": [
+     5723,
+     0
+    ],
+    "FIND.1": [
+     5723,
+     0
+    ],
+    "REBUILD": [
+     7282,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "r2m": {
+   "states": 16722,
+   "secs": 1.25,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    16722,
+    92947,
+    16369353550160889622
+   ],
+   "judged": {
+    "FIND.0": [
+     12760,
+     0
+    ],
+    "REBUILD": [
+     16722,
+     0
+    ]
+   }
+  },
+  "d2": {
+   "states": 170709,
+   "secs": 17.65,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    170709,
+    1090145,
+    8548218699001095141
+   ],
+   "judged": {
+    "FIND.0": [
+     170709,
+     0
+    ],
+    "REBUILD": [
+     170709,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "connect.open",
+   "kind": "update",
+   "role": "world",
+   "note": "a server dials its own machine's directory (pinned)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "r1",
+    "REBUILD",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "connect.again",
+   "kind": "update",
+   "role": "softdir",
+   "note": "on every new link it announces every copy it holds, and itself (rule 3)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "connect.take",
+   "kind": "update",
+   "role": "softdir",
+   "note": "its later announcement takes over its own older entries (rule 11, first half)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "rconnect.open",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a server also links to every other seed directory (rule 7)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "rconnect.again",
+   "kind": "update",
+   "role": "softdir",
+   "note": "rule 3, on a link to another machine's seed",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "rconnect.take",
+   "kind": "update",
+   "role": "softdir",
+   "note": "rule 11, on a link to another machine's seed",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    6,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    6,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "notice",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "expire",
+     "(('d', 1), ('e', (0, 0, 0)))"
+    ]
+   ]
+  },
+  {
+   "id": "announce.entry",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a server announces a copy it gains to every directory it is linked to (rule 1)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('d', 1), ('s', 1))"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "announce.clear",
+   "kind": "update",
+   "role": "world",
+   "note": "the to-do is done (pinned)",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "notice.close",
+   "kind": "update",
+   "role": "world",
+   "note": "the host's failure detector closes a silent link (pinned: v4's WATCH_TICKS)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "expire.owner",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "only the entry's current announcer's death drops it (rule 11, second half)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    7,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    7,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ],
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "notice",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "expire",
+     "(('d', 1), ('e', (0, 'M', 1)))"
+    ]
+   ]
+  },
+  {
+   "id": "expire.drop",
+   "kind": "update",
+   "role": "softdir",
+   "note": "an entry lives only while its announcer's link lives (rule 4)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "takeback.owner",
+   "kind": "guard",
+   "role": "softdir",
+   "note": "only the current announcer may take an entry back (rule 11)",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false
+  },
+  {
+   "id": "takeback.undo",
+   "kind": "update",
+   "role": "softdir",
+   "note": "a server takes back an entry as soon as it stops holding that copy (rule 5)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "takeover.host",
+   "kind": "update",
+   "role": "softdir",
+   "note": "when a machine's directory host stops, another server there hosts it after a delay (rule 6)",
+   "cmp": null,
+   "alone": [
+    "r1",
+    "FIND.0",
+    1,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "r1",
+    "FIND.0",
+    1,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "final_trace": [
+    [
+     "hostdie",
+     "1"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "connect.again",
+   "caught": [
+    "r1",
+    "REBUILD",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "rconnect.open",
+   "caught": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "rconnect.again",
+   "caught": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "rconnect.take",
+   "caught": [
+    "r1",
+    "REBUILD",
+    6,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "notice",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "expire",
+     "(('d', 1), ('e', (0, 0, 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "announce.entry",
+   "caught": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('d', 1), ('s', 1))"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.owner",
+   "caught": [
+    "r1",
+    "REBUILD",
+    7,
+    [
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ],
+    [
+     "start",
+     "0"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ],
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "notice",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "expire",
+     "(('d', 1), ('e', (0, 'M', 1)))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.drop",
+   "caught": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "crash",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "takeback.undo",
+   "caught": [
+    "r1",
+    "REBUILD",
+    2,
+    [
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "rconnect",
+     "(('d', 1), ('s', 0))"
+    ],
+    [
+     "move",
+     "0",
+     "0",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "takeover.host",
+   "caught": [
+    "r1",
+    "FIND.0",
+    1,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": [
+    [
+     "hostdie",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "rconnect: open <-> again",
+   "caught": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "rconnect: open <-> take",
+   "caught": [
+    "r1",
+    "FIND.0",
+    0,
+    [
+     "FIND.0",
+     "REBUILD"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "swap",
+   "rule": "rconnect: again <-> take",
+   "caught": null,
+   "equivalent": true
+  }
+ ],
+ "option": "design",
+ "secs": 100
+}
