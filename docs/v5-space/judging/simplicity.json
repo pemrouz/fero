@@ -1,5 +1,5 @@
 {
- "about": "The measure is simplicity: every rule a builder must get right, borrowed or not (DECISIONS V5-1 and V5-6; VERDICT 11.7). The grain is REQUIREMENTS DEV-10 (c): a rule counts when a builder must write it and dropping it, or getting it wrong, breaks a stated property, safety or a stated liveness or performance bar (one guard, one state update, or one comparison that carries correctness). Logging, metrics, config plumbing and speed-only choices are not counted. Anchors are the model counts by ablation: raft-config 16 (E-14b 14 + E-14c 2), healing-self 14, controller-commands 18 and writer-epoch-rlog 9 (E-16), slot moves 28 and split + merge 37 and re-key 36 and fixN 13 on E-17c's real-log footing, the dedup options under fwd (E-20: window 19, sessions 14, producer state 17; keys alone 12), srchi-marks 5 (E-30), writer-time 7 (E-21, simulated), the saga with fenced locks 38 (E-24), restore-mark 8 and genesis 4 and 3 (E-33), subscribe 26 and 27 (E-31), disk-incarnation 2 and par-repair 7 (E-37). Where a model counted rules that belong to another record's state, its total is kept as a bundle: each rule is counted once, in the record that owns the state it guards or writes (the dedup guard with the dedup option, the fence check with fence-tokens, the read rules with subscribe, the move's carry of outcomes with the dedup option), and each bundle's record names where every one of its model's rules went, so the parts still sum to the model count. Records without a model count were counted from a spec or paper read in the pass (basis 'spec'), from source code read in the pass ('code'), or from the design text ('reasoned'; anything about an outside system not checked is marked 'from memory'). low and high bound each count where the grain or the source is uncertain. owner is who writes the code: 'fero', 'library' (imported, such as raft-rs, Go's etcd raft or RocksDB) or 'outside' (another system, such as JetStream for BUY). owner_by_row gives a different owner in named rows (the Raft records in the rows on raft-rs or etcd raft). owner_split splits one record's count by owner. basis_split splits one record's count by basis, where its rules mix bases (the record's basis is then the larger part). row_minus {row: n} names rules of a record that a carrying row does not need (for example a carry rule in a row whose partitions never move, or a rule another record of that row already counts). To sum a row: add each carried key's count, then subtract that key's row_minus for the row. 'BASE' in row_minus means the base row below. issue-order and timeline-merge are recorded but are in no row's list. The base row is the study's MIN row with C self and Z par, changed by V5-2 to V5-5 (see base.decisions).",
+ "about": "The measure is simplicity: every rule a builder must get right, borrowed or not (DECISIONS V5-1 and V5-6; VERDICT 11.7). The grain is REQUIREMENTS DEV-10 (c): a rule counts when a builder must write it and dropping it, or getting it wrong, breaks a stated property, safety or a stated liveness or performance bar (one guard, one state update, or one comparison that carries correctness). Logging, metrics, config plumbing and speed-only choices are not counted. Anchors are the model counts by ablation: raft-config 16 (E-14b 14 + E-14c 2), healing-self 14, controller-commands 18 and writer-epoch-rlog 9 (E-16), slot moves 28 and split + merge 37 and re-key 36 and fixN 13 on E-17c's real-log footing, the dedup options under fwd (E-20: window 19, sessions 14, producer state 17; keys alone 12), srchi-marks 5 (E-30), writer-time 7 (E-21, simulated), the saga with fenced locks 38 (E-24), restore-mark 8 and genesis 4 and 3 (E-33), subscribe 26 and 27 (E-31), disk-incarnation 2 and par-repair 7 (E-37); and since 2026-11-14 the base's per-resource records: E-51's founding, settings, group records, members and soft directory (50 at DEV-10's grain, 30 at the records' grain) and E-52's healing, hints, members and hand-back (44 kept of 87 written). Where a model writes one numbered rule as several guards, the record counts the numbered rule once, as the reasoned records do, and its notes give the model's DEV-10 count. Where a model counted rules that belong to another record's state, its total is kept as a bundle: each rule is counted once, in the record that owns the state it guards or writes (the dedup guard with the dedup option, the fence check with fence-tokens, the read rules with subscribe, the move's carry of outcomes with the dedup option), and each bundle's record names where every one of its model's rules went, so the parts still sum to the model count. Records without a model count were counted from a spec or paper read in the pass (basis 'spec'), from source code read in the pass ('code'), or from the design text ('reasoned'; anything about an outside system not checked is marked 'from memory'). 'measured' marks a rule an experiment ran on real code with and without, where a stated property broke without it in the runs (E-53), not on every state. low and high bound each count where the grain or the source is uncertain. owner is who writes the code: 'fero', 'library' (imported, such as raft-rs, Go's etcd raft or RocksDB) or 'outside' (another system, such as JetStream for BUY). owner_by_row gives a different owner in named rows (the Raft records in the rows on raft-rs or etcd raft). owner_split splits one record's count by owner; owner_split_by_row does so in named rows (handback's rule 2, Raft's voter check, is the library's in the rows on raft-rs or etcd raft). basis_split splits one record's count by basis, where its rules mix bases (the record's basis is then the larger part). row_minus {row: n} names rules of a record that a carrying row does not need (for example a carry rule in a row whose partitions never move, or a rule another record of that row already counts). row_minus_basis {basis: n} names the basis of the rules a row_minus removes, where the record's rules mix bases. To sum a row: add each carried key's count, then subtract that key's row_minus for the row. A row's keys come from tools/closure.py's carries rule, plus the records tools/simplicity.py carries itself (RIDES: controller-hints with controller-commands; CARRIES: handback in every row with a leader or writer per group that a failover moves, and bulk-rate-cap in every row with bulk work that fero writes). 'BASE' in row_minus means the base row below. issue-order and timeline-merge are recorded but are in no row's list. The base row is the study's MIN row with C self and Z par, changed by V5-2 to V5-5 and V5-9 (see base.decisions). The per-resource models E-51 and E-52 (and E-53's measurements) re-counted its per-resource records at this grain on 2026-11-14, and a check of that update (F1 to F12) moved the same findings to the study's records where the same rule holds for the same reason.",
  "mechanisms": {
   "raft-log": {
    "key": "raft-log",
@@ -155,7 +155,7 @@
    "key": "learners",
    "count": 3,
    "low": 2,
-   "high": 4,
+   "high": 3,
    "rules": [
     "A learner's ack never counts toward a commit.",
     "The leader sends the log to learners as it does to voters.",
@@ -167,7 +167,7 @@
    "owner": "fero",
    "rows_note": "owner is fero for rows on E-10's TypeScript port (I port, port(meta)); library for rows on raft-rs or Go's etcd raft (RUST, SRV, PD, EMB-V8, SIDE, PD+fix, TiKV-persisted, SRV V=full); the count is the same; ISR, OBJ, V4 and the V=full rows carry no learners",
    "confidence": "medium",
-   "notes": "'Learners grant votes' and 'a learner never stands' are raft-config's (E-14b R6, E-14c r19). 'Add a new replica as a learner first' is the healing mechanism's add step (healing-self add.append, controller-commands c_add.issue). Rule 3 is not in E-16's 14 or 18: E-16 made catch-up a world step and dropped promote.caught, while DESIGN-V5 4.2 and etcd's server keep it; low 2 drops it. High 4 adds 'never a leader-transfer target' (counted under raft-leader-transfer's high).",
+   "notes": "'Learners grant votes' and 'a learner never stands' are raft-config's (E-14b R6, E-14c r19). 'Add a new replica as a learner first' is the healing mechanism's add step (healing-self add.append, controller-commands c_add.issue). Rule 3 is not in E-16's 14 or 18: E-16 made catch-up a world step and dropped promote.caught, while DESIGN-V5 4.2 and etcd's server keep it; low 2 drops it. High 3. 'Never a leader-transfer target', which this high held before (4), is Raft's 'transfer only to a voter', counted once as handback's rule 2 (the check of the update, F5). CHECKED: rule 3 is model-checked (E-52: promote.caught, P2C in 12 steps on hp0: after a hand-back leaves one voter behind, a learner that has not caught up is promoted, and the committed entries are on 2 of 4 new voters). E-52 also counted it in its healing record; it stays here, once.",
    "owner_by_row": {
     "RUST": "library",
     "SRV": "library",
@@ -177,6 +177,10 @@
     "SRV V=full Y=fwd": "library",
     "PD+fix": "library",
     "TiKV-persisted": "library"
+   },
+   "basis_split": {
+    "spec": 2,
+    "model-checked": 1
    }
   },
   "raft-snapshot": {
@@ -250,7 +254,7 @@
    "key": "raft-leader-transfer",
    "count": 6,
    "low": 4,
-   "high": 7,
+   "high": 6,
    "rules": [
     "While a transfer runs, the leader takes no new writes.",
     "Writes that arrive during the transfer are refused with the target's name, never dropped or held.",
@@ -265,7 +269,7 @@
    "owner": "fero",
    "rows_note": "owner is fero for rows on E-10's TypeScript port (I port, port(meta)); library for rows on raft-rs or Go's etcd raft (RUST, SRV, PD, EMB-V8, SIDE, PD+fix, TiKV-persisted, SRV V=full); the count is the same; rule 2 (refuse, never drop) is fero's own A-02 rule in every row",
    "confidence": "medium",
-   "notes": "Rule 2 is one of A-02's two counted rules. High 7 adds etcd's 'transfer only to a voter, never a learner' (raft.go 1629), which a checker would likely call equivalent, since a learner cannot stand (raft-config r19) and rule 6 ends the attempt. Low 4 merges 1 with 2 and 4 with 5. Who asks for a transfer (planner lead hint, healing's hand-back, slow-leader rule, leave) is counted with each asker.",
+   "notes": "Rule 2 is one of A-02's two counted rules. High 6. etcd's 'transfer only to a voter, never a learner' (raft.go 1629), which this high held before (7), is handback's rule 2 now: E-52 found it needed for the hand-back, so it is counted once, there (the check of the update, F5). Low 4 merges 1 with 2 and 4 with 5. Who asks for a transfer (planner lead hint, healing's hand-back, slow-leader rule, leave) is counted with each asker. CHECKED (E-52, E-53): who asks is counted with each asker. The hand-back's rules are handback's; the lead hint's own transfer is planner-hints' and controller-hints' rule; a group whose transfer is in flight not going quiet is handback's rule 4 (E-53).",
    "owner_by_row": {
     "RUST": "library",
     "SRV": "library",
@@ -346,6 +350,74 @@
    "rows_note": "fero writes it in every row; etcd raft and raft-rs have no quiescence (TiKV's hibernate regions live in TiKV, from memory)",
    "confidence": "medium",
    "notes": "Never modelled with failures (E-11 and E-25 measured idle cost only). 'Two ticks' is a constant. Rule 5 is also the catalogue's readindex wake; counted here only. Low 5 merges 1 with 2 and 3 with 4; high 8 splits rule 4 into its guard and its wake request."
+  },
+  "handback": {
+   "key": "handback",
+   "count": 6,
+   "low": 3,
+   "high": 10,
+   "rules": [
+    "Once a group's preferred member has been live and caught up for settle.ms, leadership is handed to it by a transfer: by the group's leader, or in a controller row by the controller (handback.settle, with handback.transfer).",
+    "Leadership is handed back only to a voter of the group (handback.voter; Raft's 'transfer only to a voter', the library's in the rows on raft-rs or etcd raft).",
+    "At most K hand-back transfers are in flight per member, the busiest groups first (V5-7; the draft's text had ten a second, a rule of the same kind; from the design, not measured).",
+    "A group with a transfer in flight does not go quiet, so Raft's own abort ends a transfer whose taker died, and frees its slot and its held writes, within election.ms.",
+    "The preferred member is re-picked only once it has left the group's placement, so a lead hint is never undone (repref.need).",
+    "The re-pick makes another placed voter preferred: the placement's first voter, or in a ring row the full voter the ring ranks first (repref.set)."
+   ],
+   "basis": "model-checked",
+   "source": "experiments/E52-resource-healing README section 3 and results/summary.md, 'hand-back (V5-7)' (4 rules kept of 8 written, each with a counterexample: handback.settle P9L in 5 steps, handback.voter LD in 18, repref.need LH in 4, repref.set PR in 2; the hand-back's transfer, LB in 14, is kept under raft-leader-transfer there); experiments/E53-handback-pace README sections 7 to 9 (on E-10's TypeScript Raft: without rule 4, a dead taker's transfers stayed set on quiet groups in 22 of 22 runs, none with it in 6 of 6; the cap is the design's, which E-53 section 9 marks docs; caps 32 and 128 miss F-05 under every reading); DESIGN-V5 4.2 'Leaders spread'; DECISIONS V5-7",
+   "bundle": null,
+   "owner": "fero",
+   "rows_note": "Every row with a leader or writer per group that a failover moves (R raft, rlog, isr, slog or obj): 29 judged rows and the base, carried by tools/simplicity.py's CARRIES, since the closure catalogue has no record for it. After a failover a group's leadership must go back to its preferred member, or load stays on the survivors (DESIGN-V5 4.2 'Leaders spread'). In the self rows each group's leader hands it back (MECHANISMS.md lists it under healing-self). In the controller rows the controller balances leaders (controller-hints rule 2 names its balancing), with the same rules; its command's epoch check and timeout are controller-commands'. In the four PD rows this is PD's leader balancing (from memory), counted at the same grain. In ISR, SLOG and OBJ the controller names the leader (ISR) or the writer (SLOG, OBJ) and must spread them back the same way; Kafka's preferred-replica election does it for ISR (from memory); their design text does not say so (reasoned). There a change of leader or writer is no Raft transfer and no group goes quiet, so rule 4 does not apply (row_minus 1, a measured rule: row_minus_basis). In the 8 rows on raft-rs or etcd raft, rule 2 is the library's (owner_split_by_row). Rules 5 and 6 hold in every such row: every row stores a preferred member that a lead hint sets (planner-hints rule 4, controller-hints rule 2), so every row must re-pick it when that member leaves; a ring over #meta names the next one, but the guard and the update stay. Rule 4 is needed wherever groups go quiet (quiet-groups is in every Raft row), at any pace. Not carried: V4 (no leaders) and BUY (JetStream's own, in outside-log).",
+   "confidence": "medium",
+   "notes": "New after E-52 and E-53 (2026-11-14). No record counted the hand-back before: healing-self's notes left it out ('not in E-16's world'), controller-commands has no transfer command, and raft-leader-transfer counts the asker's rules with the asker. V5-7 said its cap adds no rule; E-53 measured that it does. Rules 1, 2, 5 and 6 are model-checked (E-52, on E-16's engine). Rule 4 is measured on real code (E-53: E-10's TypeScript Raft on E-26's host, three processes), not model-checked: with the cap counted at the giver, as the design's push form does, a group whose taker died goes quiet with its transfer still set, so Raft's abort never fires and the slot stays taken (22 of 22 runs; none with rule 4, 6 of 6). Rule 3, the cap itself, is the design's (V5-7), and E-53 section 9 marks it docs: no run went without a cap (ten a second is another pace rule of the same kind), so it is reasoned (the check of the update, F4). E-53's runs support it: caps 32 and 128 cost the writes that meet a transfer +11.8 to +69 ms at p99, past F-05's 10 ms, while cap 4 meets its first reading in 10 of 10 runs. E-53 recommends K = 8, or 4 where F-05 must hold; K is a setting. Rule 2 rests on a gap in E-52's world (a transfer reaching a machine the leader has no link to); it is also Raft's 'transfer only to a voter' (etcd raft.go 1629), which raft-leader-transfer's and learners' highs held before. It is counted once, here (the check of the update, F5), and it is the library's in the 8 rows on raft-rs or etcd raft. E-53's proposed handback@per-resource (4, low 3, high 7) is this record without rules 2, 5 and 6, with its pull-form timeout. Low 3 drops rule 2 (Raft's), reads rule 3 as a setting (V5-7) and merges rules 5 and 6. High 10 adds: a transfer not won within election.ms plus jitter frees its slot and is tried again (needed in the pull form, or with a cap counted at the taker: groups never handed back in 20 of 20 runs without it, measured); a transfer that keeps failing backs off, or is given up until the taker's link or caught-up state changes (E-53 F14, reasoned); and for a cap per taker in the push form, the taker answers busy past its cap and a leader that hears busy backs off (reasoned). DEV-10: E-52 kept 4 (5 with the transfer); E-53's two are counted per form. CHECKED: E-52 (rules 1, 2, 5 and 6, model-checked) and E-53 (rule 4, measured; rule 3 from the design, reasoned).",
+   "basis_split": {
+    "model-checked": 4,
+    "measured": 1,
+    "reasoned": 1
+   },
+   "row_minus": {
+    "ISR": 1,
+    "SLOG": 1,
+    "OBJ": 1
+   },
+   "row_minus_basis": {
+    "measured": 1
+   },
+   "owner_split_by_row": {
+    "RUST": {
+     "fero": 5,
+     "library": 1
+    },
+    "SRV": {
+     "fero": 5,
+     "library": 1
+    },
+    "PD": {
+     "fero": 5,
+     "library": 1
+    },
+    "EMB-V8": {
+     "fero": 5,
+     "library": 1
+    },
+    "SIDE": {
+     "fero": 5,
+     "library": 1
+    },
+    "SRV V=full Y=fwd": {
+     "fero": 5,
+     "library": 1
+    },
+    "PD+fix": {
+     "fero": 5,
+     "library": 1
+    },
+    "TiKV-persisted": {
+     "fero": 5,
+     "library": 1
+    }
+   }
   },
   "dormant-groups": {
    "key": "dormant-groups",
@@ -449,38 +521,36 @@
    "source": "DESIGN-V5 4.2 '#meta' resource record; 4.5 'Defining and changing a resource' (first open writes the catalog; a differing open is refused unless an alter allows its hash; alter rolls hashes; a full replica needs the resource's hashes)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "rows with a metadata group. Under V5-2 the same rules hold for a resource's settings record in its own log",
+   "rows_note": "rows with a metadata group (29 judged rows). The base carries meta-catalog@per-resource (4): its rule 1 is the base's genesis, and its seed rides the founding entry.",
    "confidence": "low",
-   "notes": "Not modelled. Rule 1 is a per-resource conditional create, not the cluster's (genesis-conditional-create). The fold version (fold-version) and cluster version are apart. Low 4 if the gate and the seed mark are folded into the write path; high 7 adds the check of an alter's keys against each other."
+   "notes": "Not modelled. Rule 1 is a per-resource conditional create, not the cluster's (genesis-conditional-create). The fold version (fold-version) and cluster version are apart. CHECKED: 6, kept (the check of the update, F3; a first transfer of E-51's finding made it 5). E-51 dropped the seed mark per resource because the seed rides the home group's founding entry, the same entry as the settings record (genesis rule 4), and a joining copy never applies a seed. In the #meta rows the resource's record is in #meta while the seed lands in the resource's own group log: two logs, and no one founding entry. A creator that crashes between the #meta record and the seed's first entry still needs the mark, which is why DESIGN-V5's #meta resource record holds 'seed applied' (DESIGN-V5 4.2). So E-51's reason does not carry over, and rule 5 stays (reasoned). Low 4 folds the gate into the write path and reads the seed as part of #meta's record, with the group's first entry derived from it; high 7 adds the check of an alter's keys against each other."
   },
   "meta-directory": {
    "key": "meta-directory",
-   "count": 8,
-   "low": 5,
-   "high": 8,
+   "count": 6,
+   "low": 4,
+   "high": 7,
    "rules": [
-    "After each config change, a group's leader rewrites the group's record.",
-    "A record names the config it describes, and an older config never overwrites a newer one.",
+    "Whenever #meta's record of a group differs from the group's committed config, the group's leader writes the group's record again, and it keeps comparing.",
     "An operator recovery raises the group's incarnation in its record.",
     "A leader that sees a higher incarnation for its own group stops leading.",
     "A removed replica deletes its copy only once the record shows the group's config without it.",
-    "A group's record is deleted only after the slot table has shown none of its slots for settle.ms.",
-    "A group's record is deleted only once its history is safe.",
-    "After #meta is rebuilt, every group leader writes its record again."
+    "A group's record is deleted only after the slot table has shown none of its slots.",
+    "A group's record is deleted only once its history is safe."
    ],
    "basis": "reasoned",
    "source": "DESIGN-V5 4.2 '#meta' shard record ('a hint ... the newest config winning'), 'A removed replica', 'Mixed versions, recovery and routing' (recover --unclean bumps the incarnation; the residual case; recover --new-cluster re-writes)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "rows with a metadata group. Under V5-3 the directory is soft announcements with no log: rules 1, 2 and 5 stay in the announcement form, rules 3, 4 and 8 move to each resource's own log or go",
+   "rows_note": "rows with a metadata group (29 judged rows). The base carries meta-directory@per-resource (the same 6, in each resource's home log); its soft directory keeps no group records.",
    "confidence": "low",
-   "notes": "Not modelled. The slot table's own writes (target writes before it opens, recovery writes at the new epoch) are slot-table's; the epoch high-water mark is restore-mark's. Low 5 counts only the routing-hint rules (1, 2, 5, 6, 7) and leaves recovery rules (3, 4, 8) to the operator-recovery path."
+   "notes": "Not modelled. The slot table's own writes (target writes before it opens, recovery writes at the new epoch) are slot-table's; the epoch high-water mark is restore-mark's. CHECKED: 8 -> 6 (E-51, transferred; reasoned). A record write to #meta can be lost as one to a resource's home log can (the group's leader dies after its config commits, or #meta's leader changes first), and the old rule 1 never wrote it again (E-51: REC, 5 steps). Reworded to 'whenever the record differs', rule 1 also covers the old rule 2 (an older config never overwrites a newer) and the old rule 8 (rewrite after #meta is rebuilt). E-51 model-checked this on a resource's home log; the transfer to #meta is reasoned. The settle.ms wait before a delete carries speed only (reasoned). Low 4 counts only the routing and deletion rules (1, 4, 5, 6) and leaves the recovery rules (2, 3) to the operator's recovery path, as the old low did. High 7 keeps the old rule 2 for configs that re-add a machine."
   },
   "healing-self": {
    "key": "healing-self",
-   "count": 14,
+   "count": 16,
    "low": 14,
-   "high": 14,
+   "high": 19,
    "rules": [
     "Add only a replica that is not already in the config (add.new).",
     "The add is a config entry that makes the replica a learner (add.append).",
@@ -493,17 +563,23 @@
     "Remove only from four voters (remove.four).",
     "The removal is a config entry (remove.append).",
     "A surplus removal happens only from four voters (surplus.four).",
-    "The surplus voter removed is the one the ring ranks last (surplus.last).",
+    "The surplus voter removed is the one the group's stored target leaves out, or, with no target, the one the ring ranks last (surplus.last).",
     "A surplus removal waits until the voters left answer and hold the commit offset (surplus.allheld).",
-    "The surplus removal is a config entry (surplus.append)."
+    "The surplus removal is a config entry (surplus.append).",
+    "Promote only a learner that answers the leader now, not merely one that is not yet gone (promote.live, in its strong form; E-52).",
+    "Where the group's log holds a stored target (a place hint's, or the leader's own pick once the group has one), healing follows it: it adds and promotes only machines the target names, and when a named machine is gone or said it is retiring, the leader picks its replacement and writes the new target into the group's log before any add (E-52's rule 15: pick.append, pick.need, pick.new, promote.placed; transferred, reasoned)."
    ],
    "basis": "model-checked",
    "source": "E-16 README section 4 and results/summary.md ('self': 14 rules needed of 34 written; 16 of 17 mutants caught)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "rows with C self or self+p (DRAFT, CELL, LANE, SPLIT, COMP, the owner's base)",
+   "rows_note": "rows with C self, self+p or self+mv (DRAFT, CELL, LANE, SPLIT, COMP). The base carries healing-self@per-resource instead.",
    "confidence": "high",
-   "notes": "Anchor as given. promote.odd and remove.four are the grow-first order that raft-config also counts (E-14c's 16th rule); keep it in one place. Outside E-16's world and so not in the 14: the preferred-leader hand-back after settle.ms (balance, with a rate cap), dropping a gone learner (E-16 says a real design needs it), growth from one voter and two stepping back to one, retiring members (meta-members), promote only a caught-up learner (learners). CALIBRATED: This record holds the grow-first order (promote only from three to four, remove only from four) that E-14c counted as raft-config's 16th rule. raft-config now leaves it here, so it is counted once. No count change."
+   "notes": "Anchor as given. promote.odd and remove.four are the grow-first order that raft-config also counts (E-14c's 16th rule); keep it in one place. Outside E-16's world and so not in the 14: the preferred-leader hand-back after settle.ms (now the handback record), dropping a gone learner (E-16 says a real design needs it), growth from one voter and two stepping back to one, retiring members (meta-members), promote only a caught-up learner (learners). CALIBRATED: This record holds the grow-first order (promote only from three to four, remove only from four) that E-14c counted as raft-config's 16th rule. raft-config now leaves it here, so it is counted once. No count change. CHECKED: 14 -> 15 (E-52, transferred; reasoned). E-52 ran E-16's own healing actions on E-16's world with leaves, hints and the property P2C (no config change leaves the committed entries on fewer than a majority of the new voters), which E-16 did not state: E-16 dropped promote.live, and in its weak form ('not gone') a learner that caught up and then crashed is promoted after a change of leader, leaving the committed entries on 2 of 4 new voters (13 steps, one crash). The trace needs no per-resource part, so the study's self rows need the strong form too. promote.caught, which P2C also needs, is learners' rule 3. CHECKED: 15 -> 16 (E-52 section 4, transferred; reasoned; the check of the update, F1). E-52 found that a stored placement earns its place because the platform's place hints (DEP-17) need a stored target that healing follows, and once healing follows one, the leader must write its own picks there too (else the target stays stale: P8 in 1 step). It is not needed for want of a shared member list: with no stored target and no place hint, one fixed preference ('a retiring voter first') ends the only churn E-52 found. The study's self rows store place hints in the group's log as well (DESIGN-V5 4.2: 'place(shard, members): stores a target in the shard's log, which healing then follows'; planner-hints rule 6), so they need the same rule, rule 16; a ring fallback when a placed machine dies is still that one rule. E-52's promote.placed replaces promote.need where every group has a stored placement (the base). Here a group with no target still heals by the ring (place(null) returns a group to the ring, DESIGN-V5 4.2), so promote.need (rule 4) stays for that path and promote.placed sits inside rule 16. Not here: E-52's candidate check (add.cand), whose job the study's planner-hints rule 3 does, and the dial (links reach every machine through #meta's member list). Low 14 reads rule 15 as learners' rule 3, and rule 4 as covered by rule 16 where every pick is stored. High 19 counts rule 16 at DEV-10's grain, as E-52 does (4 rules).",
+   "basis_split": {
+    "model-checked": 14,
+    "reasoned": 2
+   }
   },
   "controller-commands": {
    "key": "controller-commands",
@@ -527,7 +603,7 @@
     "The group's leader runs a command only if its config epoch still matches (exec.epoch).",
     "A surplus removal runs only once the voters left answer and hold the commit offset (exec.allheld).",
     "A removal runs only if the replica is gone to the leader's own links (exec.gone).",
-    "A promotion runs only if the learner is not gone to the leader's own links (exec.live).",
+    "A promotion runs only if the learner answers the group's leader now, not merely if it is not gone to the leader's own links (exec.live, in its strong form).",
     "The leader appends the change it runs (exec.append)."
    ],
    "basis": "model-checked",
@@ -536,27 +612,29 @@
    "owner": "fero",
    "rows_note": "rows with C cent or cent-co; for C cent (PD, ISR, SLOG, OBJ) the same 18 by reasoning (A-20)",
    "confidence": "high",
-   "notes": "Anchor as given. c_add.new and c_promote.need are undecided (kept, as E-17 counts), so low 16. c_promote.odd and c_remove.four carry the grow-first order that raft-config also counts. The 18 include the healing targets themselves, so a row never carries both this and healing-self. The command list in #meta is this mechanism's own state. CALIBRATED: This record holds the grow-first order (promote only from three to four, remove only from four) that E-14c counted as raft-config's 16th rule. raft-config now leaves it here, so it is counted once. No count change."
+   "notes": "Anchor as given. c_add.new and c_promote.need are undecided (kept, as E-17 counts), so low 16. c_promote.odd and c_remove.four carry the grow-first order that raft-config also counts. The 18 include the healing targets themselves, so a row never carries both this and healing-self. The command list in #meta is this mechanism's own state. CALIBRATED: This record holds the grow-first order (promote only from three to four, remove only from four) that E-14c counted as raft-config's 16th rule. raft-config now leaves it here, so it is counted once. No count change. CHECKED: exec.live reworded, count unchanged (E-52, transferred; reasoned): E-52 found the weak form ('not gone') lets a learner that caught up and then crashed be promoted after a change of leader (P2C, 13 steps). E-16 kept exec.live as a rule, so the controller rows already pay for the check. The controller's leader balancing after a failover is handback's."
   },
   "planner-hints": {
    "key": "planner-hints",
-   "count": 5,
-   "low": 3,
-   "high": 7,
+   "count": 7,
+   "low": 4,
+   "high": 9,
    "rules": [
-    "A hint names the group config it read, and the group applies it only if its config is still that one; otherwise it refuses stale-plan.",
     "A leader whose own link to a member's life is up ignores a gone hint for it.",
+    "A gone hint marks that member gone at once, so healing replaces it now, not after evict.after.",
     "A leader adds or promotes a member a hint names only while its own links reach that member.",
-    "A lead hint also sets the group's preferred leader, so the settle.ms hand-back does not undo it.",
-    "Leaders hand over every group a drained member leads, and a drained member is no preferred leader."
+    "A lead hint also sets the group's preferred leader, so the hand-back does not undo it.",
+    "A lead hint moves leadership to the member it names at once, by a transfer, never waiting for the hand-back.",
+    "A place hint is written into the group's log as a stored target, which healing then follows.",
+    "Leaders hand over every group a drained member leads, and no hand-over, hand-back or lead hint moves leadership to a drained or retiring member."
    ],
    "basis": "reasoned",
    "source": "DESIGN-V5 4.2 'The planner (optional)' (hints name the config; stale-plan; gone ignored if the link is up; lease row; admin key; lead sets the preferred leader; drain); E-16 README 'Against the threshold' (a hint that names its config is a command checked by epoch and needs cent-co's re-checks if it changes membership, reasoned)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "rows with C self+p, and COMP (owed for DEP-17)",
+   "rows_note": "rows with C self+p or self+mv, and C self on Raft (CELL): DEP-17's hint path at the leaders. The base carries planner-hints@per-resource (6), where healing's candidate check does rule 3's job.",
    "confidence": "low",
-   "notes": "Not modelled (K-08). Rules 1 to 3 mirror E-16's exec.epoch, exec.gone and exec.live; a hint is applied or refused at once, so cent-co's timeout is not needed. Low 3 keeps only rules 1 to 3. High 7 adds 'a retire with no replacement stays pending' and 'place(null) returns the group to the ring'. A move hint's lease is move-policy's; the leadership transfer is raft-leader-transfer's; 'retiring is never a candidate' is meta-members'. CHECKED: 7 -> 5 (skeptic F1, F8). Dropped 'a lease row in #meta lets one planner act at a time': DESIGN-V5 4.2 says two planners can only waste moves, never break a property, so by the grain it is no rule. Dropped 'only a sender holding the admin key may send a hint': it is cluster-credentials' rule 'admin asks also need the admin key', which every row carrying this record also carries."
+   "notes": "Not modelled in #meta's world (K-08). CHECKED: 5 -> 7 (E-52, transferred; reasoned): the same changes as planner-hints@per-resource, which E-52 model-checked, less one. The stale-plan check has no counterexample (a hint only writes a target or a mark, and the leader's guards check every step that follows); the gone hint's effect, the place hint's write and the lead hint's own transfer are needed (P8, PE, LE). The reach check (rule 3) stays here (the check of the update, F2): E-52 found it not needed only because healing's own candidate checks (pick.cand, add.cand) do its job in the base. The study's healing-self has no candidate check (E-16 dropped add.cand), and E-52 found add.cand needed alone for a reason the self rows share: a gone hint names a machine that came back with a new disk, and the leader adds it, drops it and adds it again for ever (P9 in 20 steps on hgn; 'not the directory'). The leadership transfer's own steps are raft-leader-transfer's; 'retiring is never a candidate' is meta-members'. Low 4 merges rules 1 with 2 and 4 with 5, and reads rule 3 as covered where healing checks its own candidates. High 9 adds 'a retire with no replacement stays pending' and 'place(null) returns the group to the ring'. Earlier: 7 -> 5 (skeptic F1, F8): the #meta lease row (two planners only waste moves) and the admin-key rule (cluster-credentials') are no rules here."
   },
   "log-replicas": {
    "key": "log-replicas",
@@ -1122,9 +1200,12 @@
    "source": "SPACE 2 Y smart; DESIGN-V5.md 4.2 'Moving a slot' (B answers retry until open commits; A answers moved(B) after its fence commits); Redis Cluster MOVED and ASK (from memory)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "SRV, ISR, EMB-V8 and the PD family (PD, PD+fix); TiKV-TS and TiKV-persisted are fwd only.",
+   "rows_note": "SRV, ISR, EMB-V8 and the PD family (PD, PD+fix); TiKV-TS and TiKV-persisted are fwd only. And the base: V5-9 (1), direct routing (PATHS PA-4), less 1 (row_minus BASE): its soft-directory rule 9 already learns the slot table and leaders from the resource, and again when they change.",
    "confidence": "low",
-   "notes": "Never examined in the study (G-25). fero's move answers retry at the target until open commits, so Redis's ASK path is not needed; a design with ASK adds one rule. Rule 2 matters because a copy of the attempt may still commit elsewhere, so a retry answer is not a refusal. High 4 adds the ASK path and a rule that the cache keeps only the newest version of each slot's entry. In the PD rows the TiKV client does this (region epoch checks); owner is library if that client is used as is. E-20: smart takes the hop rules off a server client's path but browsers keep fwd, so no row saves them."
+   "notes": "Never examined in the study (G-25). fero's move answers retry at the target until open commits, so Redis's ASK path is not needed; a design with ASK adds one rule. Rule 2 matters because a copy of the attempt may still commit elsewhere, so a retry answer is not a refusal. High 4 adds the ASK path and a rule that the cache keeps only the newest version of each slot's entry. In the PD rows the TiKV client does this (region epoch checks); owner is library if that client is used as is. E-20: smart takes the hop rules off a server client's path but browsers keep fwd, so no row saves them. In the base (V5-9 (1), PATHS 7.1 row 1): a client with a link to its slot's leader sends there directly; the forward path stays for browsers and one-link clients, so route-forward stays. PATHS prices it 0 to +1, since the client already learns the slot table and leaders from the resource, and learns them again when they change (soft-directory rule 9), and forward.once stays written. Rule 1's cache update on moved is that rule 9 seen from the write path, so the base subtracts 1 (row_minus BASE; the check of the update, F6) and pays 1: rule 2, a retry answer that is never final, is new to it. The smart rows carry no soft directory, so they keep both. Reasoned.",
+   "row_minus": {
+    "BASE": 1
+   }
   },
   "admission-credits": {
    "key": "admission-credits",
@@ -2246,22 +2327,28 @@
   },
   "genesis-conditional-create": {
    "key": "genesis-conditional-create",
-   "count": 4,
-   "low": 4,
-   "high": 10,
+   "count": 6,
+   "low": 6,
+   "high": 12,
    "rules": [
     "The create of the cluster id in the object store succeeds only while no id is stored there (If-None-Match) (found.absent).",
-    "The seed whose create succeeds writes that id and founds #meta as its only voter (found.create).",
+    "A seed first writes a candidate id to its own disk, only while its dir holds no id, and only then asks the store to create that id (E-51's cand.keep, cand.noid).",
+    "After the create answers, or after a restart, the seed founds only if the stored id is its own candidate; otherwise it drops its candidate and adopts the stored id (E-51's first.mine, drop.other, drop.drop).",
+    "The seed that founds writes that id and founds #meta as its only voter (found.create).",
     "Every other seed adopts only the id it finds stored (adopt.stored).",
     "A seed that adopts keeps that id in its dir and joins as a replica through healing (adopt.adopt)."
    ],
    "basis": "model-checked",
-   "source": "E-33 results/summary.md section objcas (4 of 9 written, 4 of 4 mutants caught); AMENDMENTS A-08",
+   "source": "E-33 results/summary.md section objcas (4 of 9 written, 4 of 4 mutants caught); AMENDMENTS A-08; experiments/E51-resource-founding README section 2 (the candidate on disk and the compare)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "MIN, RUST, LEAN, SLOG, OBJ, MIN-P, MIN-TS, SIDE, COMP, the MIN-P and COMP hybrids, and the base. Every row that also runs on one box needs the one-box path too: E-33's one-box model needs 4 rules by ablation (join through a member; the stale check finds no readable dir holding #meta; and no dir is unreadable; the stale step founds anew) plus the exclusive create (reasoned), 5 in all, in neither genesis anchor.",
+   "rows_note": "MIN, RUST, LEAN, SLOG, OBJ, MIN-P, MIN-TS, SIDE, COMP, and the MIN-P and COMP hybrids (16 judged rows); the base carries genesis-conditional-create@per-resource (the same 6, per resource). Every row that also runs on one box needs the one-box path too: E-33's one-box model needs 4 rules by ablation (join through a member; the stale check finds no readable dir holding #meta; and no dir is unreadable; the stale step founds anew) plus the exclusive create (reasoned), 5 in all, in neither genesis anchor.",
    "confidence": "high",
-   "notes": "Anchor as given. High 10 adds the one-box path's 5 rules and 'seeds never runs beside a dir that holds an id' (A-08, which E-33 states as a rule, not modelled). Under V5-2 and V5-3 (the base) there is no #meta: the winner founds the project's first resource or the directory's seed instead, and the same create-if-absent rule holds (reasoned). Per-resource conditional creates are meta-catalog's rule 1, not this one."
+   "notes": "Anchor as given for the first 4 (E-33). Under V5-2 and V5-3 (the base) there is no #meta: the winner founds the project's first resource or the directory's seed instead, and the same create-if-absent rule holds (reasoned). Per-resource conditional creates are meta-catalog's rule 1, not this one. CHECKED: 4 -> 6 (E-51, transferred; reasoned). E-51 found the gap in E-33's own step: the store create and the founding entry are a round trip and then a log write, and a plain crash between them strands the id for good (G2, 6 steps). The project's founding by create-if-absent here is the same steps with the project as the name, so it needs the same two rules: the candidate on disk first, and the compare. E-51 model-checked them per resource; the transfer to the project's founding is reasoned. Low 6. High 12 adds the one-box path's 5 rules and 'seeds never runs beside a dir that holds an id' (A-08, which E-33 states as a rule, not modelled).",
+   "basis_split": {
+    "model-checked": 4,
+    "reasoned": 2
+   }
   },
   "genesis-init": {
    "key": "genesis-init",
@@ -2868,7 +2955,7 @@
   "soft-directory": {
    "key": "soft-directory",
    "count": 12,
-   "low": 5,
+   "low": 11,
    "high": 14,
    "rules": [
     "A server announces each resource it holds a copy of: the project, the resource's name and its own address.",
@@ -2877,24 +2964,20 @@
     "An entry lives only while its announcer's link to that directory lives: a closed link, or one silent for 20 of the host's beats, drops every entry it made.",
     "A server takes back an entry as soon as it stops holding that copy, because its link stays up for its other resources.",
     "When a machine's directory host stops, the other servers there try to host it after a short random delay, until one does or a link is back.",
-    "Across machines, a server announces to every seed directory, so whichever seed a client asks knows every copy.",
+    "Across machines, a server links and announces to every seed directory, so whichever seed a client asks knows every copy.",
     "A client keeps an address only if the HELLO there names the same project and resource; any other answer drops it, and the client tries the next.",
-    "A client asks the directory only for a first address; from then on it learns members, slot table and leaders from the resource itself.",
+    "A client learns members, slot table and leaders from the resource itself, and learns them again when they change; it does not stop asking the directory after a first address (rule 10 asks again).",
     "A lookup that fails or finds nothing is asked again after a growing delay; it is never given up.",
-    "A later announcement of the same entry takes it over, and only the entry's current announcer may take it back, so an old link's death cannot drop a newer entry.",
+    "A later announcement of the same entry takes it over, and only its current announcer's link may drop it, so an old link's death cannot drop a newer entry (needed on links to another machine's seed; v4 keeps both halves on its own machine and for take-backs too).",
     "A server that announces is marked seen at once, so a server that leaves cleanly does not leave its dead address behind (v4's I-34)."
    ],
-   "basis": "code",
-   "source": "v4 api/directory.ts (read here: register and the re-register on every link-up, lines 13, 259-287 and 477; the peer-down cleanup and WATCH_TICKS, lines 206 and 247-258; unregister, 288-300; the bind-retry loop, 333; a failed lookup opened again, 527-536) and kernel/node.ts (the HELLO name check, nameReject, 1961-1983); docs/DESIGN-DIRECTORY.md sections 5, 6, 12 and 13; DECISIONS V5-3 for rules 2, 7 and 9 (reasoned)",
+   "basis": "model-checked",
+   "source": "v4 api/directory.ts (read here: register and the re-register on every link-up, lines 13, 259-287 and 477; the peer-down cleanup and WATCH_TICKS, lines 206 and 247-258; unregister, 288-300; the bind-retry loop, 333; a failed lookup opened again, 527-536) and kernel/node.ts (the HELLO name check, nameReject, 1961-1983); docs/DESIGN-DIRECTORY.md sections 5, 6, 12 and 13; DECISIONS V5-3 for rules 2, 7 and 9 (reasoned); experiments/E51-resource-founding README sections 2 to 4 (dirtable.py, client.py, place.py, fold.py: every one of the 12 rules has a needed part; 52 of 53 non-equivalent mutants caught in those four models)",
    "bundle": null,
    "owner": "fero",
    "rows_note": "The base only (V5-3). The study's rows find resources through #meta's directory (meta-directory) and the member records (meta-members) instead.",
    "confidence": "medium",
-   "notes": "New: the catalogue has no mechanism for v4's #directory. By MECHANISMS section 1's letter it is not one: its table is soft state, neither durable nor replicated (like E-23's merger). It is counted because its rules carry stated properties: a client never takes another project's or resource's copy for its own (rule 8, safety); a client can find a live copy while one exists (rules 1, 3, 4, 6, 7, 10, liveness); connected clients keep working while the directory is down (rule 9, V5-3); healing can find a machine for a new copy (rule 2). Rules 1, 3, 4, 5, 6, 8 and 10 exist in v4 today and would be ported; rules 2, 7 and 9 are new and reasoned from V5-3. It takes over meta-members' join record (a joiner now announces) and the first-lookup role of meta-directory. Low 5 keeps only 1, 3, 6, 7 and 8. High 14 adds two v4 rules: an announced address must be one other machines can dial, so an address from another machine that names its loopback is dropped; and a registrant never published as up survives a few cleanup passes before it is dropped. The seed addresses need a config key (V5-3): config plumbing, not counted. Who may announce (the door secret) is cluster-credentials@per-resource's. CHECKED: 10 -> 12 (skeptic F6): rules 11 and 12 are in v4's api/directory.ts today (the current-owner map and the seen-on-register fix, I-34), and both carry liveness at this record's grain. Rules 1, 3 to 6, 8, 10, 11 and 12 are code (9); rules 2, 7 and 9 are reasoned (3).",
-   "basis_split": {
-    "code": 9,
-    "reasoned": 3
-   }
+   "notes": "New: the catalogue has no mechanism for v4's #directory. By MECHANISMS section 1's letter it is not one: its table is soft state, neither durable nor replicated (like E-23's merger). It is counted because its rules carry stated properties: a client never takes another project's or resource's copy for its own (rule 8, safety); a client can find a live copy while one exists (rules 1, 3, 4, 6, 7, 10, liveness); connected clients keep working while the directory is down (rule 9, V5-3); healing can find a machine for a new copy (rule 2). Rules 1, 3, 4, 5, 6, 8, 10, 11 and 12 exist in v4 today and would be ported; rules 2, 7 and 9 are new from V5-3. It takes over meta-members' join record (a joiner now announces) and the first-lookup role of meta-directory. High 14 adds two v4 rules: an announced address must be one other machines can dial, so an address from another machine that names its loopback is dropped; and a registrant never published as up survives a few cleanup passes before it is dropped. The seed addresses need a config key (V5-3): config plumbing, not counted. Who may announce (the door secret) is cluster-credentials@per-resource's. CHECKED: 10 -> 12 (skeptic F6): rules 11 and 12 are in v4's api/directory.ts today (the current-owner map and the seen-on-register fix, I-34), and both carry liveness at this record's grain. Before E-51: code 9, reasoned 3 (rules 2, 7 and 9). CHECKED: 12 -> 12, model-checked (E-51); the code and reasoned split is gone. Rule 9's first half, 'a client asks the directory only for a first address', breaks FIND (5 steps: every member the client learned dies or moves while the directory lists a live copy) and carries only directory load, so it is dropped; its second half (learn from the resource, and again on change) is needed (CONN, FIND). Rule 11's halves are needed on a link to another machine's seed (REBUILD, 6 and 7 steps), not on a server's own machine or for take-backs. Rule 7's 'every seed' is held by REBUILD's wording on two seeds; that a client asking one seed needs every seed is reasoned (E-51 F14). Rules 12 and 14 are needed in v4's host shape (fold.py) and not in a host that keys entries to the link (dirtable.py): low 11. High 14 adds rule 14 (needed where it applies) and the loopback check (speed only given rule 8, reasoned). DEV-10: 17 needed of 21 written, plus high rule 14."
   },
   "ack-stages": {
    "key": "ack-stages",
@@ -2929,14 +3012,13 @@
   },
   "healing-self@per-resource": {
    "key": "healing-self@per-resource",
-   "count": 15,
-   "low": 14,
-   "high": 16,
+   "count": 17,
+   "low": 15,
+   "high": 21,
    "rules": [
     "Add only a replica that is not already in the config (add.new).",
     "The add is a config entry that makes the replica a learner (add.append).",
     "Promote only a learner (promote.learner).",
-    "Promote only while a voter is gone (promote.need).",
     "Promote only from three voters to four (promote.odd).",
     "The promotion is a config entry (promote.append).",
     "Remove only a voter (remove.voter).",
@@ -2944,42 +3026,42 @@
     "Remove only from four voters (remove.four).",
     "The removal is a config entry (remove.append).",
     "A surplus removal happens only from four voters (surplus.four).",
-    "The surplus voter removed is the one the group's stored placement leaves out (surplus.last, now read from the log, not from a ring over #meta).",
+    "The surplus voter removed is the one the group's stored placement leaves out (surplus.last, read from the log, not from a ring over #meta).",
     "A surplus removal waits until the voters left answer and hold the commit offset (surplus.allheld).",
     "The surplus removal is a config entry (surplus.append).",
-    "A leader that picks a machine for a new copy writes its pick into the group's log as the placement before it adds the learner, so every later leader follows the same target."
+    "Promote only a learner that answers the leader now, not merely one that is not yet gone (promote.live, in its strong form).",
+    "When a placed machine is gone to the leader or said it is retiring, the leader picks a machine not already placed and writes the new placement into the group's log before any add; it adds and promotes only machines the stored placement names (pick.append, pick.need, pick.new, promote.placed, which replaces E-16's promote.need).",
+    "A pick or an add takes only a machine the leader's own link has reached within evict.after (pick.cand, add.cand).",
+    "To use a spare, the leader first dials a machine the soft directory lists, so that its own link can reach it (dial.link)."
    ],
    "basis": "model-checked",
-   "source": "E-16 README section 4 and results/summary.md ('self': 14 rules by ablation; surplus.last breaks P9, no churn, in 29 steps on three2); DECISIONS V5-2 (3) and its consequences (each leader picks among the quieter machines, reasoned); DESIGN-V5 4.2 'Healing' (the target: a stored placement, else the ring over #meta's members)",
+   "source": "experiments/E52-resource-healing README sections 2, 3 and 6 and results/summary.md (resheal.py on E-16's engine and world: 22 of 43 rules kept, 46 of 48 mutants caught, 2 undecided; up to 3,704,723 states); E-16 README section 4 (the first 13); DECISIONS V5-2 (3); DESIGN-V5 4.2 'Healing'",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base only. Healing runs in EACH group of a resource, by that group's own leader, not by the resource's home leader (see decisions).",
+   "rows_note": "The base only. Healing runs in each group of a resource, by that group's own leader, not by the resource's home leader (see decisions). The study's healing-self (16) holds the same rules except rules 16 and 17 here, and keeps E-16's promote.need for groups the ring places; its planner-hints keeps the reach check that rule 16 does here.",
    "confidence": "medium",
-   "notes": "Rules 1 to 14 are E-16's model-checked 14, used as given (the anchor). Rule 15 is reasoned and new: with no #meta there is no member list that every leader shares. Candidates now come from the soft directory and the leader's own links, and V5-2 picks by load, so two leaders of one group can rank machines differently; without a stored target a new leader could remove the voter the last one just added, which is the churn surplus.last guards (P9). Low 14: a target every leader computes the same way from the group's own config alone needs no stored pick. High 16 adds add.cand (add only a machine the leader's own link has reached within evict.after): E-16 dropped it as covered, but a soft directory can list a machine that just died. promote.odd and remove.four are the grow-first order that raft-config also counts (E-14c's 16th rule); keep it in one place, as the healing-self record says. Not in E-16's world and not counted: the preferred-leader hand-back after settle.ms, dropping a gone learner, growth from one voter, two voters stepping back to one. CALIBRATED: promote.odd and remove.four hold the grow-first order; raft-config no longer counts it, so it is counted here once.",
-   "basis_split": {
-    "model-checked": 14,
-    "reasoned": 1
-   }
+   "notes": "CHECKED: 15 -> 17, model-checked (E-52). Of E-16's 14, 13 are kept; promote.need is replaced by promote.placed (the stored placement carries the need), inside rule 15. Rule 15 (the stored placement) is 4 rules at DEV-10's grain; its old reason ('a new leader could remove the voter the last one just added') has no counterexample: the churn without a stored placement comes from a leave, and the placement earns its place because the platform's place hints need it (E-52 section 4). New, each with a counterexample: rule 14 (E-16's 'not gone' lets a learner that caught up and then crashed be promoted; the committed entries end on 2 of 4 new voters, P2C in 13 steps with one crash), rule 16 (the old high-bound add.cand: needed at the pick, P9 in 21 steps, and alone at the add, P9 in 20, undecided in the smallest model), rule 17 (links run only between a group's members, so a spare is found only through the directory: PE in 2 steps). Not counted here: promote.caught (P2C, 12 steps), which E-52 also kept, is learners' rule 3, which the base carries, so it is counted there once (E-52 itself says it is not new to the base); E-52's record-grain 18 includes it. Not counted: the hand-back after settle.ms and the re-pick of the preferred member, which are now handback's; dropping a gone learner (dropl.learner, dropl.gone: undecided, dropped as in E-16); growth from one voter and two voters stepping back to one (not modelled). DEV-10: 22 kept (21 decided), 21 without promote.caught: the high, since the study's healing-self and controller-commands are E-16's DEV-10 counts. Low 15 merges the dial into rule 16 and reads rule 14 as learners' rule 3 (a learner that answers now shows it caught up). promote.odd and remove.four are the grow-first order that raft-config also counts (E-14c's 16th rule); counted here once. Paired with the study's healing-self (16; the check of the update, F1, F2): rule 15 is in both, since the study's self rows store place hints too (E-52 section 4's reason, not the lack of a shared member list); rule 16's job is the study's planner-hints rule 3 there; only rule 17, the dial, is the base's alone (links run only between the machines a resource's groups share, so a spare is found through the soft directory). The study keeps promote.need for groups the ring places, which the base, where every group's placement is stored, does not need."
   },
   "planner-hints@per-resource": {
    "key": "planner-hints@per-resource",
-   "count": 5,
-   "low": 3,
-   "high": 7,
+   "count": 6,
+   "low": 4,
+   "high": 8,
    "rules": [
-    "A hint names the group config, or the slot table version, it read; the leader applies it only if that is still current, else refuses stale-plan.",
-    "A leader whose own link to a machine's life is up ignores a gone hint for it.",
-    "A leader adds or promotes a machine a hint names only while its own links reach that machine.",
-    "A lead hint also sets the group's preferred leader, so the settle.ms hand-back does not undo it.",
-    "A draining process hands over every group it leads and says it is draining in its pings, so no leader hands leadership back to it while it drains."
+    "A leader whose own link to a machine is up ignores a gone hint for it (gone.link).",
+    "A gone hint the leader takes makes that machine gone to it at once, so healing replaces it now, not after evict.after (gone.mark).",
+    "A lead hint also sets the group's preferred member, so the hand-back does not undo it (lead.pref).",
+    "A lead hint moves leadership to the machine it names at once, by a transfer, never waiting for the hand-back (lead.transfer).",
+    "A place hint is written into the group's log as its stored placement, which healing then follows (place.append).",
+    "A draining process says so in its pings and hands over every group it leads; no hand-over, hand-back or lead hint moves leadership to a machine that says it is draining or retiring (drain.mark, handover.self, handover.notdrn, handback.notdrn, lead.notdrn)."
    ],
-   "basis": "reasoned",
-   "source": "DESIGN-V5 4.2 'The planner (optional)'; REQUIREMENTS DEP-17 (MUST: the platform is the planner); judging/closure/rerulings.mech.json RM-05 (a C self row with a Raft group carries the hint path at its leaders); E-16 README 'Against the threshold' and line 184 (healing needs no planner)",
+   "basis": "model-checked",
+   "source": "experiments/E52-resource-healing README sections 2, 3 and 6 and results/summary.md (resheal.py; one hint or two, stale or not, on every bound); DESIGN-V5 4.2 'The planner (optional)'; REQUIREMENTS DEP-17; judging/closure/rerulings.mech.json RM-05",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base. The study's planner-hints (5) has the same rules.",
-   "confidence": "low",
-   "notes": "Not modelled (K-08, G-09). The base needs no planner to heal or to move slots (E-16: self heals alone; V5-2 (3): the home leader moves its own slots). It keeps only DEP-17's hint path from the platform: gone reports, placement and lead hints, and a drain, sent as asks to a group's leader (or to the home leader for move and group-count hints). Dropped from the study's 7: the lease row in #meta that keeps two planners apart. There is no #meta, and two planners can only waste moves, never break a property (DESIGN-V5 4.2). A retire is the process's own leave (Ctrl-C), whose rules are meta-members@per-resource's and healing's; a drain is the process's restart signal. Rules 1 to 3 mirror E-16's exec.epoch, exec.gone and exec.live; a hint is applied or refused at once, so cent-co's timeout is not needed. Low 3 keeps rules 1 to 3. High 7 adds: a retire with no replacement stays pending; place(null) returns the group to the leader's own pick. The placement a hint writes is the same record healing-self@per-resource rule 15 writes. CHECKED: 6 -> 5 (skeptic F1). Dropped 'only a sender holding the admin key may send a hint': it is cluster-credentials@per-resource's rule 5. The study's planner-hints is now the same 5 rules."
+   "rows_note": "The base. The study's planner-hints has the same 6 rules (transferred, reasoned) and keeps the reach check besides (7), since the study's healing has no candidate check.",
+   "confidence": "medium",
+   "notes": "CHECKED: 5 -> 6, model-checked (E-52). Two listed rules have no counterexample at any bound, with one hint or two: rule 1, the stale-plan check (a hint only writes a target or a mark, and the leader's own guards check every step that follows, as in E-16's self, which has no epoch check either), and rule 3, 'add a hinted machine only while the leader reaches it' (healing's own pick.cand and add.cand do it). Needed and new: the gone hint's own effect (P8, 2 steps), the place hint's write (PE, 1 step) and the lead hint's own transfer (LE, 1 step where settle.ms has not passed; E-52's count.py keeps it in raft-leader-transfer, whose note counts an asker's transfer with the asker). Rule 6 is 5 rules at DEV-10's grain. DEV-10: 9 kept of 12 written, 11 with the lead hint's and the drain's transfers counted here. Not modelled: two hints with a fault; place(null); a retire with no replacement. Low 4 merges rules 1 with 2 and 3 with 4. High 8 adds 'a retire with no replacement stays pending' and 'place(null) returns the group to the leader's own pick'. The base needs no planner to heal or to move slots (E-16; V5-2 (3)); it keeps DEP-17's hint path. The admin key is cluster-credentials@per-resource's rule 5; #meta's lease row goes."
   },
   "meta-members@per-resource": {
    "key": "meta-members@per-resource",
@@ -2987,78 +3069,77 @@
    "low": 1,
    "high": 3,
    "rules": [
-    "A leaving server marks itself retiring first: it takes its machine entry out of the directory and from then refuses to become a new copy of anything.",
-    "Healing never adds a copy on a machine that said it is retiring."
+    "A leaving server says it is retiring first, in its pings, before anything else (leave.mark).",
+    "Healing never picks, adds or promotes a machine that said it is retiring (pick.notret, add.notret, promote.notret)."
    ],
-   "basis": "reasoned",
-   "source": "DESIGN-V5 4.2 'Leaving' (retiring first) and 'Healing' (a retiring member is never a candidate); healing.py round 2's P7 (no step adds a retiring member); DECISIONS V5-2 and V5-3",
+   "basis": "model-checked",
+   "source": "experiments/E52-resource-healing README section 3 and results/summary.md (resheal.py); experiments/E51-resource-founding section 3 (place.py, with stale reads); DESIGN-V5 4.2 'Leaving' and 'Healing'; healing.py round 2's P7; DECISIONS V5-2 and V5-3",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base only; the study's rows keep meta-members (5).",
-   "confidence": "low",
-   "notes": "The member record in #meta goes. Of the study's 5 rules: 'a joiner writes its own record' becomes soft-directory's machine announcement (rule 2 there); the cluster-wide gone mark and its clearing (2 rules) go, since each leader's own links decide gone (link-pings rules 3 and 4, healing's remove.gone) and a dead machine leaves the directory when its link drops (soft-directory rule 4); 'retiring first' and 'never pick a retiring member' stay, now as the leaver's own refusal plus its directory exit. Its state is no longer replicated: the retiring mark is local to the leaving process. Low 1: the refusal at the target alone does it. High 3 adds DESIGN-V5's 'a retiring voter is left to its own leave until leave.ms', so only one of the leave and healing promotes a replacement. E-16 had no leave, so nothing here is model-checked."
+   "rows_note": "The base only; the study's rows keep meta-members (5), whose rules 4 and 5 are these two.",
+   "confidence": "medium",
+   "notes": "CHECKED: 2 -> 2, model-checked (E-51 and E-52); reworded. Leaving the directory is not needed for healing (E-51 and E-52: a listed leaver is a spare, which exits at once so a dial to it fails, or a member, heard over its member link), and never re-announcing is not needed either; whether clients need the exit is soft-directory's question. Rule 2 is three guards of one check at DEV-10's grain (E-52: 4 rules kept, 2 distinct checks; the pick's guard is needed once two machines leave, P9 in 21 steps); E-51's one guard at the add stands for it with no learners. A leader keeps what it heard a machine say after the link drops (E-52's world, the design's own words 'said it is retiring'). The member record in #meta goes: the joiner's record becomes soft-directory's machine announcement, and the cluster-wide gone mark goes (each leader's own links decide gone). Low 1: the refusal at the target alone does it (not tested). High 3 adds DESIGN-V5's 'a retiring voter is left to its own leave until leave.ms' (not modelled)."
   },
   "meta-catalog@per-resource": {
    "key": "meta-catalog@per-resource",
-   "count": 5,
+   "count": 4,
    "low": 3,
-   "high": 6,
+   "high": 5,
    "rules": [
-    "A later open whose options differ from the resource's settings record is refused, naming the difference, unless an alter in progress allows its code hash.",
-    "An alter changes the settings record online, by an entry in the resource's home log, and a roll adds the new code hash before it removes the old one.",
-    "A server becomes a full copy of one of the resource's groups only if it can run one of the resource's allowed code hashes.",
-    "The seed is applied only once, and the settings record marks it applied in the same entry.",
-    "While the write gate is read-only, every group of the resource refuses every write with its reason."
+    "A later open whose options differ from the resource's settings record is refused, naming the difference, unless an alter in progress allows its code hash (join.same).",
+    "An alter changes the settings record online, by an entry in the resource's home log; a roll adds the new code hash first and removes the old one only after the roll (alteradd.entry, alterrm.rolled, alterrm.entry).",
+    "A server becomes a full copy of one of the resource's groups only if it can run one of the resource's allowed code hashes, checked at the join and by healing (join.code, add.code).",
+    "While the write gate is read-only, every group of the resource refuses every write with its reason (write.gate)."
    ],
-   "basis": "reasoned",
-   "source": "DESIGN-V5 4.2 '#meta' resource record and 4.5 'Defining and changing a resource'; DECISIONS V5-2 (2): settings are records in the resource's own log",
+   "basis": "model-checked",
+   "source": "experiments/E51-resource-founding README sections 3 and 4 (found.py, catalog.py, place.py); DESIGN-V5 4.2 '#meta' resource record and 4.5; DECISIONS V5-2 (2)",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base only; the study's rows keep meta-catalog (6).",
-   "confidence": "low",
-   "notes": "The study's rule 1 (the first open writes the record only if none exists) moves to genesis-conditional-create@per-resource: with no #meta, creating a resource is that resource's own genesis, and its found.create writes the settings as the home group's first entry. Count it there once. The home group is the group that holds the resource's settings, slot table and group records (made at genesis). Each group's leader follows the home log for the gate and the code hashes, as every member followed #meta before; no new rule. Low 3 folds the seed mark and the gate into the write path. High 6 adds the check of an alter's keys against each other."
+   "rows_note": "The base only; the study's rows keep meta-catalog (6: the seed mark stays there, where the record and the seed are in two logs).",
+   "confidence": "medium",
+   "notes": "CHECKED: 5 -> 4, model-checked (E-51). The old rule 4 (the seed applied once, and marked applied) has no needed part: a joining copy never applies its seed (DESIGN-V5 6.2, row 6), so the founding entry is the one place a seed is applied, and that is genesis-conditional-create@per-resource's rule 4. Rule 2's 'the old hash goes only after the new one is in' is covered by 'only after the roll'. The study's rule 1 (create only if no record exists) is genesis's. DEV-10: 7 needed of 12 written, plus the high check of an alter's keys against each other (needed where alters set keys). Low 3 folds the gate into the write path. High 5 adds that cross-key check. Each group's leader follows the home log for the gate and the code hashes; no new rule."
   },
   "meta-directory@per-resource": {
    "key": "meta-directory@per-resource",
-   "count": 8,
-   "low": 5,
-   "high": 8,
+   "count": 6,
+   "low": 4,
+   "high": 7,
    "rules": [
-    "After each config change, a group's leader writes the group's record (members, leader) into the resource's home log.",
-    "A record names the config it describes, and an older config never overwrites a newer one.",
-    "An operator recovery raises the group's incarnation in its record; for the home group itself, in its own log and in its members' HELLO.",
-    "A leader or copy that sees a higher incarnation for its own group, in the home log or in a peer's HELLO, stops and comes back as a new copy.",
-    "A removed copy deletes its data only once the group's record shows the config without it.",
-    "A group's record is deleted only after the slot table has shown none of its slots for settle.ms.",
-    "A group's record is deleted only once its history is safe.",
-    "After the home group is recovered from a copy that was behind, every group leader writes its record and its open slots again."
+    "Whenever the home log's record of a group differs from the group's committed config, the group's leader writes the group's record (members, leader) into the resource's home log, and it keeps comparing (resend.again).",
+    "An operator recovery raises the group's incarnation in its record; for the home group itself, in its own log and in its members' HELLO (recover.raise, recover.record).",
+    "A leader or copy that sees a higher incarnation for its own group, in the home log or in a peer's HELLO, stops and comes back as a new copy (logstop.higher, logstop.stop, hellostop.higher, hellostop.stop).",
+    "A removed copy deletes its data only once the group's record shows the config without it (gc.shown).",
+    "A group's record is deleted only after the slot table shows none of its slots (delete.noslots).",
+    "A group's record is deleted only once its history is safe (delete.safe)."
    ],
-   "basis": "reasoned",
-   "source": "DESIGN-V5 4.2 '#meta' shard record, 'A removed replica', 'A shard is deleted', 'Mixed versions, recovery and routing' (recover --unclean, the residual case, recover --new-cluster and its HELLO compare); DECISIONS V5-2 (2) and V5-3",
+   "basis": "model-checked",
+   "source": "experiments/E51-resource-founding README sections 2 to 4 (records.py, incarnation.py; probes noresend, ack, home3s, home3e); DESIGN-V5 4.2 '#meta' shard record, 'A removed replica', 'A shard is deleted', 'Mixed versions, recovery and routing'; DECISIONS V5-2 (2) and V5-3",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base only; the study's rows keep meta-directory (8).",
-   "confidence": "low",
-   "notes": "Same 8 rules as the study's meta-directory, moved from #meta to each resource's home log. The soft directory does not take them: it keeps no log and decides nothing, and these records carry recovery and deletion (V5-3: a client learns members, slot table and leaders from the resource itself, which means from these records). The home group needs no record of its own: its config is its own log, and clients reach it through the soft directory. #meta's own recovery (recover --new-cluster, members compare its incarnation in HELLO) becomes the home group's (rules 3 and 4), so no rule is added. Low 5 counts only the routing and deletion rules (1, 2, 5, 6, 7) and leaves 3, 4 and 8 to the operator's recovery path."
+   "rows_note": "The base only; the study's rows keep meta-directory (now the same 6, in #meta).",
+   "confidence": "medium",
+   "notes": "CHECKED: 8 -> 6, model-checked (E-51). As first written, rule 1 ('after each config change, write the record') never wrote a lost record write again (REC, 5 steps). Reworded to 'whenever the home log's record differs', it also covers the old rule 2 (an older config never overwrites a newer: a late old record is written over again) and the old rule 8 (rewrite after the home group is recovered from a copy that was behind); neither has a counterexample once rule 1 compares. It must keep comparing: writing again only until the record has once been shown breaks REC (9 steps). The settle.ms wait before a record is deleted carries speed only (reasoned: E-51's world has no client with a stale route). Rules 2 and 3 need both paths, the home log for a data group and the HELLO for the home group; the home group's own recovery leaves a window that the design text must state (E-51 fix 4; no rule). The record's leader field goes stale after an election or a hand-back; as a hint it costs one 'moved' (reasoned). DEV-10: 10 needed of 15 written. Low 4 leaves rules 2 and 3 to the operator's recovery path, as before. High 7 keeps the old rule 2 for configs that re-add a machine they removed (reasoned, not modelled: rule 4's garbage collection reads the record)."
   },
   "genesis-conditional-create@per-resource": {
    "key": "genesis-conditional-create@per-resource",
-   "count": 4,
-   "low": 4,
-   "high": 9,
+   "count": 6,
+   "low": 6,
+   "high": 11,
    "rules": [
     "The create of the resource's id in the object store succeeds only while no id is stored under that project and name (If-None-Match) (found.absent).",
-    "The opener whose create succeeds founds the resource's home group as its only voter, with the id and the settings record as its first entry (found.create).",
-    "Every other opener adopts only the id it finds stored (adopt.stored).",
-    "An opener that adopts keeps that id in its dir and joins as a copy through healing (adopt.adopt)."
+    "An opener first writes a candidate id to its own disk, only while its dir holds no id, and only then asks the store to create that id (cand.keep, cand.noid).",
+    "After the create answers, or after a restart, the opener founds only if the stored id is its own candidate; otherwise it drops its candidate and adopts the stored id (first.mine, drop.other, drop.drop).",
+    "The opener that founds makes the resource's home group with itself as the only voter, with the id, the settings record and the seed in its first entry (found.create: put.create, first.group, first.settings, first.seed).",
+    "Every other opener adopts only the id it finds stored, under a key that carries the project and the name (adopt.stored, adopt.key).",
+    "An opener adopts only while it holds no id, keeps that id in its dir and joins as a copy through healing (adopt.adopt, adopt.noid)."
    ],
    "basis": "model-checked",
-   "source": "experiments/E33-genesis-restore results/summary.md section objcas (4 of 9 written, 4 of 4 mutants caught) and README; AMENDMENTS A-08; DECISIONS V5-2 (5) and V5-3",
+   "source": "experiments/E51-resource-founding README sections 2 to 4 and results/summary.md (found.py: 14 of 14 rules needed by ablation, 15 of 15 non-equivalent mutants caught, up to 4,050,927 states); E-33 results/summary.md section objcas (the first 4); AMENDMENTS A-08; DECISIONS V5-2 (5) and V5-3",
    "bundle": null,
    "owner": "fero",
-   "rows_note": "The base only. The study's rows found #meta once per project with the same 4 rules and then create each resource by meta-catalog's rule 1.",
+   "rows_note": "The base only. The study's rows found #meta once per project with genesis-conditional-create (now the same 6 rules) and then create each resource by meta-catalog's rule 1.",
    "confidence": "medium",
-   "notes": "E-33's 4 rules, used as given, now run once per resource instead of once per project: a project has no genesis of its own (V5-2 (5): machines plus a name lookup). It absorbs meta-catalog's rule 1. The scope change is reasoned: the rules are the same, with the resource's name in the key. Every resource create costs one object-store round trip (speed, not counted). High 9 adds the one-box path (E-33's one-box model: 4 rules by ablation plus the exclusive file create), since a resource founded on one box has no object store to ask. Every row that runs on one box needs that path, the base included, and every row's genesis record keeps it in its high alike, so each row's count is about 5 low and no place changes (skeptic F10)."
+   "notes": "CHECKED: 4 -> 6, model-checked (E-51). E-33 took the store create and the home group's first entry as one step; a builder cannot, and a plain crash between them (no lost disk) strands the name for good (G2, 6 steps; also when the id goes to disk once the create answers). So rule 2 (the candidate on disk first, with E-33's found.noid moved to it) and rule 3 (the compare) are new; rule 4 now also carries the seed, which E-51 found is applied only here, once (a joining copy never applies one), so meta-catalog@per-resource loses its seed mark. DEV-10: 14 rules (found.create is 4 of them, the compare 3); the record grain counts each numbered rule once, as the study's other records do (E-33's DEV-10 4 wrote found.create as one rule). Low 6: every rule has a counterexample. High 11 adds the one-box path (E-33's one-box model: 4 rules by ablation plus the exclusive file create), which every row that runs on one box needs alike; E-51 found E-33's onebox1 carry-over (two ids, 3 steps) applies once per resource, and its rule belongs to that path. Every resource create costs one object-store round trip (speed, not counted)."
   },
   "cluster-version@per-resource": {
    "key": "cluster-version@per-resource",
@@ -3148,12 +3229,13 @@
   },
   "controller-hints": {
    "key": "controller-hints",
-   "count": 2,
-   "low": 1,
-   "high": 4,
+   "count": 3,
+   "low": 2,
+   "high": 5,
    "rules": [
     "On a drain, the controller moves leadership off every group the drained member leads (a transfer command to each group's leader), and never names a draining member as a preferred leader.",
-    "A lead hint sets the group's preferred leader in the controller's own records, so the controller's balancing does not hand leadership back."
+    "A lead hint sets the group's preferred leader in the controller's own records, so the controller's balancing does not hand leadership back.",
+    "A lead hint also moves leadership at once: the controller sends the group's leader a transfer to the member it names, never waiting for its balancing."
    ],
    "basis": "reasoned",
    "source": "REQUIREMENTS DEP-17 (MUST: the platform is the planner); judging/closure/rerulings.mech.json RM-05 (in a controller row the hints are inputs to the controller's loop); DESIGN-V5 4.2's planner table ('drain: written to #meta. Leaders hand over the shards it leads'); skeptic finding F1",
@@ -3161,7 +3243,39 @@
    "owner": "fero",
    "rows_note": "Every row that carries controller-commands (C cent, cent-co and their footnoted forms): the hint path DEP-17 owes, at the controller. Carried by tools/simplicity.py beside controller-commands, since the closure catalogue folds it into the controller's loop.",
    "confidence": "low",
-   "notes": "Added after the skeptic check (F1). RM-05 says a controller row's hints are inputs to the controller's loop, but no record held those rules: controller-commands' 18 (E-16) has no drain hand-over and no preferred leader. The leadership transfer itself is raft-leader-transfer's; the gone report and the placement hint are rules the controller already has (exec.gone, exec.live, c_add.cand); the admin key is cluster-credentials'. Low 1 merges the two. High 4 adds: a retire with no replacement stays pending, and place(null) returns a group to the controller's own pick. Not modelled."
+   "notes": "Added after the skeptic check (F1). RM-05 says a controller row's hints are inputs to the controller's loop, but no record held those rules: controller-commands' 18 (E-16) has no drain hand-over and no preferred leader. The leadership transfer itself is raft-leader-transfer's; the gone report and the placement hint are rules the controller already has (exec.gone, exec.live, c_add.cand); the admin key is cluster-credentials'. Not modelled. CHECKED: 2 -> 3 (E-52, transferred; reasoned). E-52 found that a lead hint must move leadership itself (LE, 1 step where settle.ms has not passed); the controller's balancing waits for settle.ms as the leaders' hand-back does. Low 2 merges rules 2 and 3. High 5 adds: a retire with no replacement stays pending, and place(null) returns a group to the controller's own pick."
+  },
+  "batch-checksum": {
+   "key": "batch-checksum",
+   "count": 1,
+   "low": 1,
+   "high": 2,
+   "rules": [
+    "One checksum per batch (CRC-32/IEEE, Node's native zlib.crc32), made where the batch is made and checked once per receiver, covers the batch's term, base offset, group and writer time; the journal row header has its own small checksum and keeps the chain, so every byte that boot, par or disk-incarnation trusts sits under a checksum."
+   ],
+   "basis": "reasoned",
+   "source": "PATHS.md 7.1 row 2 and section 6, PA-1a; DECISIONS V5-9 (2); E-37 (the checksum check it changes)",
+   "bundle": null,
+   "owner": "fero",
+   "rows_note": "The base only (V5-9 (2)). The study's rows keep v4's checksum per entry.",
+   "confidence": "medium",
+   "notes": "New (V5-9, 2026-11-13). PATHS 7.1 counts +1: every trusted byte under a checksum. A term or an offset outside every checksum would flip unseen (Kafka keeps its base offset and leader epoch outside its CRC: a known weak spot, from memory). The check itself stays disk-incarnation's rule 1, now per batch, and par-repair's unit becomes a batch (wording, no count). It is a format change from v4's crc32c (DEV-09). Model before building: E-37's model read with 'entry' as 'batch', with a damaged header (not run). High 2 counts the journal row header's own checksum apart."
+  },
+  "bulk-rate-cap": {
+   "key": "bulk-rate-cap",
+   "count": 1,
+   "low": 1,
+   "high": 3,
+   "rules": [
+    "Bulk work (a catch-up, a snapshot install, a move's copy, a roll's catch-up) is held to a byte rate on the link and on the disk; on a member link it goes in chunks of 64 KB or less, queued behind live frames."
+   ],
+   "basis": "reasoned",
+   "source": "PATHS.md 7.1 row 3 and section 6, PA-6; DECISIONS V5-9 (3); E-35; E-01; E-13",
+   "bundle": null,
+   "owner": "fero",
+   "rows_note": "Every row with bulk catch-up, snapshot installs or slot moves that fero writes (R raft, rlog, isr, slog, obj or lww): 30 judged rows and the base, carried by tools/simplicity.py's CARRIES, since the closure catalogue has no record for it. It carries REQUIREMENTS SC-08 (c), p99 write latency at most 2 x the steady state during any scale change, and (f), data moved per added server paced: MUSTs for every row, not only the base. Each such row moves bulk data beside live writes when a server is added or a slot moves: a Raft snapshot install and catch-up, a log member's or a folding learner's catch-up (RLOG, SLOG), an ISR follower's fetch, a slot move's copy (OBJ), v4's teacher (V4). Only the base's design text names the cap (V5-9 (3)); in the other rows it is reasoned from SC-08. Not carried: BUY, whose catch-up is JetStream's own, inside outside-log.",
+   "confidence": "medium",
+   "notes": "New (V5-9, 2026-11-13). PATHS 7.1 counts about +1. It guards the live writes' p99 while a heal, catch-up, move or roll runs: a 4 MB frame holds a 1 Gb/s link 34 ms (computed), big records raised other groups' commit p99 1.18-1.59 times (E-35), and a small fsync beside bulk writes waited 250-300 ms (E-01). Raft safety does not rest on it (a follower acks only what is fsynced). Model before building: PATHS 7.3's catch-up beside live writes (not run). High 3 adds a side file (+2), only if that run shows it helps. CHECKED: the base only -> every row with bulk work (the check of the update, F7). The cap is what meets SC-08's stated bars (c) and (f) while bulk work runs, so every row that owes SC-08 and moves bulk data owes it (reasoned); no row's own text says how it meets SC-08 (c) without one."
   }
  },
  "base": {
@@ -3177,6 +3291,7 @@
    "raft-readindex",
    "link-pings",
    "quiet-groups",
+   "handback",
    "slow-leader-self",
    "meta-members@per-resource",
    "meta-catalog@per-resource",
@@ -3197,14 +3312,17 @@
    "saga-intents",
    "none-rung",
    "journal",
+   "bulk-rate-cap",
    "tier",
    "restore-mark",
    "fold-all",
    "fold-version",
    "subscribe",
    "route-forward",
+   "route-smart",
    "admission-credits",
    "disk-incarnation",
+   "batch-checksum",
    "genesis-conditional-create@per-resource",
    "dir-lease",
    "par-repair",
@@ -3230,6 +3348,7 @@
    "raft-readindex",
    "link-pings",
    "quiet-groups",
+   "handback",
    "dormant-groups",
    "slow-leader-self",
    "meta-members@per-resource",
@@ -3251,14 +3370,17 @@
    "saga-intents",
    "none-rung",
    "journal",
+   "bulk-rate-cap",
    "tier",
    "restore-mark",
    "fold-all",
    "fold-version",
    "subscribe",
    "route-forward",
+   "route-smart",
    "admission-credits",
    "disk-incarnation",
+   "batch-checksum",
    "genesis-conditional-create@per-resource",
    "dir-lease",
    "par-repair",
@@ -3275,17 +3397,17 @@
   "decisions": [
    "The base is the closure tool's MIN row with Z par and C self ('BASE (V5-6) approx' in rows.json, 50 keys), changed as below. Every option in that vector matches V5-6's list: R raft, G shard, P slot, I port, Z par, D sess, X saga, F all, T clamp, S jrnl +tier(store), H emb, L ts→rs, Q maj-d (every write commits at persisted, V5-5). Source: DECISIONS V5-6, rows.json.",
    "Who leads what. Each resource has a home group, made at its genesis, whose log holds the settings record, the slot table and the group records (V5-2 (2)). The home group's leader decides the resource's slot moves (move-policy, one decider per resource, so no move lease is needed). Each group's own leader heals that group's copies. Reason: if the home leader healed other groups, decider and executor would be apart, which is cent-co inside a resource and costs E-16's 4 more rules (epoch check, two re-checks, a timeout). Source: E-16 section 4; V5-2 (3).",
-   "planner-hints: kept as planner-hints@per-resource (5, the study's planner-hints' same 5 rules after the skeptic check dropped the admin-key rule from both and #meta's lease row from the study's). A leader that heals its own group and a home leader that moves its own slots need no planner (E-16: self heals with no planner; SPACE's self needs none, self+p adds it). But DEP-17 is a MUST (the platform's drains, retirements, gone reports and placement hints), and with no controller those hints can only land at the leaders (RM-05, as for CELL and COMP). The #meta lease row goes; a drain and a retire are the process's own restart and leave. Source: E-16; REQUIREMENTS DEP-17; RM-05; DESIGN-V5 4.2.",
+   "planner-hints: kept as planner-hints@per-resource (5, the study's planner-hints' same 5 rules after the skeptic check dropped the admin-key rule from both and #meta's lease row from the study's). A leader that heals its own group and a home leader that moves its own slots need no planner (E-16: self heals with no planner; SPACE's self needs none, self+p adds it). But DEP-17 is a MUST (the platform's drains, retirements, gone reports and placement hints), and with no controller those hints can only land at the leaders (RM-05, as for CELL and COMP). The #meta lease row goes; a drain and a retire are the process's own restart and leave. Source: E-16; REQUIREMENTS DEP-17; RM-05; DESIGN-V5 4.2. SUPERSEDED by 27 and 29: planner-hints@per-resource is 6 (E-52), and the study's planner-hints 7 (it keeps the reach check, which healing's candidate check does in the base).",
    "dormant-groups: two variants. 'mechanisms' leaves it out; 'with_dormant' carries it at its unchanged 4 rules. It is carried only for SC-13's 100,000 resources (A-15, E-36), and the owner set no number yet (V5-2 consequences). Nothing in it reads #meta that the base lacks: a server keeps announcing its dormant copies to the soft directory, and the home log still names the dormant group. Source: AMENDMENTS A-15; E-26; E-36; V5-2.",
-   "meta-members becomes meta-members@per-resource (2, from 5). The joiner's record becomes soft-directory's machine announcement; the cluster-wide gone mark goes (each leader's own links decide gone, and a dead machine leaves the directory when its link drops); 'retiring first' and 'never pick a retiring machine' stay, held by the leaver itself. Source: V5-2, V5-3; DESIGN-V5 4.2 Leaving and Healing.",
-   "meta-catalog becomes meta-catalog@per-resource (5, from 6): the same rules on the resource's settings record in its home log; its first rule (create only if no record exists) moves to genesis-conditional-create@per-resource. Source: V5-2 (2); DESIGN-V5 4.5.",
-   "meta-directory becomes meta-directory@per-resource (8, the same 8): the group records move from #meta to each resource's home log. The soft directory cannot take them, since it keeps no log and decides nothing, and they carry recovery and deletion. #meta's own recovery becomes the home group's. Source: V5-2 (2); V5-3; DESIGN-V5 4.2.",
+   "meta-members becomes meta-members@per-resource (2, from 5). The joiner's record becomes soft-directory's machine announcement; the cluster-wide gone mark goes (each leader's own links decide gone, and a dead machine leaves the directory when its link drops); 'retiring first' and 'never pick a retiring machine' stay, held by the leaver itself. Source: V5-2, V5-3; DESIGN-V5 4.2 Leaving and Healing. SUPERSEDED by 27: still 2, reworded (E-51, E-52): leaving the directory is not needed for healing.",
+   "meta-catalog becomes meta-catalog@per-resource (5, from 6): the same rules on the resource's settings record in its home log; its first rule (create only if no record exists) moves to genesis-conditional-create@per-resource. Source: V5-2 (2); DESIGN-V5 4.5. SUPERSEDED by 27 and 29: meta-catalog@per-resource is 4 (the seed rides the founding entry, E-51); the study's meta-catalog stays 6 (its seed and record are in two logs).",
+   "meta-directory becomes meta-directory@per-resource (8, the same 8): the group records move from #meta to each resource's home log. The soft directory cannot take them, since it keeps no log and decides nothing, and they carry recovery and deletion. #meta's own recovery becomes the home group's. Source: V5-2 (2); V5-3; DESIGN-V5 4.2. SUPERSEDED by 27 and 29: both forms are 6 (E-51: rule 1 compares, which covers the old rules 2 and 8).",
    "slow-leader-self: unchanged (3). It is local to each group's leader and reads nothing from #meta, so per-resource groups change nothing. Source: AMENDMENTS A-03; catalogue entry.",
-   "healing-self becomes healing-self@per-resource (15, from 14): E-16's 14 plus one reasoned rule, 'write the chosen machine into the group's log as its placement before the add'. With no shared member list, and V5-2's picks by load, leaders of one group can rank machines differently, and surplus.last (no churn, P9) then needs a stored target. Source: E-16; V5-2 consequences; DESIGN-V5 4.2 (the stored placement).",
+   "healing-self becomes healing-self@per-resource (15, from 14): E-16's 14 plus one reasoned rule, 'write the chosen machine into the group's log as its placement before the add'. With no shared member list, and V5-2's picks by load, leaders of one group can rank machines differently, and surplus.last (no churn, P9) then needs a stored target. Source: E-16; V5-2 consequences; DESIGN-V5 4.2 (the stored placement). SUPERSEDED by 27 and 29: healing-self@per-resource is 17 (E-52), and its stored placement is in the study's healing-self too (16). The reason given here, 'no shared member list, and surplus.last then needs a stored target', has no counterexample (E-52 section 4): the stored placement is needed because place hints need a stored target that healing follows.",
    "ack-stages: new, 12 rules (W1's four parts and Y from E-48; the Raft-side and client rules from MEMORY 9.4). The memory rung is not in the base (V5-5: third, only for a timed need), and no Raft commit, election or recovery rule changes (E-48, brute force). Source: E-48 section 5; MEMORY 9.4; V5-5.",
    "O.seq is common to all rows, so it is not counted in ack-stages and not put in the base list. It is recorded as issue-order (3) for the calibrator to add to every row alike, or to none. Source: AMENDMENTS A-10; E-48 section 2 (ORDER 7 under persisted with pipelining); E-45 F4.",
    "soft-directory: new, 12 rules (10, plus two v4 rules the skeptic found, F6), ported from v4's #directory plus V5-3's cross-machine seeds and the machine announcement healing needs. It replaces #meta as the way a client first finds a resource. Source: v4 api/directory.ts; DESIGN-DIRECTORY; V5-3.",
-   "genesis-conditional-create becomes genesis-conditional-create@per-resource (4, the same 4): there is no project genesis and no #meta to found; each resource's first open is its genesis, by a create-if-absent of its id in the object store. Source: E-33; V5-2 (5).",
+   "genesis-conditional-create becomes genesis-conditional-create@per-resource (4, the same 4): there is no project genesis and no #meta to found; each resource's first open is its genesis, by a create-if-absent of its id in the object store. Source: E-33; V5-2 (5). SUPERSEDED by 27 and 29: both forms are 6 (E-51: the candidate on disk before the create, and the compare).",
    "cluster-version becomes cluster-version@per-resource (5, the same 5): the version lives in each resource's home log. Source: DESIGN-V5 4.2; OPS-12; V5-2.",
    "cluster-credentials becomes cluster-credentials@per-resource (12: fero 9, outside 3), an open choice: with no project log, the CA, join tokens and revocations move to the operator or fero deploy's platform, and fero keeps the handshake checks. The three moved rules still count, as outside rules (skeptic F4). Keeping the PKI inside fero, in each resource's home log, is the same 12, all fero. Source: v4 kernel/door.ts; DESIGN-V5 4.1 and 4.5; V5-2; V5-3.",
    "Removed with no replacement: slow-leader-controller and controller-commands (no #meta loop; already absent from the approximation since C is self), project-groups (G shard, not pslot). Source: V5-2 REJECTED.",
@@ -3293,13 +3415,19 @@
    "V5-2 (4), derived resources: no new mechanism. 'Its log records how far it has read in each source' is srchi-marks' source sequence in each output entry and consumer-groups' cursor; a derived process learns a source's members and slots through that source's soft-directory entry and home log. Source: V5-2 (4); srchi-marks; consumer-groups.",
    "Unchanged, with only their home moving from #meta to the resource's home log (no rule added or dropped): slot-table (B writes its row in the home log before it opens; a move waits while the home group has no majority), slot-move, move-policy (no #meta lease: the home leader is the one mover), route-forward (a moved answer's new owner comes from the answer or the home log), restore-mark (the mark stays in the object store, per resource), forks (count-4 already placed them in the resources' own logs). Source: DESIGN-V5 4.2; V5-2.",
    "Every other key in the approximation stays as the study counted it: the Raft core, learners, link-pings, quiet-groups, writer-judging, client-sessions, caller-keys, srchi-marks, writer-time, lock-rows, fence-tokens, saga-intents, none-rung (P-06, every row), journal, tier, fold-all, fold-version, subscribe, admission-credits, disk-incarnation (kept beside par for a lost disk), par-repair, dir-lease, consumer-groups, presence-rows, queue-claims, input-recorder. Source: V5-6; rows.json. CALIBRATED: these keys now carry the calibrated counts in 'mechanisms' (see 'calibration'), not the study's or the counters' first counts.",
-   "Calibrated sum for the base: 402 rules (406 with dormant groups), counting each key's count less its row_minus for 'BASE'. Before calibration the same keys summed to 426 (430).",
+   "Calibrated sum for the base: 402 rules (406 with dormant groups), counting each key's count less its row_minus for 'BASE'. Before calibration the same keys summed to 426 (430). SUPERSEDED by 31: the sums now.",
    "ack-stages stays in the base: V5-5 builds answer stages second, as part of the plan. No study row priced them (any row could add them, MEMORY 9.0), so a re-rank should show the base with and without its 12 rules.",
    "issue-order (3) stays out of every list, as base.json chose: A-10 owes it to every row. The base needs it for ack-stages as well (E-48: ORDER breaks under S1 without O.seq), so a re-rank should add it to every row or to none, never to the base alone.",
    "presence-rows: in the base, one #sessions registry serves dedup and presence, so presence-rows' rule 7 is client-sessions' apply.live; the base subtracts 1 (row_minus BASE).",
    "route-forward is 2 after calibration: its handover rule is raft-leader-transfer's rule 2. In the base, a moved answer's new owner comes from the answer or the resource's home log.",
    "Checked against V5-1 to V5-6 and VERDICT 11.7: per-group healing by each group's own leader is E-16's 'self' (the form 11.7 cites as smaller and safer than #meta's loop); slot moves decided by the home leader; no project-wide controller; the soft directory decides nothing. No base key was added or dropped in calibration.",
-   "The skeptic check (F1-F14) changed: planner-hints 7 -> 5 and planner-hints@per-resource 6 -> 5; a new controller-hints (2) in every controller row; lsm-store 17 -> 23; cluster-credentials@per-resource 9 -> 12 (3 outside); soft-directory 10 -> 12; caller-keys 9 -> 8; two-phase-commit 28 -> 29; and basis_split on the four base records that mix bases. tools/simplicity.py's interval() now pairs each '@per-resource' record with its study record (and slow-leader-self with slow-leader-controller), so their shared rules cancel."
+   "The skeptic check (F1-F14) changed: planner-hints 7 -> 5 and planner-hints@per-resource 6 -> 5; a new controller-hints (2) in every controller row; lsm-store 17 -> 23; cluster-credentials@per-resource 9 -> 12 (3 outside); soft-directory 10 -> 12; caller-keys 9 -> 8; two-phase-commit 28 -> 29; and basis_split on the four base records that mix bases. tools/simplicity.py's interval() now pairs each '@per-resource' record with its study record (and slow-leader-self with slow-leader-controller), so their shared rules cancel.",
+   "After the per-resource models (2026-11-14). E-51 and E-52 modelled the base's per-resource records; each is now counted at the records' grain (one numbered rule, one rule, as the study's other records count), as the two experiments map them, and is model-checked: genesis-conditional-create@per-resource 4 -> 6 (the candidate on disk before the create, and the compare), meta-catalog@per-resource 5 -> 4 (the seed mark goes), meta-directory@per-resource 8 -> 6 (rule 1 reworded to 'whenever the record differs', which covers the old rules 2 and 8), meta-members@per-resource 2 (reworded: no directory exit), soft-directory 12 (rule 9 loses 'only a first address'), healing-self@per-resource 15 -> 17 (E-52's 18 less promote.caught, which learners' rule 3 already counts in the base), planner-hints@per-resource 5 -> 6 (stale-plan and the reach check go; the gone and place hints' effects and the lead hint's own transfer come in). Each record's notes give the model's DEV-10 count. Source: E-51 sections 2 to 4; E-52 sections 2, 3 and 6.",
+   "handback: new, 6 rules, in every row with a leader or writer per group that a failover moves, the base included (tools/simplicity.py's CARRIES; 5 in ISR, SLOG and OBJ, whose groups do not go quiet). No record counted the hand-back after settle.ms before. E-52 model-checked 4 of its rules (the settle wait with its transfer, only to a voter, and the re-pick of the preferred member, guard and update); E-53 measured 1 on real code ('a group with a transfer in flight does not go quiet', the +1 V5-7's cap needs); the cap on transfers in flight is the design's (V5-7), reasoned (F4 of the check, line 32). The study's rows need them as much as the base: each must spread leaders (or writers) back after a failover, and each stores a preferred member a lead hint sets. Source: E-52 section 3; E-53 sections 7 to 9; DESIGN-V5 4.2; V5-7.",
+   "The same findings in the study's records, so that no row gets a rule for free and none pays for a rule a model found not needed (each transfer reasoned, and said in the record's CHECKED note): healing-self 14 -> 16 (promote.live in its strong form; the stored placement, because the study's self rows store place hints too, E-52 section 4); controller-commands' exec.live reworded (count unchanged); planner-hints 5 -> 7 (the gone and place hints' effects and the lead hint's own transfer, less stale-plan; the reach check stays, since the study's healing has no candidate check) and controller-hints 2 -> 3 (the lead hint's own transfer); genesis-conditional-create 4 -> 6 (the project's founding by create-if-absent has E-33's merged step too); meta-directory 8 -> 6 (rule 1 reworded); learners' rule 3 is model-checked (E-52). meta-catalog stays 6: its seed mark stays in the #meta rows, where the record and the seed are in two logs. Only the dial (healing-self@per-resource rule 17) stays the base's alone in healing: links run only between the machines a resource's groups share. The soft directory, the answer stages and V5-9's direct routing and checksum are the base's alone too.",
+   "V5-9's three path changes, reasoned from PATHS 7.1: route-smart for direct routing (PA-4: the catalogue's record for sending to the slot's leader, 2 in the smart rows; 1 in the base, row_minus BASE, since soft-directory rule 9 already relearns leaders and the slot table; PATHS prices it 0 to +1), batch-checksum (1, PA-1a), the base's alone, and bulk-rate-cap (1, PA-6), which carries SC-08 (c) and (f), MUSTs for every row, and so is carried in every row with bulk work (tools/simplicity.py's CARRIES). tools/simplicity.py adds a line BASE-paths, the base without the two path changes only it carries. Source: DECISIONS V5-9; PATHS 7.1; REQUIREMENTS SC-08.",
+   "Sum for the base after these and the check (32): 416 rules (BASE), 404 without answer stages, 414 without V5-9's two path changes only the base carries (413 without all three), 420 with dormant groups (tools/simplicity.py). Before the per-resource models: 405, 393, -, 409.",
+   "The check of this update (F1 to F12) changed: the study's healing-self 15 -> 16 (the stored placement, F1) and planner-hints 6 -> 7 (the reach check, F2); the study's meta-catalog back to 6 (F3); handback's cap reasoned, not measured, so its bases are 4 model-checked, 1 measured, 1 reasoned (F4); handback's 'only to a voter' counted once, out of raft-leader-transfer's high (7 -> 6) and learners' (4 -> 3), and the library's in the 8 rows on raft-rs or etcd raft (F5); route-smart 1 in the base (F6); bulk-rate-cap in every row with bulk work (F7); stale decisions marked superseded and two rows_notes renumbered (F10); and the tool takes a row_minus off the basis the record names (row_minus_basis, F12)."
   ]
  },
  "calibration": [
@@ -3335,6 +3463,11 @@
   "Not changed, flagged for the re-rank: V4 carries no dir-lease although v4 has the dir lock (V4-59, 12 of dir-lease's rules), and SLOG carries neither journal nor wal-per-group although its log nodes and metadata group keep disks; both come from the closure tool's carries rule, not from a count.",
   "Kept as counted after a side-by-side check (no grain change): the Raft core 65 (spec guards, the same grain as raft-config), the Kafka ISR family 34 and the BookKeeper family 36 (spec guards), the v4 kernel (code, matched to E-14b), dir-lease 18 (each rule a red V4-59 mutation or a stated v5 rule), two-phase-commit 28 (E-24's grain, program order included, as the saga's 38), and the reasoned small records (policies, credits, budgets) whose stated bars (SC-03, SC-04, F-19, SC-11) are properties at this grain.",
   "Base: checked base.json against V5-1 to V5-6, VERDICT 11.7 and the catalogue; its choices hold (per-group healing by each group's leader, the home leader moving slots, soft directory, #meta records moved to each resource's home log, ack-stages in, memory rung out, dormant groups as a variant). Added decision lines for ack-stages and issue-order fairness, presence-rows' row_minus, and the calibrated sum.",
-  "After the skeptic check (findings F1-F14, all applied): see base.decisions' last line, and each changed record's 'CHECKED:' note."
+  "After the skeptic check (findings F1-F14, all applied): see base.decisions' last line, and each changed record's 'CHECKED:' note.",
+  "After the per-resource models (2026-11-14; E-51, E-52, E-53, and V5-9's three): see base.decisions 27 to 31 (counted from 0), and each changed record's CHECKED note. The grain stays the records' own: one numbered rule counts one, as the reasoned records and E-33's genesis count, and each model's DEV-10 count (a guard conjunct or update each) is in the record's notes. healing-self@per-resource takes its DEV-10 count less promote.caught (21) as its high, since its study twins (healing-self, controller-commands) are E-16's DEV-10 counts; the other records' twins are reasoned at the record grain, so their highs stay there.",
+  "A finding goes to every row whose record holds the same rule for the same reason, needed or not needed, so pairs of a '@per-resource' record and its study record keep their difference: genesis-conditional-create (+2: the candidate on disk is not the base's alone, since E-51 locates the gap in E-33's own merged step, which the project's founding shares), meta-directory (-2), planner-hints (+2: three new, less stale-plan; the reach check stays, since the study's healing has no candidate check), healing-self (+2: 'answers now', and the stored placement, which the study's place hints need as the base's do), controller-hints (+1), and the new handback (+6 in every Raft row, +5 in ISR, SLOG and OBJ). meta-catalog keeps its seed mark (6): in the #meta rows the record and the seed are in two logs, so E-51's reason does not carry over. Each transfer is marked reasoned; the base's own records are model-checked.",
+  "A new basis label, 'measured': an experiment ran the design on real code with and without the rule, and without it a stated property broke in the runs (E-53). It is weaker than model-checked (runs, not every state) and stronger than reasoned. Only handback's rule 4 carries it; its rule 3, the cap, is the design's (V5-7), so reasoned.",
+  "Judgements, each said in its record: ISR, SLOG and OBJ carry handback less its quiet-group rule, since their controller must spread leaders or writers back after a failover as the Raft rows' leaders do, though their design text does not say so (reasoned; without it SLOG would have 5 fewer rules). promote.caught is counted once, in learners. The cap per taker in the push form (E-53: about +3 to +4, reasoned) is in handback's high, not its count.",
+  "After a check of that update (findings F1 to F12, all applied; base.decisions' last line): the transfers in 34 now include the stored placement (healing-self), the reach check (planner-hints) and the seed mark (meta-catalog), as said there; handback is 4 model-checked, 1 measured and 1 reasoned, its voter rule is counted once (out of raft-leader-transfer's and learners' highs) and is the library's in the 8 rows on raft-rs or etcd raft; route-smart is 1 in the base (soft-directory rule 9 already relearns leaders and the slot table); and bulk-rate-cap, which carries SC-08 (c) and (f), is in every row with bulk work fero writes (+1 in 30 judged rows), not the base alone. tools/simplicity.py takes a row_minus off the basis a record names (row_minus_basis), so ISR, SLOG and OBJ lose handback's measured rule, not a model-checked one."
  ]
 }

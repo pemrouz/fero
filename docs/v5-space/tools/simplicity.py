@@ -9,16 +9,22 @@ Run from docs/v5-space. Standard library only, no network, deterministic.
 
 The counts are judging/simplicity.json ('mechanisms'). A row's mechanisms come from tools/closure.py: the 20 study
 rows' options are in judging/closure/axes.json, the 11 closure rows' in judging/closure/hybrids/cards.json, and a row
-carries a mechanism when closure.py's carries() says so. The owner's base is added in three lines:
+carries a mechanism when closure.py's carries() says so. The owner's base is added in four lines:
   BASE          simplicity.json's base 'mechanisms' (no dormant groups)
   BASE+dormant  its 'with_dormant' list (dormant groups for SC-13's 100,000 resources)
   BASE-ack      BASE without ack-stages, which no study row priced (V5-5 builds answer stages second)
+  BASE-paths    BASE without V5-9's two path changes only the base carries (route-smart, batch-checksum); the
+                third, bulk-rate-cap, every row with bulk work carries (CARRIES)
 
-A row's rules: each carried mechanism's count, less its row_minus for that row ('BASE' for the three base lines).
-controller-hints rides with controller-commands (RIDES). In 'diff' and the footer, a '@per-resource' record and its
-study record (and slow-leader-self and slow-leader-controller) hold the same rules, so they cancel (SAME).
-low and high add the records' low and high the same way. Who owns each rule: the record's owner, or its
-owner_by_row for that row, or its owner_split. issue-order (3) and timeline-merge (2) are in no line (see the footer).
+A row's rules: each carried mechanism's count, less its row_minus for that row ('BASE' for the four base lines).
+Three records this tool carries itself, since closure's catalogue has none: controller-hints rides with
+controller-commands (RIDES); handback is carried by every row with a leader or writer per group that a failover
+moves, and bulk-rate-cap by every row with bulk work that fero writes (CARRIES, in closure's own condition form).
+In 'diff' and the footer, a '@per-resource' record and its study record (and slow-leader-self and
+slow-leader-controller) hold the same rules, so they cancel (SAME). low and high add the records' low and high the
+same way. Who owns each rule: the record's owner, or its owner_by_row for that row, or its owner_split_by_row for
+that row, or its owner_split. By basis: the record's basis_split, less its row_minus on the basis its row_minus_basis
+names. issue-order (3) and timeline-merge (2) are in no line (see the footer).
 
 Rule 3's numbers sit beside each row, as closure.py scores them: novel mechanisms and interacting pairs (DEV-01 and
 DEV-02, Model.score), and SHOULDs met. The frame is the owner's (VERDICT 11.6): the clauses restated, DATA-01's loose
@@ -36,21 +42,34 @@ import closure as C  # noqa: E402
 
 DATA = os.path.join(ROOT, 'judging', 'simplicity.json')
 OWNERS = ('fero', 'library', 'outside')
-BASE_LINES = ('BASE', 'BASE+dormant', 'BASE-ack')
+BASE_LINES = ('BASE', 'BASE+dormant', 'BASE-ack', 'BASE-paths')
 # The base's option vector: the closure tool's MIN row with Z par and C self (simplicity.json base.decisions[0]).
 BASE_VEC = ('MIN', {'Z': 'par', 'C': 'self'})
 # What the owner's decisions swap in that vector's carried list (base.decisions): records that move from #meta or the
-# project to each resource's home log, the dormant groups kept as a variant, and the two new records.
+# project to each resource's home log, the dormant groups kept as a variant, and the new records: V5-3's soft
+# directory, V5-5's answer stages, and the two of V5-9's path changes only the base carries (PATHS 7.1: direct
+# routing as the catalogue's route-smart, and one checksum per batch). V5-9's third, a byte-rate cap on bulk work, is
+# carried by CARRIES, since SC-08 (c) and (f) owe it in every row with bulk work.
 BASE_SWAPS = {'meta-members': 'meta-members@per-resource', 'meta-catalog': 'meta-catalog@per-resource',
               'meta-directory': 'meta-directory@per-resource', 'healing-self': 'healing-self@per-resource',
               'planner-hints': 'planner-hints@per-resource',
               'genesis-conditional-create': 'genesis-conditional-create@per-resource',
               'cluster-version': 'cluster-version@per-resource', 'cluster-credentials': 'cluster-credentials@per-resource'}
-BASE_ADDS = ('soft-directory', 'ack-stages')
+BASE_PATHS = ('route-smart', 'batch-checksum')
+BASE_ADDS = ('soft-directory', 'ack-stages') + BASE_PATHS
 BASE_VARIANT = 'dormant-groups'
 # Records the closure catalogue folds into another and this tool carries beside it: controller-hints is DEP-17's hint
 # path at a controller (RM-05 calls the hints inputs to the controller's loop), carried wherever controller-commands is.
 RIDES = {'controller-hints': 'controller-commands'}
+# Records the closure catalogue lacks, carried by a condition in closure's own form (a list of option maps, any of
+# which matches): the hand-back after settle.ms (DESIGN-V5 4.2 'Leaders spread'; E-52, E-53), in every row with a
+# leader or writer per group that a failover moves. In the self rows each group's leader hands back; in the controller
+# rows the controller balances leaders, or in ISR, SLOG and OBJ its leaders or writers, with the same rules (less the
+# quiet-group rule there: the record's row_minus). And V5-9's byte-rate cap on bulk work (PATHS 7.1, PA-6), which
+# carries SC-08 (c) and (f), MUSTs for every row: in every row with bulk catch-up, snapshot installs or slot moves that
+# fero writes (every R but BUY's outside log, whose catch-up is JetStream's own).
+CARRIES = {'handback': ({'R': ['raft', 'rlog', 'isr', 'slog', 'obj']},),
+           'bulk-rate-cap': ({'R': ['raft', 'rlog', 'isr', 'slog', 'obj', 'lww']},)}
 # Records that hold the same rules under another key (simplicity.json says so in each one's notes): every
 # '@per-resource' record and its study record, and the slow-leader rule in its two forms. interval() counts their
 # shared rules once: a pair in the two rows cancels to the fixed difference of its mid counts.
@@ -65,7 +84,8 @@ AREAS = (
                    'leader-epoch eligible-leaders obj-log obj-manifest obj-writer-lease outside-log'),
     ('v4 kernel', 'v4-lanes v4-stamps v4-digests v4-tombstones v4-frontiers v4-orphans v4-sheds v4-latches v4-teachers '
                   'v4-floors v4-feed-words v4-views v4-ring v4-confirm-ladder'),
-    ('many groups', 'link-pings quiet-groups dormant-groups slow-leader-controller slow-leader-self project-groups'),
+    ('many groups', 'link-pings quiet-groups handback dormant-groups slow-leader-controller slow-leader-self '
+                    'project-groups'),
     ('control', 'meta-members meta-catalog meta-directory healing-self controller-commands controller-hints planner-hints '
                 'controller-sessions soft-directory genesis-conditional-create genesis-init cluster-version '
                 'cluster-credentials'),
@@ -76,7 +96,7 @@ AREAS = (
     ('time', 'writer-time timestamp-oracle timeline-merge'),
     ('transactions', 'lock-rows fence-tokens saga-intents two-phase-commit mvcc ktxn-coordinator ktxn-markers'),
     ('storage', 'memory-rung none-rung journal wal-per-group lsm-store tier restore-mark dir-lease disk-incarnation '
-                'par-repair'),
+                'par-repair batch-checksum bulk-rate-cap'),
     ('reads', 'fold-all fold-leader fold-lazy fold-version subscribe read-lease closed-timestamps'),
     ('platform', 'worker-map side-seam leader-calls tenant-budget consumer-groups presence-rows queue-claims forks '
                  'input-recorder'),
@@ -108,20 +128,27 @@ def base_vec(ax):
     return v
 
 
+def carried(cm, vec):
+    """The keys a row with this option vector carries: closure's catalogue, then RIDES and CARRIES."""
+    ks = [e['key'] for e in cm if C.carries(e, vec)]
+    ks += [k for k, host in RIDES.items() if host in ks]
+    return ks + [k for k, when in CARRIES.items() if C.carries({'when': when}, vec)]
+
+
 def rows(S):
     """name -> (option vector or None, carried mechanism keys), in a fixed order: 20 study rows, 11 closure rows, base."""
     ax = C.axes()
     cm = C.mech()['mechanisms']
     out = {}
     for nm, vec in C.all_rows(ax).items():
-        ks = [e['key'] for e in cm if C.carries(e, vec)]
-        out[nm] = (vec, ks + [k for k, host in RIDES.items() if host in ks])
+        out[nm] = (vec, carried(cm, vec))
     b = S['base']
     out['BASE'] = (None, list(b['mechanisms']))
     out['BASE+dormant'] = (None, list(b['with_dormant']))
     out['BASE-ack'] = (None, [k for k in b['mechanisms'] if k != 'ack-stages'])
+    out['BASE-paths'] = (None, [k for k in b['mechanisms'] if k not in BASE_PATHS])
     # The base list must be its vector's carried list with the decisions' swaps (a guard against drift).
-    approx = [e['key'] for e in cm if C.carries(e, base_vec(ax))]
+    approx = carried(cm, base_vec(ax))
     want = [BASE_SWAPS.get(k, k) for k in approx if k != BASE_VARIANT] + list(BASE_ADDS)
     if sorted(want) != sorted(b['mechanisms']):
         raise SystemExit('simplicity.json base.mechanisms is not MIN (Z par, C self) with the decisions\' swaps: %s'
@@ -134,6 +161,14 @@ def rows(S):
     missing = sorted({k for _, ks in out.values() for k in ks if k not in S['mechanisms']})
     if missing:
         raise SystemExit('no count in simplicity.json for: %s' % ', '.join(missing))
+    # A row_minus_basis must name as many rules as each row_minus takes, and an owner split as many as the count.
+    for k, m in S['mechanisms'].items():
+        rmb = m.get('row_minus_basis')
+        if rmb and any(sum(rmb.values()) != n for n in (m.get('row_minus') or {}).values()):
+            raise SystemExit('%s: row_minus_basis does not match its row_minus' % k)
+        for nm, sp in (m.get('owner_split_by_row') or {}).items():
+            if sum(sp.values()) != m['count'] or set(sp) - set(OWNERS):
+                raise SystemExit('%s: owner_split_by_row for %s does not sum to its count' % (k, nm))
     return out
 
 
@@ -151,8 +186,9 @@ def items(S, row, keys):
         n, lo, hi = m['count'] - mi, max(0, m['low'] - mi), max(0, m['high'] - mi)
         who = (m.get('owner_by_row') or {}).get(rk, m['owner'])
         own = dict.fromkeys(OWNERS, 0)
-        if m.get('owner_split'):
-            for o, c in m['owner_split'].items():
+        split = (m.get('owner_split_by_row') or {}).get(rk) or m.get('owner_split')
+        if split:
+            for o, c in split.items():
                 own[o] += c
             own[m['owner']] -= mi
             who = '/'.join('%s %d' % (o, own[o]) for o in OWNERS if own[o])
@@ -163,13 +199,16 @@ def items(S, row, keys):
 
 
 def basis_of(S, i):
-    """One carried record's rules in this row by basis: its basis_split where its rules mix bases (a row_minus comes
-    off the record's own basis), else all on its basis."""
-    split = S['mechanisms'][i['key']].get('basis_split')
+    """One carried record's rules in this row by basis: its basis_split where its rules mix bases, else all on its
+    basis. A row_minus comes off the basis the record's row_minus_basis names, else off the record's own basis."""
+    m = S['mechanisms'][i['key']]
+    split = m.get('basis_split')
     if not split:
         return {i['basis']: i['n']}
     out = dict(split)
-    out[i['basis']] = out.get(i['basis'], 0) - i['minus']
+    if i['minus']:
+        for b, c in (m.get('row_minus_basis') or {i['basis']: i['minus']}).items():
+            out[b] = out.get(b, 0) - c
     return out
 
 
@@ -284,8 +323,9 @@ def cmd_rank(S, R, strict):
     print()
     b = r3['BASE']
     say('~ The base is no judged row. Its rule-3 numbers are those of its option vector (MIN with Z par and C self), '
-        'predicted by closure.py with %d guessed cell%s (%s). The per-resource records, the soft directory and ack '
-        'stages are not in its catalogue. Its "in" and r3 are where it would fall among the judged rows in.' % (
+        'predicted by closure.py with %d guessed cell%s (%s). The per-resource records, the soft directory, ack '
+        'stages and V5-9\'s path changes are not among the mechanisms closure.py gives that vector. Its "in" and r3 '
+        'are where it would fall among the judged rows in.' % (
             len(b['guessed']), '' if len(b['guessed']) == 1 else 's', ', '.join(b['guessed']) or 'none'))
     # The order at the bounds: every record at its low count, or every record at its high count.
     print()
