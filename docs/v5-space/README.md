@@ -8,9 +8,9 @@ Start here. This folder asks one question: which design should fero v5 be? The s
 
 ### The answer
 
-**Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** ([VERDICT 0](VERDICT.md#0-the-answer)). [API.md](API.md) is its API as first built, and [LAYERS.md](LAYERS.md) its layers.
+**Aim for COMP2: build MIN-P+par's shape first, and add the `memory` rung only if it passes its kill test** ([VERDICT 0](VERDICT.md#0-the-answer)). (API.md and LAYERS.md described COMP2 until 2026-11-16; they now describe the owner's chosen design, and git history keeps COMP2's.)
 
-> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. Second come answer stages per call: every write still commits on disk, and only its own caller may hear earlier that it was received or replicated ([E-48](experiments/E48-ack-stages/README.md)). A `memory` option comes third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. **The owner then chose the log-first shape instead**, judged by simplicity: each resource is its own cluster whose truth is its log, with MIN's row as the base ([VERDICT 11.7](VERDICT.md#117-the-owners-design-decisions-2026-11-12), [DECISIONS V5-1 to V5-6](../DECISIONS.md)). By that measure, with its per-resource pieces model-checked, the base has 416 rules, 23rd of the 24 rows that fail no MUST, and more than MIN-P's plain family at every bound; each rule of that gap comes from one of the owner's choices ([SIMPLICITY.md](SIMPLICITY.md), section 8). The rest of Part 1 still reads on VERDICT's own frame.
+> **After the owner's answers (2026-11-12).** The owner chose the loose DATA-01 reading and accepts a named test line as a loss when the trade buys something real. On that frame the arithmetic picks **TiKV-persisted**: TiKV's shape with only the `persisted` rung (0 / 5 / 233), with MIN-P+par as the fallback. Second come answer stages per call: every write still commits on disk, and only its own caller may hear earlier that it was received or replicated ([E-48](experiments/E48-ack-stages/README.md)). A `memory` option comes third, only for a timed need answer stages cannot meet ([MEMORY.md](MEMORY.md)). [VERDICT 11.6](VERDICT.md#116-the-owners-answers-2026-11-12) has the detail. **The owner then chose the log-first shape instead**, judged by simplicity: each resource is its own cluster whose truth is its log, with MIN's row as the base ([VERDICT 11.7](VERDICT.md#117-the-owners-design-decisions-2026-11-12), [DECISIONS V5-1 to V5-6](../DECISIONS.md)). By that measure, with its per-resource pieces model-checked, the base has 416 rules, 23rd of the 24 rows that fail no MUST, and more than MIN-P's plain family at every bound; each rule of that gap comes from one of the owner's choices ([SIMPLICITY.md](SIMPLICITY.md), section 8). [API.md](API.md) and [LAYERS.md](LAYERS.md) are rewritten for this design, and [API-TOUR.md](API-TOUR.md) walks the owner through the API's choices and open questions. The rest of Part 1 still reads on VERDICT's own frame.
 
 - **COMP2 in short.** Raft groups owned by the project hold fixed slots of many resources. One loop on `#meta`'s leader heals replicas and moves slots. `data` folds the rows on every full replica. (A **group** is one Raft log with one leader. A **slot** is a fixed share of a resource's keys. `#meta` is the project's own system group. To **fold** is to turn the log's change records into rows.)
 - **MIN-P+par is COMP2 without the `memory` rung.** A **rung** is what a commit means: `persisted` is on disk at a majority, `memory` is in memory at a majority. So the first build always commits to disk.
@@ -69,7 +69,7 @@ The **kill table** ([VERDICT 9](VERDICT.md#9-the-next-step)) lists the results t
 
 ## Part 2: every file, in reading order
 
-Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer), the [COMP2 report](candidates/COMP2.md) and [API.md](API.md).
+Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer) and the [COMP2 report](candidates/COMP2.md) for the study's own pick; for the design the owner chose, [VERDICT 11.7](VERDICT.md#117-the-owners-design-decisions-2026-11-12) and [API-TOUR.md](API-TOUR.md).
 
 | # | File | What it is | When to read it |
 |---|---|---|---|
@@ -81,15 +81,16 @@ Short on time? Read Part 1, then [VERDICT 0](VERDICT.md#0-the-answer), the [COMP
 | 6 | [AMENDMENTS.md](AMENDMENTS.md) | what the evidence changed in the map: fixes (A-nn), the 19 rows as amended, the composite row COMP, crossings (K-nn) and gaps (G-nn) | when a report cites A-nn, K-nn or G-nn |
 | 7 | [MECHANISMS.md](MECHANISMS.md) | the mechanism catalogue: two blind counts of novel mechanisms (DEV-01) and the interacting pairs (DEV-02); its section 2 counts predate the re-rulings RM-01 to RM-08 | when a mechanism count matters |
 | 8 | [VERDICT.md](VERDICT.md) | the answer, the arithmetic, the search, how sure, what the user must confirm, the next step, and the skeptics | after Part 1, for the full case |
-| 9 | [API.md](API.md) | the public API of COMP2 as first built: every declaration, error and config key, and the code for every pattern | to see what an app developer writes |
-| 10 | [LAYERS.md](LAYERS.md) | what each layer, L0 to L5, keeps, does and still owes, with walk-throughs | to see how the design works inside |
-| 11 | [MEMORY.md](MEMORY.md) | whether to offer a `memory` option on TiKV's shape: what it buys, what a lost tail breaks, the forms, the rules and the API | after the owner's answers, to see the speed trade |
-| 12 | [SIMPLICITY.md](SIMPLICITY.md) | the rows re-ranked by every rule a builder must get right, borrowed or not (V5-6): where the owner's base lands, and how sure the count is | after DECISIONS V5-1 to V5-6, to see what each design costs in rules |
-| 13 | [PATHS.md](PATHS.md) | every path of the chosen design stepped through (writes, reads and flow, upkeep, and the costs every op pays): each step's work, whether it is needed, the least work any correct design must do, and what would close the gap, design or build | before building, to see where the time and bytes go |
-| 14 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
-| 15 | [experiments/](#experiments) | 64 experiment folders, listed below | to check a measurement or a model |
-| 16 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
-| 17 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
+| 9 | [API.md](API.md) | the public API of the chosen design (V5-1 to V5-11): every declaration, error and config key, the cost of every call, and the code for every pattern; it type-checks | to see what an app developer writes |
+| 10 | [API-TOUR.md](API-TOUR.md) | a walk through API.md for the owner: the choices that matter, each with before, why and cost, and the questions to settle | before API.md, to review the API |
+| 11 | [LAYERS.md](LAYERS.md) | what each layer of the chosen design, L0 to L5, keeps, does, counts in rules and still owes, with nine walk-throughs | to see how the design works inside |
+| 12 | [MEMORY.md](MEMORY.md) | whether to offer a `memory` option on TiKV's shape: what it buys, what a lost tail breaks, the forms, the rules and the API | after the owner's answers, to see the speed trade |
+| 13 | [SIMPLICITY.md](SIMPLICITY.md) | the rows re-ranked by every rule a builder must get right, borrowed or not (V5-6): where the owner's base lands, and how sure the count is | after DECISIONS V5-1 to V5-6, to see what each design costs in rules |
+| 14 | [PATHS.md](PATHS.md) | every path of the chosen design stepped through (writes, reads and flow, upkeep, and the costs every op pays): each step's work, whether it is needed, the least work any correct design must do, and what would close the gap, design or build | before building, to see where the time and bytes go |
+| 15 | [candidates/](candidates/README.md) | one report per judged row (28 reports for 31 rows), an index, and the `repro` script | to see why any row won or lost |
+| 16 | [experiments/](#experiments) | 64 experiment folders, listed below | to check a measurement or a model |
+| 17 | [judging/](#judging) | the judges' files, the referee's rulings and the arithmetic, listed below | to check a cell or a count |
+| 18 | [tools/](#tools) | the scripts that build every output, listed below | to rebuild a number |
 
 ### experiments/
 

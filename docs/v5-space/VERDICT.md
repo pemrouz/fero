@@ -1051,7 +1051,7 @@ Settle the readings, and write the models COMP2 rests on. Then build the thinnes
 | 3 | D `keys` keeps F-02 beside fence tokens and fits DEP-13; or `rampv` holds read atomicity with one novel mechanism; or `vsr` costs fewer pairs | as the critic prices them | COMP2 with D `keys` (8 to 10 fewer pairs), with `rampv` (one more SHOULD) or with `vsr` (up to 10 fewer pairs), after a judging pass of their unjudged cells and a two-counter novelty ruling |
 | 4 | the whole-resource cursor at 4,096 slots | ≤ Q-19's 8 KB (E-18 reasons about 32 KB) | fall back to 1,024 slots: 72 effective writers, still above 64 |
 | 6a | p99 commit on the real kernel at 50,000 writes a second | ≤ C + 5 ms = 5.73 ms (TS) | over it, P-01 and PERF-08 fail in TS |
-| 6a, with L2 on the main thread | E-07's 5 s main-thread stall, rerun with writes judged on `data`'s rows on the main thread, as the design rule reads (section 11.5; [LAYERS.md section 10](LAYERS.md#10-this-pages-own-readings), item 1) | writes keep going (F-14's test), and commit p99 stays ≤ 5.73 ms | if writes stop, F-14 fails for COMP2 on the strict reading, and for every row that judges writes on `data`'s rows. Two ways back, both untested: a referee ruling that lets the worker judge against its checked copy (RR-17 as written does not), or a watchdog that hands a stalled server's leaderships to a peer |
+| 6a, with L2 on the main thread | E-07's 5 s main-thread stall, rerun with writes judged on `data`'s rows on the main thread, as the design rule reads (section 11.5; [LAYERS.md section 10](LAYERS.md#10-this-pages-readings-and-what-the-records-leave-unclear), item 1) | writes keep going (F-14's test), and commit p99 stays ≤ 5.73 ms | if writes stop, F-14 fails for COMP2 on the strict reading, and for every row that judges writes on `data`'s rows. Two ways back, both untested: a referee ruling that lets the worker judge against its checked copy (RR-17 as written does not), or a watchdog that hands a stalled server's leaderships to a peer |
 | 6c | memtier SET, matched | about 92,000 persisted SETs a second at 200 connections with p99 under 4.9 ms ([E-09a2]) | below it, PERF-02 fails |
 | 6d | etcd one-client put | p99 under 1.73 ms ([E-09e]) | over it in TS and native, PERF-07 fails |
 | 6e | Redpanda, matched | a TS build keeps at least 62 % of E-02's protocol-free ceiling ([E-09d]) | below it in TS and native, PERF-06 fails |
@@ -1274,7 +1274,9 @@ After 11.6, the owner set the arithmetic's pick aside and chose by judgement. Th
 
 **The answer-stage rulings** are settled ([DECISIONS V5-11](../DECISIONS.md)): an early answer reports how far a write got and never stands in for its commit.
 
-**Next, all without code:** API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
+**API.md and LAYERS.md redone** (2026-11-16). Both now describe this design. [LAYERS.md](LAYERS.md) gives each layer's rules (416, split L0 78, L1 183, L2 72, L3 33, L5 50), nine walk-throughs, and what is owed before the first build slice; writing it found gaps the records leave, chief among them that no counted rule grows a group from one voter to three, though every founding needs it. [API.md](API.md) was made from three independent drafts (keep v4, guess first, show the cost) and a skeptic's 31 findings; its 36 code blocks type-check. [API-TOUR.md](API-TOUR.md) walks the owner through it.
+
+**Next, all without code:** the owner's review of the API; then the decisions in LAYERS section 11 (which thread judges writes, the hand-back's form, growth from one voter, whether the first slice has a slot move, DEP-04 on a cold wake).
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md
