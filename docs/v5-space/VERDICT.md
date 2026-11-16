@@ -1272,7 +1272,9 @@ After 11.6, the owner set the arithmetic's pick aside and chose by judgement. Th
 
 **The per-resource models** ([E-51](experiments/E51-resource-founding/README.md), [E-52](experiments/E52-resource-healing/README.md), [E-53](experiments/E53-handback-pace/README.md), 2026-11-14; [DECISIONS V5-10](../DECISIONS.md)). Founding, finding and healing a resource that is its own cluster hold every stated property at every bound once nine fixes enter the design's text. The capped hand-back evens leaders in 0.1 to 15 s on real Raft code, against minutes at ten a second, and takes one rule; its default is 8 transfers in flight, busiest first. Counted from the models ([SIMPLICITY 8](SIMPLICITY.md)), the base has 416 rules, 23rd of the 24 rows in; DRAFT (419) and SPLIT (426) have more, and MIN-P's family stays the simplest.
 
-**Next, all without code:** the three ack rulings (MEMORY 9.7); API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
+**The answer-stage rulings** are settled ([DECISIONS V5-11](../DECISIONS.md)): an early answer reports how far a write got and never stands in for its commit.
+
+**Next, all without code:** API.md and LAYERS.md, which describe COMP2's shape, redone for this one (the owner will review the API).
 
 [E-47]: experiments/E47-memory-rung/README.md
 [E-48]: experiments/E48-ack-stages/README.md

@@ -3093,3 +3093,21 @@ Decision: The design takes the nine fixes the models found. From E-51: (1) an op
 REJECTED: V5-7's "no rule is added" (E-53: without the rule a stalled transfer holds its slot for good, in 10 of 10 runs at the taker, and at the giver a quiet group never aborts it). A cap of 32 or 128 (under a second faster up to 10,000 resources per process, at 2 to 26 times the cost to writes).
 
 Consequences: SIMPLICITY section 8 counts the per-resource records from the models, at the records' grain, and gives the hand-back (6 rules) and the byte-rate cap (1) to every row that has them. The base has 416 rules, 23rd of the 24 rows that fail no MUST; DRAFT (419) and SPLIT (426) have more, and the order against DRAFT is not sure; MIN-P's family stays the simplest. DESIGN-V5's text, and API.md and LAYERS.md when they are redone for this shape, carry the nine fixes.
+
+## V5-11 — Answer stages are progress reports: the eight rulings of MEMORY 9.7 (2026-11-16; recommended under the owner's delegation, approved)
+
+Context: V5-5 put answer stages per call (`received`, `replicated`, then `committed`) second, with every write committing on disk at a majority. MEMORY 9.7 listed eight rulings they need. One principle settles all of them: an early answer reports how far a write got, and never stands in for its commit.
+
+Decision:
+1. **A rung is what a commit means** (R-a), not what the writer's "ok" means. Answer stages add no rung and are not fero's "matching rung" for PERF-01's lines. A benchmark line is won at the commit, or by the `memory` rung (V5-5's third step) where a timed need calls for it. A gateway's JetStream PubAck waits for the commit and carries the true sequence number; no provisional number is ever sent.
+2. **F-01's "acknowledged" means the committed answer.** `received` and `replicated` are named weaker answers, not acknowledgements.
+3. **Read-your-writes** holds for reads that wait (E-48's rule Y). A sync read shows a write only from its committed answer; V4-7 stands (no optimistic copy).
+4. **A gateway never answers a value judged before the commit**: Redis INCR answers at commit.
+5. **`replicated` means a majority has handed the write to the operating system**: it survives any process crash, not a power loss of that majority.
+6. **Only a write that cannot be refused takes an early stage.** A write that can be refused on state (a condition, an op, a resource with `rules.write`) or that returns a value or a decision answers at commit only. So an early answer is never followed by a refusal.
+7. **A-04 and REQUIREMENTS' default line are restated** for values, decisions and refusals: each waits for the commit it was judged on. Decision 23a's cut of per-call answer timing is reversed.
+8. **S1 is part of the chosen base** (V5-5, V5-6): no study row is judged again for it, so RR-14's question about TiKV-persisted's row is moot.
+
+REJECTED: R-b (ack time alone would win lines whose rivals also show the write to readers at that point, which an early answer does not). A provisional JetStream sequence or INCR value (a result that a loss could change). Early answers on refusable writes (a "received" that later turns into a refusal is harder to reason about than the time it saves). `replicated` as all three copies (slower, and still not on disk).
+
+Consequences: Answer stages win no benchmark line; they are a latency option for writers that can use it. E-48's ack-stages record already holds rule 6 (its rule 12), so no count changes. MEMORY 9.7's rulings are closed by this record; its models stay open as listed there.

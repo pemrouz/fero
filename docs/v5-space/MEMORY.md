@@ -1036,7 +1036,8 @@ f.data.k = { n: 4 }                                       // assignment returns 
 3. **One write in flight through the gateway** (JetStream's line 5) at `received` and `replicated`.
 4. **The credit grant**: its size, and a loop that waits for each early answer at that size (9.3).
 
-**Rulings for the owner.**
+**Rulings for the owner.** Settled on 2026-11-16 by [DECISIONS V5-11](../DECISIONS.md): R-a; acknowledged means committed; read-your-writes for reads that wait, sync reads from the commit; no value or sequence before the commit; `replicated` survives a process crash; early stages only on writes that cannot be refused; A-04 restated and 23a reversed; S1 is part of the chosen base.
+
 1. **R-a or R-b** (9.3): does an answer stage count as fero's "matching rung" for PERF-02 and PERF-04? And under R-b, **may an early JetStream answer carry a sequence number that a lost write would change?** Without both, S1 wins no benchmark line.
 2. **F-01**: does "acknowledged" mean the committed answer?
 3. **Read-your-writes (P-01)** after an early answer: it holds for reads that wait (Y), and for sync reads only from the committed answer. Or a design that shows a pending own write in sync reads, which V4-7 forbids.
