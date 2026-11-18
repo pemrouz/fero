@@ -1,0 +1,24 @@
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"map","nsPerWrite":688.9,"gcMsDuring":22,"keptBPerWrite":-248.8,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-latest","nsPerWrite":2498.2,"gcMsDuring":486,"keptBPerWrite":-258.5,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-all","nsPerWrite":4937.3,"gcMsDuring":2234,"keptBPerWrite":1138.8,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"map","nsPerWrite":1296,"gcMsDuring":106,"keptBPerWrite":-252.7,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-latest","nsPerWrite":3339.1,"gcMsDuring":751,"keptBPerWrite":-293.3,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-all","nsPerWrite":4593.9,"gcMsDuring":2037,"keptBPerWrite":1316.2,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"map","nsPerWrite":614.3,"gcMsDuring":17,"keptBPerWrite":-248.8,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-latest","nsPerWrite":1948.4,"gcMsDuring":362,"keptBPerWrite":-258.5,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-all","nsPerWrite":4096.8,"gcMsDuring":1859,"keptBPerWrite":1138.8,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"map","nsPerWrite":1263.2,"gcMsDuring":118,"keptBPerWrite":-252.7,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-latest","nsPerWrite":3407.7,"gcMsDuring":754,"keptBPerWrite":-293.3,"keep":1}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-all","nsPerWrite":4648.9,"gcMsDuring":2038,"keptBPerWrite":1316.2,"keep":1}
+{"run":3,"loadavg":"1.27 0.78 0.61 1/116 16750","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 100000 map"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"map","nsPerWrite":756,"gcMsDuring":22,"keptBPerWrite":-248.8,"keep":1}
+{"run":3,"loadavg":"1.27 0.78 0.61 1/117 16763","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 100000 hamt-latest"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-latest","nsPerWrite":1844.5,"gcMsDuring":350,"keptBPerWrite":-258.5,"keep":1}
+{"run":3,"loadavg":"1.25 0.78 0.61 1/117 16775","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 100000 hamt-all"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":100000,"way":"hamt-all","nsPerWrite":4093.2,"gcMsDuring":1890,"keptBPerWrite":1138.8,"keep":1}
+{"run":3,"loadavg":"1.23 0.78 0.61 1/117 16802","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 1000000 map"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"map","nsPerWrite":1374.2,"gcMsDuring":112,"keptBPerWrite":-252.7,"keep":1}
+{"run":3,"loadavg":"1.21 0.79 0.62 1/120 16831","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 1000000 hamt-latest"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-latest","nsPerWrite":3543.4,"gcMsDuring":831,"keptBPerWrite":-293.1,"keep":1}
+{"run":3,"loadavg":"1.33 0.83 0.63 1/117 16863","cmd":"node --max-old-space-size=10240 --expose-gc --experimental-strip-types --no-warnings docs/v5-space/experiments/E54-time-travel/bench/hamtstore.mjs 1000000 hamt-all"}
+{"skeptic":"hamtstore","node":"v22.22.0","rows":1000000,"way":"hamt-all","nsPerWrite":4874.6,"gcMsDuring":2157,"keptBPerWrite":1316.1,"keep":1}
