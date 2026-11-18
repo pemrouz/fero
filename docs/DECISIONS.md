@@ -3111,3 +3111,29 @@ Decision:
 REJECTED: R-b (ack time alone would win lines whose rivals also show the write to readers at that point, which an early answer does not). A provisional JetStream sequence or INCR value (a result that a loss could change). Early answers on refusable writes (a "received" that later turns into a refusal is harder to reason about than the time it saves). `replicated` as all three copies (slower, and still not on disk).
 
 Consequences: Answer stages win no benchmark line; they are a latency option for writers that can use it. E-48's ack-stages record already holds rule 6 (its rule 12), so no count changes. MEMORY 9.7's rulings are closed by this record; its models stay open as listed there.
+
+## V5-12 — The connect lens: a path is an address; reads, live links, methods and server work hang off it (2026-11-18; LENS.md section 7's fourteen picks, recommended to the owner, who approved them all)
+
+Context: The owner's review of API.md (2026-11-16) asked for the lens they had explored before data's rewrite: `resource.a.b.c` builds an address, `connect()` pipes the current state and then the changes to a target, weak references tie a link's life to its target, calls are a space apart from keys, operators before and after the call split server work from local work, and `r.a.b.c.method()` runs at that path's leader. LENS.md took three independent proposals and one facts brief, picked one shape, and had it built small on data 63fea66 (E-55) and reviewed (24 findings, each applied). E-54 measured time travel. Of E-55's 27 claims, 10 pass, 10 pass in part, sit at their bar or are stand-ins, 1 misses (a `Proxy` step at 162-222 ns, median 205, with keys spread over 1e6 rows, bar 150), 3 are records and 3 were not run.
+
+Decision: LENS.md section 7's picks, all of them.
+1. A bare `fero('shop')` holds nothing until `here()` or `tap`. `hold: 'all'` stays an option; a size is a cache of pictures that is not subscribed.
+2. The wire sends whole partitions in the first build. Work pushed below a partition (class B) is in the grammar and waits for a cap on shapes, the modelled `view` selector and the order channel.
+3. A method on a path is `lens.sell(1)`, with fero's names winning and `lens.call('name', arg)` as the way out; `f.methods.x(arg)` calls at the root.
+4. `{ before }` goes for `depth: 1 | 2`: the first key is always the partition. The partition function stays, built later. V5-2's "a prefix" reads "the first key".
+5. A client may not make up server work over a whole resource. Server views are named in `methods:` (V4-5), with a cap on live served views per client and per resource (`too-many-views`).
+6. Typed code writes with `set`; plain assignment stays for untyped handles.
+7. The mark is a write option, `{ from: e }`, read back with `marks()`.
+8. Time travel is `lens.asOf(position)` on a reader only: no version structure in data, no prior value in the log.
+9. data's changes start now, in TypeScript: D1 (path subscriptions through a keyed index) and D2 (the uncached, callable lens) first, then D3 (two-level stores) and D4 (one sink shape). Rust stays for L0 and L1.
+10. The lens stays a full lens, not only an address. Claim 1's one missed cell is the case LENS 2.1 sends to `at()`; claim 8 measures the keyed index, which `at()` needs too.
+11. A read is `await lens.get()`. A lens is never a promise (no `then`), and seven probe names read as `undefined`.
+12. fero gets a browser build in which a server role throws, later, beside `import type` and a type check before bundling.
+13. A method is callable at the root only unless it declares `{ at: 'row' | 'partition' | 'any', run }`; the server refuses any other path with `bad-path`.
+14. API.md, API-TOUR.md and LAYERS.md are rewritten around the lens now; what is still owed is built next.
+
+With the review's rules: a read is served here only from rows held on purpose, and a GET carries the highest position this process has seen; a `connect` function changes only its target; a marked write is never refused `backpressure` and pauses its reader instead, and the four-line derive runs in one process (`derive()` and `consumer()` are the forms shown first); rows handed to a sink are frozen; a link ends at `close()`, its scope, its target's own close (named kinds, or `closes`) or a count with a linger, and the collector is only a net. `follow`, `.open()`, `near`, `{ before }`, `f.data.set`, `hold: 'asked'`, `get`'s `hold: false`, `changes`'s `of:` and derive's `out` go.
+
+REJECTED: Keeping API.md's shape (fewest rules, but four of seven places named by four unrelated words, a follow hidden in every `get`, and `f.data.*` untyped). The collector as the way a link ends (7 ms to never in Node; Chromium collected 0 of 1,000 removed DOM nodes in 30 s, E-55). The lens as an address only (`at()`), the fallback LENS's first form named for a miss on claims 1, 8 or 14. Any plain-data operator from any client run on the server (the door, V4-5, guards compute too). A version structure on the write path (E-54: a hash-tree root per write adds 3.3-5.7 µs to a 0.8-1.4 µs fold). `await lens` with guards (an `async` helper returning the root lens downloaded 100,000 rows).
+
+Consequences: The first build gains about +12 to +18 rules on 416 (3 to 4 %, reasoned; LENS 4.4), users learn seven rules, and `asOf` adds three in a reader library. LAYERS' L4 gains its first rules of its own. Owed before the lens ships: the `view` selector in E-31's model (E-55 claim 22), the 22 patterns end to end (claim 25), a served view with its cap on the prototype (claim 27), E-30's model with marks from app code, and the pacing rule in a real client.
