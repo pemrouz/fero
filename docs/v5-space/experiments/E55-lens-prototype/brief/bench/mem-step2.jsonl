@@ -1,0 +1,2 @@
+{"bench":"mem-step2","node":"v22.22.0","rows":100000,"way":"get1","bytesPerKey":318,"s":true}
+{"bench":"mem-step2","node":"v22.22.0","rows":100000,"way":"sugar2","bytesPerKey":990,"s":true}

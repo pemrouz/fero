@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","files":["out/env.d.ts","env2.d.ts","screens.ts"]}

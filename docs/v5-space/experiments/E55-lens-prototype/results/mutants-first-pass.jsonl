@@ -1,0 +1,10 @@
+{"run":1,"loadavg":"1.11 0.80 0.52 1/115 16762","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 sim.mjs picture 300"}
+{"exp":"E-55","node":"v22.22.0","claim":7,"bench":"picture-then-changes","seeds":300,"sinks":28117,"doubled":1396,"missed":1113,"unequal":0,"propUnequal":0,"firstsNotEmpty":0,"failedSeeds":[1,2,3,4,5,6,7,8,9,10]}
+{"run":1,"loadavg":"1.10 0.80 0.52 1/113 16794","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 sim.mjs picture 300"}
+{"exp":"E-55","node":"v22.22.0","claim":7,"bench":"picture-then-changes","seeds":300,"sinks":27902,"doubled":514,"missed":392,"unequal":204,"propUnequal":0,"firstsNotEmpty":0,"failedSeeds":[1,2,3,4,5,6,7,9,10,11]}
+{"run":1,"loadavg":"1.09 0.81 0.52 1/113 16805","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 sim.mjs picture 300"}
+{"exp":"E-55","node":"v22.22.0","claim":7,"bench":"picture-then-changes","seeds":300,"sinks":28428,"doubled":0,"missed":0,"unequal":536,"propUnequal":83,"firstsNotEmpty":0,"failedSeeds":[32,112,118,130,228]}
+{"run":1,"loadavg":"1.08 0.81 0.52 1/116 16819","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 net.mjs reconnect 100"}
+{"exp":"E-55","node":"v22.22.0","claim":7,"bench":"net-reconnect","seeds":100,"steps":4441,"sinks":1205,"disconnects":418,"resumes":651,"pictures":435,"doubled":0,"missed":0,"phantom":2,"unequal":1035,"failedSeeds":[1,4,5,7,8,15,17,23,24,28]}
+{"run":1,"loadavg":"1.07 0.82 0.53 1/113 16986","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 net.mjs reconnect 100"}
+{"exp":"E-55","node":"v22.22.0","claim":7,"bench":"net-reconnect","seeds":100,"steps":4441,"sinks":1205,"disconnects":418,"resumes":587,"pictures":499,"doubled":0,"missed":0,"phantom":699,"unequal":0,"failedSeeds":[1,2,3,5,6,8,9,10,11,13]}

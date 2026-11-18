@@ -1,0 +1,54 @@
+{"run":1,"loadavg":"1.99 2.09 2.15 1/123 10390","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":1425,"p50Ms":1426,"p99Ms":1427,"why":{"collected":999},"held":true}
+{"run":1,"loadavg":"1.20 1.89 2.08 1/120 10532","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":7,"p50Ms":7,"p99Ms":8,"why":{"collected":999},"held":true}
+{"run":1,"loadavg":"0.73 1.71 2.01 1/115 10611","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy-writes","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":7,"p50Ms":7,"p99Ms":8,"why":{"collected":999},"held":true}
+{"run":1,"loadavg":"0.44 1.54 1.95 1/115 10666","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"idle","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":330,"p50Ms":330,"p99Ms":331,"why":{"collected":1000},"held":true}
+{"run":1,"loadavg":"0.34 1.41 1.89 1/118 10705","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":343,"p50Ms":344,"p99Ms":344,"why":{"collected":1000},"held":true}
+{"run":1,"loadavg":"0.20 1.28 1.83 1/115 10754","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy-writes","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":327,"p50Ms":327,"p99Ms":328,"why":{"collected":1000},"held":true}
+{"run":1,"loadavg":"0.12 1.15 1.77 1/118 10791","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs idle"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":1,"loadavg":"0.20 1.05 1.71 1/116 10892","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":1,"loadavg":"0.25 0.98 1.66 1/117 10992","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy-writes"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy-writes","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":2,"loadavg":"0.21 0.90 1.61 1/116 11110","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":1360,"p50Ms":1361,"p99Ms":1361,"why":{"collected":999},"held":true}
+{"run":2,"loadavg":"0.34 0.86 1.57 1/117 11153","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":6,"p50Ms":7,"p99Ms":7,"why":{"collected":999},"held":true}
+{"run":2,"loadavg":"0.21 0.78 1.52 1/118 11221","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy-writes","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":6,"p50Ms":7,"p99Ms":8,"why":{"collected":999},"held":true}
+{"run":2,"loadavg":"0.12 0.70 1.47 1/116 11243","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"idle","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":349,"p50Ms":349,"p99Ms":350,"why":{"collected":1000},"held":true}
+{"run":2,"loadavg":"0.07 0.64 1.42 1/116 11266","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":360,"p50Ms":361,"p99Ms":362,"why":{"collected":1000},"held":true}
+{"run":2,"loadavg":"0.04 0.57 1.38 1/116 11289","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy-writes","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":397,"p50Ms":398,"p99Ms":398,"why":{"collected":1000},"held":true}
+{"run":2,"loadavg":"0.02 0.52 1.33 1/117 11312","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs idle"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":2,"loadavg":"0.01 0.47 1.29 1/119 11397","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":2,"loadavg":"0.01 0.42 1.25 1/118 11481","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy-writes"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy-writes","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":3,"loadavg":"0.00 0.38 1.21 2/119 11567","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":1188,"p50Ms":1189,"p99Ms":1189,"why":{"collected":999},"held":true}
+{"run":3,"loadavg":"0.00 0.34 1.17 1/116 11591","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":6,"p50Ms":7,"p99Ms":8,"why":{"collected":999},"held":true}
+{"run":3,"loadavg":"0.06 0.32 1.13 1/116 11614","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural young busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"young","mode":"busy-writes","links":1000,"endedBy":{"100":999,"1000":999,"5000":999,"15000":999,"30000":999},"never30s":1,"firstMs":7,"p50Ms":8,"p99Ms":8,"why":{"collected":999},"held":true}
+{"run":3,"loadavg":"0.03 0.29 1.09 1/118 11651","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old idle"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"idle","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":388,"p50Ms":388,"p99Ms":389,"why":{"collected":1000},"held":true}
+{"run":3,"loadavg":"0.02 0.26 1.06 1/118 11675","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":341,"p50Ms":342,"p99Ms":342,"why":{"collected":1000},"held":true}
+{"run":3,"loadavg":"0.07 0.25 1.03 1/118 11699","cmd":"node --experimental-strip-types --no-warnings --max-old-space-size=12000 gc.mjs natural old busy-writes"}
+{"exp":"E-55","node":"v22.22.0","claim":13,"bench":"natural","age":"old","mode":"busy-writes","links":1000,"endedBy":{"100":1000,"1000":1000,"5000":1000,"15000":1000,"30000":1000},"never30s":0,"firstMs":334,"p50Ms":335,"p99Ms":336,"why":{"collected":1000},"held":true}
+{"run":3,"loadavg":"0.28 0.29 1.02 1/117 11723","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs idle"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"idle","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":3,"loadavg":"0.21 0.27 0.98 1/118 11809","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}
+{"run":3,"loadavg":"0.12 0.25 0.95 1/118 11892","cmd":"node docs/v5-space/experiments/E55-lens-prototype/browser/run.mjs busy-writes"}
+{"exp":"E-55","claim":13,"bench":"browser","browser":"153.0.8010.12","mode":"busy-writes","links":1000,"endedBy":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0},"never":1000,"firstMs":null,"p50Ms":null,"p99Ms":null,"why":{}}

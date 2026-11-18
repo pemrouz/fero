@@ -1,0 +1,3 @@
+{"bench":"path-step","node":"v22.22.0","rows":1000,"ns":{"lens.k.spread":470.1,"lens.k.same":259.5,"lens.k.n":547.5,"handle.k.spread":210.1,"handle.k.same":123,"handle.k.n":215.7,"map.get.spread":31.8,"idx.only":16.2},"sink":true}
+{"bench":"path-step","node":"v22.22.0","rows":100000,"ns":{"lens.k.spread":3090.5,"lens.k.same":396.9,"lens.k.n":822.2,"handle.k.spread":3207.2,"handle.k.same":132.9,"handle.k.n":215.7,"map.get.spread":267,"idx.only":40.9},"sink":true}
+{"bench":"path-step","node":"v22.22.0","rows":1000000,"ns":{"lens.k.spread":4460.8,"lens.k.same":547.2,"lens.k.n":1060.7,"handle.k.spread":4362,"handle.k.same":128.5,"handle.k.n":245,"map.get.spread":660.1,"idx.only":101},"sink":true}

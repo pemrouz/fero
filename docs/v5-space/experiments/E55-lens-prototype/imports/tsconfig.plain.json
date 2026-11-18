@@ -1,0 +1,1 @@
+{"compilerOptions":{"module":"esnext","target":"es2022","moduleResolution":"bundler","allowImportingTsExtensions":true,"noEmit":true,"strict":true,"types":[],"lib":["es2022","dom"]}}

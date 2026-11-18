@@ -1,0 +1,30 @@
+{"run":1,"loadavg":"2.57 2.28 1.36 1/122 3926","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":100000,"records":1000000,"nsPerRecord":2007.5,"keptBytesPerVersion":-20.2,"commits":1000000}
+{"run":1,"loadavg":"2.77 2.32 1.38 1/118 3948","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":100000,"records":1000000,"nsPerRecord":3836.7,"keptBytesPerVersion":102.5,"commits":1000000,"stepNs":10.042,"rowAtVersionNs":805.9,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":1,"loadavg":"2.62 2.30 1.38 1/123 4002","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":1000000,"records":1000000,"nsPerRecord":2508.7,"keptBytesPerVersion":-133.2,"commits":1000000}
+{"run":1,"loadavg":"2.69 2.32 1.40 1/124 4072","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"nsPerRecord":4151,"keptBytesPerVersion":284.7,"commits":1000000,"stepNs":9.812,"rowAtVersionNs":1104.5,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":1,"loadavg":"3.13 2.43 1.44 1/122 4158","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"hot":0.15,"nsPerRecord":3741.7,"keptBytesPerVersion":267.8,"commits":1000000,"stepNs":10.381,"rowAtVersionNs":1032.8,"hotRowVersions":150473,"hotRowAtVersionNs":142,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":2,"loadavg":"2.79 2.34 2.04 1/121 7369","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":100000,"records":1000000,"nsPerRecord":2070.2,"keptBytesPerVersion":-20.2,"commits":1000000}
+{"run":2,"loadavg":"2.79 2.34 2.04 1/120 7387","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":100000,"records":1000000,"nsPerRecord":3747.7,"keptBytesPerVersion":102.5,"commits":1000000,"stepNs":10.019,"rowAtVersionNs":924.2,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":2,"loadavg":"3.13 2.43 2.07 1/123 7413","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":1000000,"records":1000000,"nsPerRecord":2452.5,"keptBytesPerVersion":-133.2,"commits":1000000}
+{"run":2,"loadavg":"3.28 2.47 2.09 1/123 7443","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"nsPerRecord":4411.6,"keptBytesPerVersion":284.7,"commits":1000000,"stepNs":10.25,"rowAtVersionNs":1371.9,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":2,"loadavg":"3.16 2.48 2.10 1/120 7483","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"hot":0.15,"nsPerRecord":3931.9,"keptBytesPerVersion":267.8,"commits":1000000,"stepNs":11.887,"rowAtVersionNs":1295.9,"hotRowVersions":150473,"hotRowAtVersionNs":210.6,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":3,"loadavg":"2.00 2.11 2.16 1/123 10217","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":100000,"records":1000000,"nsPerRecord":1843.4,"keptBytesPerVersion":-20.2,"commits":1000000}
+{"run":3,"loadavg":"2.00 2.11 2.16 1/126 10238","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 100000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":100000,"records":1000000,"nsPerRecord":3575.9,"keptBytesPerVersion":102.5,"commits":1000000,"stepNs":10.633,"rowAtVersionNs":611.7,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":3,"loadavg":"1.92 2.09 2.15 1/127 10263","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 base"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"base","rows":1000000,"records":1000000,"nsPerRecord":2511.9,"keptBytesPerVersion":-133.2,"commits":1000000}
+{"run":3,"loadavg":"2.07 2.12 2.16 1/123 10285","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"nsPerRecord":4377.6,"keptBytesPerVersion":284.7,"commits":1000000,"stepNs":9.716,"rowAtVersionNs":1093,"checks":{"checked":560,"wrong":0},"sink":true}
+{"run":3,"loadavg":"1.83 2.07 2.14 1/124 10331","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 asof.mjs 1000000 fat"}
+{"exp":"E-55","node":"v22.22.0","claim":23,"bench":"asof","mode":"fat","rows":1000000,"records":1000000,"hot":0.15,"nsPerRecord":3806.4,"keptBytesPerVersion":267.8,"commits":1000000,"stepNs":10.592,"rowAtVersionNs":1113.4,"hotRowVersions":150473,"hotRowAtVersionNs":159.9,"checks":{"checked":560,"wrong":0},"sink":true}

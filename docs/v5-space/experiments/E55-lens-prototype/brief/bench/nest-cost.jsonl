@@ -1,0 +1,3 @@
+{"bench":"nest-cost","node":"v22.22.0","messagesPerRoom":10,"writes":100000,"nsPerWrite":{"room row, field write":1102,"row per message":731}}
+{"bench":"nest-cost","node":"v22.22.0","messagesPerRoom":1000,"writes":20000,"nsPerWrite":{"room row, field write":428734,"row per message":925}}
+{"bench":"nest-cost","node":"v22.22.0","messagesPerRoom":10000,"writes":2000,"nsPerWrite":{"room row, field write":3585352,"row per message":2037}}

@@ -1,0 +1,1 @@
+{"bench":"path-fan","node":"v22.22.0","rows":10000,"writes":50000,"nsPerWrite":{"0":{"path":1715,"router":1973},"10":{"path":2037,"router":2028},"100":{"path":4179,"router":2123},"1000":{"path":23098,"router":2219},"10000":{"path":356437,"router":2459}}}

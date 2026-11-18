@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true,"allowImportingTsExtensions":true,"types":[],"lib":["es2022"],"noUnusedLocals":false,"paths":{"fero":["./lens.d.ts"],"fero-base":["./out/fero.d.ts"],"data":["../../../../../../data/types/public.d.ts"]}},"files":["out/env.d.ts","env2.d.ts","patterns.ts"]}

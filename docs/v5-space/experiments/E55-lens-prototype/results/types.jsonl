@@ -1,0 +1,6 @@
+{"exp":"E-55","claim":5,"config":"tsconfig","tsc":"Version 6.0.2","exit":0,"errors":""}
+{"exp":"E-55","claim":5,"config":"tsconfig.neg","tsc":"Version 6.0.2","exit":0,"errors":""}
+{"exp":"E-55","claim":5,"config":"tsconfig.screens","tsc":"Version 6.0.2","exit":0,"errors":""}
+{"exp":"E-55","claim":5,"config":"negatives stripped","errors":"_stripped.ts(9,27): error TS2551 _stripped.ts(11,37): error TS2769 _stripped.ts(13,40): error TS2339 _stripped.ts(15,19): error TS2349 _stripped.ts(27,34): error TS2339 _stripped.ts(29,29): error TS2339 _stripped.ts(31,16): error TS2349 _stripped.ts(34,34): error TS2339 _stripped.ts(36,24): error TS2339 _stripped.ts(39,9): error TS2322 _stripped.ts(43,34): error TS2345 "}
+{"exp":"E-55","claim":5,"config":"typed assignment","errors":"assign.ts(8,19): error TS2540: Cannot assign to 'stock' because it is a read-only property assign.ts(12,1): error TS2322: Type 'number' is not assignable to type '{ set(v: number): void; }' assign.ts(17,9): error TS2339: Property 'set' does not exist on type 'number' "}
+{"exp":"E-55","claim":5,"config":"typed assignment, mapped accessors","errors":"error TS1005: ']' expected error TS1128: Declaration or statement expected "}

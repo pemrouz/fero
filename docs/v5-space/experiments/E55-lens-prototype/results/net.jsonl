@@ -1,0 +1,6 @@
+{"run":1,"loadavg":"1.40 1.68 0.93 1/111 2523","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 net.mjs miss"}
+{"exp":"E-55","node":"v22.22.0","claim":20,"bench":"miss","reads":100000,"serverGets":100000,"serverSubs":0,"clientSelections":0,"cacheRows":0,"heapDeltaB":197536,"usPerRead":44.4,"sumRight":true}
+{"run":2,"loadavg":"2.06 2.32 1.97 1/120 6415","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 net.mjs miss"}
+{"exp":"E-55","node":"v22.22.0","claim":20,"bench":"miss","reads":100000,"serverGets":100000,"serverSubs":0,"clientSelections":0,"cacheRows":0,"heapDeltaB":197416,"usPerRead":43.8,"sumRight":true}
+{"run":3,"loadavg":"1.70 2.26 2.21 1/125 9251","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 net.mjs miss"}
+{"exp":"E-55","node":"v22.22.0","claim":20,"bench":"miss","reads":100000,"serverGets":100000,"serverSubs":0,"clientSelections":0,"cacheRows":0,"heapDeltaB":197416,"usPerRead":42.9,"sumRight":true}

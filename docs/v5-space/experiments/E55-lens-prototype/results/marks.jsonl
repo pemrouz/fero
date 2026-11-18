@@ -1,0 +1,6 @@
+{"run":1,"loadavg":"2.66 2.36 1.44 2/124 4186","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 marks.mjs rate"}
+{"exp":"E-55","node":"v22.22.0","claim":21,"bench":"marks-rate","syncMs":4,"awaitedPerS":240,"notAwaitedPerS":134082,"ratio":558.4}
+{"run":2,"loadavg":"2.68 2.41 2.08 1/124 7519","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 marks.mjs rate"}
+{"exp":"E-55","node":"v22.22.0","claim":21,"bench":"marks-rate","syncMs":4,"awaitedPerS":239,"notAwaitedPerS":122054,"ratio":510.3}
+{"run":3,"loadavg":"2.16 2.13 2.16 2/122 10373","cmd":"node --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000 marks.mjs rate"}
+{"exp":"E-55","node":"v22.22.0","claim":21,"bench":"marks-rate","syncMs":4,"awaitedPerS":240,"notAwaitedPerS":130737,"ratio":543.9}

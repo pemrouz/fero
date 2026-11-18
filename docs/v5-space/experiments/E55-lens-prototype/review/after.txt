@@ -1,0 +1,21 @@
+== probe1.mjs
+async fn returning a lens gives                      the lens itself (GETs: 0)
+Promise.all([lens]) gives                            [the lens itself] (GETs: 0)
+typeof lens                                          function
+typeof lens.subscribe (svelte store probe)           undefined
+typeof lens.$$typeof (react)                         undefined
+typeof lens.asymmetricMatch (jest)                   undefined
+JSON.stringify({ a: lens })                          {}
+template string                                      s.k
+structuredClone(lens)                                throws DataCloneError
+view tap calls after close (should be 0)             0
+views kept in r.views after close                    0
+target of selection.connect collected after gc       true
+row widgets after widgets.left.sell(1)               {"left":5}
+== probe2.mjs
+{"collect":false,"value":{"n":3},"gets":1,"subs":1,"unsubs":0}
+{"collect":true,"value":{"n":3},"gets":1,"subs":1,"unsubs":1}
+== probe3.mjs
+{"returnedType":"function","rowsInAnswer":"a lens (nothing was read)","gets":0,"ms":0.1,"bytesIfJSON":0}
+== probe4.mjs
+{"viaProxy":7,"viaAtNumber":7,"viaAtString":7,"viaGet":7}

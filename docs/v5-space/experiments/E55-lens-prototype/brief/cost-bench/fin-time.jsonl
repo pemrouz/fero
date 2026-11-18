@@ -1,0 +1,4 @@
+{"bench":"fin-time","node":"v22.22.0","mode":"idle","anchors":1000,"registerNs":198,"firstMs":16156,"firedByMs":{"100":0,"1000":0,"5000":0,"15000":0,"30000":999}}
+{"bench":"fin-time","node":"v22.22.0","mode":"alloc","anchors":1000,"registerNs":222,"firstMs":1343,"firedByMs":{"100":0,"1000":0,"5000":999,"15000":999,"30000":999}}
+{"bench":"fin-time","node":"v22.22.0","mode":"old-idle","anchors":1000,"registerNs":287,"firstMs":8055,"firedByMs":{"100":0,"1000":0,"5000":0,"15000":999,"30000":999}}
+{"bench":"fin-time","node":"v22.22.0","mode":"old-alloc","anchors":1000,"registerNs":304,"firstMs":-1,"firedByMs":{"100":0,"1000":0,"5000":0,"15000":0,"30000":0}}

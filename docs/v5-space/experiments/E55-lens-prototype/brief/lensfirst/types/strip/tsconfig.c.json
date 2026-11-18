@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true,"allowImportingTsExtensions":true,"types":[],"lib":["es2022"],"paths":{"fero":["./fero.d.ts"],"fero-lens":["./lens.d.ts"],"data":["../../../../../../../../../data/types/public.d.ts"]}},"files":["env.d.ts","patterns.ts","server.ts","client-type.ts","collide.ts"]}

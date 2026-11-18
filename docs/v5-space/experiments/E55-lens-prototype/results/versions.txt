@@ -1,0 +1,7 @@
+v22.22.0
+Version 6.0.2
+data 63fea66 2026-09-22
+esbuild 0.25.12
+chromium 153.0.8010.12 (Playwright 1.63.0)
+6.18.44-fc-v595
+4

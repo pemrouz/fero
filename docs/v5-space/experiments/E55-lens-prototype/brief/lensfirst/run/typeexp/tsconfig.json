@@ -1,0 +1,1 @@
+{"compilerOptions":{"verbatimModuleSyntax":true,"module":"esnext","target":"es2022","allowImportingTsExtensions":true,"noEmit":true,"strict":true,"types":[],"lib":["es2022","dom"]},"files":["client-plain.ts"]}
