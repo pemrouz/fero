@@ -1,6 +1,6 @@
 # The connect lens: one recommendation
 
-Written 2026-11-18. It answers the owner's feedback on [API.md](API.md) and [API-TOUR.md](API-TOUR.md) (2026-11-16). **Revised the same day**, after [E-55](experiments/E55-lens-prototype/README.md) built the shape small on data's real engine, and after a skeptic reviewed this page, E-54 and E-55 (24 findings; E-55's README has them under "The review"). **API.md, API-TOUR.md and LAYERS.md are not changed yet: the owner decides first** (section 7).
+Written 2026-11-18. It answers the owner's feedback on [API.md](API.md) and [API-TOUR.md](API-TOUR.md) (2026-11-16). **Revised the same day**, after [E-55](experiments/E55-lens-prototype/README.md) built the shape small on data's real engine, and after a skeptic reviewed this page, E-54 and E-55 (24 findings; E-55's README has them under "The review"). **The owner approved all of section 7's picks on 2026-11-18** ([DECISIONS V5-12](../DECISIONS.md)), and API.md, API-TOUR.md and LAYERS.md were rewritten around the lens the same day. Where those pages read this one more narrowly, they say so and list the question (API.md section 11.1, questions 15 to 24).
 
 **What this page is.** Three designers each wrote a full proposal from one facts brief: one took the owner's lens as far as it goes (**lens-first**), one priced every construct and doubted the lens (**cost-first**), one mapped every place a computation can run (**space**). [E-54](experiments/E54-time-travel/README.md) measured time travel. E-55 then built the recommended shape and ran this page's claims (section 6). This page takes the best answer to each question, says why, and says what the build and the review changed.
 
@@ -473,7 +473,7 @@ The four lines in 1.7 are exact across any restart only if the API gives nine th
 9. **A marked write that fails for another reason ends the loop with its error.** The loop is started again from the marks.
 
 - **Without bare marks the four lines restart from far back.** `marks()` is the lowest mark over the output slots. A slot that got no output for a while holds the cursor back, so a restart reads again every source record since then (each is skipped at its mark), and the source must keep its log that far. `derive()` sends bare marks so that idle slots keep up.
-- **`derive()` and `consumer().run()` stay as library code** over these. They earn their names: they cannot be written the slow way, they send the bare marks, they run once, and they split the source's shares so three servers do the work once.
+- **`derive()` and `consumer().run()` stay as library code** over these. They earn their names: they cannot be written the slow way, they send the bare marks, they run once, and they split the source's shares so three servers do the work once. *(API.md section 3.11 reads this more narrowly: `consumer().run()` has no target, so it sends no bare marks and restarts from its share's own cursor instead; API.md question 24.)*
 - **A marked write answers at commit only**: it can be skipped, so it takes no early stage (V5-11 ruling 6).
 - **By hand without the mark** the loop is at least once from a saved cursor, and at most once from `'latest'`.
 
