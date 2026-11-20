@@ -1,6 +1,6 @@
 # fero v5: the public API
 
-Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][dec]; [VERDICT 11.7](VERDICT.md)). Rewritten again 2026-11-18 around the connect lens ([V5-12][dec]; [LENS.md](LENS.md)). **Rewritten a third time 2026-11-20 for V5-13 to V5-15** ([dec]): how code reads data ([CONNECT.md](CONNECT.md), [READS.md](READS.md)), where transformations run ([TRANSFORMS.md](TRANSFORMS.md)), and reads and writes at any path ([ANYPATH.md](ANYPATH.md)). Section 5.6 lists every change from the 2026-11-18 page, with its decision.
+Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][dec]; [VERDICT 11.7](VERDICT.md)). Rewritten again 2026-11-18 around the connect lens ([V5-12][dec]; [LENS.md](LENS.md)). **Rewritten a third time 2026-11-20 for V5-13 to V5-15** ([dec]): how code reads data ([CONNECT.md](CONNECT.md), [READS.md](READS.md)), where transformations run ([TRANSFORMS.md](TRANSFORMS.md)), and reads and writes at any path ([ANYPATH.md](ANYPATH.md)). **Amended the same day for V5-16**: a sync read is `.value`, and only where it is sure; `f.rows`, `ctx.rows` and the cluster's `snapshot()` go. Section 5.6 lists every change from the 2026-11-18 page, with its decision.
 
 **This page replaces COMP2's API** of 2026-11-11. Git history keeps that one, and the earlier forms of this page (`git log -- docs/v5-space/API.md`). COMP2 was the study's earlier pick: Raft groups owned by the project, a `#meta` group and one central loop. The owner set it aside (V5-2, V5-6).
 
@@ -29,7 +29,7 @@ Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][d
 - **Run on a prototype, under an earlier spelling.** [E-22] ran all 22 patterns on five kernel operations, with a leader change and a slot move forced into each. This page respells them; the respelled lines did not run.
 - **Model-checked.** The rules under the surface: subscribe ([E-31]), retries ([E-20]), sagas ([E-24]), derived outputs ([E-30]; with two outputs of one record in one slot, E-57 B5), answer stages ([E-48]), founding and finding a resource ([E-51]), healing ([E-52]). Not yet: the `view` selector (V5-14's owed list), marks written by app code (section 11.2).
 - **Measured.** The costs are [PATHS.md](PATHS.md)'s and the experiments'. No v5 server was timed end to end (PATHS 8).
-- **Read by a skeptic.** The 2026-11-16 page had 31 findings; LENS.md, E-54 and E-55 had 24; the 2026-11-18 rewrite had two skeptics (20 and 21 findings); CONNECT.md had 21, TRANSFORMS.md 30 and ANYPATH.md 19. Each that held was applied there. **This rewrite had two reviews the same day**: one against the decisions and their sources (27 findings), one of the mechanics: types against prose, line cites, links (16). Each that held is applied here, with one part left for other files: line cites in CONNECT.md and two E-56 READMEs, and the v5-space index (docs/v5-space/README.md), are a follow-up.
+- **Read by a skeptic.** The 2026-11-16 page had 31 findings; LENS.md, E-54 and E-55 had 24; the 2026-11-18 rewrite had two skeptics (20 and 21 findings); CONNECT.md had 21, TRANSFORMS.md 30 and ANYPATH.md 19. Each that held was applied there. **This rewrite had two reviews the same day**: one against the decisions and their sources (27 findings), one of the mechanics: types against prose, line cites, links (16). Each that held is applied here, with one part left for other files: line cites in CONNECT.md and two E-56 READMEs, and the v5-space index (docs/v5-space/README.md), are a follow-up. **V5-16's study had a skeptic too** (12 findings), and the amendment had two reviews: one for consistency across the three pages (14 findings), one of the mechanics (9). The ones that held are applied here. Left for other files: CONNECT.md, LENS.md and READS.md still offer `f.rows` as a current read, from before V5-16, and the V5-16 record in DECISIONS.md must carry what this page cites it for.
 - **Nothing here is built.**
 
 ## 1. Words and layers
@@ -109,7 +109,7 @@ const w = shop.data.gizmos.set({ stock: 7, price: 9 })     // a write: it shows 
 await w.received                                           // optional: the leader has it (a progress report)
 const ack = await w                                        // committed: on disk on a majority, visible to all
 const sold = await shop.data.widgets.stock.set(op.incr(-1, { min: 0 }))   // the leader computes it
-console.log(ack.version, sold.value, was.value?.stock, shop.rows.widgets?.stock)   // rows: the hot sync read
+console.log(ack.version, sold.value, was.value?.stock, shop.cluster.value.writable)   // f.cluster: this process's own state
 ```
 
 **Where each kind of line runs.**
@@ -117,7 +117,7 @@ console.log(ack.version, sold.value, was.value?.stock, shop.rows.widgets?.stock)
 | What you write | Where it runs | What it costs |
 |---|---|---|
 | a step: `f.data.a.b`, or `f.at(a, b)` | **nowhere.** It builds an address | no trip and nothing kept: 0 to 0.3 B a key; 49 to 99 ns a step with one key (E-55 claims 1, 2) |
-| a sync read: `f.rows.k`, `h.value`, a view right of `connect()` | **here**, on rows held on purpose. It never leaves this process | no trip, no disk, no copy |
+| a sync read: `h.value`, a view right of `connect()`, `f.cluster.value` | **here**, on what a live link holds. It never leaves this process (V5-16) | no trip, no disk, no copy |
 | a read you `await`: `lens.get()` | **here** if its partition is held on purpose; else at a copy (`fresh`: at the leader) | held: no trip. Else one GET, and nothing is kept |
 | a change: `lens.set(v)`, `room.set(rows)`, `f.set(path, v)`, an assignment, a method | **at the partition's leader.** It is sent whether you `await` it or not; `await` only chooses when you hear back | one trip, and one shared disk sync on a majority |
 | a link: `connect()`, `connect(fn)`, a loop over `connect()` | **at a copy**, from the moment of the call; then here, for every change | one SUB, shared by every equal lens in this process; the partition once, then its changes |
@@ -139,10 +139,10 @@ Transformations add ten more, for served views, `derive` and `lookup` (TRANSFORM
 **Still true from the page before.**
 - **Anything that changes data, or opens a link, sends a message.** `await` does not send it; it only waits. **Awaiting a write's handle means committed**: one trip to the leader and a share of one disk sync, about 1 ms on one box (MEMORY 9.3, computed from [E-02]). The handle's `received` and `replicated` are earlier progress reports for the few who want them (section 3.5).
 - **Make writes together, a few hundred at a time.** They leave in one frame, share disk syncs and keep their order within a partition (PATHS 3.6; A-10). A client may hold 512 waiting writes; past that the next plain one is refused `backpressure` (section 3.6).
-- **Only a line you wrote walks a whole resource:** `hold: 'all'`, `f.data.connect()`, `f.data.get()`, listing `f.rows`, `f.data.changes({ from: 'earliest' })`, and a served view on its copy. Nothing else decodes, copies or walks every row.
+- **Only a line you wrote walks a whole resource:** `hold: 'all'`, `f.data.connect()`, `f.data.get()`, listing a whole resource's `h.value`, `f.data.changes({ from: 'earliest' })`, a served view on its copy, and an operator over every row on a server. Nothing else decodes, copies or walks every row. On a spare server, that last line also downloads the resource first (section 3.3).
 - **A resource is a table, not a row.** Each one is a small cluster. Users and orders are rows of one resource, not a resource each (V5-2).
 
-**Two places, one job each** (V5-13 pick 6). `f.data` is the address of everything: steps, reads, links, writes, and calls on a path or at the root (`f.data.low(5)`). `f.rows` is the hot sync read of what this process holds for the whole resource. Section 5.6 lists the words that went.
+**One address, and one sync read** (V5-13 pick 6; V5-16). `f.data` is the address of everything: steps, reads, links, writes, and calls on a path or at the root (`f.data.low(5)`). `.value` is the one sync read, and it is there only where it is sure: a live handle's `h.value`, a `past`'s `value`, and `f.cluster.value`, this process's own state. Everywhere else, `get()` reads once and `connect()` keeps a link. Section 5.6 lists the words that went.
 
 ## 3. Using it, and what each call costs
 
@@ -164,14 +164,14 @@ console.log(a.name, b.name, c.name, d.name, e.name)
 - **A process that brings something serves.** A seed, `methods` or another code key, `listen`, `dir` or `server: true` make a **server**. A bare name is a **client**. This is v4's rule (code: api/index.ts; README "Roles").
 - **The role is per resource** (V5-2 point 4). One process can serve `totals` and be a client of `orders`. `server: false` pins the client role.
 - **A resource exists once a server opens it.** Until then a client's writes wait as `pending` rows of `f.cluster.writes`, as in v4's rung 03.
-- **Three servers of one name are a cluster of three**, as in v4's rung 13 (rung 01 is two). Each stores the log, keeps every row in memory, and can be elected leader of some partitions (V5-2, V5-6).
+- **Three servers of one name are a cluster of three**, as in v4's rung 13 (rung 01 is two). Each stores the log, keeps every row in memory, and can be elected leader: of every partition in the first build, which has one group per resource, and of some partitions once a resource has more groups (V5-2, V5-6).
 - Ctrl-C is a clean stop (V4-8). `fero.spawn` stays (V4-9).
 
 **When `await fero(…)` comes back** *(stated here; reasoned from v4's rung 03 and section 3.9's "never guesses")*.
 - **A server:** once it holds the log and has folded it.
 - **A client, by default:** once it has reached a server and learned the leaders. No rows come: a client holds nothing until a `connect()` says what (V5-12 pick 1).
-- **A client with `hold: 'all'`:** once the first picture of every row has arrived and is folded. So a sync read of `f.rows` on the next line is right. At 1,000,000 rows that is seconds (the table below).
-- **No server answers:** the open waits `connect.wait` (10 s), prints who is missing, and then resolves all the same. Writes made on that handle wait as `pending`; a `get()` waits; a sync read throws `not-held` ("no server of 'shop' reached yet") until the first picture comes. It never reads as an empty resource. (v4's rung 03 prints `{}` here; that line changes.)
+- **A client with `hold: 'all'`:** once the first picture of every row has arrived and is folded. So `f.data.connect()` on the next line shares those rows, with no SUB of its own (reasoned). At 1,000,000 rows that is seconds (the table below).
+- **No server answers:** the open waits `connect.wait` (10 s), prints who is missing, and then resolves all the same. Writes made on that handle wait as `pending`; a `get()` waits; a handle's `value` throws `not-ready` until its first picture comes; `f.cluster.value` shows `members` as `undefined`, with a health row that says no server was reached yet (V5-16). It never reads as an empty resource. (v4's rung 03 prints `{}` here; that line changes.)
 
 **A server role is real work. Give it to a server process, not to every app process.**
 - A server of a resource copies and folds its whole log, keeps a `dir` and syncs it, votes or stands by, takes the per-resource budget (about 8 KB idle, V5-8), and leaves the cluster on Ctrl-C.
@@ -245,18 +245,22 @@ const users = await fero<User>('users')                    // the default: it ho
 const all = await fero<User>('users', { hold: 'all' })     // every row, kept live: one picture, then every write
 const warm = await fero<User>('users', { hold: '200MB' })  // a cache of pictures of closed selections
 const me = users.data.u42.connect()                        // now u42's partition is held on purpose
-await me.ready
-console.log(me.value?.name, all.rows.u42?.name, warm.name)
+const every = all.data.connect()                           // a handle on what hold: 'all' holds: no new SUB
+await me.ready; await every.ready
+console.log(me.value?.name, every.value.u42?.name, warm.name)   // a sync read is a live handle's value (V5-16)
 me.disconnect()                                            // after the linger, the unsubscribe is sent
+every.disconnect()                                         // the rows stay: hold: 'all' still holds them
 ```
 
 - **A client holds nothing until a `connect()` says what** (V5-12 pick 1, in V5-13's words). It then holds on purpose exactly what its live links name, for as long as they live. Every download is a line you wrote.
-- **`hold: 'all'`** (v4's behaviour, now an option). The open sends one picture of the whole resource, **and then every later write to it, for as long as the handle is open.** `f.rows` and operators over every row then work here. Cost: the resource's size in bytes, memory and decode time, once; then a decode and a fold here for every write anyone makes. At 1,000,000 small rows the first fold alone is seconds of this process's main thread (computed from PATHS 2.1). `f.data.connect()` holds the same rows, said as a line, with a handle you can end; you read them through that handle (`all.value`), and operators over every row go right of it. `f.rows` stays for a server and for `hold: 'all'` (section 3.9).
+- **`hold: 'all'`** (v4's behaviour, now an option). The open sends one picture of the whole resource, **and then every later write to it, for as long as the handle is open.** A local `get()` and operators over every row then work here. Cost: the resource's size in bytes, memory and decode time, once; then a decode and a fold here for every write anyone makes. At 1,000,000 small rows the first fold alone is seconds of this process's main thread (computed from PATHS 2.1). `f.data.connect()` holds the same rows, said as a line, with a handle you can end, and operators over every row go right of it. **A sync read of every row is that handle's `value`**, on any role (V5-16): with `hold: 'all'`, `f.data.connect()` shares the open's rows and sends no SUB of its own (section 3.10, "Equal lenses share"; reasoned). There is no `f.rows`.
 - **`hold: '200MB'`, a size, is a cache of pictures, not a subscription** (LENS 2.2; reasoned, not built). When the last link on a selection ends, the unsubscribe is sent after the linger, as always. Inside the bound, the rows stay in memory, least recently used first, with the server position they were good at. They are **not held on purpose**: no read is served from them. A new link sends that position. If the server can still resume from it (its ring of recent frames, or the log when the resource has `history`), only the changes since cross. If not, a new picture crosses. So opening it again is a resume or a download, never free, and nothing crosses while it is closed.
   - The other choice, staying subscribed while warm, would have the server send, and this process decode and fold, every change to every warm partition for nobody (LENS 2.2).
 - **A `get()` never holds** (section 3.9). It reads once. `get({ when })` holds the partition while it waits, then lets go.
-- **A server holds every row** of the resources it serves (V5-6: `data` folds on every copy), as a voter or a standby. That is true for the first `copies + standbys` servers of a resource: 5 by default.
-  - **A server past that number is a spare** *(this page's reading of LAYERS 8.4 and PATHS 4.4)*. It holds no copy until a leader's healing places one on it. Until then its reads behave like a client's, and a SUB for a served view there is answered `moved`, naming a copy (TRANSFORMS N-8).
+- **A server holds every row** of the resources it serves (V5-6: `data` folds on every copy), as a voter or a standby. That is true for the first `copies + standbys` servers of a resource: 5 by default. The first build has one group per resource (TRANSFORMS' "Words"), so a server holds every row or none.
+  - **A server past that number is a spare** *(this page's reading of LAYERS 8.4 and PATHS 4.4)*. It holds no copy until a leader's healing places one on it. Until then its links behave like a client's: `f.data.connect()` subscribes, and a SUB for a served view there is answered `moved`, naming a copy (TRANSFORMS N-8).
+  - **An operator over every row on a spare holds what it lacks first** *(this page's reading of TRANSFORMS 3.9's R0: a process that runs a view over every row holds any slot it lacks the way `hold: 'all'` does)*. That covers its root operators and a handler's `ctx.data`, if a root call reaches it. A `connect()` of such a line takes one picture of the whole resource and then every write, as `hold: 'all'` does, for as long as its link lives. A `get()` of it takes one picture, answers, and keeps nothing, as every `get()` does. So the line works on every server, and only its cost depends on the deployment: a download on the sixth server, none on the first five. Health shows the download. Not measured (TRANSFORMS 10 item 10).
+  - **That is why there is no sync lookup of every row, on any role** (V5-16). A sync read cannot wait for that download, so on a spare it would have to throw: the same line would work on five servers and throw on the sixth, and the deployment would decide, not the line. `get()` and `connect()` can wait. So a server, too, reads every row in sync through `f.data.connect()`'s handle.
 - At 80 % of the process's `memory`, health warns and names the fix: end links, or give `hold` a smaller size.
 - `hold: 'asked'` is gone: what it did, hold only what you asked for, is the default, with nothing kept after a `get()` (section 5.5).
 
@@ -473,7 +477,7 @@ const rows: readonly { stock: number }[] = await shop.data.low(5)
 console.log(sale.left, pong, low.value, first.rows, rows)
 ```
 
-- **A handler is `(arg, ctx) => result`**, as in v4. `ctx.at` is the lens the call was made on (for a root action, the root). `ctx.data` is this server's root lens, where operators run here, functions included (at `depth: 2` the types give the root no operators: a name there is a room, section 3.10); `ctx.rows` its rows, and `ctx.set`, `ctx.remove` and `ctx.batch` the array-form writes. `ctx.peer` and `ctx.claims` say who called. `ctx.signal` aborts when the call ends, so a handler's links end with the call. `ctx.use(other)` gives another resource's handle bound to this call (section 7, "Methods").
+- **A handler is `(arg, ctx) => result`**, as in v4. `ctx.at` is the lens the call was made on (for a root action, the root). `ctx.data` is this server's root lens, where operators run here, functions included (at `depth: 2` the types give the root no operators: a name there is a room, section 3.10); `ctx.set`, `ctx.remove` and `ctx.batch` are the array-form writes. **A handler reads a row once with `get()`** (V5-16; `ctx.rows` went): `await ctx.at.get()` on a path, which runs at the leader, so the read makes no trip; at the root, where `ctx.at` is every row, `await ctx.data[k].get()`. `ctx.peer` and `ctx.claims` say who called. `ctx.signal` aborts when the call ends, so a handler's links end with the call. `ctx.use(other)` gives another resource's handle bound to this call (section 7, "Methods").
 - **Where a method may be called** (V5-12 pick 13; LENS 2.4). A bare function, a `{ view }` and a `{ pages }` are called at the root only: `f.data.ping()`, `f.data.low(5)`. To be called on a path, a method says which kind: `{ at: 'row' | 'partition' | 'any', run }`. **The server refuses any other path with `bad-path`**, and the types offer the method only on lenses of that kind, by its name (`lens.sell(1)`) and through `lens.call('sell', 1)` alike.
   - Why: under V4-5 a method is the only door, and a client picks the path. On E-55's first build a method on every lens let a client change a row's shape through the door; on the changed build, 202 of 202 calls on a path the method did not declare were refused, with 0 commits (E-55 review, claim 18).
   - `at: 'partition'` at depth 1 is the row, since each row is its own partition. `at: 'any'` may be called on any lens and at the root: inside one partition it runs at that partition's leader, at the root on any server *(this page's reading of LENS 2.4)*.
@@ -513,17 +517,17 @@ All measured (E-55 claim 24).
 - A call with `once` is **three commits in a row**: claim the name, run, store the result. The claim and the result are rows of `#calls`, a resource of its own (V5-2), so a `once` call also makes **up to two more trips**, which calling on a path cannot save.
 - A view and pages: section 3.10.
 
-### 3.9 Reads: `get()`, `f.rows`, and what a sync read never does
+### 3.9 Reads: `get()`, `.value`, and what a sync read never does
 
 | Read | Where | Cost | Can it be stale? |
 |---|---|---|---|
-| `f.rows.k` | here, on a server or with `hold: 'all'`. The types refuse it on a bare client, and untyped code gets `not-held` | a `Map` read plus one trap; the row is handed out by reference, frozen. The `Map` read alone is 43 to 51 ns at 1,000 rows, about 1 µs at 1,000,000, where cache misses rule (PATHS 4.1). **The first read of a row after it was written also freezes it**, once, deeply (DATA-07) | it is this process's last applied commit. Never older than anything this process already saw or wrote |
-| `h.value` (from `connect()`) | here, through the handle, while the link is live | the same lookup | the same |
-| `await lens.get()`, its partition held on purpose | here | no trip | the same |
+| `h.value`, `h.value[k]` (from `connect()`) | here, through the handle, while the link is live | a `Map` read plus one trap and the `ended` check; the row is handed out by reference, frozen. The `Map` read alone is 43 to 51 ns at 1,000 rows, about 1 µs at 1,000,000, where cache misses rule (PATHS 4.1). **The first read of a row after it was written also freezes it**, once, deeply (DATA-07) | it is this process's last applied commit. Never older than anything this process already saw or wrote |
+| `f.cluster.value`, `f.cluster.writes.value` | here: this process's own state (V5-16) | a property read; a new frozen object at each change | members and leaders as this process last learned them |
+| `await lens.get()`, its partition held on purpose | here | no trip: the lens's walk, 0.17 to 0.29 µs with one key (section 4), and a promise, about 50 to 90 ns more than a sync read on a stand-in (V5-16). So about 3 to 5 times a handle's lookup: in a hot loop, read `h.value` | the same as `h.value` |
 | `await lens.get()`, not held on purpose | **one GET** to a copy; nothing is kept | one trip and the value's bytes, every time. After 100,000 misses: 100,000 GETs, 0 SUBs, 0 rows kept (E-55 claim 20) | a copy may trail the leader by a moment, but never behind what this process saw |
 | `await lens.get({ fresh: true })` | **always at the leader** | one trip, plus the leader's check with a majority that it still leads. No disk (PATHS 4.3). etcd's same read: 0.43 ms against 0.18 ms ([E-09e]) | no: it sees every write that finished before it began |
 | `await lens.get({ when })` | holds the partition live until the test passes, reads, and lets go; ends at the test, its `signal` or its `timeout` | as `connect()` while it waits | as a link |
-| listing `f.rows` or a partition's `value` | here | **every held row is walked**: 87 µs at 1,000 rows, 30 ms at 100,000, 0.5 s at 1,000,000 (PA-8, measured on v4's two passes; one pass is owed) | as `f.rows` |
+| listing a partition's or a whole resource's `value` | here | **every held row is walked**: 87 µs at 1,000 rows, 30 ms at 100,000, 0.5 s at 1,000,000 (PA-8, measured on v4's two passes; one pass is owed) | as `h.value` |
 
 ```ts
 // file: reads.ts — read once, hold, read fresh, wait until
@@ -559,24 +563,25 @@ console.log(u, again, same, sure, name, v?.version, adult)
 
 **A read is served here only from rows held on purpose** (V5-12; LENS 2.2 rule 2): a server, `hold: 'all'`, or a live link on its partition or on the whole resource. **A GET carries the highest position this process has seen**, and waits for the process's own early-answered writes (rule Y). A copy that is behind waits before it answers, so a process never reads backwards when a link ends and its next read goes to another copy (reasoned; counted, not tested).
 
-**A lens is for wiring; `rows` is for reading in a loop** (LENS 2.1).
-- A read through two steps and a verb costs 0.17 to 0.29 µs with one key, and 1.6 to 1.7 µs with keys spread over 1,000,000 rows, against 0.014 to 0.06 µs and 0.60 to 0.64 µs for a `Map` read (E-55 claim 1). So `rows` stays the hot sync read.
+**A lens is for wiring; a handle's `value` is for reading in a loop** (LENS 2.1; V5-16).
+- A read through two steps and a verb costs 0.17 to 0.29 µs with one key, and 1.6 to 1.7 µs with keys spread over 1,000,000 rows, against 0.014 to 0.06 µs and 0.60 to 0.64 µs for a `Map` read (E-55 claim 1). So the hot sync read is a handle's lookup, `h.value[k]`: the reason LENS kept `rows` holds for it too.
 - **A step keeps nothing**: 0 to 0.3 B per key after 100,000 keys (E-55 claim 2). data's handle today keeps 318 to 1,333 B per key.
 - A step costs 49 to 99 ns with one key read again and again; with keys spread over 1,000,000 rows, 162 to 222 ns, most of it the `Proxy` on a big heap (E-55 claim 1). **`f.at(...keys)`** builds the same lens with no `Proxy`, and with full types: use it for computed keys and in hot loops (−79 to +33 ns over the direct read with keys spread). **A number key becomes its string**: `f.at(1, 'n')` is `f.data[1].n`. Any other key type, and a key `__proto__`, is refused `bad-key` (V5-15 pick 6).
 - **What gets worse** (LENS 2.1). `typeof lens` is `'function'`. `console.log(lens)` prints `Lens(shop.widgets.stock)`. `JSON.stringify` skips a lens, and `structuredClone(lens)` throws.
 
-**`f.rows`** *(proposed; PA-8)* is a read-only view of the rows this process holds **for the whole resource, on purpose**: a server's, or `hold: 'all'`'s. A partition held by `connect()` is read through its handle (`room.value`). The types refuse `f.rows` on a bare client, and name the two ways: a `connect()` handle, or `hold: 'all'`.
-- `f.rows.k` is one lookup and returns the frozen row itself, or `undefined` when no such row exists. At depth 2, `f.rows.room1?.m7`.
-- A row you took never changes: it is frozen (DATA-07). `f.rows` itself is always "now".
-- Listing it walks every row; that cost is in plain sight. `f.rows` is an object of a small class that carries `[util.inspect.custom]`, so `console.log(f.rows)` lists the rows (owed: a test). **Owed: two pins**: `f.rows.k` on a row already read within twice a `Map` read; the first read of a row just written, apart.
+**To read every row in sync, take `f.data.connect()`'s handle** (V5-16, which drops V5-13 pick 6's `f.rows`). It works on every role: on a server and with `hold: 'all'` it shares the rows already held, with no SUB of its own; on a bare client or a spare it subscribes, and if the link fails, `h.closed` says why.
+- With `h = f.data.connect()`, `h.value.k` is one lookup and returns the frozen row itself, or `undefined` when no such row exists. At depth 2, `h.value.room1?.m7`. A partition held by `connect()` is read the same way (`room.value.m7`).
+- A row you took never changes: it is frozen (DATA-07). A partition's or the whole resource's `h.value` is one live view, always "now" while the link lives.
+- Listing it walks every row; that cost is in plain sight. **Owed: two pins**: `h.value.k` on a row already read within twice a `Map` read; the first read of a row just written, apart.
 
-**No whole picture per read** (V5-13 pick 6; READS 9 question 5; section 5.6). One row is `f.rows[k]`; a copy is a spread you write, `{ ...h.value }`, O(rows) on the line. It closes question 1 of section 11.1. The price: 89 lines in 52 example files read `.snapshot`, that read the old whole picture, and their printed output changes (READS 9) *(checked there)*.
+**No whole picture per read** (V5-13 pick 6; READS 9 question 5; section 5.6). One row is `h.value[k]`; a copy is a spread you write, `{ ...h.value }`, O(rows) on the line. It closes question 1 of section 11.1. The price: 89 lines in 52 example files read `.snapshot`, that read the old whole picture, and their printed output changes (READS 9) *(checked there)*.
 
-**Sync reads never guess.** A sync read never returns a stale, empty or partial answer in place of rows that exist somewhere else, and it never makes a hidden trip.
-- **A row not held on purpose here throws `not-held`.** The hint names the row's partition and the two calls: `get()` and `connect()`.
-- **A handle's value before its first picture throws `not-ready`; after its link ended, `ended`** (V5-13 pick 5; section 3.10).
-- **On a process that is not a server and did not say `hold: 'all'`, everything that needs every row throws `not-held`**: listing `f.rows`, and an operator over every row left of `connect()`. The types refuse both on a bare client and name the way out: a view the server named (section 3.10), or `f.data.connect()` with the operator right of it. At `depth: 2` that handle has no operators in the types: your own code reads its value, rooms of rows (section 3.10).
-- **Only a string row key can throw.** Reading a symbol or a probe name off `f.rows` gives `undefined` and never throws, so `JSON.stringify(f.rows)` or a React, Jest, DOM or Svelte check on it does not throw for the wrong reason.
+**Sync reads never guess** (V5-16). A sync read never returns a stale, empty or partial answer in place of rows that exist somewhere else, and it never makes a hidden trip. So **there is one sync read, `.value`, and only where that is sure**:
+- **a live handle's `h.value`**: its link holds what it reads. Before its first picture it throws `not-ready`; after its link ended, `ended` (V5-13 pick 5; section 3.10);
+- **a `past`'s `value`**: a value that never changes (section 3.12);
+- **`f.cluster.value` and `f.cluster.writes.value`**: this process's own state, kept by a link the open holds (section 3.10).
+- **Nowhere else.** There is no `f.rows`, no `f.value` and no `ctx.rows`, and a lens has no `.value`: a property on a lens is a step, so `lens.value` is the row or field named `value` (`f.data.value` is a row named `value`, not every row). Elsewhere, `get()` reads once and `connect()` keeps a link.
+- **On a process that is not a server and did not say `hold: 'all'`, an operator over every row left of `connect()` throws `not-held`.** The types refuse it on a bare client and name the way out: a view the server named (section 3.10), or `f.data.connect()` with the operator right of it. At `depth: 2` that handle has no operators in the types: your own code reads its value, rooms of rows (section 3.10).
 
 ### 3.10 Reads that stay: `connect`, the log, positions, and where a transform runs
 
@@ -650,7 +655,8 @@ console.log(best.value, shown.cursor)
   3. **The first call comes a microtask after `connect()` returns**, so `const h = lens.connect((v) => { if (done(v)) h.disconnect() })` is safe. Without it, `h.disconnect()` inside the first call threw, the link leaked, and every later write threw data's `AggregateError`.
 - **No weak links, no net, no `scope`** (V5-13 pick 2; what went is in 5.6). No link is tied to an object's life, and no block of code gathers links: each link carries its own end. The collector never ends a link: in a headless Chromium it collected 0 of 1,000 removed DOM nodes in 30 s (E-55 claim 13), and a weak link cost 2.2 times a strong sink (claim 11). A link nobody ends runs until the process stops: 1,000 of them cost 0.80 to 0.90 ms a commit (*measured* for weak links whose targets were never collected, E-55 claim 12; the same work here, *reasoned*). So **end every link**: `disconnect()` where the code removes what it drew, a signal for a request, a job or a component, `until` for a socket.
 - **The dev warning.** In development fero prints one line, with the path, when an open link's handle is collected while the link has no `signal`, no `until` and no parent. The link keeps running, so no result depends on the collector. It is only a net, and often silent: it needs the collector to run, and a handle kept in a variable is never collected (CONNECT 2.3).
-- **`f.cluster` shows the open links**, by path, with counts: what always shows a leak (V5-13 pick 2; section 6, `ClusterShape.open`).
+- **`f.cluster.value.open` lists the open links**, by path, with counts: what always shows a leak (V5-13 pick 2; V5-16; section 6, `ClusterShape.open`). The name `open` is this page's pick (question 26).
+- **`f.cluster` is a live link the open holds for you** (V5-16): on a client it follows the home group's records, members and leaders (LAYERS 8.3 step 5), and it adds this process's own writes and links. `f.cluster.value` and `f.cluster.writes.value` are sync reads of it: a new frozen object at each change, which you may keep. Until a server answers, `id`, `members` and `groups` read `undefined`, never `{}`. After `destroy()`, both throw `ended`. `f.cluster.connect((shape) => …)` and `f.cluster.writes.connect((rows) => …)` (this page's pick, question 31) follow a lens's three rules above: the first call a microtask after `connect()` returns, then one per change; `disconnect()`, `signal` and `until` end it, each safe twice. Neither has `get()` or `snapshot()`: the value is already here, so a wait ("until three members") is `connect(fn)` with `disconnect()` inside. **Owed:** how often `lag` makes a new shape; at every commit, a screen would redraw per commit.
 - **The ended rule** (V5-13 pick 5). **A partition's value is readable only while its link is live; after the link ends, a read throws `ended`**, and so does `h.value`. As first built, E-56 handed out the shared view, and a read after the end gave a different answer on a client with no linger, with a 50 ms linger, on a server, and with another link on the same rows; with a guard per link every such read threw `ended` (E-56 probe 4) *(checked)*. **To keep rows, copy them while the link is live**: `{ ...h.value }`, O(rows), on the line. A row or field value you took stays yours; a `past` is a value that never changes. **Owed:** the guard's cost in a real build, one flag check in the view's read trap (V5-13's consequences).
 - **What `connect` costs** (section 4): the first on a partition is one SUB; a 100-row room's picture 26 to 28 µs (E-55 claim 6); another on a held selection 163 to 169 ns. A callback 161 to 189 ns a commit over no link on E-56's build; a loop +166 to +241 ns a commit over a callback when commits merge in bursts (E-56 probe 2) *(measured)*.
 
@@ -707,7 +713,7 @@ for await (const e of chat.data.room1.m7.stars.changes({ from: hour, signal })) 
 | **C. a view over every row, named by the server** | `fans.data.best(10).connect()` | on one copy, never the leader | the door says which views; a cap says how many |
 
 - **A function left of `connect()` does not compile**, and untyped code is refused `unencodable`: code cannot travel. So do `limit` and `reverse` left of it (write `za(field, n)`), `byFn`, and `lookup`. Each type error names the fix.
-- **An operator over every row, on a bare client, is refused by the types**, and at run time `not-held`; the message names a view the server named. On a server, with `hold: 'all'`, and in a handler's `ctx.data`, the root's operators run here, over this process's one store, functions included.
+- **An operator over every row, on a bare client, is refused by the types**, and at run time `not-held`; the message names a view the server named. On a server, with `hold: 'all'`, and in a handler's `ctx.data`, the root's operators run here, over this process's one store, functions included. On a spare server, which holds no copy yet, such a `get()` or `connect()` first takes every row, the way `hold: 'all'` does (a `get()` for its one read, a `connect()` while its link lives), and then runs here (section 3.3; *this page's reading of TRANSFORMS R0*).
 - **At `depth: 2` the types give the root no operators, on any role** (*this page's reading*; question 28). A name on that root is a room, so `f.data.za` is the room named `za`, and `f.data.connect()` gives a handle with no operators. Over every row at depth 2, a server declares a view, whose `ctx` is typed over rows; any process with `f.data.connect()` reads its value, rooms of rows, with its own code. A room lens keeps its plain-data operators (`chat.data.room1.za('stars', 10)`). CONNECT's and TRANSFORMS' sketches have the same gap.
 - **Class B is the same answer, not cheaper CPU.** It buys bytes: a shape costs the copy 1.2 to 3.2 µs a change, about what the client pays in class A (1.3 to 5.0 µs), and the wire carries 0.1 to 28 B a change against 108 to 113 B (E-57 A7) *(measured)*. It equalled the chain run here in 79,209 checks through disconnects, resumes and the fallback to class A *(checked)*. It waits for the `view` selector in E-31's model and the order channel on the wire.
 
@@ -891,7 +897,7 @@ const old = await parts.data.widgets.stock.past(-3)          // a field: 3 commi
 console.log(old.value)
 ```
 
-- **A value, not a link.** Its window is read before the promise resolves, and it keeps no SUB and no link. It never changes, and it never serves `get()` or `f.rows`, so dropping it changes nothing anyone can read (CONNECT 2.3). Its memory, 103 to 285 B a version (E-55 claim 23), goes when your code drops every value of that window.
+- **A value, not a link.** Its window is read before the promise resolves, and it keeps no SUB and no link. It never changes, and it never serves `get()` or a handle's value, so dropping it changes nothing anyone can read (CONNECT 2.3). Its memory, 103 to 285 B a version (E-55 claim 23), goes when your code drops every value of that window.
 - **`value`, `version`, `cursor`.** `p.value` is the state right after the position: after a version's commit, or at a place. `p.version` is the commit that made it, and `p.cursor` the place right after it. A row's value is the row that version made; a room's is a view fixed at that place, which you may keep.
 - **`step(n)` gives a new value** n commits back or forward, sharing the window, or `undefined` past the window's edge, which starts at the nearest snapshot before the place asked. It never changes the value you have. A step is one commit, not one record: nobody can see a state inside a commit. 10 to 12 ns a step, plus one small object (E-55 claim 23) *(measured; the object reasoned)*.
 - **`for…of` walks the window**: `past(pos, { to })` yields exactly the commits `changes({ from: pos, to })` would yield, each as `[value, c]`, the state right after it and its diff, with `c.version`, `c.cursor`, `c.recs()` and `c.text()`.
@@ -911,12 +917,12 @@ console.log(old.value)
 |---|---|---|---|---|
 | a step, `f.data.a.b` | 0 | 0 | none. Nothing kept: 0 to 0.3 B a key (data's handle today keeps 318 to 1,333 B a key for ever). A `Proxy` per step: 49 to 99 ns with one key; 162 to 222 ns (median 205) with keys spread over 10^6 rows | E-55 claims 1, 2 |
 | `f.at(k1, k2)` | 0 | 0 | none: −79 to +33 ns over the direct read with keys spread | E-55 claim 1 |
-| `f.rows.k`, `h.value` | 0 | 0 | none: one lookup, the row by reference; a row's first read after a write freezes it | PATHS 4.1; PA-8 |
-| a read through a lens (two steps and `get()`), held on purpose | 0 | 0 | none: 0.17 to 0.29 µs with one key, 1.6 to 1.7 µs with keys spread over 10^6 rows (a `Map` read: 0.014 to 0.06 and 0.60 to 0.64 µs) | E-55 claims 1, 14 |
+| `h.value`, `h.value.k`, `f.cluster.value` | 0 | 0 | none: one lookup, the row by reference; a row's first read after a write freezes it | PATHS 4.1; PA-8 |
+| a read through a lens (two steps and `get()`), held on purpose | 0 | 0 | none: 0.17 to 0.29 µs with one key, 1.6 to 1.7 µs with keys spread over 10^6 rows (a `Map` read: 0.014 to 0.06 and 0.60 to 0.64 µs), timed without the promise; the promise adds about 50 to 90 ns on a stand-in | E-55 claims 1, 14; V5-16 |
 | `lens.get()`, not held on purpose | 1, each time | 0 | the value, and the highest position this process has seen. **Nothing kept**: 0 rows and 0 SUBs after 100,000 misses. `get()` built as a one-shot subscription moved 65,671 B to read 1 B | E-55 claim 20; E-56 probe 1; PATHS 4.4 |
 | `lens.get({ fresh: true })` | 1, plus the leader's round with a majority | 0 | one value | PATHS 4.3 |
 | `lens.get({ when })` | as `connect()` while it waits | 0 | the partition, held until the test passes | CONNECT 2.1 |
-| listing `f.rows`, or a partition's `value` | 0 | 0 | **every held row walked** | PA-8 |
+| listing a partition's or a whole resource's `value` | 0 | 0 | **every held row walked** | PA-8 |
 | `lens.set(v)`, `f.set(path, v)`, an assignment, `lens.remove()` | 1 to the leader (+1 if this process cannot route: a browser, or a missing partition function) | 1, shared | one encode, kept for resends. The steps add 0.18 to 0.73 µs to a 0.7 to 1.3 µs local data write; a kept lens −0.03 to +0.42 µs; `at()` about 0 | PATHS 3.1; V5-9; E-55 claim 3 |
 | a field write with `if: { equals }` | as a write | 1 | the old value in the request; a compare at the leader. **Not priced** | V5-15's consequences |
 | `room.set(rows)`, `room.remove()` | 1 | 1 | one log entry, expanded by the leader into row records; one tombstone per removed row. In data's fold alone, one batch was 2.3 to 5.9 times less work than the same rows as separate local commits. **A size rule is owed** | E-58 T1; V5-15's consequences |
@@ -940,7 +946,7 @@ console.log(old.value)
 | `{ signal }` on a link | 0 | 0 | 0.11 to 0.16 µs to join one listener per signal, 0.05 to 0.07 µs to leave, at 1,000 to 10,000 links. A listener per link, as E-56's prototype does, is the trap: 19 µs to add at 10,000 links | E-56 probe 4b |
 | `{ until }` on a link | 0 | 0 | +0.39 to +0.59 µs a link (a shape check and one `once('close')`) | E-56 probe 4b |
 | the `ended` guard | 0 | 0 | one flag check in the view's read trap *(reasoned)*. **Owed** in a real build | V5-13's consequences |
-| a link nobody ended | 0 | 0 | **a cost the line does not show**: its changes go on crossing, decoding and folding, and its function runs, until the process stops: 0.80 to 0.90 ms a commit for 1,000 such links (measured for weak links never collected; the same work here, reasoned). The fix is `disconnect()`, a signal, `until` or `break`; `f.cluster` shows it | E-55 claim 12; CONNECT 2.3 |
+| a link nobody ended | 0 | 0 | **a cost the line does not show**: its changes go on crossing, decoding and folding, and its function runs, until the process stops: 0.80 to 0.90 ms a commit for 1,000 such links (measured for weak links never collected; the same work here, reasoned). The fix is `disconnect()`, a signal, `until` or `break`; `f.cluster.value.open` shows it | E-55 claim 12; CONNECT 2.3 |
 | a lens inside a big partition | as `connect()` | 0 | **the whole partition** (first build) | user rule 5 |
 | operators right of `connect()` | 0 | 0 | a filter about 1 µs per affected view; an ordered view with a window 1.6 to 62 µs a change, by partition size; `by().sum()` 0.66 to 1.84 µs at 10^6 rows, where `group(fn)` is 78 to 94 ms. Released when their handle ends | [E-05]; E-55 claims 16, 26; E-57 B2 |
 | `lookup(other, field)` | 1 per new key named | 0 | 2.9 to 3.9 µs a left change; a right change 1.9 to 3.3 µs when one left row names it, 39 to 48 at 100; 161 B a left row | E-57 B4 |
@@ -958,7 +964,8 @@ console.log(old.value)
 | `depth: 2` | | | a key grows 2 B. Partitions of 100 rows and more: the fold is 0.78 to 1.10 times flat with PA-17's index, and 1.2 to 805 KB **less** memory a partition. One-row partitions: 1.3 to 1.5 times, and +0.9 KB each, until data's D3 | E-55 claim 19 |
 | a partition function (later) | | | an index from partition to rows on every copy: memory per row, an update per fold | PA-17 |
 | `fero(name)`, a client, by default | 2 to 3 built well | 1 (its session) | none: it holds nothing | PATHS 3.2 |
-| `hold: 'all'`, or `f.data.connect()` | 1 SUB | 0 | **the whole resource, once; then every write to the resource**, decoded and folded here | PATHS 3.2, 4.5 |
+| `hold: 'all'`, or `f.data.connect()` | 1 SUB (none for `f.data.connect()` on a server or with `hold: 'all'`: it shares the rows held) | 0 | **the whole resource, once; then every write to the resource**, decoded and folded here | PATHS 3.2, 4.5 |
+| an operator over every row on a spare server: its root operators, or `ctx.data` | 1 SUB per such `connect()`; one picture per such `get()` | 0 | **the whole resource**: a `connect()` takes it once and then every write while its link lives; a `get()` takes it for each read and keeps nothing. None on the first `copies + standbys` servers. **Not measured** | section 3.3; TRANSFORMS R0 and 10 item 10 |
 | `hold: '200MB'`: a closed selection opened again | 1 SUB | 0 | a resume (the changes since) if the server can; else the picture again. Nothing while closed; never free | reasoned (LENS 2.2) |
 | `fero(name, …)` with a server role, joining | | | the whole log copied and folded; a `dir` and its syncs; a vote or a standby | PATHS 2.1, 5.1 |
 | `fero(name, …)` founding a resource | one create-if-absent | about 5 ms; about 35 ms across machines | about 8 KB per server while idle | [E-49]; V5-8 |
@@ -967,10 +974,10 @@ console.log(old.value)
 | a queue message | | 3 (add, take, ack) | | PATHS 4.13 |
 | a `service` ask | | 3 | | [E-22] D7 |
 
-Nothing on the surface decodes, copies or walks a whole resource except the bold "whole" and "every" rows. Most of those say so in their shape: a call that returns everything, or a listing you wrote. **Three do not, so learn them:** `hold: 'all'` (an option, not a line of code), a lens inside a partition, which holds the whole partition (user rule 5), and a served view or a `{ pages }` index, which costs its copy something on every write to the resource.
+Nothing on the surface decodes, copies or walks a whole resource except the bold "whole" and "every" rows. Most of those say so in their shape: a call that returns everything, or a listing you wrote. **Four do not, so learn them:** `hold: 'all'` (an option, not a line of code), a lens inside a partition, which holds the whole partition (user rule 5), a served view or a `{ pages }` index, which costs its copy something on every write to the resource, and an operator over every row on a spare server, which downloads the resource first (the deployment, not the line, says whether this server is a spare).
 
 **Where the surface itself used to cost, and what this page did.**
-- A whole picture copied every row per read: `f.rows` is a lookup, and the picture went (PA-8; V5-13 pick 6).
+- A whole picture copied every row per read: a sync read is a handle's lookup, and the picture went (PA-8; V5-13 pick 6; V5-16).
 - A `get` that missed followed its key for the life of the handle: `get()` holds nothing (E-55 claim 20); and it is not a one-shot subscription (E-56 probe 1).
 - A bare `fero(name)` downloaded the whole resource, then every write to it: the default holds nothing (V5-12 pick 1).
 - data's handle kept every child for its parent's life, 318 to 1,333 B a key: a step keeps nothing (E-55 claim 2).
@@ -999,9 +1006,9 @@ Nothing on the surface decodes, copies or walks a whole resource except the bold
 | `methods.update(change, { confirm })` | `lens.set(v)` returns a handle; await it, or `.received`, or `.replicated` | V5-5, V5-11: every write goes all the way; you choose when to stop waiting |
 | built-in `methods.update / insert / remove / read` | `lens.set`, `lens.remove`, `f.batch`, `lens.get`; your methods sit on `f.data` | one write path, and no clash with a method you name `update`. (The door still refuses a client's plain write when it runs, as v4's refused `methods.update`; a typed client now cannot write it at all) |
 | v4's lens calls: `f.data.set(k, v)`, `f.data.k.update(v)`, `f.data.patch(pairs)` | `f.data.k.set(v)`; one `set` per pair | V5-12: one write verb on the address; the others were second names |
-| reading a row through `f.snapshot`, which builds the whole picture | `f.rows.k` is one lookup; `f.snapshot` is gone | PA-8, V5-13 pick 6: 87 µs to 0.5 s per read becomes one lookup |
+| reading a row through `f.snapshot`, which builds the whole picture | `h.value.k`, through a `connect()` handle, is one lookup; `f.snapshot` is gone | PA-8, V5-13 pick 6, V5-16: 87 µs to 0.5 s per read becomes one lookup |
 | `replicas: N`, and `await f.data` gathering from every member | `lens.get()` and `lens.connect()`: a row not held is one trip to one copy | PATHS 4.4: the gather cost members × cells per read |
-| `ScopedError` on a sync read of a shard | `FeroError` with `not-held` | one error type; the hint names the call |
+| `ScopedError` on a sync read of a shard | no sync read of a shard: a handle's `value` covers what its link holds; else `get()` or `connect()` (V5-16). One error type, `FeroError` | one error type; the hint names the call |
 | a reconnect downloads the whole resource | a reconnect sends what was missed | [E-31]; E-55 claim 7 |
 | `tap(() => …)` or `tap((rec) => …)`, chosen by reading the function's source text | `connect((value, c) => …)`: one call per commit, the value first | LENS 1.6, V5-13 pick 1: one shape; a parameter cost 1.5 to 1.8 µs a change (code data:ops/misc.ts:598-611) |
 | `connect(anchor, fn)`: the anchor is checked, then ignored | `connect(fn, { signal, until })`: a strong link that ends by your code, at `disconnect()`, a signal, `until` (a socket that closes), `break` or the count | V5-13 pick 2; code data:api/index.ts:357-361 |
@@ -1011,8 +1018,9 @@ Nothing on the surface decodes, copies or walks a whole resource except the bold
 | `replicas`, `heartbeat.ms`, `seams` | `copies` and `standbys`, `ping.ms`; `seams` gone | Raft needs a fixed, odd set of voters; Raft has heartbeats of its own, so the link's ping gets its own word |
 | `dir` per resource, off by default | `dir` per process, on by default for a server | one journal and one disk sync for every resource in the process ([E-12]); every write is on disk (V5-5) |
 | `cluster.epoch`, `cluster.partitions` | `cluster.groups`, `cluster.health`; `cluster.writes` stays | the ring and the ballots are gone; health says what is wrong and the fix |
+| `f.cluster.snapshot()`, `f.cluster.me.snapshot()`, `f.cluster.writes.snapshot()`, `tap(fn)` on each | `f.cluster.value` (with `me` inside it), `f.cluster.writes.value`, `connect((shape) => …)` | V5-16: one sync read, of this process's own state |
 
-**The examples ladder.** Most rungs keep their files. Every `console.log(f.snapshot)` changes, since `f.snapshot` is gone: 89 lines in 52 example files (READS 9). The ones whose lesson changes: 03 (the pending row now waits for a majority; and a client with no server yet throws `not-held` on a sync read where v4 printed `{}`), 04 and 08 (the built-in methods become verbs), 10 (`confirm` becomes stages), 12 and 13 (`{ confirm: 'persisted' }` becomes a plain `await`), 16 (scoped becomes "holds what its links name"), 17 (the lost increment becomes `op.incr`, with the old race shown as the reason). **And every rung whose client reads rows**: a bare client now holds nothing, so its `client.rows.k` throws `not-held` until a line says `hold: 'all'`, `f.data.connect()`, or reads through a handle (V5-12 pick 1; about 20 READMEs, LENS 7 Q1).
+**The examples ladder.** Most rungs keep their files. Every `console.log(f.snapshot)` changes, since `f.snapshot` is gone: 89 lines in 52 example files (READS 9). The ones whose lesson changes: 03 (the pending row now waits for a majority; and a client with no server yet has a handle that throws `not-ready`, and `f.cluster.value.members` that reads `undefined`, where v4 printed `{}`), 04 and 08 (the built-in methods become verbs), 10 (`confirm` becomes stages), 12 and 13 (`{ confirm: 'persisted' }` becomes a plain `await`), 16 (scoped becomes "holds what its links name"), 17 (the lost increment becomes `op.incr`, with the old race shown as the reason). **And every rung that reads rows in sync**: a bare client now holds nothing, and no role has a sync lookup of every row, so such a line reads through a handle, `f.data.connect()` or a partition's `connect()`, or reads once with `get()` (V5-12 pick 1; V5-16; about 20 READMEs, LENS 7 Q1). **And 46 lines in 33 files read the cluster** with `snapshot()` or `tap` *(checked: grep)*. Each becomes `value` or `connect(fn)`, but 23 of them, in 23 files, also read a field v5's shape lacks: `peers` (10 lines), `epoch` (8), `me.uuid` (5), `me.hosts` (2), `me.origin` (1), `partitions` (1). The table's `cluster.epoch` row maps `epoch` and `partitions`; the rest are owed (section 11.2).
 
 ### 5.2 From COMP2's API, because the design changed
 
@@ -1037,7 +1045,7 @@ Each is a rename, a short form of calls that exist, or removes a cost. None adds
 
 | COMP2's page | This page | Why |
 |---|---|---|
-| `f.snapshot.k`, promised as a property read but built as a full copy | `f.rows.k`, a lookup; `f.snapshot` is gone (V5-13 pick 6) | "snapshot" says "a copy"; "rows" says "the rows, now" (PA-8) |
+| `f.snapshot.k`, promised as a property read but built as a full copy | `h.value.k`, a lookup through a live handle; `f.snapshot` is gone (V5-13 pick 6; V5-16) | "snapshot" says "a copy"; a handle's `value` is "the state, now", and only while its link lives (PA-8) |
 | `f.read({ from })` | `lens.changes({ from })`; `from` defaults to `'latest'` | "read" sounds like reading a row; the lens is the selector (5.5) |
 | `fero.cursor(text)` to bring back a saved cursor | the saved text goes back in as `from` | one step less; a wrong text is refused `bad-cursor` at the open |
 | `shortfall`, `holistic` | one code, `not-held`, whose hint names the call | the two names said nothing; the fix is the same kind |
@@ -1100,9 +1108,9 @@ The owner reviewed the 2026-11-16 page and asked for the lens they had explored 
 - **The price in rules: about +12 to +18 on 416, 3 to 4 %, for the first build, plus three in a reader library for `asOf`** (reasoned, not modelled; LENS 4.4). By V5-6's measure the lens costs rules and cannot win on rules alone. The trade: the seven places a computation can run (LENS 2.3) are said with one address and one line, `here()`, where the 2026-11-16 page named four of them with four unrelated words; a `get` no longer hides a follow; and `f.data.*` is typed.
 - **data changes for it, in TypeScript, none in Rust** (V5-12 pick 9; LENS 4.5): D1 (path subscriptions through a keyed index) and D2 (the uncached, callable lens) first; then D3 (two-level stores) and D4 (one sink shape). Each is useful to data alone.
 
-### 5.6 From the 2026-11-18 page, for V5-13 to V5-15
+### 5.6 From the 2026-11-18 page, for V5-13 to V5-16
 
-The owner found the mix of `here`, `tap`, `connect` and `changes` unclear, asked why a root method was `f.methods.x` while a path method was `f.data.k.x`, proposed one `connect` with options, asked for a validated plan for transformations, and asked whether v5 keeps reads and writes at any level of a resource. READS.md and [CONNECT.md](CONNECT.md) answered the first (V5-13), [TRANSFORMS.md](TRANSFORMS.md) the second (V5-14), and [ANYPATH.md](ANYPATH.md) the third (V5-15). Each row below is a change from the 2026-11-18 page; section 5.5's table is V5-12's change as written then, and its words that this table replaces are not current.
+The owner found the mix of `here`, `tap`, `connect` and `changes` unclear, asked why a root method was `f.methods.x` while a path method was `f.data.k.x`, proposed one `connect` with options, asked for a validated plan for transformations, and asked whether v5 keeps reads and writes at any level of a resource. READS.md and [CONNECT.md](CONNECT.md) answered the first (V5-13), [TRANSFORMS.md](TRANSFORMS.md) the second (V5-14), and [ANYPATH.md](ANYPATH.md) the third (V5-15). Later the same day the owner asked whether the remaining snapshot reads could go as well, keeping a sync `.value` read only where it is safe beyond doubt, and reading through `get()` or `connect()` elsewhere (V5-16). Each row below is a change from the 2026-11-18 page; section 5.5's table is V5-12's change as written then, and its words that this table replaces are not current.
 
 **Reads** (V5-13).
 
@@ -1123,10 +1131,19 @@ The owner found the mix of `here`, `tap`, `connect` and `changes` unclear, asked
 | a handle and a served view that could be awaited (`Served` was a `PromiseLike`) | no `then` on a handle; a served view is an address | pick 3; a thenable handle lost 1,000 of 1,000 links (E-56 probe 1) |
 | `f.methods.x(arg)`; "fero's names win" with `lens.call` as the way out | `f.data.x(arg)`; a method named like a fero word is refused where it is declared (`bad-name`); an unknown name `no-such-method`; `call()` stays for a name in a variable | pick 6 |
 | a method that returns a view, `here()`'d | `{ view }`, an address you `get` or `connect` | pick 6 |
-| `f.snapshot` | gone: `f.rows[k]`, or a spread you write | pick 6 |
+| `f.snapshot` | gone: `h.value[k]` through a `connect()` handle, or a spread you write | pick 6; V5-16 |
 | (new) | `from`, `at` and `once` on `connect` refused by the types, naming `changes()` and `past()` | pick 3 |
 | (not taken) | a folded resume, `connect({ resume })` | pick 7: modelled first in E-31's model |
-| `f.cluster.tap(fn)`, `f.cluster.writes.tap(fn)` | `connect(fn)`, giving a handle with `disconnect` | *this page's reading* of pick 1's one live verb (question 31) |
+| `f.cluster.tap(fn)`, `f.cluster.writes.tap(fn)` | `connect((shape) => …)`, giving a handle with `disconnect` | pick 1's one live verb, carried to the cluster: this page's pick (question 31) |
+
+**Sync reads** (V5-16, the same day).
+
+| Gone | Now | Decision, and why |
+|---|---|---|
+| `f.rows`, on a server and with `hold: 'all'` (V5-13 pick 6 kept it) | every row read in sync through `f.data.connect()`'s handle, on any role: `h.value[k]`. No `f.value` | a lookup on "a server" works on five servers and throws on a spare, which cannot wait for its download: the deployment, not the line, would decide (section 3.3). The handle costs what `f.rows` did, one lookup and one trap, plus the `ended` check; and it says when it fails (`h.closed`) |
+| `f.cluster.snapshot()`, `f.cluster.writes.snapshot()` | `f.cluster.value`, `f.cluster.writes.value`: sync, this process's own state; `id`, `members` and `groups` are `undefined` until a server answers; `ended` after `destroy()` | the one sync read, `.value`, where it is sure. No `get()` there: the value is already here |
+| `ctx.rows` | `await ctx.at.get()`, local at a path's leader; at the root, `await ctx.data[k].get()` | right on any server, with no trip where the rows are held |
+| (not taken) | `.value` on a lens; an `f.value` of every row with `hold: 'all'` | a property on a lens is a step: `lens.value` is the row or field named `value`. `f.value` would need a new role in the types and a rule for `hold` on a server, for what the handle already gives |
 
 **Transformations** (V5-14).
 
@@ -1154,9 +1171,9 @@ The owner found the mix of `here`, `tap`, `connect` and `changes` unclear, asked
 | a diff entry without its room; a depth-2 commit not cut; `c.recs()` as data's merged row; `op.merge` as the whole row | `partition` on every entry; commits cut to the link's rows; `c.recs()` from the log's bytes; `op.merge` as one field record per key | pick 7 |
 | the record form sees records only (V5-14 pick 8) | the record form with rows, `{ rows: true }`, in the first build, with a dev warning | pick 4 |
 
-- **What a user no longer has to know:** `here`, `tap`, the weak `connect` and its rule, `scope`, `closes`, `asOf` and its `seek` and `close`, `f.methods`, `f.snapshot`, `c.changes`, `c.now`, and "fero's names win".
+- **What a user no longer has to know:** `here`, `tap`, the weak `connect` and its rule, `scope`, `closes`, `asOf` and its `seek` and `close`, `f.methods`, `f.snapshot`, `c.changes`, `c.now`, and "fero's names win"; since V5-16, `f.rows`, `ctx.rows` and `snapshot()` on the cluster.
 - **What a user learns instead:** seven read rules (section 2; V5-13's consequences) and ten for transformations (3.10; V5-14's). Paths bring data's rule and the shape rule (V5-15 picks 1 and 6), which the types cannot show and no record counts as user rules.
-- **The price in rules** (reasoned, SIMPLICITY's measure): the read surface about 0 to +16 over READS.md's pick (V5-13; READS put its pick at +10 to +25 on 416, so +10 to +41 in all); transformations about +26 (21 to 45) for the first build (V5-14); the "on the path" reader for the log below a row, and the room write, the shape rule and the field guard, not counted together yet (V5-15's consequences name the reader and the field `-N`).
+- **The price in rules** (reasoned, SIMPLICITY's measure): the read surface about 0 to +16 over READS.md's pick (V5-13; READS put its pick at +10 to +25 on 416, so +10 to +41 in all); transformations about +26 (21 to 45) for the first build (V5-14); the "on the path" reader for the log below a row, and the room write, the shape rule and the field guard, not counted together yet (V5-15's consequences name the reader and the field `-N`); V5-16 about −1 to +1, in L4 (LAYERS 5.4; reasoned).
 - **data changes for it, in TypeScript, none in Rust** (V5-14 pick 6): data 5.0.0, a large major version: D1 and D2 first, then the merge contract (C1 to C10), the new operators (N1 to N5), D3, D4, D6 to D9 (TRANSFORMS 9.1). data's five path-rule holes are listed in STATUS for its owner; fero needs none of them fixed if its leader refuses those shapes first (V5-15).
 
 ## 6. The declarations
@@ -1168,14 +1185,17 @@ What every code block on this page compiles against. They merge three type sketc
 - **New, for transformations:** the operators of data 5 (`eq`, `in`, `by` with `Grouped`, numbers-only range filters, windows and pages, `CodeOps`, `lookup` with `Joined`); served views and pages (`ViewDef`, `PagesDef`, `ViewCtx`, `CheckViews`, `Served`, `ServedLive` with `sync()`, `Paged`, `Page`, `After`); `derive`'s view form and its record form with rows.
 - **New, for writes and the rest:** room writes (`PartWrites`, `NewRows`); field options without `ttl` and `while` (`FieldOpts`); the name rule (`NoClash`); `ctx.signal`, `Lock.signal`, `ClusterShape.open`, `Role`'s `'all'`; `ResourceOptions`' timing keys (`skew`, `lag`, `catchup`); and the codes the decisions add.
 - **Gone:** `Held`'s `rows`, `View`, `Value`, `Sel`, `LocalOps`, `Link.close`, `Commit.changes` and `now`, `tap`, `here`, `asOf`, `seek`, `scope`, `Scope`, `ConnectOpts` and its `closes`, `Position`, `f.methods` (`RootCalls` moved onto the root lens), `f.snapshot`, the operator `top`, and the code `no-method` (now `no-such-method`).
+- **V5-16, the same day.** New: `ClusterView.value` and `WritesView.value`; `connect((value) => …, { signal, until })` on both; `ClusterShape`'s `id`, `members` and `groups` typed `| undefined` until a server answers. Gone: `Handle.rows` (`f.rows`), `Ctx.rows`, `ClusterView.snapshot` and `WritesView.snapshot`. After its two reviews: every field of `ClusterShape`, `HealthRow` and `WriteRow` is read-only, as a frozen value is; `hold` is in a client's open only (`ClientOpen`), not in a server's; and a stream (`rows: false`) has `cluster` too.
 
-**How the types know a role.** `Resource<Row, M, D, R>` carries the row type, the methods, the depth and what the types know of the role: `'server'`, `'client'` (a bare client, which holds what its links name) or `'all'` (a client that said `hold: 'all'`). A server marker in the open makes `'server'` (section 3.1). `fero<Shop>(name)` turns a server's type into `'client'`, or `'all'` with `{ hold: 'all' }`. A client of a resource with methods has no writes on its lenses, rooms or root (V4-5). A bare client has no `f.rows` and no operators over every row. A handle typed by its rows only (`fero<Row>(name)`) has no methods in its type, so it may write, and calls through `call()` are untyped.
+**How the types know a role.** `Resource<Row, M, D, R>` carries the row type, the methods, the depth and what the types know of the role: `'server'`, `'client'` (a bare client, which holds what its links name) or `'all'` (a client that said `hold: 'all'`). A server marker in the open makes `'server'` (section 3.1). `fero<Shop>(name)` turns a server's type into `'client'`, or `'all'` with `{ hold: 'all' }`. A client of a resource with methods has no writes on its lenses, rooms or root (V4-5). A bare client has no operators over every row. No role has a sync lookup of every row (V5-16): `f.data.connect()` gives a handle on every role. A handle typed by its rows only (`fero<Row>(name)`) has no methods in its type, so it may write, and calls through `call()` are untyped.
 
 **Where the types are weaker than the text** (stated, not fixed):
 - `f.set(path, v)` checks a whole row's value; a field's value (a longer path) is not checked, and neither is a value under `f.at(…)` past the row.
 - A depth-2 seed does not give the row type: name it, `fero<Msg, 2>` or `fero.of<Msg, 2>()`. The depth type argument is not tied to the founding `depth`; a later open that disagrees with the stored depth is refused `config-differs`.
 - The role is known from the open's markers and from `fero<Shop>`. A server marker given through the config cascade, not the call, is not seen by the types.
 - `ctx.at` of a method declared `at: 'any'` is untyped: it may be any kind of lens.
+- `ClusterShape`'s `id`, `members` and `groups` are `| undefined` on every role, though a server that holds a copy has them: `ClusterView` does not carry the role, and a spare may not have them yet.
+- The types cannot tell a spare server from a copy (section 3.3): a spare's root operators compile as a copy's do, and first download the resource.
 - `session.ms` is `#sessions`' own setting (section 9), not a key of an app's resource, so no type carries it: an app sets it through the cascade (`fero.opt.ts`, `FERO_SESSION_MS`).
 - At `depth: 2` the root has no operators in the types, on any role, and `f.data.connect()` gives a handle with none: a name on that root is a room (section 3.10; question 28). The text's root operators on a server, with `hold: 'all'` and in `ctx.data` hold at depth 1 only.
 - A saga `Step`'s value is not checked against its lens's type.
@@ -1187,7 +1207,7 @@ What every code block on this page compiles against. They merge three type sketc
 - The libraries keep their shape.
 
 ```ts
-// file: fero.d.ts — fero v5's public API for the chosen design (V5-1 to V5-15). Declarations only.
+// file: fero.d.ts — fero v5's public API for the chosen design (V5-1 to V5-16). Declarations only.
 //   lens.get(opts?)              read once; hold nothing. One GET, or no trip where the rows are held on purpose
 //   lens.connect(opts?)          the newest state, kept here: a handle (value, ready, cursor, closed, disconnect), and a loop
 //   lens.connect(fn, opts?)      the same, plus fn(value, c) on the picture and once per commit. Not a loop
@@ -1299,7 +1319,9 @@ export interface ProcessOptions {
   connect?: { wait?: Duration }
   shuffle?: boolean | number
 }
-/** What a client's open may carry: no server marker. */
+/** What a client's open may carry: no server marker. `hold` is a client's key only: a server's open does not take it.
+ *  A client holds what its live links name (the default). 'all': every row, kept live: the open sends the
+ *  whole resource once, then every write. A size: a cache of pictures of closed selections, never read from. */
 type ClientOpen = Omit<ProcessOptions, 'listen' | 'dir'> & { server?: false; hold?: 'all' | Size; signals?: boolean; bind?: OpenOptions['bind'] }
 
 /** Remembered by the resource's own log (V5-2). The founding open writes them; fero.alter changes some. */
@@ -1344,15 +1366,13 @@ export interface Schema<Row> {
 export interface OpenOptions {
   /** true: serve this resource from this process. false: stay a client. Default: by declared act. */
   server?: boolean
-  /** A client holds what its live links name (the default). 'all': every row, kept live: the open sends the
-   *  whole resource once, then every write. A size: a cache of pictures of closed selections, never read from. */
-  hold?: 'all' | Size
   signals?: boolean
   bind?: 'live' | 'sim' | `tape:${string}` | `./${string}`
 }
 
 // ── the resource ─────────────────────────────────────────────────────────
-/** A handle. `data` is the address of everything, root methods included; `rows` is the hot sync read. */
+/** A handle. `data` is the address of everything, root methods included. Its one sync read is a live handle's
+ *  value: `f.data.connect()` for every row (V5-16). */
 export type Resource<Row = any, M = {}, D extends Depth = 1, R extends Role = Role> =
   Handle<Row, M, D, R> & (Door<M, R> extends true ? {} : RootWrites<Row, D>)
 declare const typesOf: unique symbol
@@ -1362,13 +1382,12 @@ export interface Handle<Row, M, D extends Depth, R extends Role> {
   readonly name: string
   /** The root lens: the address of everything. Root methods are called on it: `f.data.low(5)`. */
   readonly data: Lens<Tree<Row, D>, Row, M, 'root', D, R>
-  /** The hot sync read: one lookup, frozen rows. Only where every row is held: a server, or hold: 'all'. */
-  readonly rows: [R] extends ['client'] ? Steer<'f.rows needs every row held here: read through a connect() handle, or open with hold: "all"'> : RowsOf<Row, D>
   /** The same address as f.data.a.b, with no Proxy: keys from input, keys named like fero words, hot loops. */
   readonly at: AtFn<Row, M, 'root', D, R>
   /** A reader name's marks, as a cursor for changes({ from }). */
   marks(name: string): Promise<Cursor>
-  /** This resource's members, groups, health, writes in flight, and the links this process has open. */
+  /** This resource's members, groups, health, writes in flight, and the links this process has open: a live
+   *  link the open holds for you. `f.cluster.value` is a sync read of it (V5-16). */
   readonly cluster: ClusterView
   destroy(): Promise<boolean>
 }
@@ -1417,6 +1436,8 @@ export interface Stream<Row = any, D extends Depth = 1, R extends Role = Role> {
   readonly data: LogLens<Row, 'root', D>
   readonly at: (...keys: (Key | number)[]) => LogLens<Row, 'row', D>
   marks(name: string): Promise<Cursor>
+  /** As a Resource's: members, groups, health, writes in flight and open links. */
+  readonly cluster: ClusterView
   destroy(): Promise<boolean>
 }
 type NoRows = 'this resource keeps no rows (rows: false): read its log with changes()'
@@ -1607,7 +1628,8 @@ export interface Change<Row> {
 // ── operators: left of connect() plain data, right of it your code ───────
 /** left: left of connect() on a lens inside a partition (plain data; a copy may run it later). right: right of
  *  connect(), here, on held rows. server: where this process holds every row (a server, hold: 'all', a handler's
- *  ctx.data): it runs here. view: inside { view } or { pages }: this resource only, and no caller. */
+ *  ctx.data): it runs here; a spare server first takes every row, as hold: 'all' does (section 3.3).
+ *  view: inside { view } or { pages }: this resource only, and no caller. */
 type Mode = 'left' | 'right' | 'server' | 'view'
 /** rows: unordered, unbounded. sorted: ordered, unbounded. window: ordered, at most n. page: a window after a cursor.
  *  scalar: one value. buckets: one value per bucket. members: rows per bucket. arrival: this process's arrival order. */
@@ -1882,7 +1904,6 @@ export interface Ctx<Row = any, D extends Depth = 1, K extends Kind = 'root'> {
   readonly at: Lens<K extends 'row' ? Row : K extends 'part' ? Record<Key, Row> : K extends 'root' ? Tree<Row, D> : any, Row, {}, K, D, 'server'>
   /** This server's own resource: its rows held, its writes allowed; operators run here (at depth 1; at depth 2 a name on the root is a room). */
   readonly data: Lens<Tree<Row, D>, Row, {}, 'root', D, 'server'>
-  readonly rows: RowsOf<Row, D>          // this server's rows: one lookup
   set: RootWrites<Row, D>['set']
   remove: RootWrites<Row, D>['remove']
   batch: RootWrites<Row, D>['batch']
@@ -1986,34 +2007,54 @@ export interface Who { peer: string; claims: Claims | null; session: string }
 
 // ── cluster and health ───────────────────────────────────────────────────
 export interface ClusterView {
-  snapshot(): ClusterShape
-  /** fn after each change of the shape; ended by its handle's disconnect(). */
-  connect(fn: () => void): { readonly disconnect: () => void }
+  /** What this process knows of the resource now: a sync read, never a trip, a new frozen object at each change.
+   *  After destroy(), 'ended' (V5-16). There is no get() and no snapshot(): the value is already here. */
+  readonly value: ClusterShape
+  /** fn(shape) a microtask after the call, then after each change, as a lens's connect(fn). */
+  connect(fn: (value: ClusterShape) => void, opts?: Pick<LinkOpts, 'signal' | 'until'>): { readonly disconnect: () => void }
   readonly writes: WritesView
 }
+/** id, members and groups are learned from a server: undefined until one answers, never {} (V5-16).
+ *  Frozen, deeply: every field is read-only. */
 export interface ClusterShape {
-  id: string                  // the resource's id, made when it was founded
-  writable: boolean
-  me: { id: string; role: 'server' | 'client' | 'solo'; listen: string | false; caughtUp: boolean; lag: number; links: string[] }
-  members: Record<string, { listen: string; state: 'live' | 'draining' | 'retiring' | 'gone'; up: boolean }>
-  groups: Record<string, { voters: string[]; learners: string[]; leader: string | null; lag: number; slots: number }>
+  readonly id: string | undefined      // the resource's id, made when it was founded
+  readonly writable: boolean
+  readonly me: {
+    readonly id: string; readonly role: 'server' | 'client' | 'solo'; readonly listen: string | false
+    readonly caughtUp: boolean; readonly lag: number; readonly links: readonly string[]
+  }
+  readonly members: Readonly<Record<string, {
+    readonly listen: string; readonly state: 'live' | 'draining' | 'retiring' | 'gone'; readonly up: boolean
+  }>> | undefined
+  readonly groups: Readonly<Record<string, {
+    readonly voters: readonly string[]; readonly learners: readonly string[]; readonly leader: string | null
+    readonly lag: number; readonly slots: number
+  }>> | undefined
   /** This process's open links on this resource, by path, with counts: a leak shows here. */
-  open: { path: string; kind: 'connect' | 'changes' | 'view' | 'pages'; count: number; since: Time }[]
-  health: HealthRow[]
+  readonly open: readonly {
+    readonly path: string; readonly kind: 'connect' | 'changes' | 'view' | 'pages'; readonly count: number; readonly since: Time
+  }[]
+  readonly health: readonly HealthRow[]
 }
-export interface HealthRow { kind: string; severity: 'info' | 'warn' | 'down'; since: Time; message: string; fix: string }
+export interface HealthRow {
+  readonly kind: string; readonly severity: 'info' | 'warn' | 'down'; readonly since: Time
+  readonly message: string; readonly fix: string
+}
 export interface WritesView {
-  snapshot(): WriteRow[]
-  connect(fn: () => void): { readonly disconnect: () => void }
+  /** This process's writes in flight and its recent answers: its own state, a sync read. After destroy(), 'ended'. */
+  readonly value: readonly WriteRow[]
+  /** fn(rows) a microtask after the call, then after each change, as a lens's connect(fn). */
+  connect(fn: (value: readonly WriteRow[]) => void, opts?: Pick<LinkOpts, 'signal' | 'until'>): { readonly disconnect: () => void }
   lookup(id: AttemptId): Promise<WriteRow>
 }
+/** Frozen, as the list it is in. */
 export interface WriteRow {
-  id: AttemptId
-  key: Path
-  state: 'pending' | 'committed' | 'refused' | 'unknown'
-  stage?: 'received' | 'replicated'   // how far a pending write got
-  version?: Version
-  code?: Code
+  readonly id: AttemptId
+  readonly key: Path
+  readonly state: 'pending' | 'committed' | 'refused' | 'unknown'
+  readonly stage?: 'received' | 'replicated'   // how far a pending write got
+  readonly version?: Version
+  readonly code?: Code
 }
 
 // ── errors ───────────────────────────────────────────────────────────────
@@ -2168,8 +2209,9 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 ## 7. What the types cannot say
 
 **The rules the types cannot check.** Most of section 2's seven rules are in the types: a lens and a handle are never promises (rule 1), each verb gives what it says (rule 2), a version and `-N` are refused on the root (rule 3), a function cannot stand left of `connect()` (rule 4), `until` refuses what cannot say it closed (rule 6), and a method is offered only where it is declared and never takes a fero word (rule 7). These are yours to keep:
-- **End every link** (rule 6). The types cannot see that a handle is ended. A link nobody ends runs until the process stops: its changes go on crossing and decoding, and its function runs (E-55 claim 12). The dev warning fires only if the collector runs and the handle has no signal, no `until` and no parent; a handle kept in a variable never warns. `f.cluster` always shows open links by path (section 3.10).
-- **Read a partition's value only while its link is live** (V5-13 pick 5). A read after the end compiles and throws `ended`. Copy what you keep, `{ ...h.value }`, while the link is live.
+- **End every link** (rule 6). The types cannot see that a handle is ended. A link nobody ends runs until the process stops: its changes go on crossing and decoding, and its function runs (E-55 claim 12). The dev warning fires only if the collector runs and the handle has no signal, no `until` and no parent; a handle kept in a variable never warns. `f.cluster.value.open` always lists open links by path (section 3.10).
+- **Read a partition's value only while its link is live** (V5-13 pick 5). A read after the end compiles and throws `ended`. Copy what you keep, `{ ...h.value }`, while the link is live. The same holds for `f.cluster.value` and `f.cluster.writes.value` after `destroy()` (V5-16).
+- **`f.data.value` is a row named `value`**, not every row: a property on a lens is a step, so the slip compiles and reads one row. Every row is `f.data.connect()`'s `value`.
 - **A lens inside a partition holds the whole partition** (rule 5, first build). `chat.data.room1.m7.text.connect(…)` downloads `room1` once, then every change to it.
 - **data's rule is a run-time rule** (V5-15 pick 1). That a link or a field's log runs only when its value changed, and never for a write beside it, is in the comments of section 6, not in the types. "Changed" means a new object, so an object value's link may run again on every copy but the leader after a whole-row write that left it equal.
 - **The shape rule is the leader's** (V5-15 pick 6). That a field write's parent is an object, that an array step is an index, and that no key is `__proto__` depend on the row's shape at run time, not its type: the leader refuses `absent-path`, `bad-shape` and `bad-key`.
@@ -2186,7 +2228,7 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 **Roles.**
 - Section 3.1 has the rule. The server markers are: `server: true`, `listen`, `dir`, a `data` seed, `methods`, and the other code keys (`validation`, `schema`, `rules`, `load`, `rows.where`, `shape.up`). A `partition` function alone is not one: a client may pass it to route by itself.
 - `listen: false` is a solo node with no socket: the only voter of its groups, for tests.
-- A server holds and folds every row of each resource it serves, with `data`, while it is one of the resource's `copies + standbys`. A server past that number is a spare (section 3.3). A client holds what its live links name, or every row with `hold: 'all'` (section 3.3).
+- A server holds and folds every row of each resource it serves, with `data`, while it is one of the resource's `copies + standbys`. A server past that number is a spare (section 3.3): the types cannot tell it from a copy, and its first operator over every row downloads the resource. A client holds what its live links name, or every row with `hold: 'all'` (section 3.3).
 - **The libraries' own resources need a server too.** `queue('thumbs', { server: true })` on a server founds and serves the queue; a worker's `queue('thumbs')` is a client of it. fero's system resources (`#sessions`, `#locks`, `#sagas`, `#calls`, `#groups`) are resources like any other; any process that serves a resource serves them too (this page's reading, with [LAYERS.md](LAYERS.md) section 10 item 5; the records do not say who founds them).
 
 **Answers.**
@@ -2222,7 +2264,7 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 **Ops on what is missing.** An op on a missing row, or on a missing field of a row that exists, starts from its identity: `incr` from 0, `push` from `[]`, `merge` from `{}`; `max`, `min` and `now` take the value. A field write or field op on a row that does not exist is refused `absent-row`. So a counter is its own row, or a field of a row you created first. `op.merge` on a row that exists is appended as one field record per merged key (V5-15 pick 7).
 
 **Reads.**
-- `f.rows`, a handle's `value`, a view, and `get()` of a partition held on purpose read this process's committed rows, with no trip.
+- A handle's `value`, a view, and `get()` of a partition held on purpose read this process's committed rows, with no trip. `.value` is the one sync read, and only where it is sure: a live handle, a `past`, and `f.cluster` (V5-16).
 - A row handed out is frozen, so a read by reference cannot change it (DATA-07), and that covers rows handed to sinks (section 3.10). Open: in E-22's probe, a row read through a `filter` view was not frozen.
 - Every awaited read carries the highest position this process has seen. A server answers only once its own rows have reached it. So a process never reads older than what it already saw or wrote, even when a link ends and the next read goes to another copy.
 - A `get()` of a partition not held on purpose is answered from a copy, which may trail a write another process already had answered. `get({ fresh: true })` is the form that cannot ([E-22] C11).
@@ -2251,7 +2293,7 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 - **One timeline.** A viewer merges the resources' logs by writer time (V5-4). Writes to different resources within the clocks' gap (a few ms) may show in either order.
 
 **Methods.**
-- A handler called on a path runs at that path's leader, once the server has checked the path against the method's `at:` (`bad-path` if it does not fit). At the root, it runs on the server the caller reached. `ctx.at` is the lens it was called on; `ctx.rows` and `ctx.data` are that server's committed rows; `ctx.signal` aborts when the call ends.
+- A handler called on a path runs at that path's leader, once the server has checked the path against the method's `at:` (`bad-path` if it does not fit). At the root, it runs on the server the caller reached. `ctx.at` is the lens it was called on; `ctx.data` is that server's own resource; `await ctx.at.get()` reads the called row, with no trip at the leader (at the root, `await ctx.data[k].get()`; V5-16); `ctx.signal` aborts when the call ends.
 - **A call with `once`** claims a row in `#calls` first. It runs at most once within its `ttl`, and a retry gets the first result. If its server dies, it is re-run elsewhere when the claim's lease lapses, with the same attempt ids, `ctx.now()` and `ctx.id()`. So handlers must give the same writes for the same `arg` and `ctx`; a re-run that writes a different change is refused `call-diverged`.
 - **A call with `retry: true`** whose server dies is sent again to another server, as in v4. It may run twice; that is what the option says is safe. No claim, no extra commit.
 - **A call with neither** whose server dies answers `unknown`: it may have run. fero does not resend it.
@@ -2361,9 +2403,9 @@ Every failure is a `FeroError`. `code` says what, `outcome` says whether it may 
 
 | Code | Layer | When | Fields |
 |---|---|---|---|
-| `not-held` | L4 | a sync read of a row this process does not hold on purpose; `f.rows` on a client without `hold: 'all'`; on such a client, anything that needs every row: listing `f.rows`, an operator over every row left of `connect()`. Never a stale or partial answer, never a hidden trip. The hint names the row's partition and `get()` and `connect()`, or a view the server named, or `f.data.connect()` | `key` |
+| `not-held` | L4 | an operator over every row left of `connect()` on a client without `hold: 'all'` (the types refuse it on a bare client; untyped code meets it at run time). Never a stale or partial answer, never a hidden trip. No sync read throws it since V5-16: a handle's `value` throws `not-ready` or `ended` instead. The hint names a view the server named, or `f.data.connect()` with the operator right of it | |
 | `not-ready` | L4 | **new (V5-13):** a handle's `value` read before its first picture: await `h.ready` | |
-| `ended` | L4 | **new (V5-13 pick 5):** a read of a partition's value, or of `h.value`, after its link ended. Copy what you keep while the link is live | |
+| `ended` | L4 | **new (V5-13 pick 5):** a read of a partition's value, or of `h.value`, after its link ended. Copy what you keep while the link is live. Also `f.cluster.value` and `f.cluster.writes.value` after `destroy()` (V5-16) | |
 | `aborted` | L4 | a `get({ when })` or a link ended by its `signal` before it had what it waited for | |
 | `expired` | L3 | a reader's cursor, `-N` or `Date` is older than `history`; a past read before what is kept; a deriver whose source cut its log | `earliest` |
 | `bad-cursor` | L3 | text that is not a cursor, or a cursor of another resource or from before a restore | |
@@ -2449,7 +2491,7 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 | Key | Default | What it does |
 |---|---|---|
 | `server` | by declared act | `true` serves this resource from this process; `false` stays a client |
-| `hold` | nothing: a client holds what its live links name (V5-12 pick 1) | `'all'`: every row, kept live; a size: a cache of pictures of closed selections, not subscribed (section 3.3) |
+| `hold` | nothing: a client holds what its live links name (V5-12 pick 1) | `'all'`: every row, kept live; a size: a cache of pictures of closed selections, not subscribed (section 3.3). A client's key only: a server's open does not take it in the types |
 | `signals` | `true` | Ctrl-C is a clean stop (V4-8) |
 | `bind` | `live` | under `fero test`: what this name resolves to |
 
@@ -2532,7 +2574,7 @@ page.abort(); me.disconnect()                           // after the linger: uns
 console.log(u, same, sure)
 ```
 
-**Guarantee.** `get()` reads once and keeps nothing. `connect()` holds the row's partition by choice: the rows so far, then each change, with no gap and no overlap; a reconnect misses nothing. A read is served here only while a link holds the partition; a page's links end together on one signal; `fresh` asks the leader. A sync read of a row not held throws `not-held`, never a stale answer. With a size, a closed selection's picture stays warm inside the bound, not subscribed: opening it again sends its position, and only the changes since cross if the server can still resume (LENS 2.2; reasoned, not built). **Cost.** One trip per `get()`; one SUB per `connect()`, shared by equal lenses; later reads through the handle are one lookup. **Layer:** L3, L4.
+**Guarantee.** `get()` reads once and keeps nothing. `connect()` holds the row's partition by choice: the rows so far, then each change, with no gap and no overlap; a reconnect misses nothing. A read is served here only while a link holds the partition; a page's links end together on one signal; `fresh` asks the leader. The one sync read is a live handle's `value` (V5-16): after its link ends it throws `ended`, and a warm picture never answers one, so it is never a stale answer. With a size, a closed selection's picture stays warm inside the bound, not subscribed: opening it again sends its position, and only the changes since cross if the server can still resume (LENS 2.2; reasoned, not built). **Cost.** One trip per `get()`; one SUB per `connect()`, shared by equal lenses; later reads through the handle are one lookup. **Layer:** L3, L4.
 **Evidence.** The cursor rule is model-checked across a leader crash, a reload, a slot move and a relay ([E-31]). A read holds nothing: 100,000 GETs, 0 SUBs, 0 rows kept (E-55 claim 20). Reads served here only from rows held on purpose: 1 pattern per program over 1,000 collector seeds (E-55 claim 14). The warm cache is not built.
 
 ### P-04 Read-through cache
@@ -2877,9 +2919,9 @@ if (m) { await sendMail(m.job.to); await m.ack() }
 
 ### 11.1 For the owner
 
-Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on most. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 are new on this page. **V5-12 closed six of the first fourteen**, and **V5-13 to V5-15 close five more** (1, 5, 15, 19, and the served-view half of 16). Question 21 is settled by TRANSFORMS 3.4, which the owner approved in general with V5-14. Each says by what.
+Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on most. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 are new on this page. **V5-12 closed six of the first fourteen**, and **V5-13 to V5-15 close five more** (1, 5, 15, 19, and the served-view half of 16). **V5-16 closes 1 and 15 again**, the other way for `f.rows`. It also moved 26 and 31 onto `value` and `connect`, but the names there are this page's picks, so both stay open. Question 21 is settled by TRANSFORMS 3.4, which the owner approved in general with V5-14. Each says by what.
 
-1. **`f.rows` for reads; what is `f.snapshot`?** **Closed by V5-13 pick 6**: `f.snapshot` goes; `f.rows` stays, the lookup where every row is held (a server, or `hold: 'all'`).
+1. **`f.rows` for reads; what is `f.snapshot`?** **Closed by V5-13 pick 6 and V5-16**: `f.snapshot` goes (pick 6); `f.rows` goes too (V5-16, which supersedes pick 6's "`f.rows` stays"): every row is read in sync through `f.data.connect()`'s handle.
 2. **Verbs on the resource (`f.set`), or on `f.data` (`f.data.set`)?** **Closed by V5-12**: the path write is the main spelling; `f.set(path, v)` stays as the array form; `f.data.set` is the root's refused write.
 3. **`near` on a method.** **Closed by V5-12 picks 3 and 13**: a method on a path runs at that path's leader and declares `at:`.
 4. **`set(key, fn)`: add it?** **Settled in use** (V5-12, LENS 2.5): `lens.set(fn)`. On a field lens it is guarded by the field (V5-15 pick 5). The owner has not ruled on it by name, so a "no" still removes it.
@@ -2892,11 +2934,11 @@ Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on mos
 11. **`{ retry: true }` on a call: keep v4's cheap resend?** This page: yes, beside `once`.
 12. **A write with `once` has no early stages.** **Settled by V5-11 ruling 6.** A marked write and a room write have none either.
 13. **The partition function.** **Closed by V5-12 pick 4**: it stays in the API and is built later.
-14. **Names only:** `once`; `not-held`; `consumer`; `if: { lock }`; `hold`; `copies` and `standbys`; `fero.of<Row>()`; `e.value`; a queue's `key`; `ping.ms`; `rendezvous` as a list; `handback.max`; `bulk.rate`; `at`; `depth`; `ctx.at`; a method's `at:`; `{ from: e }`, `marks`, `mark`; `call`; `linger.ms`; a token's `read` claim. **Settled by V5-13 to V5-15:** `connect`, `disconnect`, `changes`, `past`, `c.diff`, `c.version`, `c.cursor`, `to`, `{ view }`, `{ pages }`, `room.set`, `bad-shape`. **Still the page's:** `views.rows`, `sync()`, `ClusterShape.open`, `FieldEntry`. Of the new names, `{ from: e }`, a call's path, `depth`, the `view` selector, a version's text and the cursor touch the record or the wire.
+14. **Names only:** `once`; `not-held`; `consumer`; `if: { lock }`; `hold`; `copies` and `standbys`; `fero.of<Row>()`; `e.value`; a queue's `key`; `ping.ms`; `rendezvous` as a list; `handback.max`; `bulk.rate`; `at`; `depth`; `ctx.at`; a method's `at:`; `{ from: e }`, `marks`, `mark`; `call`; `linger.ms`; a token's `read` claim. **Settled by V5-13 to V5-16:** `connect`, `disconnect`, `changes`, `past`, `c.diff`, `c.version`, `c.cursor`, `to`, `{ view }`, `{ pages }`, `room.set`, `bad-shape`, `.value` as the one sync read, and `f.cluster.value`. **Still the page's:** `views.rows`, `sync()`, `FieldEntry`, and the `open` list in `f.cluster.value` (question 26). Of the new names, `{ from: e }`, a call's path, `depth`, the `view` selector, a version's text and the cursor touch the record or the wire.
 
 **From the 2026-11-18 page.**
 
-15. **`f.rows` on a client.** **Closed by V5-13 pick 6** ("`f.rows` stays") with CONNECT's types: only on a server or with `hold: 'all'`; the types refuse it on a bare client and name a `connect()` handle.
+15. **`f.rows` on a client.** **Closed by V5-16**: `f.rows` is gone on every role, and there is no `f.value`; a `connect()` handle is the sync read on a bare client, with `hold: 'all'` and on a server alike. (V5-13 pick 6 had closed it the other way: only on a server or with `hold: 'all'`.)
 16. **The config keys for links and served views** (section 9). **The served-view half is closed by V5-14 pick 2**: `views.max` is 64 per copy, weighted by cost, with headroom. Still the page's: `linger.ms` 1000 (a guess), `views.client` 16 per client per copy (a guess), `views.rows` 1,000 (a guess).
 17. **`bad-path` for a write above a row.** This page reuses `bad-path` for a write at the root and for a room written any way but `room.set` and `room.remove()` (V5-15 pick 3). The other way is a code of its own.
 18. **`f.get(k)`, `f.data.snapshot()` and a token's `follow` claim go.** This page: `get` is a verb on a lens only; `f.remove(path)` and `f.touch(path)` stay as array forms; the claim is renamed `read`. **`ctx.use(other)` stays**: no decision removed it.
@@ -2910,12 +2952,12 @@ Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on mos
 **New on this page: choices the rewrite made where V5-13 to V5-15 leave room.**
 
 25. **What a log entry below a row carries.** V5-15 pick 2 says the reader keeps the lens's value and gives a change only when it changed, but not what the entry shows. This page: `e.value` is the lens's value right after the record (`FieldEntry`), since the reader has it anyway. ANYPATH carries the same reading (its T1-T3 and its section 8 sketch, `FieldEntry`). The other way keeps `e.value` as "what a whole-row record wrote" at every level and adds nothing below a row, so a user would fold the field out of `e.rec` by hand.
-26. **The name of the open-links list.** V5-13 pick 2 says `f.cluster` shows open links. This page: `f.cluster.snapshot().open`, each with its path, kind, count and start time.
-27. **Roles in the types.** CONNECT's sketch types a bare client, a client with `hold: 'all'`, and a server. This page reads every server marker of section 3.1 (`server: true`, a seed, `listen`, `dir`, a code key) as `'server'` in the types, and a handle typed by its rows only with no marker as a bare client, so its `f.rows` and root operators do not compile. The other way keeps the 2026-11-18 page's "either role" for `fero<Row>(name)`.
-28. **Operators on a server's root.** TRANSFORMS types a server's own root as a place where functions run (it holds every row). This page does the same for `hold: 'all'` and a handler's `ctx.data`; a partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types give the root no operators on any role**, since a name there is a room; CONNECT's and TRANSFORMS' sketches have the same gap. There a server declares a view, and code over every row reads `f.data.connect()`'s value. The other way types a depth-2 root's operators over (partition, row) keys and says how an operator name and a room name share the root.
+26. **The name of the open-links list.** V5-13 pick 2 says `f.cluster` shows open links, and V5-16 moved the cluster's state from `snapshot()` to `value`. The name is this page's: `f.cluster.value.open`, each with its path, kind, count and start time. The other way is a name such as `links`.
+27. **Roles in the types.** CONNECT's sketch types a bare client, a client with `hold: 'all'`, and a server. This page reads every server marker of section 3.1 (`server: true`, a seed, `listen`, `dir`, a code key) as `'server'` in the types, and a handle typed by its rows only with no marker as a bare client, so its root operators do not compile. The other way keeps the 2026-11-18 page's "either role" for `fero<Row>(name)`.
+28. **Operators on a server's root.** TRANSFORMS types a server's own root as a place where functions run (it holds every row). This page does the same for `hold: 'all'` and a handler's `ctx.data`; a partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types give the root no operators on any role**, since a name there is a room; CONNECT's and TRANSFORMS' sketches have the same gap. There a server declares a view, and code over every row reads `f.data.connect()`'s value. The other way types a depth-2 root's operators over (partition, row) keys and says how an operator name and a room name share the root. **On a spare server**, which holds no copy, this page reads TRANSFORMS R0: such a read first takes every row, as `hold: 'all'` does, so the line works on every server and only its cost depends on the deployment (section 3.3). The other way refuses it `not-held` there, as on a bare client: the line would then work on five servers and throw on the sixth.
 29. **How `moved` and `stale-client` show.** TRANSFORMS 3.8 lists them as a served view's refusals or ends. This page keeps `moved` inside fero, a reason the client follows by itself (section 8), and shows `stale-client` as a refusal the app sees.
 30. **A remove that finds nothing answers as done** (ANYPATH 4, *reasoned*). No pick named it; this page takes it.
-31. **`f.cluster.tap(fn)` and `f.cluster.writes.tap(fn)` become `connect(fn)`.** V5-13 pick 1 makes `connect` the one live verb, but names only lenses. This page gives `f.cluster` and `f.cluster.writes` the same form, a handle with `disconnect` (section 5.6). The other way keeps `tap` there, a second word for a live callback.
+31. **`f.cluster.tap(fn)` and `f.cluster.writes.tap(fn)` become `connect(fn)`.** V5-13 pick 1 named only lenses, and V5-16 took the cluster's `snapshot()` away. This page's pick: `connect((shape) => …)` and `connect((rows) => …)`, under a lens's link rules (the first call a microtask after the call; `disconnect()`, `signal` and `until`, each safe twice), giving a handle with `disconnect` (sections 3.10, 5.6). The other way keeps `tap(fn)` on the cluster, a second live verb.
 32. **Who serves a view when the leader is the only copy.** V5-14 pick 3 places a view on "every copy but the leader". A group with one voter and no learner has no such copy: a resource with one server process (`copies` is 1 until three servers exist, section 3.3), and a group at the start of its growth from one voter. TRANSFORMS does not say. This page takes [LAYERS.md](LAYERS.md) section 10's reading: then the leader serves, and pays the build's stall on the write path, until a second copy is ready; health says so. Not run. The other way refuses served views until a second copy exists, so a one-box app has none.
 33. **Codes for two V5-15 refusals.** V5-15 pick 7 refuses a `ttl` or `while` on a field write, and its consequences owe a size rule for room writes; neither names a code. This page: `bad-arg` for the first, at the leader (the types already refuse it), and `too-large` for a room write past the size rule, once that rule exists. The other way is a code of its own for each.
 
@@ -2940,10 +2982,11 @@ Each is a gap the records leave. None changes a call.
 - **V5-13 pick 7:** a folded resume on a live link, `connect({ resume })`, in E-31's model with a client-held base, before it is offered.
 - **V5-14:** the `view` selector in [E-31]'s model (E-57 XA-14, not run); paging across a failover; a data upgrade under live views (Q-B11). **Three missed bars, stated:** a view build over 10^6 rows stalls its copy 0.2 to 1.9 s until data builds in slices (XA-1); a client that held a view can still be refused after failures, in 1 to 21 of 1,000 seeds by configuration (XA-2; TRANSFORMS 3.8; V5-14's consequences quote 5 to 21, its standby and leader-kill runs); the chunked ordered index costs 9.5 to 15.1 µs a write at 10^6 rows against a guessed 3 (XB-1). And the defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 and the row guards are guesses.
 - **V5-15:** the cost of an `equals` guard at the leader, and its size on the wire; a size rule for room writes; a build of the record form with rows; the "on the path" reader for the log below a row, with its run-time rule; a field's `-N`, read from the row's log back, unpriced.
+- **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers`, `me.uuid`, `me.hosts` and `me.origin`, which 23 of the 46 example lines that read the cluster use (section 5.1); the `ended` guard on `f.cluster.value` in a real build; the promise's cost on a real `get()`, measured here only on a stand-in; what an operator over every row costs on a spare server, which first downloads the resource (section 3.3; TRANSFORMS 10 item 10).
 - **From V5-12, still owed:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27; E-57 A built one on its own harness); E-30's model with marks written by app code, including the reader name a mark goes under and `run()`'s restart from its share's cursor (questions 20, 24); the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
 - **data's changes** (V5-14 pick 6): data 5.0.0, D1 and D2 first (D1 needs a pin: claim 8 sits at its bar), then the merge contract C1 to C10 with its SCHEDULE clause and version bump, N1 to N9, D3, D4, D6 to D9, F1 to F3 (TRANSFORMS 9.1).
 
-**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-15 on the same day; its table "What V5-12 to V5-15 changed" says where each change lands there. It carries this page's own picks, questions 25 to 33, in its section 10 item 46. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
+**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-16 on the same day; its table "What V5-12 to V5-16 changed" says where each change lands there. It carries this page's own picks, questions 25 to 33, in its section 10 item 46. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
 
 ### 11.3 Carried from COMP2's page
 
@@ -3161,10 +3204,18 @@ parts.data.widgets.tap(draw)
 parts.data.widgets.asOf(v)
 // @ts-expect-error a lens is not a store: connect(fn)
 parts.data.widgets.subscribe(() => {})
-// @ts-expect-error f.rows on a bare client: every row is not held here; read through a connect() handle
-parts.rows.widgets
-// @ts-expect-error f.snapshot is gone: rows[k] for one row; a copy is a spread you write
+// @ts-expect-error f.rows is gone, on every role (V5-16): the one sync read is a live handle's value, f.data.connect()
+f.rows.k
+// @ts-expect-error f.snapshot is gone: h.value[k] for one row; a copy is a spread you write
 f.snapshot
+const heldAll = await fero<Part>('parts', { hold: 'all' })   // every row held, said at the open
+// @ts-expect-error nor an f.value: read every row through a handle; heldAll.data.connect() shares the held rows
+heldAll.value
+const everyRow = heldAll.data.connect()                  // no new SUB: it shares the open's selection (3.10)
+const w1: Part | undefined = everyRow.value.widgets      // a sync read: a live handle's value, one lookup
+everyRow.disconnect()                                    // the rows stay: the open's hold: 'all' still holds them
+// @ts-expect-error a lens has no sync read: .value is a step to a field named value, and Part has none
+parts.data.widgets.value
 // @ts-expect-error a probe name reads undefined: a row named 'then' is f.at('then')
 parts.data.then.get()
 // @ts-expect-error a function cannot travel to a server: connect() first, then filter right of it
@@ -3187,7 +3238,17 @@ const best = chat.data.room1.gt('stars', 0).za('stars', 10).connect()   // plain
 const mine = chat.data.room1.connect().filter((m) => m.stars > 0)         // a function right of connect(): runs here
 for await (const en of parts.data.widgets.stock.changes({ from: -5 })) console.log(en.value)   // a field's log: on its path (V5-15)
 const back5 = -5, last5 = chat.data.room1.changes({ from: back5 })       // a const holding -5 is a count
-f.cluster.snapshot().open.forEach((l) => console.log(l.path, l.count))   // the links this process has open, by path
+f.cluster.value.open.forEach((l) => console.log(l.path, l.count))   // the links this process has open, by path
+const inFlight: number = f.cluster.writes.value.length   // this process's own writes: a sync read
+f.cluster.connect((shape) => draw(shape.health), { signal })   // the shape a microtask after the call, then each change
+// @ts-expect-error snapshot() is gone (V5-16): the cluster is this process's own state; read f.cluster.value
+f.cluster.snapshot()
+// @ts-expect-error ... and on its writes: f.cluster.writes.value
+f.cluster.writes.snapshot()
+// @ts-expect-error no get() on the cluster: its value is already here, so a promise would wait for nothing
+await f.cluster.get()
+// @ts-expect-error members are learned from a server: undefined until one answers, never {} in place of members elsewhere
+console.log(f.cluster.value.members.s1)
 
 // ── the types carry through: each line fails to compile if a type is any or wrong
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
@@ -3277,6 +3338,11 @@ await fero.of<Part>()('names', { methods: {
   za: { view: (k: number, ctx) => ctx.data.za('stock', k) },
   best: { view: (k: number, ctx) => ctx.data.za('stock', k) },
 } })
+await fero.of<{ cents: number }>()('wallet', { methods: {
+  pay: { at: 'row', run: async (n: number, ctx) => ((await ctx.at.get())?.cents ?? 0) >= n },   // local at the leader
+  // @ts-expect-error ctx.rows is gone (V5-16): read the called row once, await ctx.at.get(), local at the leader
+  peek: { at: 'row', run: (_: null, ctx) => ctx.rows },
+} })
 // the row type given by hand, and the methods: `fero.of<Row>()` works out the methods' type
 type Acct = { cents: number }
 const till = await fero.of<Acct>()('till', { methods: { pay: { at: 'row', run: (n: number, ctx) => ctx.at.set({ cents: n }) } } })
@@ -3359,22 +3425,22 @@ await fero('x', { server: true, history: '7 days' })
 // @ts-expect-error a stream keeps no rows (rows: false): there is no state to connect to; read its log
 await fero<Msg>('news', { server: true, rows: false }).then((s) => s.data.x.connect())
 console.log(cond, acks, held, n1, n2, all2, viaResolve, row1, best, mine, last5, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12,
-  n, who, rich, richRows, n3, t13, t14, wrongRows)
+  n, who, rich, richRows, n3, t13, t14, wrongRows, w1, inFlight)
 ```
 
 The checker writes every `// file:` block to a fresh folder and runs `tsc` against data's `types/public.d.ts`. Then, in a copy where each `@ts-expect-error` is a plain comment, each line it marks must fail at its own line, and nothing else may (the strip proof, as on CONNECT.md, TRANSFORMS.md and ANYPATH.md):
 
 ```js check
 // API.md checker: every ```ts block whose first line is "// file: <name>" is written to a fresh folder and
-// type-checked with tsc against data's shipped types (DATA names data's folder). Then, in a copy where each
-// @ts-expect-error is a plain comment, each line it marks must fail, and nothing else may (the strip proof).
+// type-checked with tsc against data's shipped types (DATA names data's folder; ../data by default). Then, in a
+// copy where each @ts-expect-error is a plain comment, each line it marks must fail, and nothing else may (the strip proof).
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 const blocks = [...readFileSync(process.argv[1], 'utf8').matchAll(/^```ts\n(\/\/ file: (\S+)[^\n]*\n[\s\S]*?)^```$/gm)]
   .map(([, body, name]) => [name, body])
-const data = process.env.DATA ?? join(here, '../../../../../../data')
+const data = resolve(process.env.DATA ?? '../data')
 const root = mkdtempSync(join(tmpdir(), 'fero-api-'))
 const compilerOptions = { target: 'es2022', module: 'esnext', moduleResolution: 'bundler', strict: true, noEmit: true,
   types: [], lib: ['es2022', 'dom'], paths: { fero: ['./fero.d.ts'], data: [join(data, 'types/public.d.ts')] } }
@@ -3406,14 +3472,14 @@ console.log(`stripped → ${join(root, 'stripped')}: ${marked.length} marked lin
 if (!marked.length || missed.length || stray.length) { console.log({ missed, stray }); process.exit(1) }
 ```
 
-Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the default is this machine's):
+Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the default is `../data`, next to this repo):
 
 ```sh
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/API.md)" docs/v5-space/API.md
 ```
 
-**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `139 marked lines, 139 fail at their own line, 0 errors elsewhere`.
-- **Where the 139 are:** 131 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
+**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite and the V5-16 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `146 marked lines, 146 fail at their own line, 0 errors elsewhere`.
+- **Where the 146 are:** 138 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
 
 | `types.ts` group | The wrong uses | tsc |
 |---|---|---|
@@ -3423,7 +3489,8 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 | reads (V5-13) | `await` a lens, a root lens, a lens through `Promise.resolve`, a handle; `.then` on a handle; `get(key)`; `get({ at })`; `from`, `at` and `once` on `connect`; a loop over a callback handle; the log looped as state and state as the log; `prev` on an entry; `text()` on a loop turn; changing a frozen row; `c.changes` | TS2322 and TS2739: a lens or a handle is not a row; TS2339: no `then`; TS2769; TS2322 against the `Steer` that names `changes()` and `past()`; TS2504; TS2488; TS2339; TS2349; TS2540; TS2339 |
 | positions | `-5` and a version on the root; a bare number as a time; a count typed `number`; a positive count; `past` on the root; `.value` on `past(…)` before `await`; a place in `until` | TS2322 on `Pos<false>`, whose text says a version or a count back names one partition; TS2345 and TS2322: "a time is a Date"; "a count back is negative"; TS2349; TS2339 on a `Promise`; TS2322 |
 | ends | `until` with a DOM node, a plain emitter, an HTTP request | TS2322: not `Closes` (a request has a `method`) |
-| words that went | `tap`, `asOf`, `subscribe`, `f.rows` on a bare client, `f.snapshot`, a row named `then` | TS2339; TS2349 (`subscribe` is a `Steer`); TS2339 on the `f.rows` message; TS18048: a probe name reads `undefined` |
+| words that went | `tap`, `asOf`, `subscribe`, `f.snapshot`, a row named `then` | TS2339; TS2349 (`subscribe` is a `Steer`); TS18048: a probe name reads `undefined` |
+| sync reads (V5-16) | `f.rows` on a server; `f.value` with `hold: 'all'`; `.value` on a lens; `snapshot()` on the cluster and on its writes; `get()` on the cluster; `members` read with no check for `undefined`; `ctx.rows` | TS2339; TS18048 on `members` |
 | the line | `filter`, `limit`, `lookup` left of `connect()`; `by(fn)`; `sum('text')`; `eq` on an object; `gt` on a string; an operator over every row on a bare client | TS2349 with the fix in the type's text; TS2345 against `ScalarF` and `NumF` |
 | methods | a wrong or missing argument; `connect()` on an action's answer; a view given `{ once }`; `f.methods`; the door client's `set`, `remove`, `touch`, `batch`, `at().set`, `mark`, `claim`; a row method at the root or on a field; a root method on a path; `call()` with a name not allowed there, or unknown; the depth-2 `at:` cases; a method named `connect` or `za`; `fero<Row>(name, { methods })` | TS2345; TS2554; TS2339; TS2349; TS2345 on `call()`'s names; TS2322 on the method, with the `NoClash` text; TS2769 |
 | served views and pages (V5-14) | an operator after a served view; `await` a served view; `c.order` on a scalar; a lookup's `other` used unchecked; a lookup on a missing field; a 2-part cursor at depth 2; `derive` of `group`, into the wrong target, by a boolean; a `{ view }` unbounded, of `limit`, of `group`, of a page after a cursor; `{ pages }` over buckets; a view that reads `claims`; `lookup` inside a view | TS2339; TS2740; TS2339; TS18049; TS2345; TS2345; TS2345 against the view form; TS2322 on the method, with `CheckViews`' text; TS2339: no `claims` on `ViewCtx`; TS2349 |
