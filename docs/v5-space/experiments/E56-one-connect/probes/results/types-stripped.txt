@@ -1,0 +1,36 @@
+stripped 17 lines; tsc reports 17 errors
+misuse.ts:13  [M1 a string first: E-55's connect(target, 'prop') form is gone]
+    -> TS2769 misuse.ts(13,24): error TS2769: No overload matches this call. | Overload 1 of 2, '(fn: (state: Readonly<Widget>, commit: Commit<Widget>) => void, opts?: ConnectOpts | undefined): Link<Readonly<Widget>, Widget>', gave the following error. | Argument of type 'string' is not assignable to parameter of type '(state: Readonly<Widget>, commit: Commit<Widget>) => void'. | Overload 2 of 2, '(opts?: ConnectOpts | undefined): Link<Readonly<Widget>, Widget>', gave the following error. | Type '"textContent"' has no properties in common with type 'ConnectOpts'.
+misuse.ts:14  [M2 two functions]
+    -> TS2559 misuse.ts(14,30): error TS2559: Type '(w: Readonly<Widget>) => void' has no properties in common with type 'ConnectOpts'.
+misuse.ts:15  [M3 the options first, then the function]
+    -> TS2353 misuse.ts(15,26): error TS2353: Object literal may only specify known properties, and 'once' does not exist in type '(state: Readonly<Widget>, commit: Commit<Widget>) => void'.
+misuse.ts:16  [M4 a position that is not one]
+    -> TS2769 misuse.ts(16,23): error TS2769: No overload matches this call. | Overload 1 of 2, '(fn: (state: Rows<Widget>, commit: Commit<Widget>) => void, opts?: ConnectOpts | undefined): Link<Rows<Widget>, Widget>', gave the following error. | Object literal may only specify known properties, and 'from' does not exist in type '(state: Rows<Widget>, commit: Commit<Widget>) => void'. | Overload 2 of 2, '(opts?: ConnectOpts | undefined): Link<Rows<Widget>, Widget>', gave the following error. | Type '"yesterday"' is not assignable to type 'Date | Version | Cursor | "now" | undefined'.
+misuse.ts:17  [M5 until on a thing that cannot say it closed: a DOM element]
+    -> TS2322 misuse.ts(17,32): error TS2322: Type 'HTMLElement' is not assignable to type 'Closable | undefined'. | Property 'readyState' is missing in type 'HTMLElement' but required in type 'WebSocketClosable'.
+misuse.ts:18  [M6 until on a signal: a signal goes in signal]
+    -> TS2322 misuse.ts(18,32): error TS2322: Type 'AbortSignal' is not assignable to type 'Closable | undefined'. | Property 'readyState' is missing in type 'AbortSignal' but required in type 'WebSocketClosable'.
+misuse.ts:23  [M7 V-a: the helper's caller got the state, so there is nothing to disconnect]
+    -> TS2339 misuse.ts(23,19): error TS2339: Property 'disconnect' does not exist on type 'Readonly<Widget>'.
+misuse.ts:24  [M8 V-a: `const h = await lens.connect(fn)` is the state, not the handle]
+    -> TS2339 misuse.ts(24,50): error TS2339: Property 'disconnect' does not exist on type 'Readonly<Widget>'.
+misuse.ts:25  [M9 V-a: Promise.all resolved the handles away]
+    -> TS2339 misuse.ts(25,67): error TS2339: Property 'disconnect' does not exist on type 'Readonly<Widget>'.
+misuse.ts:29  [M10 V-b: awaiting the handle gives the handle; it has no stock]
+    -> TS2339 misuse.ts(29,44): error TS2339: Property 'stock' does not exist on type 'Link<Readonly<Widget>, Widget>'.
+misuse.ts:30  [M11 V-b: the handle is not the row]
+    -> TS2739 misuse.ts(30,9): error TS2739: Type 'Link<Readonly<Widget>, Widget>' is missing the following properties from type 'Widget': name, stock, tags
+misuse.ts:31  [M12 V-b: the handle has no then]
+    -> TS2339 misuse.ts(31,30): error TS2339: Property 'then' does not exist on type 'Link<Readonly<Widget>, Widget>'.
+misuse.ts:32  [M13 a for-await turn is { state, commit }, not the row]
+    -> TS2339 misuse.ts(32,56): error TS2339: Property 'stock' does not exist on type 'Turn<Readonly<Widget>, Widget>'.
+misuse.ts:37  [M14 get(key) reads like Map.get, but it is a step: the awaited lens is not a number]
+    -> TS2365 misuse.ts(37,7): error TS2365: Operator '>' cannot be applied to types 'Lens<number, Widget, "field", "b">' and 'number'.
+misuse.ts:38  [M15 the same: a lens is not the row]
+    -> TS2322 misuse.ts(38,9): error TS2322: Type 'Lens<Widget, Widget, "row", "b">' is not assignable to type 'Widget'. | Types of property 'name' are incompatible. | Type 'Lens<string, Widget, "field", "b">' is not assignable to type 'string'.
+misuse.ts:39  [M16 get(key) below a row takes the row's field names only]
+    -> TS2769 misuse.ts(39,20): error TS2769: No overload matches this call. | Overload 1 of 2, '(opts?: GetOpts | undefined): Promise<Readonly<Widget>>', gave the following error. | Type '"stok"' has no properties in common with type 'GetOpts'. | Overload 2 of 2, '(key: "name" | "stock" | "tags"): Lens<string | number | string[], Widget, "field", "b">', gave the following error. | Argument of type '"stok"' is not assignable to parameter of type '"name" | "stock" | "tags"'.
+misuse.ts:43  [M17 a framework cleanup: returning the handle, not its disconnect]
+    -> TS2322 misuse.ts(43,17): error TS2322: Type 'Link<Readonly<Widget>, Widget>' is not assignable to type 'void | Destructor'.
+17 of 17 stripped lines error at their own line
