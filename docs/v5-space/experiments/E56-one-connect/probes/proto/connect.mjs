@@ -19,8 +19,14 @@
 //         destroys the stream, from memory);
 //         'cursor': it ends only that loop, and the handle's callback goes on
 //     until 'strict' (the default): `until` takes only a thing whose closed state can be read now (a Node socket or
-//           stream: `destroyed`; the `ws` library or a WebSocket: `readyState`); anything else is refused bad-target.
-//           'loose': anything with once() or addEventListener() (a plain EventEmitter, a MessagePort)
+//           stream: `destroyed`; the `ws` library or a WebSocket: `readyState`), and never an HTTP request (`method`:
+//           a request may say 'close' once its body is read, long before the client goes); anything else is refused
+//           bad-target. 'loose': anything with once() or addEventListener() (a plain EventEmitter, a MessagePort)
+//   one policy for what a partition's state is once its link has ended (policy.after):
+//     'view' (the default, as first built): the selection's live view, shared by every link on it; read after the end,
+//           it shows whatever the cache holds then (a client evicts it, a server or another link keeps it changing)
+//     'throw' (the fix CONNECT.md takes): each link gets its own guard over the view; any read through it after the
+//           link ends throws FeroError('ended'), on every role, linger and number of links; so does handle.state
 // Views right of the handle (h.gt(...), h.filter(fn)) are E-55's LocalView; a view's own sink is viewConnect(view, fn, opts).
 // Planted bugs (E56_MUTATE; never set in a measured run): twice | percopy | mergeprev | mergedrop | untilclosed |
 // nosignalcleanup | onceheld. E55_MUTATE=viewleak plants E-55's own view leak in this handle too.
@@ -29,16 +35,29 @@ import { Resource, Link, Selection, LocalView, ViewLink, FeroError, PLAIN, FUNCS
 
 export const MUT = process.env.E56_MUTATE ?? ''
 const VIEWLEAK = process.env.E55_MUTATE === 'viewleak'
-export const policy = { first: 'micro', brk: 'link', until: 'strict' }
+export const policy = { first: 'micro', brk: 'link', until: 'strict', after: 'view' }
 export const counts = { conns: 0, live: 0, untilListeners: 0, signalListeners: 0, attaches: 0, attachMidBatch: 0, attachInEffects: 0 }
 
 // the state a call hands over: a row or a field is its value now (data makes a new row object at each write); a partition
 // or the whole resource is the selection's live view, the same object at every commit (nothing is copied)
-function stateOf(r, sel, path) {
+function stateOf(r, sel, path, conn) {
   const e = r.eng, cut = e.depth === 1 ? 1 : 2
   if (path.length >= cut) return () => e.readSync(path)
   const v = sel.view
-  return () => v.rows
+  if (policy.after !== 'throw') return () => v.rows
+  let g = null
+  return () => (g ??= guardOf(v, conn))
+}
+// policy.after 'throw': a link's own guard over the shared live view. Each read checks the link first; after the end
+// it throws 'ended' (the same at every run), never an answer that depends on the role, the linger or other links
+function guardOf(v, conn) {
+  const live = () => { if (conn.dead) throw new FeroError('ended', `the rows of ${conn.r.name}.${conn.path.join('.')} were read after their link ended (${conn.why}): copy them while it is live, { ...rows }`) }
+  return new Proxy(Object.create(null), {
+    get: (_, k) => { live(); return v.rows[k] },
+    has: (_, k) => { live(); return k in v.rows },
+    ownKeys: () => { live(); return Reflect.ownKeys(v.rows) },
+    getOwnPropertyDescriptor: (_, k) => { live(); return Reflect.getOwnPropertyDescriptor(v.rows, k) },
+  })
 }
 
 // a closed thing: a Node socket or stream (destroyed, closed), the `ws` library or a WebSocket (readyState 2 or 3)
@@ -63,7 +82,7 @@ export class Conn {
     if (this.until !== null && MUT !== 'untilclosed' && isClosed(this.until)) { this.dead = true; this.why = 'until'; return }
     const e = r.eng
     this.sel = e.sel(e.partOf(path))
-    this.state0 = stateOf(r, this.sel, path)
+    this.state0 = stateOf(r, this.sel, path, this)
     this.link = new Link(this.sel, path, 'tap', null, (c) => this.deliver(c), null)
     counts.live++
     if (this.signal !== null) { this.onAbort = () => this.disconnect('signal'); this.signal.addEventListener('abort', this.onAbort, { once: true }); counts.signalListeners++ }
@@ -82,7 +101,10 @@ export class Conn {
     else queueMicrotask(go)
   }
   get ready() { return this.link === null ? Promise.resolve() : this.link.ready }
-  get state() { return this.link === null ? undefined : this.state0() }
+  get state() {
+    if (this.dead && policy.after === 'throw') throw new FeroError('ended', `${this.r.name}.${this.path.join('.')}: state read after the link ended (${this.why})`)
+    return this.link === null ? undefined : this.state0()
+  }
   get attached() { return this.firstSeen }
   deliver(c) {
     if (c.first) this.firstSeen = true
@@ -275,6 +297,7 @@ function checkUntil(u) {
   if (u === undefined) return
   if (u === null || typeof u !== 'object' || (typeof u.once !== 'function' && typeof u.addEventListener !== 'function')) throw new FeroError('bad-target', 'until: a socket, stream or WebSocket')
   if (policy.until === 'strict' && !hasState(u)) throw new FeroError('bad-target', 'until: this thing cannot say whether it has already closed (no destroyed, no readyState); end the link with a signal')
+  if (policy.until === 'strict' && typeof u.method === 'string') throw new FeroError('bad-target', 'until: an HTTP request may say it closed once its body is read, while the client stays; pass the response')
 }
 function onUntilClose(t, f) { if (typeof t.once === 'function') t.once('close', f); else t.addEventListener('close', f, { once: true }) }
 function offUntil(t, f) { if (typeof t.off === 'function') t.off('close', f); else if (typeof t.removeListener === 'function') t.removeListener('close', f); else t.removeEventListener('close', f) }

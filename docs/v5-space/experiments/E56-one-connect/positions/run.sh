@@ -12,7 +12,7 @@
 #   ./run.sh           clean, then all of the above
 # Env: SP (a scratch folder, required: it holds bin/timing and bin/heavy, the lock wrappers; timing runs its
 # command alone on the box, heavy shares it), NODE (default node on PATH: Node 22.22.0), RUNS (default
-# "1 2 3"). Nothing is downloaded and nothing outside this folder is written but $SP/e56pos. The benches import
+# "1 2 3"), NODEF (the node command with its flags; default NODE with a 4,000 MB heap cap). Nothing is downloaded and nothing outside this folder is written but $SP/e56pos. The benches import
 # E-05's xxHash32 (../../E05-fold-cost/bench/xxh.mjs), which checks itself against xxHash's reference vectors.
 # Raw JSON lines land in results/.
 set -e
@@ -26,7 +26,8 @@ R=$HERE/results
 B=$HERE/bench
 W=$SP/e56pos
 mkdir -p "$R" "$W"
-NODEF="$NODE --expose-gc --no-warnings --max-old-space-size=8000"
+# every node process stays under 4 GB of heap (the box has 15 GB and no swap); NODEF overrides the whole command
+NODEF=${NODEF:-"$NODE --expose-gc --no-warnings --max-old-space-size=4000"}
 
 # one process: its load average first, then its JSON line(s); a failure becomes a line too
 one() {

@@ -2,13 +2,13 @@
 
 **Question.** The owner asked for one verb, `connect`, with options (2026-11-20). Built small on E-55's prototype, what happens at run time and in the types with the owner's ideas I1-I4, I9, I11 and I12? (The ideas are numbered in the experiment's brief: I1 one verb with options; I2 each call gets `(state, commit)`; I3 `disconnect()`; I4 a lifetime option as well; I9 a read once is a subscription that ends after one, perhaps awaited; I11 `get()` as a small wrapper to await one value; I12 the same handle is an async iterable.)
 
-**What was built** ([proto/connect.mjs](proto/connect.mjs), about 300 lines). E-55's [proto/lens.mjs](../../E55-lens-prototype/proto/lens.mjs) is imported from its folder and never edited; its lens verbs `connect` and `get` are pointed at this file's code at load. Its worker and `MessagePort` half, `proto/net.mjs`, is not used: every probe runs in one process with E-55's loopback client.
+**What was built** ([proto/connect.mjs](proto/connect.mjs), about 330 lines). E-55's [proto/lens.mjs](../../E55-lens-prototype/proto/lens.mjs) is imported from its folder and never edited; its lens verbs `connect` and `get` are pointed at this file's code at load. Its worker and `MessagePort` half, `proto/net.mjs`, is not used: every probe runs in one process with E-55's loopback client.
 
 - `lens.connect(fn?, opts?)`: `fn(state, commit)` once per commit, the first call with the picture so far (`commit.first`). `opts`: `{ from, until, signal, once }`. It returns a handle: `disconnect()` (bound; `close` is an alias), `state` (a sync read), `ready`, and `Symbol.asyncIterator`, which yields `{ state, commit }`.
 - `state` is the row (or field) for a row or field lens, and the selection's live view for a partition or the whole resource. `commit` is E-55's commit object: `first`, `changes` (data's row deltas by reference, each with `prev`), `seq`, `recs()`, `text()`.
 - Three variants of awaiting. **V-a**: the handle is thenable; `await handle` gives the first state and the link stays open. **V-a1**: the same, but awaiting also ends the link. **V-b** (the default): the handle has no `then`; `lens.get()` is `connect({ once })` as a promise.
 - A `for await` loop gets **merged** turns without `from` (the newest state, and one change per row since its last turn: live state) and **every** commit with `from: 'now'` (kept here in order until the loop takes it: the log's rule). The prototype has no log, so `from` takes only `'now'`.
-- Three policies a probe can switch: the first call a **microtask** after `connect()` returns (the default) or **inside** it (E-55's `Link.attach` as built); `break` in a loop ends the **whole handle** (the default) or **only that loop**; `until` takes only a thing that **can say it already closed** (a Node socket's `destroyed`, a WebSocket's `readyState`; the default) or anything with `once` or `addEventListener`.
+- Four policies a probe can switch: the first call a **microtask** after `connect()` returns (the default) or **inside** it (E-55's `Link.attach` as built); `break` in a loop ends the **whole handle** (the default) or **only that loop**; `until` takes only a thing that **can say it already closed** (a Node socket's `destroyed`, a WebSocket's `readyState`) and is not an HTTP request (it has a `method`) (the default), or anything with `once` or `addEventListener`; a partition's `state` read after its link ends is the **shared live view** (the default, as first built) or goes through a **guard per link** that throws `ended` (the fix CONNECT.md takes; lifetimes case 11 switches it).
 - Views right of a handle and operators left of `connect` reuse E-55's `LocalView`.
 
 **Words.** A *link* is one live connection from a lens into this process. A *picture* is the rows so far, which a link gets first. A *selection* is what one subscription brings in; equal lenses share one. A *SUB* is the subscribe message, a *GET* a one-off read. A *microtask* is a step JavaScript runs right after the current code. *Planted bug*: a bug put in on purpose, to show a check can fail.
@@ -22,8 +22,8 @@
 | 1 | I9, I11 | [bench/thenable.mjs](bench/thenable.mjs) | a thenable handle (V-a, V-a1) against none (V-b), in seven ways code resolves values; and what reading once costs on a client | see "Probe 1" |
 | 2 | I12 | [bench/foreach.mjs](bench/foreach.mjs) | a `for await` loop 10 times slower than the writes: merged against every commit; the cost per delivery against a callback | see "Probe 2" |
 | 3 | I2 | [bench/commit.mjs](bench/commit.mjs) | what `state` and `commit` are for a row, a field, a partition, the whole resource; what `prev` costs | see "Probe 3" |
-| 4 | I3, I4 | [bench/lifetimes.mjs](bench/lifetimes.mjs), [bench/sims.mjs](bench/sims.mjs) | `disconnect()` and a lifetime on one link: 15 cases and 6 limits; E-55's seeded lifetime checks (its claims 7, 9 and 26) on connect, each with planted bugs | see "Probe 4" |
-| 5 | I1, I9-I12 | [check/](check) | a `fero.d.ts` sketch of the owner's connect: which forms type well, which misuses fail, and with what message | see "Probe 5" |
+| 4 | I3, I4 | [bench/lifetimes.mjs](bench/lifetimes.mjs), [bench/sims.mjs](bench/sims.mjs), [bench/signal.mjs](bench/signal.mjs) | `disconnect()` and a lifetime on one link: 17 cases and 6 limits; E-55's seeded lifetime checks (its claims 7, 9 and 26) on connect, each with planted bugs; what `{ signal }` and `{ until }` cost a link | see "Probe 4" |
+| 5 | I1, I9-I12 | [check/](check), [bench/slips.mjs](bench/slips.mjs) | a `fero.d.ts` sketch of the owner's connect: which forms type well, which misuses fail, and with what message; two slips types cannot catch, run | see "Probe 5" |
 
 ### Probe 1: a thenable handle (I9, I11)
 
@@ -47,28 +47,28 @@ One client over E-55's loopback transport with JSON frames, so SUBs, UNSUBs, GET
 
 | Loop | Link on | Turns | Commits the loop has seen | Commits a turn | Waiting at the end | Most waiting | Heap growth | Bytes per waiting commit |
 |---|---|---|---|---|---|---|---|---|
-| merged (no `from`) | one row | 4,332-4,388 | 49,988-49,991 of 50,000 | 11.4-11.5 | 1 | 1 | 0.3-0.4 MB | |
-| merged (no `from`) | the whole resource | 4,323-4,352 | 49,970-49,992 of 50,000 | 11.5-11.6 | 8-30 rows | 25-39 rows | 0.3 MB | |
-| every commit (`from: 'now'`) | one row | 4,358-4,403 | 4,357-4,402 | 1 | **45,598-45,643** | 45,598-45,643 | **16.1 MB** | 353 |
-| every commit (`from: 'now'`) | the whole resource | 4,378-4,407 | 4,377-4,406 | 1 | **45,594-45,623** | 45,594-45,623 | **17.1 MB** | 375 |
+| merged (no `from`) | one row | 4,314-4,367 | 49,990-49,996 of 50,000 | 11.4-11.6 | 1 | 1 | 0.3-0.4 MB | |
+| merged (no `from`) | the whole resource | 4,322-4,395 | 49,991-49,995 of 50,000 | 11.4-11.6 | 5-9 rows | 27-50 rows | 0.3 MB | |
+| every commit (`from: 'now'`) | one row | 4,363-4,413 | 4,362-4,412 | 1 | **45,588-45,638** | 45,588-45,638 | **16.1 MB** | 353 |
+| every commit (`from: 'now'`) | the whole resource | 4,373-4,388 | 4,372-4,387 | 1 | **45,613-45,628** | 45,613-45,628 | **17.1 MB** | 375 |
 
-- **Every commit, in order, means a queue that grows for as long as the loop is slower** (measured): about 9,180 more each second, in a straight line (4,600 waiting at 0.5 s, 41,300 at 4.5 s), 353-375 bytes each with the rows they hold. At the end the loop was 52 s of its own work behind (reasoned from the numbers).
-- **Merged turns stay small** (measured): at most one waiting change per row changed since the last turn (1 for a row, 25-39 for the whole resource), and every commit's effect still reached the loop, about 11.5 commits a turn.
-- **That is evidence 5, measured on one verb**: the live state (merged; a slow reader sees the newest) and the log (every record; it waits for you) behave differently on purpose. With one `connect`, the single option `from` switches the same loop from bounded memory to a queue with no bound. This prototype keeps that queue in the process; a real log reader reads the server's log by position, so there the cost is lag behind the log, not memory here (reasoned).
+- **Every commit, in order, means a queue that grows for as long as the loop is slower** (measured): 9,116-9,127 more each second, in a straight line (about 4,600 waiting at 0.5 s, 41,300 at 4.5 s), 353-375 bytes each with the rows they hold. At the end the loop was 52 s of its own work behind (reasoned from the numbers).
+- **Merged turns stay small** (measured): at most one waiting change per row changed since the last turn (1 for a row, at most 27-50 for the whole resource), and every commit's effect still reached the loop, 11.4-11.6 commits a turn.
+- **That is evidence 5, measured on one verb**: the live state (merged; a slow reader sees the newest) and the log (every record; it waits for you) behave differently on purpose. With one `connect`, the single option `from` switches the same loop from bounded memory to a queue with no bound. This prototype keeps that queue in the process; a real log reader reads the server's log by position, so there the cost is lag behind the log, not memory here (reasoned). What this measures is the gap between the two rules, which a design with a separate log verb has too; whether the switch may sit behind one option is a judgement, not something this probe settles (CONNECT.md 2.4).
 
 **The cost per delivery** (`foreach.mjs cost`; measured, three runs; one link on the whole resource of 10,000 rows, a field write per commit; the ways interleaved, the median of 7 rounds; differences taken inside each round):
 
 | Way | ns a commit | Over no link | Over the callback |
 |---|---|---|---|
-| no link | 948-974 | | |
-| a callback `fn(state, commit)` that reads nothing | 1,014-1,126 | **110-141** | |
-| a callback that reads `commit.changes` and each `prev` | 1,021-1,111 | 92-171 | |
-| `for await`, every commit, the writer writes 100 then waits for the loop to drain | 1,123-1,250 | 186-300 | **103-142** |
-| `for await`, merged, the same | 1,264-1,311 | 298-316 | **164-239** |
-| `for await`, one commit at a time (every), over the writer's own `await` | 1,375-1,481 | | **413-519** over that `await` |
-| `for await`, one commit at a time (merged), the same | 1,527-1,578 | | **578-621** over that `await` |
+| no link | 931-976 | | |
+| a callback `fn(state, commit)` that reads nothing | 1,087-1,162 | **161-189** | |
+| a callback that reads `commit.changes` and each `prev` | 1,119-1,147 | 157-192 | |
+| `for await`, every commit, the writer writes 100 then waits for the loop to drain | 1,209-1,279 | 311-336 | **116-137** |
+| `for await`, merged, the same | 1,308-1,394 | 358-446 | **166-241** |
+| `for await`, one commit at a time (every), over the writer's own `await` (1,011-1,096 with no link) | 1,763-1,830 | | **707-789** over that `await` |
+| `for await`, one commit at a time (merged), the same | 1,918-1,982 | | **874-910** over that `await` |
 
-- **A loop costs more than a callback per delivery** (measured): 103-142 ns more a commit when it keeps up in bursts, 164-239 ns when it merges (a map entry per changed row), and 413-621 ns when each commit is its own turn (a promise and its turns each time). The callback's own 110-141 ns matches E-55's 92-198 ns for a tap (claim 10).
+- **A loop costs more than a callback per delivery** (measured): 116-137 ns more a commit when it keeps up in bursts, 166-241 ns when it merges (a map entry per changed row), and 707-910 ns more than a writer that awaits each commit with no link, when each commit is its own turn (a promise and its turns each time; no callback was timed that way). The callback's own 161-189 ns is within E-55's 92-198 ns for a tap (claim 10).
 
 ### Probe 3: the callback's `(state, commit)` (I2)
 
@@ -90,38 +90,38 @@ What `state` is ([results/checks.jsonl](results/checks.jsonl), `commit.mjs ident
 
 | Read in the callback, over a callback that reads nothing | 1 change a commit | 10 changes a commit |
 |---|---|---|
-| `commit.recs()` (the records only) | −31 to −8 ns | +2 to +323 ns |
-| `commit.changes` and each `prev` | −4 to +6 ns | −87 to +184 ns |
-| a fresh diff array `{ op, key, row, prev, version }` | −31 to +1 ns | −236 to +59 ns |
-| the same, taken down to the written field | −60 to −4 ns | −153 to +414 ns |
-| `commit.text()` | −6 to +6 ns | −37 to +256 ns |
+| `commit.recs()` (the records only) | −70 to +29 ns | −118 to +177 ns |
+| `commit.changes` and each `prev` | −57 to +3 ns | −94 to +112 ns |
+| a fresh diff array `{ op, key, row, prev, version }` | −65 to +21 ns | −137 to +52 ns |
+| the same, taken down to the written field | −80 to +7 ns | −239 to +114 ns |
+| `commit.text()` | −23 to +24 ns | −82 to +47 ns |
 
 The same work alone, with no writes in the timed loop (each way run over 100,000 commits' changes captured by reference from a real fold; ns per change):
 
 | Way | 1 change a commit | 10 changes a commit |
 |---|---|---|
-| read `prev` (by reference) | 9.4-10.9 | 7.6-12.1 |
-| build a diff object with `prev` and a version | 20.0-21.4 | 19.2-32.3 |
-| build a field diff (`leafAt` on `row` and `prev`) | 30.9-34.9 | 44.3-50.2 |
-| build the records | 123.7-129.8 | 122.7-127.2 |
-| the records as JSON | 258.9-282.7 | 215.1-233.5 |
+| read `prev` (by reference) | 8.5-11.1 | 8.2-11.5 |
+| build a diff object with `prev` and a version | 21.0-22.4 | 28.1-29.2 |
+| build a field diff (`leafAt` on `row` and `prev`) | 30.5-35.3 | 50.3-59.0 |
+| build the records | 137.6-170.3 | 155.1-164.2 |
+| the records as JSON | 334.4-376.9 | 278.6-289.2 |
 
 - **`prev` costs nothing to hand over** (measured): data already has it from its copy-on-write fold, and the commit passes it by reference (about 10 ns a change to read). End to end, no read of the commit was told apart from reading nothing at one change a commit; at ten, the rounds' spread (hundreds of ns) hides any of them.
-- **Code that wants only the records pays for the records, not for `prev`** (measured): building the records costs 122-130 ns a change and their JSON 215-283 ns, against 19-32 ns for a fresh diff object. E-55 builds both once a commit, only when asked, and shares them across links (claim 9).
+- **Code that wants only the records pays for the records, not for `prev`** (measured): building the records costs 138-170 ns a change and their JSON 279-377 ns, against 21-29 ns for a fresh diff object. E-55 builds both once a commit, only when asked, and shares them across links (claim 9).
 
 ### Probe 4: `disconnect()` and a lifetime on one link (I3, I4)
 
-**The cases** ([bench/lifetimes.mjs](bench/lifetimes.mjs), [results/checks.jsonl](results/checks.jsonl), checked). With the defaults (first call a microtask later, `break` ends the handle, strict `until`), **15 of 15 cases pass**: `disconnect()` twice; a signal that aborts after `disconnect()` (its listener was removed); `disconnect()` then the signal aborts; `until` on a Node socket already destroyed (the link is born ended, no selection); `until` on a thing that cannot say it closed (refused `bad-target`); `once` with `until` (one call; `once` removes the `until` listener); a loop over a handle nobody kept, ended by `break` (no link left); `disconnect()` from inside the callback's first call; one link ending another inside the same commit (not called for it); 1,000 links on one signal, 500 ended by hand first; `for await` over `connect({ once: true })` (one item); `until` and `signal` on one link (the first to fire removes the other's listener); a signal already aborted (no selection; `get()` with it rejects `aborted`); `until` closing while a loop waits (the loop ends); the callback aborting its own signal on its first call.
+**The cases** ([bench/lifetimes.mjs](bench/lifetimes.mjs), [results/checks.jsonl](results/checks.jsonl), checked). With the defaults (first call a microtask later, `break` ends the handle, strict `until`), **17 of 17 cases pass**: `disconnect()` twice; a signal that aborts after `disconnect()` (its listener was removed); `disconnect()` then the signal aborts; `until` on a Node socket already destroyed (the link is born ended, no selection); `until` on a thing that cannot say it closed (refused `bad-target`); `once` with `until` (one call; `once` removes the `until` listener); a loop over a handle nobody kept, ended by `break` (no link left); `disconnect()` from inside the callback's first call; one link ending another inside the same commit (not called for it); 1,000 links on one signal, 500 ended by hand first; `for await` over `connect({ once: true })` (one item); `until` and `signal` on one link (the first to fire removes the other's listener); a signal already aborted (no selection; `get()` with it rejects `aborted`); `until` closing while a loop waits (the loop ends); the callback aborting its own signal on its first call; with a guard per link, a partition's state read after its link ends throws `ended` in all four settings below; `until` with an HTTP request is refused `bad-target`.
 
 **What breaks, and under which choice** (checked):
 
 | Choice | What happens |
 |---|---|
-| the first call **inside** `connect()` (E-55's way) | `const h = lens.connect((s) => h.disconnect())` throws `ReferenceError: Cannot access 'h' before initialization` out of `connect()`; the link stays open, is called again at the next write, and **every later write throws** data's `AggregateError`. `for await (… of lens.connect({ once: true }))` gets **0 items**. 2 of 15 cases fail |
+| the first call **inside** `connect()` (E-55's way) | `const h = lens.connect((s) => h.disconnect())` throws `ReferenceError: Cannot access 'h' before initialization` out of `connect()`; the link stays open, is called again at the next write, and **every later write throws** data's `AggregateError`. `for await (… of lens.connect({ once: true }))` gets **0 items**. 2 of 17 cases fail |
 | `until` takes anything with `once` or `addEventListener` | a plain `EventEmitter` or a `MessagePort` that already closed is taken, and **the link never ends** |
 | `break` ends only that loop | `for await (const x of lens.connect()) { …; break }` **leaves the link open for good** (1 link left), since nobody holds the handle |
 | `break` ends the whole handle | a callback on the same handle **stops** when another piece of code breaks out of a loop over it (0 calls after the break) |
-| a client, after `disconnect()` | a partition `state` kept from a call reads **empty**: the client evicted the rows (2 rows before, 0 after) |
+| a partition's `state` kept and read after its link ends, as first built (the shared live view) | **a different answer in each setting**: a client with no linger, 2 rows before and **0 after** (evicted); a client with a 50 ms linger, still 2 rows, and a server write after the end **shows** (`k1.n` 1 then 41), then 0 after the linger; a server, the write after the end **shows** (42); a client with another link on the same rows, the write **shows** (43). With a guard per link, every one of those reads, and `handle.state`, throws `ended` (a check above) |
 | `from: 'now'`, commits made after `connect()` returns but before the loop starts | folded into the loop's first picture, not seen one by one: this prototype keeps commits only for loops that exist (a limit of the stand-in; a real `from` is a log position) |
 
 **E-55's seeded lifetime checks, on connect** ([bench/sims.mjs](bench/sims.mjs), [results/sims.jsonl](results/sims.jsonl); each ran once under the heavy lock; a seed gives the same line every time):
@@ -132,6 +132,28 @@ The same work alone, with no writes in the timed loop (each way run over 100,000
 | the same, the first call inside `connect()` | 1,000 seeds, 74,356 links | 0 wrong; 14,354 first calls came inside an open batch and 13,800 inside a commit's effects; 8,184 first pictures of client links were taken while the server was mid-commit, where the check's oracle (the server's rows) is ahead of what the client can have, so those checks were skipped and counted |
 | views end with their handle (26) | 1,000 seeds, 59,941 view sinks ended by the handle's `disconnect()` 20,758, its signal 17,579, `until` 9,597, `once` 4,670, the view link's own `disconnect()` 7,337 | **0 calls after the end, 0 views left, 0 selections left** |
 | equal lenses share (9) | 1,000 bare handles and 1,000 callbacks on one row of a client, 100 writes; every handle disconnected twice | 1 SUB, 100 decodes, 100 folds, 100 `text()` builds for 200,000 deliveries; 0 UNSUB before the linger, 1 timer, 1 UNSUB after; 0 selections and 0 cache rows left |
+
+**What `{ signal }` and `{ until }` cost a link** ([bench/signal.mjs](bench/signal.mjs), [results/timing.jsonl](results/timing.jsonl); measured, three runs, each process alone under the timing lock; each run the median of 7 interleaved rounds; ns a link). One signal shared by n links, the mechanism alone:
+
+| links on one signal | a listener per link: add | its remove | one listener per signal and a Set: join | leave |
+|---|---|---|---|---|
+| 10 | 4,237-6,517 | 1,448-1,601 | 1,014-1,118 | 346-375 |
+| 100 | 5,150-5,242 | 650-660 | 235-246 | 127-131 |
+| 1,000 | 1,932-7,223 | 290-499 | 114-124 | 54-64 |
+| 10,000 | 18,782-19,165 | 355-391 | 148-161 | 69-71 |
+
+The prototype as built (a listener per link): n links on one row of a server, `connect()` then `disconnect()`, both together:
+
+| links | no end option | `{ signal }`, one shared | `{ until }`, one socket-like thing | signal over none | until over none |
+|---|---|---|---|---|---|
+| 10 | 4,622-4,812 | 9,414-11,313 | 5,139-5,712 | +4,486 to +6,309 | +389 to +593 |
+| 100 | 2,562-3,508 | 6,590-6,950 | 5,360-6,833 | +3,400 to +4,089 | +2,605 to +3,123 |
+| 1,000 | 570-631 | 3,349-3,587 | 2,459-5,299 | +2,718 to +2,986 | +1,940 to +4,397 |
+| 10,000 | 803-877 | 26,180-28,452 | 22,675-24,563 | +25,308 to +27,656 | +21,873 to +23,690 |
+
+- **Listen once per signal, not once per link** (measured). A listener per link costs microseconds to add at every size (4-7 µs even at 10 and 100 links, so Node's `AbortSignal.addEventListener` is slow in itself, reasoned from those rows) and grows with the number of listeners (19 µs at 10,000), so the prototype's `{ signal }` adds 2.7-6.3 µs a link up to 1,000 links and 25-28 µs at 10,000. One listener and a Set cost 0.11-0.16 µs to join and 0.05-0.07 µs to leave at 1,000 and 10,000 links. That confirms READS.md's rough number (0.13-0.19 µs a link, from a bench not kept) and its rule; this prototype does not follow the rule.
+- **`until` on a socket costs well under a microsecond for a few links** (measured): +0.39-0.59 µs a link with 10 links on one socket-like thing. With thousands of links on one emitter it grows the same way (a removal walks the list), which a real socket never sees.
+- Small n is the noisiest row: at 10 links the per-round setup is spread over few links.
 
 **The checks have teeth** (each planted bug must make its run fail):
 
@@ -165,20 +187,32 @@ The same work alone, with no writes in the timed loop (each way run over 100,000
 
 The messages for a wrong call are poor (checked): `connect(draw, draw)` says "Type '(w: Readonly<Widget>) => void' has no properties in common with type 'ConnectOpts'" (TS2559); `connect({ once: true }, draw)` says "'once' does not exist in type '(state: Readonly<Widget>, commit: Commit<Widget>) => void'" (TS2353); `connect('textContent')` lists both overloads (TS2769).
 
+**Two slips the types cannot catch, run** ([bench/slips.mjs](bench/slips.mjs), [results/checks.jsonl](results/checks.jsonl), checked; not timed):
+
+| Slip | What it did on Node 22.22.0 |
+|---|---|
+| a forgotten `.get()`, printed: `JSON.stringify(lens)` | `undefined`; inside an object the field is dropped, `{}`. `console.log(lens)` prints `Lens(shop.widgets)`, `String(lens)` gives `shop.widgets`, and the lens is truthy |
+| `{ until: req }` on a long response, the request's body read (as a body parser does) | the request said `close` at 19 ms, with `destroyed` true, while the client stayed until 315 ms; the response said `close` at 318 ms. So a link ended by the request would end at once |
+| the same, the body not read | the request said `close` with the client, at 304 ms |
+
+The prototype's strict `until` now refuses a thing with a `method` (an HTTP request) with `bad-target` (lifetimes case 16).
+
 ## Limits
 
 - The prototype's `connect` sits on E-55's prototype: no fero kernel, no log, no positions. `from` takes only `'now'`, and an every-commit loop keeps its commits in this process; a real one would read the server's log by position.
 - The seeded runs use small worlds (12-30 rows, 4 partitions), on a server and a loopback client in one process; no worker, no real port, no reconnect.
 - The timed parts are this folder's harness, not data's perf suite. The for-await loop's slowness is a 1 ms timer (I/O-like work), not CPU work.
 - The types are a sketch of the owner's connect, not API.md's declarations.
+- The guard that makes a read after the end throw `ended` is a second `Proxy` per link over the shared view; it shows the rule can be kept in every setting, not what it costs. A real build would check one flag inside the read trap the view already has.
+- The prototype listens to a signal once per link (`addEventListener` per link), not once per signal as CONNECT.md says fero does; `signal.mjs` times both ways.
 
 ## How to rerun
 
 ```sh
 SP=<your scratch folder> ./run.sh types    # probe 5 (tsc 6.0.2), under the heavy lock
-SP=<your scratch folder> ./run.sh checks   # probes 1, 3 (identity) and 4 (lifetimes, its planted bugs), under the heavy lock
+SP=<your scratch folder> ./run.sh checks   # probes 1, 3 (identity), 4 (lifetimes, its planted bugs) and 5's slips, under the heavy lock
 SP=<your scratch folder> ./run.sh sims     # E-55's seeded checks on connect, then every planted bug, under the heavy lock
-SP=<your scratch folder> ./run.sh timing   # probes 2 and 3, three runs each under the timing lock (about 5 minutes)
+SP=<your scratch folder> ./run.sh timing   # probes 2, 3 and 4's signal cost, three runs each under the timing lock
 SP=<your scratch folder> ./run.sh summary  # the timed tables from results/timing.jsonl
 ```
 

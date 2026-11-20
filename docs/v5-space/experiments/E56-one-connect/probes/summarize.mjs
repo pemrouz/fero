@@ -11,13 +11,15 @@ const failed = lines.filter((o) => o.part === 'failed')
 if (failed.length) console.log(`**${failed.length} failed runs**: ${failed.map((f) => f.cmd).join('; ')}\n`)
 
 console.log('### Probe 2: a for-await loop 10 times slower than the writes (10,000 commits a second for 5 s)\n')
-console.log('| mode | link on | runs | achieved writes/s | turns | commits the loop saw | commits per turn | waiting at the end | most waiting | heap growth MB | bytes per waiting commit |')
-console.log('|---|---|---|---|---|---|---|---|---|---|---|')
+console.log('| mode | link on | runs | achieved writes/s | turns | commits the loop saw | commits per turn | waiting at the end | most waiting | heap growth MB | bytes per waiting commit | waiting grows a second |')
+console.log('|---|---|---|---|---|---|---|---|---|---|---|---|')
+// how fast the waiting count grows: from the first sample to the last, per run
+const growth = (o) => { const s = o.samples ?? []; if (s.length < 2) return undefined; const a = s[0], b = s[s.length - 1]; return Math.round((b.waiting - a.waiting) / ((b.ms - a.ms) / 1000)) }
 for (const mode of ['merge', 'every']) for (const shape of ['row', 'whole']) {
   const g = lines.filter((o) => o.part === 'grow' && o.mode === mode && o.shape === shape)
   if (!g.length) continue
   const f = (k) => rng(g.map((o) => o[k]))
-  console.log(`| ${mode} | ${shape === 'row' ? 'one row' : 'the whole resource (1,000 rows)'} | ${g.length} | ${f('achievedRate')} | ${f('turns')} | ${f('commitsSeenByTheLoop')} | ${f('commitsPerTurn')} | ${f('waitingAtEnd')} | ${f('maxWaiting')} | ${f('heapGrowthMB')} | ${f('bytesPerWaitingCommit')} |`)
+  console.log(`| ${mode} | ${shape === 'row' ? 'one row' : 'the whole resource (1,000 rows)'} | ${g.length} | ${f('achievedRate')} | ${f('turns')} | ${f('commitsSeenByTheLoop')} | ${f('commitsPerTurn')} | ${f('waitingAtEnd')} | ${f('maxWaiting')} | ${f('heapGrowthMB')} | ${f('bytesPerWaitingCommit')} | ${mode === 'every' ? rng(g.map(growth)) : ''} |`)
 }
 
 const c = lines.filter((o) => o.part === 'cost')
@@ -44,4 +46,17 @@ for (const K of [1, 10]) {
   console.log('| way | ns a change |')
   console.log('|---|---|')
   for (const k of Object.keys(p[0].aloneNsPerChange)) console.log(`| ${k} | ${rng(p.map((o) => o.aloneNsPerChange[k]))} |`)
+}
+
+const sg = lines.filter((o) => o.part === 'signal')
+if (sg.length) {
+  console.log(`\n### Probe 4b: what { signal } and { until } cost a link (${sg.length} runs; each run the median of ${sg[0].rounds} interleaved rounds; ns a link)\n`)
+  console.log('One signal shared by n links, alone (no fero): a listener per link, against one listener per signal and a Set of its links.\n')
+  console.log('| links on one signal | a listener per link: add | its remove | one listener and a Set: add | its remove |')
+  console.log('|---|---|---|---|---|')
+  for (const n of Object.keys(sg[0].mechanism)) { const m = (k) => rng(sg.map((o) => o.mechanism[n][k])); console.log(`| ${Number(n).toLocaleString('en')} | ${m('perLinkAdd')} | ${m('perLinkRemove')} | ${m('perSignalAdd')} | ${m('perSignalRemove')} |`) }
+  console.log('\nThe prototype (a listener per link, as built): n links on one row of a server, connect() then disconnect(), ns a link for both.\n')
+  console.log('| links | no end option | { signal } (one shared) | { until } (one socket-like thing) | signal over none | until over none |')
+  console.log('|---|---|---|---|---|---|')
+  for (const n of Object.keys(sg[0].connect)) { const m = (k) => rng(sg.map((o) => o.connect[n][k])); console.log(`| ${Number(n).toLocaleString('en')} | ${m('none')} | ${m('signal')} | ${m('until')} | ${m('signalOverNone')} | ${m('untilOverNone')} |`) }
 }

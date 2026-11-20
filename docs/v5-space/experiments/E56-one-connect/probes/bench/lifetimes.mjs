@@ -148,14 +148,40 @@ policy.brk = 'link'
   await flush(); ac.abort()
   check('until and signal: abort ends it and removes the close listener', h.dead && em.listenerCount('close') === 0 && count(r) === 0, { endedBy: h.why, closeListenersLeft: em.listenerCount('close') })
 }
-// 11. the state read after disconnect: a client's evicted rows, against a server's
+// 11. the state read after the link ends. As first built (policy.after 'view'), a partition's state is the selection's
+// live view, shared by every link on it, so what a read after the end gives depends on the role, the linger and other
+// links: a limit. With a guard per link (policy.after 'throw', the fix CONNECT.md takes), every read after the end throws
+// 'ended', in all four settings: a check
 {
-  const srv = mk(); const cl = fero('s', { role: 'client', transport: new Loop(srv, { json: true }), linger: 0 })
-  const h = cl.data.connect(); await h.ready
-  const before = Object.keys(h.state).length
-  const kept = h.state
-  h.disconnect()
-  limit('a client: the state object (a partition) a link handed out, read after the link ends', { rowsBefore: before, rowsAfterEnd: Object.keys(kept).length, k1After: kept.k1 ?? null })
+  const after = async (mode) => {
+    const was = policy.after; policy.after = mode
+    const seen = {}
+    const read = (x) => { try { return Object.keys(x).length + ' rows, k1.n=' + (x.k1?.n ?? 'none') } catch (e) { return 'throws ' + e.code } }
+    const readH = (h) => { try { h.state; return 'a value' } catch (e) { return 'throws ' + e.code } }
+    // a client, no linger: the rows go when the link ends
+    { const srv = mk(); const cl = fero('s', { role: 'client', transport: new Loop(srv, { json: true }), linger: 0 })
+      const h = cl.data.connect(); await h.ready; const kept = h.state; const live = read(kept)
+      h.disconnect(); seen['a client, no linger'] = { whileLive: live, afterEnd: read(kept), handleState: readH(h) } }
+    // a client with a linger of 50 ms: the rows stay, and keep changing, until the linger ends
+    { const srv = mk(); const cl = fero('s', { role: 'client', transport: new Loop(srv, { json: true }), linger: 50 })
+      const h = cl.data.connect(); await h.ready; const kept = h.state
+      h.disconnect(); const at0 = read(kept); srv.data.k1.n.set(41); await flush(); await flush(); const atWrite = read(kept)
+      await new Promise((res) => setTimeout(res, 80)); seen['a client, linger 50 ms'] = { afterEnd: at0, afterAWrite: atWrite, afterTheLinger: read(kept) } }
+    // a server: every row is held, so the kept view goes on changing
+    { const srv = mk(); const h = srv.data.connect(); await h.ready; const kept = h.state
+      h.disconnect(); const at0 = read(kept); srv.data.k1.n.set(42); seen['a server'] = { afterEnd: at0, afterAWrite: read(kept) } }
+    // a client with another link on the same rows: the view goes on changing for this link's old reference too
+    { const srv = mk(); const cl = fero('s', { role: 'client', transport: new Loop(srv, { json: true }), linger: 0 })
+      const h = cl.data.connect(), other = cl.data.connect(); await h.ready; await other.ready; const kept = h.state
+      h.disconnect(); const at0 = read(kept); srv.data.k1.n.set(43); await flush(); await flush(); seen['a client, another link on the same rows'] = { afterEnd: at0, afterAWrite: read(kept) }; other.disconnect() }
+    policy.after = was
+    return seen
+  }
+  const view = await after('view')
+  limit('as first built: a partition\'s state object, read after its link ends, gives a different answer in each setting', view)
+  const guarded = await after('throw')
+  const all = Object.values(guarded).flatMap((o) => Object.entries(o).filter(([k]) => k !== 'whileLive').map(([, v]) => v))
+  check('with a guard per link: a partition\'s state read after its link ends throws ended, in all four settings', all.length > 0 && all.every((v) => v === 'throws ended') && guarded['a client, no linger'].whileLive === '2 rows, k1.n=1', guarded)
 }
 // 12. a handle born ended (its signal already aborted): what ready, state and get() do
 {
@@ -190,6 +216,12 @@ policy.brk = 'link'
   const loop = (async () => { for await (const { commit } of h) { items.push({ first: commit.first, n: commit.changes.map((d) => d.row?.n) }); if (items.length === 2) break } })()
   await flush(); r.data.k1.n.set(18); await flush(); await loop
   limit('from "now": two commits made after connect() returns but before the loop starts are folded into the loop\'s first picture, not seen one by one (this prototype keeps commits only for loops that exist; a real `from` is a log position)', { items })
+}
+// 16. until with an HTTP request (it has once('close') and destroyed, so the shape check alone would take it): refused
+{
+  const r = mk(); const req = sockLike(); req.method = 'GET'; req.url = '/'
+  let code = null; try { r.data.k1.connect(() => {}, { until: req }) } catch (e) { code = e.code }
+  check('until: an HTTP request is refused bad-target (it may say close once its body is read, while the client stays)', code === 'bad-target' && count(r) === 0, { refused: code, linksCounted: count(r) })
 }
 for (const c of cases) out(c.limit ? { case: c.name, limit: true, saw: c.saw } : { case: c.name, ok: c.ok, saw: c.saw })
 const ck = cases.filter((c) => !c.limit)

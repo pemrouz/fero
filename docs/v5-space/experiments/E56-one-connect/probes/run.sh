@@ -2,19 +2,23 @@
 # E-56 probes: the owner's one `connect` (I1-I4, I9, I11, I12), built on E-55's prototype. E-55's proto/lens.mjs and
 # proto/net.mjs are imported from E-55's folder and never edited; proto/connect.mjs adds connect on top of them.
 #   ./run.sh checks   probe 1 (a thenable handle), probe 3's identity check, probe 4 (lifetimes) with its planted bugs
-#                     and with the first call inside connect(); under the heavy lock
+#                     and with the first call inside connect(), and probe 5's two slips the types cannot catch
+#                     (slips.mjs: a forgotten .get() printed; when an HTTP request says it closed); under the heavy lock
 #   ./run.sh sims     E-55's seeded lifetime checks (its claims 7, 9 and 26) run on connect, then every planted bug;
 #                     under the heavy lock
-#   ./run.sh timing   probe 2 (for await: buffer growth, cost per delivery) and probe 3 (what prev costs), RUNS times
-#                     each, every process alone under the timing lock and preceded by its load average
+#   ./run.sh timing   probe 2 (for await: buffer growth, cost per delivery), probe 3 (what prev costs) and probe 4's
+#                     cost of { signal } and { until } a link (signal.mjs), RUNS times each, every process alone under
+#                     the timing lock and preceded by its load average
 #   ./run.sh types    probe 5: tsc on check/ (must exit 0), then every must-fail line stripped (strip.mjs); under
 #                     the heavy lock
-#   ./run.sh summary  the timed tables, as ranges over the runs (node summarize.mjs)
-#   ./run.sh          all of the above
+#   ./run.sh summary  the timed tables, as ranges over the runs (node summarize.mjs), also written to results/tables.md
+#   ./run.sh clean    remove the results; checks, sims, timing and types append, so a partial rerun adds to them
+#   ./run.sh          clean, then all of the above
 # Env: SP (required: a scratch folder of your own that holds the lock helpers bin/timing and bin/heavy),
 # NODE (default node on PATH: Node 22.22.0; tsc 6.0.2 from PATH, or from NODE's folder when NODE is a path), RUNS (default "1 2 3"),
 # DATA (data's folder for E-55's lens.mjs; default ../data next to this repo, at 63fea66), OUT (temp files; default
-# $SP/e56/probes). Raw JSON lines land in results/.
+# $SP/e56/probes), NODEF (the node command with its flags; default NODE with a 4,000 MB heap cap). Raw JSON lines
+# land in results/.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 : "${SP:?set SP to a scratch folder (it holds bin/timing and bin/heavy)}"
@@ -28,7 +32,8 @@ B=$HERE/bench
 mkdir -p "$R" "$OUT/tmp"
 export TMPDIR=${TMPDIR:-$OUT/tmp}
 case $NODE in */*) PATH="$(dirname "$NODE"):$PATH"; export PATH ;; esac
-NODEF="$NODE --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=12000"
+# every node process stays under 4 GB of heap (the box has 15 GB and no swap); NODEF overrides the whole command
+NODEF=${NODEF:-"$NODE --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=4000"}
 
 # one process: its load average first, then its JSON line(s); a failure becomes a line too
 one() {
@@ -44,6 +49,7 @@ checks() {
   $H "$F" 1 $NODEF lifetimes.mjs
   (E56_FIRST=sync; export E56_FIRST; $H "$F" 1 $NODEF lifetimes.mjs) # the first call inside connect(), as E-55 built it
   for m in twice nosignalcleanup untilclosed; do (E56_MUTATE=$m; export E56_MUTATE; $H "$F" 1 $NODEF lifetimes.mjs); done
+  $H "$F" 1 $NODEF slips.mjs
 }
 
 sims() {
@@ -70,6 +76,7 @@ timing() {
     for m in merge every; do for s in row whole; do $T "$F" $run $NODEF foreach.mjs grow $m $s 5 10000 1; done; done
     $T "$F" $run $NODEF foreach.mjs cost
     for k in 1 10; do $T "$F" $run $NODEF commit.mjs prev $k; done
+    $T "$F" $run $NODEF signal.mjs
   done
 }
 
@@ -83,6 +90,9 @@ types() {
   printf '{"exp":"E-56","probe":5,"stripped":"%s"}\n' "$(tail -1 "$R/types-stripped.txt")" >> "$F"
 }
 
+# a fresh start: results from an earlier run are never mixed in
+clean() { rm -f "$R"/checks.jsonl "$R"/sims.jsonl "$R"/timing.jsonl "$R"/types.jsonl "$R"/types-stripped.txt "$R"/tables.md; }
+
 versions() {
   { $NODE --version; tsc -v; (cd "${DATA:-$(cd "$HERE/../../../../../.." && pwd)/data}" && git log -1 --format='data %h %cs'); uname -r; nproc; } > "$R/versions.txt"
 }
@@ -92,7 +102,8 @@ case "$1" in
   sims) sims ;;
   timing) versions; timing ;;
   types) types ;;
-  summary) $NODE "$HERE/summarize.mjs" ;;
-  "") versions; types; checks; sims; timing; $NODE "$HERE/summarize.mjs" ;;
-  *) echo "usage: run.sh [checks|sims|timing|types|summary]"; exit 1 ;;
+  summary) $NODE "$HERE/summarize.mjs" > "$R/tables.md"; cat "$R/tables.md" ;;
+  clean) clean ;;
+  "") clean; versions; types; checks; sims; timing; $NODE "$HERE/summarize.mjs" > "$R/tables.md" ;;
+  *) echo "usage: run.sh [clean|checks|sims|timing|types|summary]"; exit 1 ;;
 esac

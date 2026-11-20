@@ -28,17 +28,19 @@ P('\n' + loads(hash) + (failed(hash).length ? `; FAILED: ${failed(hash).length}`
 const tree = read('tree.jsonl'), T = tree.filter((r) => r.part === 'tree')
 P('### Keeping a hash structure over one partition, per write (ns), and its memory (B a row)\n')
 P('"extra" is the way minus `base` in the same run and size (each run\'s own pair), then the median and range over runs. "B a row (heap)" is heap plus array buffers after the structure is built, minus before, per row (the median over runs): it includes the per-row Maps, and is noisy at 1,000 rows. "tree B a row" is the tree\'s own typed arrays, exact. "inner µs" builds every inner node from the leaves (median of 5 in each run; the median and range over runs): what a peer\'s question costs when nothing above the leaves is kept. check: the kept structure equals one rebuilt from scratch after the writes.\n')
-P('| rows | way | depth | ns a write | extra ns | B a row (heap) | tree B a row | inner µs | build ms | check | runs |')
-P('|---|---|---|---|---|---|---|---|---|---|---|')
+P('"over ver": for the three Merkle ways that ride on `ver` (they need each row\'s old version), the way minus `ver` in the same run and size: what the tree adds beyond the per-row version store.\n')
+P('| rows | way | depth | ns a write | extra ns | over ver | B a row (heap) | tree B a row | inner µs | build ms | check | runs |')
+P('|---|---|---|---|---|---|---|---|---|---|---|---|')
 for (const n of [...new Set(T.map((r) => r.rows))].sort((a, b) => a - b)) {
   for (const way of ['base', 'ver', 'rowhash', 'sum', 'sumkept', 'mkver', 'mkverb', 'mkleaf', 'mkrow', 'mksha']) {
     const rs = T.filter((r) => r.rows === n && r.way === way)
     if (!rs.length) continue
     const extra = rs.map((r) => { const b = T.find((x) => x.rows === n && x.way === 'base' && x.run === r.run); return b ? r.ns_write - b.ns_write : NaN }).filter((x) => !Number.isNaN(x))
+    const overVer = ['mkver', 'mkverb', 'mkleaf'].includes(way) ? cell(rs.map((r) => { const v = T.find((x) => x.rows === n && x.way === 'ver' && x.run === r.run); return v ? r.ns_write - v.ns_write : NaN }).filter((x) => !Number.isNaN(x))) : '-'
     const checks = [...new Set(rs.map((r) => r.check))].join(',')
     const tb = rs[0].tree_b_row == null ? '-' : f(rs[0].tree_b_row)
     const inner = rs[0].inner_ms == null ? '-' : cell(rs.map((r) => r.inner_ms * 1000))
-    P(`| ${n.toLocaleString('en-US')} | ${way} | ${rs[0].depth} | ${cell(rs.map((r) => r.ns_write))} | ${way === 'base' ? '-' : cell(extra)} | ${f(med(rs.map((r) => r.bytes_row)))} | ${tb} | ${inner} | ${f(med(rs.map((r) => r.build_ms)))} | ${checks} | ${rs.length} |`)
+    P(`| ${n.toLocaleString('en-US')} | ${way} | ${rs[0].depth} | ${cell(rs.map((r) => r.ns_write))} | ${way === 'base' ? '-' : cell(extra)} | ${overVer} | ${f(med(rs.map((r) => r.bytes_row)))} | ${tb} | ${inner} | ${f(med(rs.map((r) => r.build_ms)))} | ${checks} | ${rs.length} |`)
   }
 }
 P('\n' + loads(tree) + (failed(tree).length ? `; FAILED: ${failed(tree).length}` : '') + '\n')
