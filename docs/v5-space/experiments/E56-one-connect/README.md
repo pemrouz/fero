@@ -65,7 +65,7 @@ All from the results files; each part's `summarize.mjs` prints the full tables (
 | E-05's order-free sum, old hash recomputed (`sum`) | +1,584 to +1,676 | +2,649 to +2,691 | +2,798 to +3,065 | none |
 | the same, each row's hash kept (`sumkept`) | +852 to +861 | +1,305 to +1,333 | +1,477 to +1,700 | 50-61 B a row |
 
-No way came under 0.2 µs in any run. 0.2 µs is the bar E-54 set for a version kept per write on the live path (API.md:747), used here only as a yardstick. Building every inner node on demand instead: 4-8 µs at 1,000 rows, 1.21-1.30 ms at 100,000 and 1.15-1.58 ms at 1,000,000; SHA-256 5.6-12.3 ms.
+No way came under 0.2 µs in any run. 0.2 µs is the bar E-54 set for a version kept per write on the live path (API.md:747 at commit 17adf71, before API.md was rewritten for V5-13 to V5-15), used here only as a yardstick. Building every inner node on demand instead: 4-8 µs at 1,000 rows, 1.21-1.30 ms at 100,000 and 1.15-1.58 ms at 1,000,000; SHA-256 5.6-12.3 ms.
 
 **A resume after compaction, bytes up plus down, 100 B rows** *(checked: exact bytes, the same in every run)*:
 
