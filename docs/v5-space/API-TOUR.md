@@ -372,7 +372,7 @@ Each says what it looks like now, what it looked like before (the 2026-11-18 pag
   // file: derive.ts — derive in two forms: the view form, and the record form, with rows or without
   import { fero, op, derive } from 'fero'
   type Order = { user: string; cents: number; paid: boolean }
-  const orders = await fero<Order>('orders', { server: true })            // a server of the source holds every row
+  const orders = await fero<Order>('orders', { server: true, history: '7d' })   // every row, and 7 days of log for the record form
   const totals = await fero<number>('totals', { server: true })
   await derive(orders.data.by('user').sum('cents'), totals)               // the view form: totals equals the view
   const counts = await fero<number>('counts', { server: true })
@@ -556,7 +556,7 @@ These did not change. They only get a plainer sentence.
 
 ## 6. Questions for you
 
-API.md 11.1 numbers the questions 1 to 33, and this tour keeps its numbers: 1 to 14 are the first tour's, 15 to 24 came with the 2026-11-18 page, and 25 to 33 are new picks of API.md where V5-13 to V5-15 leave room. Q-B1 and Q-B3 are the first tour's 15 and 16.
+API.md 11.1 numbers the questions 1 to 40, and this tour keeps its numbers: 1 to 14 are the first tour's, 15 to 24 came with the 2026-11-18 page, 25 to 33 are new picks of API.md where V5-13 to V5-15 leave room, and 34 to 40 are meanings the declarations left out, found by the patterns walk-through ([PATTERNS.md](PATTERNS.md)). Q-B1 and Q-B3 are the first tour's 15 and 16.
 
 ### 6.1 Decided
 
@@ -600,6 +600,13 @@ Each has API.md's pick. **Say yes, and both pages mark it closed.**
 - **31. The cluster's `tap` becomes `connect`.** V5-13 pick 1 named only lenses, and V5-16 took the cluster's `snapshot()` away. **Pick:** `f.cluster.connect((shape) => …)` and `f.cluster.writes.connect((rows) => …)`, under a lens's link rules: the first call a microtask after the call; `disconnect()`, `signal` and `until`, each safe twice. The other way keeps `tap(fn)` on the cluster, a second live verb.
 - **32. Who serves a view when the leader is the only copy.** V5-14 puts views on every copy but the leader; with one server process there is no such copy. **Pick (LAYERS 10's reading):** the leader serves, and pays the build's stall on the write path, until a second copy is ready; health says so. Not run. The other way: no served views until a second copy exists.
 - **33. Codes for two refusals V5-15 names without a code.** **Pick:** `bad-arg` for a `ttl` or `while` on a field write, and `too-large` for a room write past the size rule, once that rule exists. The other way is a code of its own for each.
+- **34. What a lock's `renew` option means.** **Pick (PATTERNS.md section 7's reading):** on by default; fero renews the lease while the lock is held, every third of the lease, as E-22's library did. With `renew: false` the holder calls `renew()` itself. The other way: off by default, so a holder that forgets loses the lock after one lease.
+- **35. What `saga()` gives when a step is refused.** **Pick:** the call rejects with that step's own error, such as `conflict`, once the undo has committed; a retry under the same `once` name gets the same refusal (E-22's library). The other way: a code of its own, such as `undone`, so a whole undone unit is never taken for one refused write.
+- **36. May a saga span resources?** **Pick (PATTERNS.md section 8's reading): yes.** To a saga, another resource's partition is one more partition in one more group, as E-24's model placed each one. The other way: one resource per saga, refused before it starts.
+- **37. `consumer()`'s options, and the unit of `lag`.** **Pick (E-22's library):** `shares` 16, fixed for the group's life (E-22 had it as a constant, not an option); `lease` 10 s, renewed every third of it; `max` 100 entries a batch; `from` `'earliest'`, used only by a share with no saved cursor. `lag` counts records not yet run in the shares this process owns; E-22's was always 0, so the unit is API.md's pick. The other way: `lag` in ms of writer time, and a share count that can change.
+- **38. What an asker gets when the answer function throws.** **Pick:** the ask rejects `threw` with the message, as a method's throw does, and no other worker runs the request. E-22's library sent the error's text back as if it were the reply. The other way: the request goes back to be taken again, as a queue job does.
+- **39. The live links a library opens.** "`no-answerer` at once" needs the asker to follow the answerers' presence rows; an asker also follows its reply rows, and a `take({ wait })` follows the queue's partition. None is a line you wrote. **Pick:** the library opens and ends them, and they show with the open links (26). Each costs what `connect()` on a partition costs: one SUB, the partition once, then a frame per change; for a waiting take, the queue's whole partition *(reasoned; not measured)*. The other way: no hidden link; an ask with no answerer waits for its timeout, and a waiting take waits at the leader once V5-9's measurements allow it.
+- **40. Cost rows for keeping a lock, and for a consumer.** **Pick (E-22's library and P-08; reasoned):** a held lock renews with one commit every third of its lease, 3 a lease, and one more to release; a consumer renews each share the same way; `commit()` is one commit per share the batch read; `run` is one marked write per output, plus a cursor write now and then, at a rate not yet set. The times are owed. The other way: renew less often, which writes less and leaves less room for a slow commit.
 - **Q-B1 (the first tour's 15). An early answer, then a refusal not about the row.** **Pick:** through a closed write gate or a full disk fero keeps retrying; a revoked token ends `forbidden`. **Decides:** E-48's model with a gate and a revoke.
 - **Q-B3 (the first tour's 16). Who serves fero's own resources.** **Pick:** any process that serves a resource serves the system ones too. **Decides:** LAYERS section 10 item 5.
 - **Q-B10 and Q-B11 (new).** A stale or missing method table, in a rolling deploy or before any server answered, must never refuse a valid call; **decides:** a sim with servers on two table versions. A data upgrade under live served views and derivers: entries and the deriver's lock row carry the data build *(reasoned)*; **decides:** a rolling deploy with the build in the key.
@@ -628,7 +635,7 @@ No experiment ran these. API.md marks each one.
 - **A spare server**, past `copies + standbys`, holds no copy, and answers a served view's SUB `moved`. An operator over every row there first takes every row, as `hold: 'all'` does (API 3.3, reading TRANSFORMS R0).
 
 **Follow-ups this pass leaves for other files.**
-- **[LAYERS.md](LAYERS.md)** was updated for V5-13 to V5-16 the same day. It carries API.md's own picks, questions 25 to 33, in its section 10 item 46.
+- **[LAYERS.md](LAYERS.md)** was updated for V5-13 to V5-16 the same day. It carries API.md's own picks, questions 25 to 33, in its section 10 item 46; 34 to 40 are not in it yet.
 - **CONNECT.md, LENS.md and READS.md** still offer `f.rows` as a current read, from before V5-16. API.md and this tour cite them as evidence, not as the surface.
 - **The V5-16 record in DECISIONS.md** must carry what these pages cite V5-16 for: the stand-in promise cost (50 to 90 ns) and the counts of v4 example lines (46 lines in 33 files read the cluster; 23 of them a field v5 lacks).
 - **The examples ladder.** `f.snapshot` is gone, so 89 lines in 52 example files change (READS 9). Rungs 03, 04, 08, 10, 12, 13, 16 and 17 change their lesson, and so does every rung whose client reads rows, since a bare client now holds nothing (about 20 READMEs; API 5.1). And 46 lines in 33 files read the cluster with `snapshot()` or `tap`; 23 of them also read a field v5's shape lacks (API 5.1).
@@ -692,7 +699,7 @@ Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the defa
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/API-TOUR.md)" docs/v5-space/API-TOUR.md
 ```
 
-**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite and the V5-16 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 12 blocks type-check (tsc Version 6.0.2)`, then `23 marked lines, 23 fail at their own line, 0 errors elsewhere`.
+**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite, the V5-16 amendment and the fixes the patterns walk-through found** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 12 blocks type-check (tsc Version 6.0.2)`, then `23 marked lines, 23 fail at their own line, 0 errors elsewhere`.
 - **Where the 23 are:** three each in `verbs.ts`, `ends.ts`, `positions.ts`, `writes.ts`, `methods.ts` and `views.ts`, two each in `address.ts` and `sync.ts`, and one in `derive.ts`. Each fails for the reason its comment gives: `connect({ once })` and `{ from }` on `connect` against the options whose text names `get()` and `changes()` (TS2769, TS2322); an awaited handle is not a row (TS2739); `until` with a DOM node or an HTTP request is not `Closes` (TS2322); `tap`, a root `set`, a function or a root operator left of `connect()` are not callable (TS2349); a version or `-5` on the root, and a bare number as a time, against `Pos` and its "a time is a Date" text (TS2322); `ttl` on a field (TS2769); a room set to one row (TS2322); `f.methods` (TS2339); an awaited served view (TS2740); a method named `connect` and an unbounded view, on the method (TS2322); `derive` of `group` (TS2345); `await stock` and `stok`, as before; `f.rows` and the cluster's `snapshot()`, gone (TS2339).
 - **Two fail for a reason the types cannot say in words**: a root `set` and a function left of `connect()` fail with "This expression is not callable", as in API.md (its section 12).
 - **Not checked here: that any of it runs.** Nothing on this page is built.

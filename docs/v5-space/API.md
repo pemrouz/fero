@@ -815,7 +815,7 @@ There are three steps, and each costs more and lasts longer.
 // file: derived.ts — totals from orders: the two forms of derive, then what the record form is made of
 import { fero, op, derive, consumer, lock } from 'fero'
 type Order = { user: string; cents: number; paid: boolean }
-const orders = await fero<Order>('orders', { server: true })     // holds every row of the source: its root runs views here
+const orders = await fero<Order>('orders', { server: true, history: '7d' })   // every row, for views; 7 days of log, for the record form
 const totals = await fero<number>('totals', { server: true })    // a server of the target
 await derive(orders.data.by('user').sum('cents'), totals)         // the view form: totals equals the view; no history needed
 
@@ -864,7 +864,7 @@ await lock('derive:spent', async () => {
 2. **It runs in one process.** With `server: true`, every server process of the target that runs the four lines derives: the marks keep the result right, but the work is done N times. Take a lock (P-10), or use `derive()`, which splits the work.
 
 - **Not awaiting is the point.** Marked writes not awaited ran at 122,000 to 134,000 a second, against 239 to 240 awaited one by one (E-55 claim 21).
-- **The source needs `history`** for the record form. Past it, the deriver stops with `expired` rather than skip a record (LAYERS 8.8).
+- **The source needs `history`** for the record form, and the default keeps none (section 9), so the source's server opens it with one, as above. Past it, the deriver stops with `expired` rather than skip a record (LAYERS 8.8).
 - There is no transaction across the two. The target trails the source by about one commit. On the project's one timeline, a derived record is placed after its source (V5-4).
 
 **Is fero exactly once?** (LENS 1.2.) **Yes, for writes into fero, in three layers, each with a limit: a resend counts once inside one session; a `once` name counts once for a day; a mark counts once per source record while the source keeps its log and the loop is paced and runs in one process. Like Kafka, not for an email or a payment made inside your code.**
@@ -2287,7 +2287,7 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 
 **Time** (A-23, [E-21]; V5-4).
 - Writer time is the median of the members' clocks, the leader's own included. It never goes back. With one wrong clock, the leader's included, every check passed and no failover happened ([E-21]: 7 rules).
-- **When most clocks disagree, the group stops writing** rather than expire rows by a wrong time. Health shows `skew`.
+- **When most clocks are wrong, the group keeps writing by a wrong time.** A-23 has no agreement guard. In [E-21]'s 30 runs where two of three clocks jumped, 104 rows expired early (the worst by 28.5 s), 370 late, and 2 locks were granted early. A guard that makes the group stop instead costs 2 more rules, 9 in all. Whether to add it is still open ([AMENDMENTS.md](AMENDMENTS.md) G-11, and its question 12). The records disagree until the owner rules. [VERDICT.md](VERDICT.md) section 8 item 12 lists the guard as in force now. A-23 leaves it out, and so does LAYERS' count for writer time. This page follows A-23.
 - **Expiry, presence and delays are judged while a leader exists.** With none they wait.
 - `fero.now()` and `fero.id()` are the wall clock and random ids live, and the world's clock and seeded ids under test. Under a world, `setTimeout` and `setInterval` run on the world's clock ([E-22] D1).
 - **One timeline.** A viewer merges the resources' logs by writer time (V5-4). Writes to different resources within the clocks' gap (a few ms) may show in either order.
@@ -2302,7 +2302,7 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 - A session-bound write is sent only once its session's own record has committed (A-04; [E-22] F2).
 
 **Locks** (A-24, [E-24], [E-21]).
-- A lock is a row of `#locks`. Its token is the version of the write that took it; renewals keep it. Tokens rise for ever.
+- A lock is a row of `#locks`. Its token is the version of the write that took it; renewals keep it (who renews, and how often: question 34). Tokens rise for ever.
 - A write under a lock (`if: { lock: l }`) is judged by its own partition's leader. Each group remembers, per lock, the newest token it has seen, even after the lock row is gone. Leaders do not follow `#locks`.
 - **So:** no write commits under a token older than one this partition's leader has seen. A stale write can still land between a new grant and the new holder's first write there ([E-22] F5). To close that at once, write to the partition under the new token first.
 - The check does not lean on clocks ([E-21]).
@@ -2478,7 +2478,7 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 | `methods`, `validation`, `schema`, `rules`, `load`, `rows.where`, `shape.up`, a `partition` function | none | code: the call only; the same on every server, compared by its text; a change is a rolling `fero.alter` |
 | `shape.version` | 1 | which shape of row is in force |
 | `election.ms`, `election.jitter` | 2000, 500 | Raft's random election timers (V5-7); `election.ms` must be more than twice `ping.ms` |
-| `skew.max`, `lag.max`, `catchup.max` | 250, 1000 records, as COMP2's page | were cluster keys in `#meta`. Each resource is its own cluster, so they are its own: in its settings record, changed by `alter`, since every copy must agree on them (LAYERS 5.3; reasoned) |
+| `skew.max`, `lag.max`, `catchup.max` | 250, 1000 records, as COMP2's page | were cluster keys in `#meta`. Each resource is its own cluster, so they are its own: in its settings record, changed by `alter`, since every copy must agree on them (LAYERS 5.3; reasoned). Under A-23 writer time has no window, so no member clamps it by `skew.max`; in [E-21] it is still the clock gap the time bounds allow, and part of a lock holder's margin (a round trip plus `skew.max`) |
 | `views.max` | 64 per copy, weighted by cost (V5-14 pick 2) | the cap on served views a copy keeps, each counted by data 5's cost class for its call (O(1), O(log n) or O(n) a change); lingering entries and `{ pages }` indexes count. With k ≥ 2 serving copies, `views.max / k` is kept free as headroom; with one, none. Past it, a SUB is refused `too-many-views` |
 | `views.client` *(a name proposed here)* | 16 per client per copy *(a guess)* | how many served views one client may hold on a copy; a join counts |
 | `views.rows` *(a name proposed here)* | 1,000 *(a guess)* | the most buckets a served view may hold, checked on every commit; past it, the view ends `view-too-big` until its code changes (TRANSFORMS 3.2) |
@@ -2553,7 +2553,7 @@ await cache.data.hot.set({ n: 1 }, { ttl: '30s' })      // this row's own ttl
 await cache.data['user:42'].touch()                     // resets the ttl, keeps the value
 ```
 
-**Guarantee.** The leader removes rows by writer time, as records with a reason (`ttl`, `max`). So every copy agrees on which rows exist at each position. A row goes within one tick of its ttl, never before. With no leader it waits. `max` is kept per group, as its share rounded up. **Cost.** One commit per `set` or `touch`. Expiry work grows with what expires, not with what is held. The app holds nothing. **Layer:** L2.
+**Guarantee.** The leader removes rows by writer time, as records with a reason (`ttl`, `max`). So every copy agrees on which rows exist at each position. A row goes within one tick of its ttl, never before, while most clocks are sound (section 7, "Time"). With no leader it waits. `max` is kept per group, as its share rounded up. **Cost.** One commit per `set` or `touch`. Expiry work grows with what expires, not with what is held. The app holds nothing. **Layer:** L2.
 **Evidence.** Held by writer time while a leader exists ([E-21], [E-22]). With a failover near the ttl, a row went 2,036 ms late ([E-22] D9). Owed: the expiry pin at 1,000 to 1,000,000 rows.
 
 ### P-03 Near cache, client data sync
@@ -2659,7 +2659,7 @@ for await (const batch of await consumer(orders, 'billing')) {                  
 }
 ```
 
-**Guarantee.** Each share has one live owner at a time, with its own token. A crash hands its shares on within one lease plus one commit. `commit()` gives at least once. `run()` with `{ from: e }` gives exactly once, even after a long restart: each output's own entry carries a mark of the source position it came from ([E-30]), and the library paces the loop, so a marked write is never dropped for `backpressure`. `run()` restarts from its share's cursor, which moves only once the marked writes up to it are answered; a write made again is skipped at its mark (section 3.11; this page's reading). **Cost.** `run`: a share of one commit per output, with a 29 B mark; the outputs are not awaited, so they pipeline. `commit()`: one commit per batch. **Layer:** L5, over L3 and L2's lock check and marks.
+**Guarantee.** Each share has one live owner at a time, with its own token, while most clocks are sound; when most are wrong, two can overlap, and the token still fences the older one's `commit()` (section 7, "Time"). A crash hands its shares on within one lease plus one commit. `commit()` gives at least once. `run()` with `{ from: e }` gives exactly once, even after a long restart: each output's own entry carries a mark of the source position it came from ([E-30]), and the library paces the loop, so a marked write is never dropped for `backpressure`. `run()` restarts from its share's cursor, which moves only once the marked writes up to it are answered; a write made again is skipped at its mark (section 3.11; this page's reading). **Cost.** `run`: a share of one commit per output, with a 29 B mark; the outputs are not awaited, so they pipeline. `commit()`: one commit per share the batch read, so one for a batch from one share (question 40). **Layer:** L5, over L3 and L2's lock check and marks.
 **Evidence.** Nothing skipped and no paused member committed (40 of 40, [E-22]; [E-30] past the dedup horizon). Pacing: 0 lost and 0 doubled in 1,000 seeds of E-55's stand-in (claim 21). E-30's model with `{ from: e }` written by app code is owed. The hand-on time is not measured.
 
 ### P-09 Work queue
@@ -2675,7 +2675,7 @@ const work = await queue<{ url: string }>('thumbs')
 work.work(async (job) => { await resize(job.url) })     // returns: done. throws: try again; 5 tries, then thumbs.dead
 ```
 
-**Guarantee.** At most one live lease per message. None is lost while unacked. First in, first out per partition. After `deliveries` tries, the message moves to `thumbs.dead`. **Cost.** Three commits per message: add, take, ack. An empty take writes nothing. **Layer:** L5, on L2's `claim`. Unchanged by the lens.
+**Guarantee.** At most one live lease per message, while most clocks are sound (section 7, "Time"). None is lost while unacked. First in, first out per partition. After `deliveries` tries, the message moves to `thumbs.dead`. **Cost.** Three commits per message: add, take, ack. An empty take writes nothing. **Layer:** L5, on L2's `claim`. Unchanged by the lens.
 **Evidence.** One worker killed and one paused 40 s: each job removed once, never under two live leases ([E-22]).
 
 ### P-10 Locks and leader election
@@ -2691,7 +2691,7 @@ const leader = await lock('leader:billing', { wait: 'forever' })              //
 leader.lost.then(() => process.exit(1))                                       // lost the lease: stop acting
 ```
 
-**Guarantee.** At most one holder per lease, by writer time. Tokens rise for ever and compare with `<`. A write under a token older than one its partition's leader has seen is refused `fenced`; the check reads no other resource. A stale write can still land before the new holder's first write to that partition. **Cost.** Taking a lock is one conditional write: one commit. A write under a lock is an ordinary write with one more check at its own leader. **Layer:** L5, on L2's conditions.
+**Guarantee.** At most one holder per lease, by writer time, while most clocks are sound; when most are wrong, two holders can overlap, and only the fence protects writes (section 7, "Time"). Tokens rise for ever and compare with `<`. A write under a token older than one its partition's leader has seen is refused `fenced`; the check reads no other resource. A stale write can still land before the new holder's first write to that partition. **Cost.** Taking a lock is one conditional write: one commit. A write under a lock is an ordinary write with one more check at its own leader. **Layer:** L5, on L2's conditions.
 **Evidence.** The check refused every stale write under every clock fault ([E-21]); E-22's fencing checks were clean in every seed.
 
 ### P-11 Counters and rate limits
@@ -2752,7 +2752,7 @@ await who.ready
 console.log(Object.keys(who.value))
 ```
 
-**Guarantee.** When a process dies, its rows go on every copy within `session.ms` plus one tick, by a log record. A live process's rows are never removed. **Cost.** One commit per row. Showing who is in a room holds that one room, and the line `online.data.lobby.connect()` says so. **Layer:** L2.
+**Guarantee.** When a process dies, its rows go on every copy within `session.ms` plus one tick, by a log record. A live process's rows are never removed, while most clocks are sound (section 7, "Time"). **Cost.** One commit per row. Showing who is in a room holds that one room, and the line `online.data.lobby.connect()` says so. **Layer:** L2.
 **Evidence.** A killed client's rows went within 9.8 s of a 10 s lease; a client paused 5 s kept its rows ([E-22]).
 
 ### P-14 Invariants
@@ -2820,8 +2820,8 @@ for await (const e of facts.data.changes({ from: 'earliest', to: 'latest' }))   
 // file: p17.ts — derived resources
 import { fero, op, derive } from 'fero'
 type Order = { user: string; cents: number }
-const orders = await fero<Order>('orders', { server: true })    // the deriver holds its source's rows
-const totals = await fero<number>('totals', { server: true })   // and is a server of its own resource
+const orders = await fero<Order>('orders', { server: true, history: '7d' })   // its rows, for the view form; its log, for the record form
+const totals = await fero<number>('totals', { server: true })   // the deriver serves the target too
 await derive(orders.data.by('user').sum('cents'), totals)        // the view form: totals equals the view, rebuilt from rows
 const counts = await fero<number>('counts', { server: true })   // the record form: each order counted once, by marks
 await derive(orders, counts, (e) => { if (e.value) counts.data[e.value.user].set(op.incr(1), { from: e }) })
@@ -2883,17 +2883,19 @@ await (await migrate(users, { to: 2, fn: (row: any) => row, perSec: 500 })).done
 ### P-21 Request and reply
 
 ```ts
-// file: p21.ts — request and reply (two files)
+// file: p21.ts — request and reply (three files)
 import { service } from 'fero'
-// ── worker.ts, on each answerer
-const thumbs = await service<{ url: string }, { url: string }>('thumbs', { server: true })
+// ── svc.ts, on a server: it founds and serves the service's own resource
+await service<{ url: string }, { url: string }>('thumbs', { server: true })
+// ── worker.ts, on each answerer, a client
+const thumbs = await service<{ url: string }, { url: string }>('thumbs')
 thumbs.answer(async (req) => ({ url: await resize(req.url) }))
 // ── app.ts, an asker
 const asker = await service<{ url: string }, { url: string }>('thumbs')
 console.log((await asker.ask({ url: 'a.png' }, { timeout: '5s' })).url)   // one answer, 'timeout' or 'no-answerer'
 ```
 
-**Guarantee.** Requests spread over the live answerers. Each request gets at most one answer. With no live answerer, `no-answerer` at once, by this process's view of who is alive. **Cost.** Three commits per ask ([E-22] D7). When the answerer is a fero server, a method is the cheaper request and reply: one trip, and commits only for what it writes; on a path, at that path's leader. **Layer:** L5. Unchanged by the lens.
+**Guarantee.** Requests spread over the live answerers. Each request gets at most one answer. With no live answerer, `no-answerer` at once, by this process's view of who is alive (question 39). What the asker gets when an answer throws is question 38. **Cost.** Three commits per ask ([E-22] D7). When the answerer is a fero server, a method is the cheaper request and reply: one trip, and commits only for what it writes; on a path, at that path's leader. **Layer:** L5. Unchanged by the lens.
 **Evidence.** 383 answers and 17 timeouts of 400 asks, never two answers ([E-22]).
 
 ### P-22 Delayed jobs, waiting takes, priorities
@@ -2912,14 +2914,14 @@ const [m] = await mail.take(1, { wait: '20s' })         // woken by an add; writ
 if (m) { await sendMail(m.job.to); await m.ack() }
 ```
 
-**Guarantee.** A delayed message becomes takeable within one tick of its time, by writer time, never before. A waiting take writes nothing while it waits. Priorities hold within a partition. A `cron` schedule is a row under its `key`, written only if absent: the line can run at every start-up, for years, and adds the schedule once. (A `once` name would not do: it lasts a day, so a start-up two days later would add a second schedule.) **Cost.** As P-09. A lapsed lease is noticed at the library's next poll, once a second ([E-22] D6). **Layer:** L5. Unchanged by the lens.
+**Guarantee.** A delayed message becomes takeable within one tick of its time, by writer time, never before, while most clocks are sound (section 7, "Time"). A waiting take writes nothing while it waits. Priorities hold within a partition. A `cron` schedule is a row under its `key`, written only if absent: the line can run at every start-up, for years, and adds the schedule once. (A `once` name would not do: it lasts a day, so a start-up two days later would add a second schedule.) **Cost.** As P-09. A lapsed lease is noticed at the library's next poll, once a second ([E-22] D6). **Layer:** L5. Unchanged by the lens.
 **Evidence.** No delayed message was taken early, and priority 0 came first in every seed ([E-22]).
 
 ## 11. Open questions
 
 ### 11.1 For the owner
 
-Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on most. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 are new on this page. **V5-12 closed six of the first fourteen**, and **V5-13 to V5-15 close five more** (1, 5, 15, 19, and the served-view half of 16). **V5-16 closes 1 and 15 again**, the other way for `f.rows`. It also moved 26 and 31 onto `value` and `connect`, but the names there are this page's picks, so both stay open. Question 21 is settled by TRANSFORMS 3.4, which the owner approved in general with V5-14. Each says by what.
+Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on most. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 are new on this page; 34 to 40 came from the patterns walk-through ([PATTERNS.md](PATTERNS.md)). **V5-12 closed six of the first fourteen**, and **V5-13 to V5-15 close five more** (1, 5, 15, 19, and the served-view half of 16). **V5-16 closes 1 and 15 again**, the other way for `f.rows`. It also moved 26 and 31 onto `value` and `connect`, but the names there are this page's picks, so both stay open. Question 21 is settled by TRANSFORMS 3.4, which the owner approved in general with V5-14. Each says by what.
 
 1. **`f.rows` for reads; what is `f.snapshot`?** **Closed by V5-13 pick 6 and V5-16**: `f.snapshot` goes (pick 6); `f.rows` goes too (V5-16, which supersedes pick 6's "`f.rows` stays"): every row is read in sync through `f.data.connect()`'s handle.
 2. **Verbs on the resource (`f.set`), or on `f.data` (`f.data.set`)?** **Closed by V5-12**: the path write is the main spelling; `f.set(path, v)` stays as the array form; `f.data.set` is the root's refused write.
@@ -2961,6 +2963,16 @@ Each has this page's pick. [API-TOUR.md](API-TOUR.md) section 6 says more on mos
 32. **Who serves a view when the leader is the only copy.** V5-14 pick 3 places a view on "every copy but the leader". A group with one voter and no learner has no such copy: a resource with one server process (`copies` is 1 until three servers exist, section 3.3), and a group at the start of its growth from one voter. TRANSFORMS does not say. This page takes [LAYERS.md](LAYERS.md) section 10's reading: then the leader serves, and pays the build's stall on the write path, until a second copy is ready; health says so. Not run. The other way refuses served views until a second copy exists, so a one-box app has none.
 33. **Codes for two V5-15 refusals.** V5-15 pick 7 refuses a `ttl` or `while` on a field write, and its consequences owe a size rule for room writes; neither names a code. This page: `bad-arg` for the first, at the leader (the types already refuse it), and `too-large` for a room write past the size rule, once that rule exists. The other way is a code of its own for each.
 
+**From the patterns walk-through ([PATTERNS.md](PATTERNS.md)): meanings the declarations leave out.** Where PATTERNS.md already took a reading, it is the pick here. Where a pick follows [E-22]'s library, that library was a prototype under older names, not a design.
+
+34. **What `LockOpts.renew` means.** Section 6 declares `renew?: boolean`, with no default and no meaning. This page: `true` by default, and fero renews the lease while the lock is held, every third of the lease, as E-22's library did. With `renew: false` the holder calls `l.renew()` itself, and the lock is lost if it does not. PATTERNS.md section 7 reads it so. The other way: no renewal by default, so a holder that forgets loses the lock after one lease.
+35. **What `saga()` gives when a step is refused.** It returns `Promise<Ack[]>`, and nothing says what it gives when a step is refused and the unit is undone. This page: the call rejects with the refused step's own error (here `conflict`), only once the undo has committed, with a `reason` that says the saga was undone. A retry under the same `once` name gets the same refusal. E-22's library did both, and kept the outcome a day. So `outcome: 'refused'` here means the unit stands undone; its earlier steps did commit, and were undone. The other way: a code of its own, such as `undone`, so that code which catches `conflict` from one write does not take a whole unit for it.
+36. **May a saga span resources?** `Step.at` takes any lens that can write, and P-15 shows one resource. This page: yes. To a saga, another resource's partition is one more partition in one more group, and [E-24]'s model put each partition in a group of its own; E-22's library named each step's resource. PATTERNS.md section 8 reads it so. The other way: one resource per saga, refused before it starts. That is simpler to explain, and a change to two resources then goes through `derive` or a consumer.
+37. **`consumer()`'s options, and the unit of `Runner.lag`.** Section 6 declares `shares`, `lease`, `max` and `from` with no defaults or meanings, and `lag` with no unit. This page, from E-22's library: `shares` is how many parts the source's partitions are split into, 16 by default. In E-22's library 16 was a fixed constant, not an option. It is fixed for the group's life, since a partition stays in its share for good, so every member gives the same number. `lease` is how long a member holds a share without renewing: 10 s by default, renewed every third of it. `max` is the most entries in one batch: 100 by default. `from` is where a share with no saved cursor starts: `'earliest'` by default, and unused once the share has a cursor. `lag` counts records: those committed in the shares this process owns and not yet run (for a queue's `work` and a service's `answer`, the due jobs or requests not yet taken). E-22's `lag` was always 0, so the unit is this page's pick. The other way: `lag` in ms of writer time, which reads well on a screen but needs each record's time; and a share count that can change, which needs a rule to move partitions between shares.
+38. **What an asker gets when the answer function throws.** Nothing says. This page: the ask rejects `threw`, with the function's message in `reason`, as a method's throw answers its caller (section 3.8). The request counts as answered, so no other worker runs it. E-22's library sent the error's text back as the reply, which the asker's type could not tell from a real one. The other way: the request goes back to be taken again, as a queue job does after a throw; then a bad request is tried by every worker until its timeout.
+39. **The live links a library opens, and their cost.** P-21's "`no-answerer` at once" needs the asker to know who is alive, so it follows the answerers' presence rows. An asker also follows its own reply rows, and a `take({ wait })` follows the queue's partition (PATTERNS.md sections 4 and 6). None of these is a line the app wrote, against section 3.3's "every download is a line you wrote". This page: the library opens them, ends them itself, and shows them where open links show (question 26). An asker's links live while its service handle does; a waiting take's link only while it waits. Each costs what `connect()` on a partition costs (section 4): one SUB, the partition once, then a frame per change. For a waiting take, that is every job row in the queue's partition, then every add, take and ack there. That cost is reasoned from section 4's row; nothing measured it. The other way: no hidden link. An ask with no answerer waits for its timeout, and a waiting take waits at the leader once V5-9's measurements allow it (PATTERNS.md section 6).
+40. **Cost rows for keeping a lock, and for a consumer.** Section 4 prices taking a lock but not keeping it, and has no row for `consumer()`'s `commit()` or `run`. This page, from E-22's library and P-08 (reasoned): a held lock renews with one commit every third of its lease, so 3 commits a lease, and one more to release; a consumer member renews each share it owns the same way. `commit()` writes the cursor row of each share the batch read: one commit each, so one a batch when the batch read one share. `run` writes one marked write per output, a share of one commit, plus a cursor write per share now and then, at a rate not yet set. They go into section 4 once agreed; the times are owed. The other way: renew less often, which writes less and leaves less room for a slow commit before the lease lapses.
+
 ### 11.2 For the design
 
 Each is a gap the records leave. None changes a call.
@@ -2986,7 +2998,7 @@ Each is a gap the records leave. None changes a call.
 - **From V5-12, still owed:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27; E-57 A built one on its own harness); E-30's model with marks written by app code, including the reader name a mark goes under and `run()`'s restart from its share's cursor (questions 20, 24); the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
 - **data's changes** (V5-14 pick 6): data 5.0.0, D1 and D2 first (D1 needs a pin: claim 8 sits at its bar), then the merge contract C1 to C10 with its SCHEDULE clause and version bump, N1 to N9, D3, D4, D6 to D9, F1 to F3 (TRANSFORMS 9.1).
 
-**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-16 on the same day; its table "What V5-12 to V5-16 changed" says where each change lands there. It carries this page's own picks, questions 25 to 33, in its section 10 item 46. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
+**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-16 on the same day; its table "What V5-12 to V5-16 changed" says where each change lands there. It carries this page's own picks, questions 25 to 33, in its section 10 item 46; questions 34 to 40 are not in it yet. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
 
 ### 11.3 Carried from COMP2's page
 
@@ -3478,7 +3490,7 @@ Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the defa
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/API.md)" docs/v5-space/API.md
 ```
 
-**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite and the V5-16 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `146 marked lines, 146 fail at their own line, 0 errors elsewhere`.
+**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite, the V5-16 amendment and the fixes the patterns walk-through found** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `146 marked lines, 146 fail at their own line, 0 errors elsewhere`.
 - **Where the 146 are:** 138 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
 
 | `types.ts` group | The wrong uses | tsc |

@@ -184,7 +184,7 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 2. `consumer(orders, 'billing')` writes a member row in `#groups`, bound to this process's session.
 3. The source's partitions are split into **shares**. Each share has one owner at a time. A lease row in `#locks` holds it, and that row's version is the share's token. ([E-22]'s library used 16 shares; a partition stays in its share for good.)
 4. A new owner reads the share's cursor from `#groups`. It writes that cursor back once, under its own token, before it reads the log. After that, an older owner's late write of the cursor is refused `fenced`.
-5. It reads its shares' log from that cursor. `commit()` writes the cursor under the token: one commit per batch.
+5. It reads its shares' log from that cursor. `commit()` writes the cursor of each share the batch read, under that share's token: one commit per share (API.md question 40).
 6. `run(fn)` writes no cursor per batch. Each output carries `{ from: e }`, so its mark lands in the same log entry as the output, at the target's leader. That leader keeps the highest mark it has applied, per reader name and source slot. It skips a write at or below that mark, and answers it as done.
 7. `run(fn)` still keeps each share's cursor, so a restart knows where to read from. It writes the cursor now and then, and moves it only once the marked writes up to it are answered. So a restart may read some records again; their writes are skipped at their marks (API.md P-08, LAYERS 6.3, PATHS 4.14; *API.md's reading*).
 8. fero paces `run`: a marked write is never refused `backpressure`. Instead the reader stops giving records until the line of waiting writes is short again (V5-12).
@@ -205,7 +205,7 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 
 **Cost.**
 - A reader: one trip to open; then each kept record crosses the wire once. A cursor is 22 to 79 B for 1 to 10 partitions ([E-19]; measured).
-- `commit()`: one commit per batch.
+- `commit()`: one commit per share the batch read, so one for a batch from one share (API.md P-08 and question 40; reasoned from [E-22]'s library).
 - `run()`: one marked write per output. Writes sent together go in the same commits. The target keeps each mark in 29 B: one mark per reader, source slot and target slot, however many records flow ([E-30]; measured).
 - Speed: marked writes that are not awaited ran at 122,000 to 134,000 a second. Awaited one by one, they ran at 239 to 240 a second ([E-55] claim 21; measured on a prototype whose commit was a 4 ms timer, not a disk).
 
@@ -244,6 +244,7 @@ await resizes.add({ path: 'b.png' })
 
 **What it promises, and what it does not.**
 - At most one live lease per job. No job is lost until it is acked. First in, first out within a partition. Priorities hold within a partition, and a delayed job is never taken before its time, by writer time (API.md P-09, P-22).
+- The leases and the delays hold while most clocks are sound. When most are wrong, writer time is wrong too. Then a lease can lapse early, so two workers may hold one job, and a delayed job may be taken early (API.md section 7, "Time"; reasoned from [E-21]'s 2 early lock grants).
 - It does not promise one run. A worker that pauses past its lease may still finish a job that another worker has taken. Make jobs safe to run twice.
 
 **When something breaks.**
