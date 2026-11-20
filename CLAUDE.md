@@ -12,6 +12,7 @@ This root IS the v4 tree (branch `v4`, package `fero` 4.0.0, promoted 2026-08-16
 
 - **Performance is a hard requirement.** A change is done when its tests AND its perf pins are green. Never widen a `*.perf.ts` threshold to make a pin pass; investigate. A change on a `data` path fero exercises runs data's perf suite too.
 - **Never push or open a PR without the user's explicit instruction.**
+- **This repo is public.** Never copy the owner's messages into it, not even a phrase: say what was asked in your own words. Keep out how the assistant's sessions run (permissions, scheduling, tooling), AI product names, personal data and scratch paths.
 - **Speak in simple English.** Short sentences, everyday words, one idea at a time. Say the plain thing first, then the detail. Explain a fero term the first time you use it.
 - **Commit granularly**: one logical change per commit, a Conventional-Commits-ish subject, the WHY in the body. Present each change in chat before committing, then commit and keep moving.
 - **`npm test` on every change.** A bug fix ships with the regression test that catches it. Perf on every hot-path change.
