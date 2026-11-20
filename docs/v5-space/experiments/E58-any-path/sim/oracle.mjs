@@ -22,6 +22,13 @@
 // mode 'main': only shapes v5 defines. mode 'shape': adds shapes v5 is silent on (a field write on a number or string
 // row, an index past an array's end, a named field on an array, a string where a list stood, so a lens reads a
 // character) and counts what each does instead of failing.
+// mode 'edge' (added after the review): main's writes plus three edges of data's rule, counted the same way: an element
+// appended at an array's end (allowed by the shape rule ANYPATH.md proposes) read by a lens on the array's `length`; a
+// write to `length` itself; and a field write at the key `__proto__` (at the row, or under a missing field `q`), read by
+// a lens on `p` or `q.z`. It also checks a client that would join now: its picture is the server's row through JSON.
+// mode 'merge' (added after the review): main exactly (the same seeds give the same writes), but the leader appends a
+// row's `op.merge` as one field record per merged key when the row exists (the whole row only when it does not).
+// Every mode also counts, on the client of part 2, each time data's reader ran with an unchanged value, and why.
 // Planted bugs (E58_MUTATE; never set in a measured run), each must make its check fail:
 //   rowmerge   a whole-row write is merged into the row it replaces, keeping fields it dropped (how fero v2 and v3
 //              let a row write and a field write "merge", the bug V4-18 fixed)
@@ -73,6 +80,9 @@ const LENS2 = [
   ['field', ['p0', 'r0', 'a']], ['field', ['p0', 'r0', 'b']], ['nested', ['p0', 'r0', 'a', 'x']], ['nested', ['p1', 'r0', 'a', 'x']],
   ['element', ['p0', 'r0', 'list', '1']], ['not-there', ['p0', 'r0', 'q', 'z']], ['not-there', ['p2', 'r3', 'a']],
 ]
+// mode 'edge' adds two lenses: an array's length, and a key that only a prototype can give
+const EDGE1 = [['length', ['r0', 'list', 'length']], ['proto-read', ['r0', 'p']]]
+const EDGE2 = [['length', ['p0', 'r0', 'list', 'length']], ['proto-read', ['p0', 'r0', 'p']]]
 const HELD1 = new Set(['r0', 'r3']) // the client's partitions (depth 1: a row is its own partition)
 const HELD2 = new Set(['p0', 'p2'])
 
@@ -174,8 +184,9 @@ function throughString(Ms, depth, L) {
 }
 
 // ── the generator and the leader stand-in ──────────────────────────────────────────────────────────────
-// returns { kind, recs: the log records as written, refused?, ingest? }
-function nextWrite(r, M, depth, shape, S) {
+// returns { kind, recs: the log records as written, refused?, ingest? }. X: { shape, edge, mergeFields }
+function nextWrite(r, M, depth, X, S) {
+  const shape = X.shape
   const ids = depth === 1 ? ROWS.map((k) => [k]) : PARTS.flatMap((p) => ROWS.map((k) => [p, k]))
   const liveIds = ids.filter((id) => hasRow(M, depth, id))
   const anyId = () => r.pick(ids)
@@ -198,7 +209,7 @@ function nextWrite(r, M, depth, shape, S) {
     const v = rowval(r, shape)
     return { kind: hasRow(M, depth, id) ? (isObj(v) ? 'row-replace' : 'row-to-primitive') : 'row-add', recs: [{ t: 'set', key: id, value: v }] }
   }
-  if (x < 0.50) return fieldWrite(r, M, depth, shape, live(), S)
+  if (x < 0.50) return fieldWrite(r, M, depth, X, live(), S)
   if (x < 0.58) { // a field or nested field removed; an array element is refused sparse-hole
     const id = live(), f = r.pick([['a'], ['a', 'x'], ['a', 'y'], ['b'], ['list'], ['q'], ['q', 'z'], ['list', '1']])
     return { kind: f.length === 1 ? 'field-remove' : f[0] === 'list' ? 'element-remove' : 'nested-remove', recs: [{ t: 'remove', key: [...id, ...f] }] }
@@ -217,6 +228,8 @@ function nextWrite(r, M, depth, shape, S) {
     const id = anyId(), row = rowOf(M, depth, id)
     if (hasRow(M, depth, id) && !isObj(row)) return { kind: 'op-merge', refused: 'invalid', recs: [] }
     const patch = { b: prim(r) }; if (r() < 0.5) patch.a = aval(r)
+    // mode 'merge': one field record per merged key on a row that exists (the same state, other records)
+    if (X.mergeFields && hasRow(M, depth, id)) return { kind: 'op-merge', recs: Object.entries(patch).map(([k, v]) => ({ t: 'set', key: [...id, k], value: v })) }
     return { kind: 'op-merge', recs: [{ t: 'set', key: id, value: { ...(row ?? {}), ...patch } }] }
   }
   if (x < 0.85) { // a batch inside one partition: 2 to 4 writes, all or none
@@ -227,7 +240,7 @@ function nextWrite(r, M, depth, shape, S) {
       const id = depth === 1 ? id0 : [id0[0], r.pick(ROWS)]
       const y = r()
       if (y < 0.3) recs.push({ t: 'set', key: id, value: rowval(r, false) })
-      else if (y < 0.75) { const w = fieldWrite(r, M, depth, shape, inPart.length > 0 ? r.pick(inPart) : id, S); if (w.recs.length) recs.push(w.recs[0]); if (w.kind.startsWith('shape:')) shapeIn ??= w.kind }
+      else if (y < 0.75) { const w = fieldWrite(r, M, depth, X, inPart.length > 0 ? r.pick(inPart) : id, S); if (w.recs.length) recs.push(w.recs[0]); if (w.kind.startsWith('shape:') || w.kind.startsWith('edge:')) shapeIn ??= w.kind }
       else if (y < 0.9) recs.push({ t: 'remove', key: [...id, r.pick(['a', 'b', 'list'])] })
       else recs.push({ t: 'remove', key: id })
     }
@@ -235,13 +248,13 @@ function nextWrite(r, M, depth, shape, S) {
   }
   if (x < 0.90) { // a field write on a missing row: v5 and data refuse it
     const free = ids.filter((id) => !hasRow(M, depth, id))
-    if (free.length === 0) return fieldWrite(r, M, depth, shape, live(), S)
+    if (free.length === 0) return fieldWrite(r, M, depth, X, live(), S)
     return { kind: 'field-on-missing-row', recs: [{ t: 'set', key: [...r.pick(free), 'a', 'x'], value: 1 }] }
   }
   if (x < 0.95) { // a field set to a new object equal to what it holds
     const id = live(), row = rowOf(M, depth, id)
     if (isObj(row) && isObj(row.a)) return { kind: 'field-equal-copy', recs: [{ t: 'set', key: [...id, 'a'], value: clone(row.a) }] }
-    return fieldWrite(r, M, depth, shape, id, S)
+    return fieldWrite(r, M, depth, X, id, S)
   }
   // a type flip: object to primitive and back
   const id = live(), row = rowOf(M, depth, id)
@@ -251,20 +264,29 @@ function nextWrite(r, M, depth, shape, S) {
 
 // a field write at a random field path of a row. The shapes v5 does not define are counted; in the main run they are
 // turned into a defined write
-function fieldWrite(r, M, depth, shape, id, S) {
+function fieldWrite(r, M, depth, X, id, S) {
+  const shape = X.shape
   let f = r.pick(FIELDS)
   const row = rowOf(M, depth, id)
   if (hasRow(M, depth, id) && !isObj(row)) {
     if (!shape) return { kind: 'row-to-object', recs: [{ t: 'set', key: id, value: { a: aval(r) } }] }
     return { kind: typeof row === 'string' ? 'shape:field-on-string-row' : 'shape:field-on-number-row', recs: [{ t: 'set', key: [...id, ...f], value: fieldval(r, f) }] }
   }
+  // mode 'edge': a field write at the key __proto__, at the row (read by the lens on `p`) or under `q` (read by `q.z`)
+  if (X.edge && isObj(row) && r() < 0.05) {
+    if (r() < 0.5) return { kind: 'edge:proto-key', recs: [{ t: 'set', key: [...id, '__proto__'], value: { p: prim(r) } }] }
+    return { kind: 'edge:proto-key-nested', recs: [{ t: 'set', key: [...id, 'q', '__proto__'], value: { z: prim(r) } }] }
+  }
   let kind = null
   if (f[0] === 'list' && f.length > 1 && isObj(row)) {
     const lst = row.list
     if (Array.isArray(lst)) {
       if (Number(f[1]) >= lst.length) {
-        if (!shape) f = ['list']
+        if (X.edge && f.length === 2 && r() < 0.5) { kind = 'edge:append-at-end'; f = ['list', String(lst.length)] }
+        else if (!shape) f = ['list']
         else { kind = 'shape:past-array-end'; f = ['list', String(lst.length + 1 + r.int(2)), ...f.slice(2)] }
+      } else if (X.edge && lst.length >= 2 && r() < 0.15) {
+        return { kind: 'edge:length-write', recs: [{ t: 'set', key: [...id, 'list', 'length'], value: r.int(lst.length) }] }
       } else if (shape && r() < 0.2) { kind = 'shape:named-field-on-array'; f = ['list', 'foo'] }
     } else if (typeof lst === 'string') kind = 'shape:write-under-string-field'
   }
@@ -318,19 +340,21 @@ function route(frame, depth, HELD, S, tag) {
 }
 
 // ── one seed ──────────────────────────────────────────────────────────────────────────────────────────
-export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
+export function runSeed(seed, { depth, shape = false, edge = false, mergeFields = false, commits = 120 }, S) {
+  const X = { shape, edge, mergeFields }
+  const counting = shape || edge // a broken rule is counted by the write that caused it, not failed
   const r = rng(seed * 2 + depth)
   let M
   if (depth === 1) { M = {}; for (const k of ['r0', 'r1', 'r2']) M[k] = { a: { x: 1, y: 's0' }, b: 2, list: [1, { x: 2 }] } }
   else { M = { p0: {}, p1: {} }; for (const k of ['r0', 'r1', 'r2']) M.p0[k] = { a: { x: 1 }, b: 0, list: [0, 1] }; for (const k of ['r0', 'r1']) M.p1[k] = { a: { x: 2 }, b: 's1' } }
   const f = fero('e58', { depth, data: depth === 1 ? clone(M) : { p0: clone(M.p0), p1: clone(M.p1), p2: {} } })
   const store = f.eng
-  const LENS = depth === 1 ? LENS1 : LENS2
+  const LENS = depth === 1 ? (edge ? [...LENS1, ...EDGE1] : LENS1) : (edge ? [...LENS2, ...EDGE2] : LENS2)
   const HELD = depth === 1 ? HELD1 : HELD2
   const failed = new Set()
   let wkind = ''
-  // a broken rule: a failure in the main run; in the shape run, a count by the write that caused it
-  const bad = (k) => { if (shape) { inc(S, 'shape-effect:' + k + ':' + wkind); return } inc(S, 'FAIL:' + k); failed.add(k) }
+  // a broken rule: a failure in the main and merge runs; in the shape and edge runs, a count by the write that caused it
+  const bad = (k) => { if (counting) { inc(S, 'shape-effect:' + k + ':' + wkind); return } inc(S, 'FAIL:' + k); failed.add(k) }
   const norm = (L, v) => (depth === 2 && L.length === 0 ? Object.fromEntries(Object.entries(v).filter(([, rows]) => Object.keys(rows).length > 0)) : v)
 
   // readers on every lens, on the server
@@ -354,7 +378,7 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
 
   let n = 0
   for (let step = 0; step < commits * 3 && n < commits; step++) {
-    const w = nextWrite(r, M, depth, shape, S)
+    const w = nextWrite(r, M, depth, X, S)
     wkind = w.kind
     inc(S, 'kind:' + w.kind)
     if (w.refused) { inc(S, 'refused:' + w.refused); continue }
@@ -403,6 +427,12 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
       const es = engineAt(store, depth, L)
       const through = throughString([M, M2], depth, L)
       if (!deepEq(es, norm(L, mn))) bad('state:' + cls)
+      if (edge && L.length >= depth) { // a client that joins now: its picture is the server's row through JSON
+        const row = engineRow(store, depth, L.slice(0, depth))
+        const now = !deepEq(row === undefined ? undefined : leafAt(JSON.parse(JSON.stringify(row)), L, depth), es)
+        if (now && !o.picDiverged) inc(S, 'picture:client-differs-from-server:' + cls + ':' + w.kind)
+        o.picDiverged = now
+      }
       if (changed) { o.hits.truth.push(n); inc(S, 'changed:' + cls) }
       const pos = w.recs.map((x) => where(L, x.key))
       const anyUnder = pos.some((p) => p === 'at' || p === 'below'), anyNear = anyUnder || pos.includes('above')
@@ -429,7 +459,7 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
         let why = 'other'
         if (L.length >= depth) { if (mo === undefined && mn === undefined) why = 'phantom-undefined-on-row-add'; else if (isObj(es) && !Object.is(o.prevEngine, es)) why = 'new-equal-object' }
         else if (recs.every((x) => x.d.op === 'update' && deepEq(x.d.row, x.d.prev))) why = 'new-equal-object'
-        inc(S, 'data:fired-unchanged:' + why + ':' + cls)
+        inc(S, 'data:fired-unchanged:' + why + ':' + cls); inc(S, 'data:fired-unchanged-by:' + w.kind + ':' + why)
         if (why === 'other') bad('spurious:' + cls)
       }
       o.prevEngine = es
@@ -459,8 +489,8 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
       }
       if (!deepEq(norm(L, o.logMirror), norm(L, mn))) { if (through) inc(S, 'log-near:fold-through-string:' + cls); else bad('log-near:fold:' + cls); o.logMirror = clone(mn) }
     }
-    // in the shape run the model takes data's rows where they differ, so later checks stay meaningful
-    if (shape) {
+    // in the shape and edge runs the model takes data's rows where they differ, so later checks stay meaningful
+    if (counting) {
       for (const rec of w.recs) {
         const id = rec.key.slice(0, depth)
         if (!deepEq(rowOf(M2, depth, id), engineRow(store, depth, id))) { inc(S, 'shape-effect:model-differs:' + w.kind); M2 = engineHas(store, depth, id) ? putRow(M2, depth, id, clone(engineRow(store, depth, id))) : dropRow(M2, depth, id) }
@@ -476,7 +506,7 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
         const changed = !deepEq(mo, mn)
         const es = engineAt(clients[ci], depth, L)
         const through = throughString([M, M2], depth, L)
-        if (shape) { // what crosses JSON: does the client still equal the server?
+        if (counting) { // what crosses JSON: does the client still equal the server?
           const now = !deepEq(es, engineAt(store, depth, L))
           if (now && !o.diverged) inc(S, tag + ':shape-client-differs-from-server:' + w.kind)
           o.diverged = now
@@ -485,6 +515,12 @@ export function runSeed(seed, { depth, shape = false, commits = 120 }, S) {
         if (!deepEq(es, mn)) bad(tag + ':state:' + cls)
         if (ci === 1) continue // road 2: the state only
         const fired = o.recs.length > 0
+        // data's reader on the client ran with an unchanged value: why, and after which write (JSON makes new objects)
+        if (fired) inc(S, tag + ':fired:' + cls)
+        if (!changed && fired) {
+          const why = L.length >= depth && mo === undefined && mn === undefined ? 'phantom-undefined-on-row-add' : isObj(es) ? 'new-equal-object' : 'other'
+          inc(S, tag + ':fired-unchanged:' + why + ':' + cls); inc(S, tag + ':fired-unchanged-by:' + w.kind + ':' + why)
+        }
         if (L.length >= depth) for (const rec of o.recs) o.mirror = applyRel(o.mirror, rec)
         else for (const x of o.recs) o.mirror = applyDelta(o.mirror, x, depth, L)
         if (!deepEq(o.mirror, es)) { if (through) inc(S, tag + ':compose-through-string:' + cls); else bad(tag + ':compose:' + cls); o.mirror = clone(es) }

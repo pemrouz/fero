@@ -1,5 +1,5 @@
 // E-58: one seeded run, one JSON line out.
-//   node run.mjs oracle <depth 1|2> <seeds> [main|shape]   parts 1 and 2
+//   node run.mjs oracle <depth 1|2> <seeds> [main|shape|edge|merge]   parts 1 and 2 (edge, merge: added after the review)
 //   node run.mjs split <seeds>                              part 3
 //   node run.mjs filter <seeds>                             part 4
 //   node run.mjs versions <seeds> <sibling share 0..1>      part 5
@@ -19,7 +19,8 @@ let out = {}
 if (part === 'oracle') {
   const { runSeed } = await import('./oracle.mjs')
   const depth = Number(args[0]), n = Number(args[1] ?? 1000), mode = args[2] ?? 'main'
-  for (let s = 1; s <= n; s++) take(s, runSeed(s, { depth, shape: mode === 'shape' }, S))
+  if (!['main', 'shape', 'edge', 'merge'].includes(mode)) { console.error('mode: main, shape, edge or merge'); process.exit(2) }
+  for (let s = 1; s <= n; s++) take(s, runSeed(s, { depth, shape: mode === 'shape', edge: mode === 'edge', mergeFields: mode === 'merge' }, S))
   out = { depth, mode }
 } else if (part === 'split') {
   const { runSeed } = await import('./split.mjs')

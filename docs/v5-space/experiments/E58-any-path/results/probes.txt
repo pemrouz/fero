@@ -1,0 +1,39 @@
+# E-58 probes: 2026-11-20, v22.22.0
+
+## data v2 (data@2.0.0, sha256 721c5981669f1548...)
+
+1.0 the records each subscriber got on connect {"root":[{"type":"update","key":[],"value":{"g":{"a":{"b":1,"c":2},"n":5},"h":{"x":1}}}],"g":[{"type":"update","key":[],"value":{"a":{"b":1,"c":2},"n":5}}],"ga":[{"type":"update","key":[],"value":{"b":1,"c":2}}],"gab":[{"type":"update","key":[],"value":1}],"gac":[{"type":"update","key":[],"value":2}],"h":[{"type":"update","key":[],"value":{"x":1}}],"k":[{"type":"update","key":[],"value":"<undef>"}],"gz":[{"type":"update","key":[],"value":"<undef>"}]}
+1.1 below: g.a.b = 10 {"root":[{"type":"update","key":["g","a","b"],"value":10}],"g":[{"type":"update","key":["a","b"],"value":10}],"ga":[{"type":"update","key":["b"],"value":10}],"gab":[{"type":"update","key":[],"value":10}]}
+1.2 beside: g.n = 6 {"root":[{"type":"update","key":["g","n"],"value":6}],"g":[{"type":"update","key":["n"],"value":6}]}
+1.3 above, b kept, c changed: g.a = {b:10,c:3} {"root":[{"type":"update","key":["g","a"],"value":{"b":10,"c":3}}],"g":[{"type":"update","key":["a"],"value":{"b":10,"c":3}}],"ga":[{"type":"update","key":[],"value":{"b":10,"c":3}}],"gab":[{"type":"update","key":[],"value":10}],"gac":[{"type":"update","key":[],"value":3}]}
+1.4 above, a new equal object: g.a = {b:10,c:3} {"root":[{"type":"update","key":["g","a"],"value":{"b":10,"c":3}}],"g":[{"type":"update","key":["a"],"value":{"b":10,"c":3}}],"ga":[{"type":"update","key":[],"value":{"b":10,"c":3}}],"gab":[{"type":"update","key":[],"value":10}],"gac":[{"type":"update","key":[],"value":3}]}
+1.5 row replace: g = {a:{b:11},n:6} {"root":[{"type":"update","key":["g"],"value":{"a":{"b":11},"n":6}}],"g":[{"type":"update","key":[],"value":{"a":{"b":11},"n":6}}],"ga":[{"type":"update","key":[],"value":{"b":11}}],"gab":[{"type":"update","key":[],"value":11}],"gac":[{"type":"remove","key":[],"value":3}]}
+1.6 the parent becomes a number: g.a = 5 {"root":[{"type":"update","key":["g","a"],"value":5}],"g":[{"type":"update","key":["a"],"value":5}],"ga":[{"type":"update","key":[],"value":5}],"gab":[{"type":"remove","key":[],"value":11}]}
+1.7 a write under a number parent: g.a.b = 1 {"root":[{"type":"update","key":["g","a","b"],"value":1}],"g":[{"type":"update","key":["a","b"],"value":1}],"ga":[{"type":"update","key":["b"],"value":1}],"gab":[{"type":"update","key":[],"value":1}]}
+1.8 a write to a path that did not exist: g.z.q = 7 {"root":[{"type":"update","key":["g","z","q"],"value":7}],"g":[{"type":"update","key":["z","q"],"value":7}],"gz":[{"type":"update","key":[],"value":7}]}
+1.9 a field remove: delete g.a.b {"root":[{"type":"remove","key":["g","a","b"],"value":1}],"g":[{"type":"remove","key":["a","b"],"value":1}],"ga":[{"type":"remove","key":["b"],"value":1}],"gab":[{"type":"remove","key":[],"value":1}]}
+1.10 a row remove: delete g {"root":[{"type":"remove","key":["g"],"value":{"a":{},"n":6,"z":{"q":7}}}],"g":[{"type":"remove","key":[],"value":{"a":{},"n":6,"z":{"q":7}}}],"ga":[{"type":"remove","key":[],"value":{}}],"gz":[{"type":"remove","key":[],"value":7}]}
+1.11 a deep write into a missing row: m.f = 1 {"root":[{"type":"update","key":["m","f"],"value":1}]}
+1.11 state {"h":{"x":1},"m":{"f":1}}
+1.12 the whole resource replaced: [value] = {...} {"root":[{"type":"update","key":[],"value":{"h":{"x":2},"g":{"a":{"b":3}}}}],"g":[{"type":"update","key":[],"value":{"a":{"b":3}}}],"ga":[{"type":"update","key":[],"value":{"b":3}}],"gab":[{"type":"update","key":[],"value":3}],"h":[{"type":"update","key":[],"value":{"x":2}}]}
+1.12 state {"h":{"x":2},"g":{"a":{"b":3}}}
+arr-push THROWS "Unknown operator 'push'. Chainable operators (.filter, .between, .length, etc.) register when you import from 'data' (the default entry) or 'data/full' (adds JS"
+2 list subscriber [{"type":"update","key":[],"value":[{"v":1},{"v":2}]},{"type":"update","key":["0"],"value":{"v":9}},{"type":"update","key":["1","v"],"value":8},{"type":"remove","key":["0"],"value":{"v":9}}]
+2 list.1 subscriber [{"type":"update","key":[],"value":{"v":2}},{"type":"update","key":["v"],"value":8},{"type":"update","key":[],"value":"<undef>"}]
+2 state {"g":{"list":[{"v":8}]}}
+3a a null parent: g.a = null, then g.a.b = 1 THROWS "Cannot read properties of null (reading 'b')"
+3b a string parent: g.a = "xy", then g.a.b = 1 {"g":{"a":{"b":1}}}
+3c a root replace: subscribers on m.f and h.x {"mf":[{"type":"update","key":[],"value":1},{"type":"remove","key":[],"value":1}],"hx":[{"type":"update","key":[],"value":1},{"type":"update","key":[],"value":1}],"state":{"h":{"x":1}}}
+3d a root replaced by a primitive {"mf":[{"type":"update","key":[],"value":1},{"type":"remove","key":[],"value":1}],"state":5}
+3e a remove of a missing nested path THROWS "Cannot read properties of undefined (reading 'b')"
+3f a remove of a field under a missing row THROWS "Cannot read properties of undefined (reading 'f')"
+
+## data v4 at 63fea66: three edges of the per-path reader
+
+A append at the end, lens on r0.list.length: length now 3 ; records []
+B r0.list.length = 1, lens on r0.list.1: list now [1] ; records []
+C a row that is an array, append at the end, lens on r0.length: row now [10,20,30] ; records []
+D r0.__proto__ = { p: 1 }, lens on r0.p: reads 1 ; records [] ; own keys ["a"] ; through JSON r0.p reads undefined ; ({}).p is undefined
+E r0.a.__proto__.q = 2, lens on r0.a.q: reads 2 ; records [] ; own keys of r0.a ["y"] ; ({}).q is undefined
+F 100 op.merge({ b }) on a client, sent as the whole merged row: a link on r0.a, which never changed, ran 100 times
+F 100 op.merge({ b }) on a client, sent as one field record per merged key: a link on r0.a, which never changed, ran 0 times

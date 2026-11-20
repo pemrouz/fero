@@ -1,19 +1,35 @@
-// E-58: results/summary.md from the raw lines in results/*.jsonl.
+// E-58: results/summary.md from the raw lines in results/*.jsonl (or in the folder given: node summarize.mjs <dir>).
+// A run made again appends a line; the tables use the newest line of each run, and "Runs made again" compares it with
+// the first.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
-const R = join(dirname(fileURLToPath(import.meta.url)), 'results')
+const R = process.argv[2] ? resolve(process.argv[2]) : join(dirname(fileURLToPath(import.meta.url)), 'results')
 const lines = (f) => (existsSync(join(R, f)) ? readFileSync(join(R, f), 'utf8').split('\n').filter((l) => l.startsWith('{"exp"')).map((l) => JSON.parse(l)) : [])
-const sims = lines('sims.jsonl'), muts = lines('mutants.jsonl'), tim = lines('timing.jsonl')
+const runKey = (o) => JSON.stringify([o.part, o.depth, o.mode, o.sibling, o.mutate])
+const newest = (xs) => { const m = new Map(); for (const o of xs) m.set(runKey(o), o); return [...m.values()] }
+const allSims = lines('sims.jsonl'), allMuts = lines('mutants.jsonl')
+const sims = newest(allSims), muts = newest(allMuts), tim = lines('timing.jsonl')
 const md = []
 const pct = (a, b) => (b === 0 ? '-' : (100 * a / b).toFixed(1) + ' %')
 const sum = (s, re) => Object.entries(s).filter(([k]) => re.test(k)).reduce((n, [, v]) => n + v, 0)
 const g = (s, k) => s[k] ?? 0
 
-md.push('# E-58: tables from the raw lines', '', 'Made by `node summarize.mjs` from `results/*.jsonl`. Each seeded line ran once under the heavy lock; a seed gives the same line every time.', '')
-md.push('## Seeded runs: seeds that broke a checked rule', '', '| run | seeds | seeds failed | seconds |', '|---|---|---|---|')
-for (const o of sims) md.push(`| ${o.part}${o.depth ? ' depth ' + o.depth : ''}${o.mode ? ' ' + o.mode : ''}${o.sibling !== undefined ? ' sibling ' + o.sibling : ''} | ${o.seeds} | ${o.failedSeeds} | ${o.sec} |`)
+md.push('# E-58: tables from the raw lines', '', 'Made by `node summarize.mjs` from `results/*.jsonl`. Each seeded line ran under the heavy lock; a seed gives the same line every time. Where a run was made again, the tables use its newest line (see "Runs made again").', '')
+const label = (o) => `${o.part}${o.depth ? ' depth ' + o.depth : ''}${o.mode ? ' ' + o.mode : ''}${o.sibling !== undefined ? ' sibling ' + o.sibling : ''}`
+md.push('## Seeded runs: seeds that broke a checked rule', '', 'In the shape and edge runs a broken rule is counted by the write that caused it, not failed.', '', '| run | seeds | seeds failed | seconds | lines |', '|---|---|---|---|---|')
+for (const o of sims) md.push(`| ${label(o)} | ${o.seeds} | ${o.failedSeeds} | ${o.sec} | ${allSims.filter((x) => runKey(x) === runKey(o)).length} |`)
+// ── runs made again: every counter of the first line, against the newest ──
+const again = [...allSims, ...allMuts].filter((o, i, xs) => xs.findIndex((x) => runKey(x) === runKey(o)) === i && xs.filter((x) => runKey(x) === runKey(o)).length > 1)
+if (again.length) {
+  md.push('', '## Runs made again', '', 'Each row: the first line of a run against its newest line. A counter the newer code added is "new"; every counter the first line had must be equal.', '', '| run | counters in the first line | equal in the newest | new counters | seeds failed (first, newest) |', '|---|---|---|---|---|')
+  for (const f of again) {
+    const n = [...allSims, ...allMuts].filter((x) => runKey(x) === runKey(f)).pop()
+    const ks = Object.keys(f.stats), eq = ks.filter((k) => f.stats[k] === n.stats[k]).length, nu = Object.keys(n.stats).filter((k) => !(k in f.stats)).length
+    md.push(`| ${label(f)}${f.mutate ? ' (' + f.mutate + ')' : ''} | ${ks.length} | ${eq} | ${nu} | ${f.failedSeeds}, ${n.failedSeeds} |`)
+  }
+}
 
 // ── part 1 ──
 const CLS = ['root', 'partition', 'row', 'absent-row', 'field', 'nested', 'element', 'element-field', 'not-there']
@@ -57,6 +73,43 @@ for (const o of sims.filter((x) => x.part === 'oracle' && x.mode === 'shape')) {
   for (const [k, v] of Object.entries(s)) if (/through-string|lane-reject/.test(k)) md.push(`- ${k}: ${v}`)
 }
 
+// ── part 2: the client's readers that ran with an unchanged value (added after the review), main and merge ──
+const byWhy = (s, tag, why) => Object.entries(s).filter(([k]) => k.startsWith(tag + ':fired-unchanged-by:') && k.endsWith(':' + why)).map(([k, v]) => [k.slice(tag.length + 20, -(why.length + 1)), v]).sort((a, b) => b[1] - a[1])
+for (const d of [1, 2]) {
+  const ms = ['main', 'merge'].map((m) => sims.find((x) => x.part === 'oracle' && x.depth === d && x.mode === m)).filter((o) => o && 'wire:sent' in o.stats && Object.keys(o.stats).some((k) => k.startsWith('wire:fired:')))
+  if (!ms.length) continue
+  md.push('', `## Part 2, depth ${d}: data's reader ran with an unchanged value (lens-commits; added after the review)`, '', 'The server applies the leader\'s values; the client applies records that crossed JSON, which makes new objects, so a reader on an object value runs again for any record above it that leaves it equal. "merge": the same seeds, with a row\'s `op.merge` appended as one field record per merged key.', '')
+  md.push('| mode | where | readers ran | of which unchanged: a new equal object | of which unchanged: a phantom undefined | the new equal objects by write (top 6) |', '|---|---|---|---|---|---|')
+  for (const o of ms) {
+    const s = o.stats
+    for (const [where, tag, fired] of [['server', 'data', sum(s, /^count:data:/)], ['client, road 1', 'wire', sum(s, /^wire:fired:/)]]) {
+      const neo = sum(s, new RegExp('^' + tag + ':fired-unchanged:new-equal-object:')), ph = sum(s, new RegExp('^' + tag + ':fired-unchanged:phantom-undefined-on-row-add:'))
+      md.push(`| ${o.mode} | ${where} | ${fired} | ${neo} | ${ph} | ${byWhy(s, tag, 'new-equal-object').slice(0, 6).map(([k, v]) => k + ' ' + v).join('; ')} |`)
+    }
+  }
+  const mm = ms.find((o) => o.mode === 'merge')
+  if (mm) md.push('', `merge, depth ${d}: ${mm.failedSeeds} of ${mm.seeds} seeds failed; ${g(mm.stats, 'kind:op-merge')} merges; "under" missed ${['field', 'nested', 'element', 'element-field', 'not-there'].reduce((n, c) => n + g(mm.stats, 'log-under:missed:' + c), 0)} changes below a row.`)
+}
+// ── edge runs (added after the review) ──
+for (const o of sims.filter((x) => x.part === 'oracle' && x.mode === 'edge')) {
+  const s = o.stats
+  md.push('', `## Edges of data's rule, depth ${o.depth} (${o.seeds} seeds; added after the review)`, '')
+  md.push('Writes: ' + Object.entries(s).filter(([k]) => /^kind:(edge:|batch\(edge)/.test(k)).map(([k, v]) => k.slice(5) + ' ' + v).join('; ') + '.')
+  md.push('', 'Lenses: `length` reads an array\'s length (`r0.list.length`); `proto-read` reads `r0.p`, which only a `__proto__` write can give; `not-there` includes `r0.q.z`. Counts are lens-commits.', '')
+  md.push('| lens | data\'s reader missed a change | of which right after an edge write | the "near" log reader missed a change | a client joining now first differs from the server |', '|---|---|---|---|---|')
+  const isEdge = (k) => /:(edge:|batch\(edge:)[^:]*$/.test(k)
+  for (const c of ['length', 'proto-read', 'not-there', 'element', 'element-field']) {
+    const miss = Object.entries(s).filter(([k]) => k.startsWith('shape-effect:missed:' + c + ':'))
+    if (!miss.length && !(('changed:' + c) in s)) continue
+    const tot = miss.reduce((n, [, v]) => n + v, 0), ed = miss.filter(([k]) => isEdge(k)).reduce((n, [, v]) => n + v, 0)
+    md.push(`| ${c} | ${tot} | ${ed} | ${sum(s, new RegExp('^shape-effect:log-near:missed:' + c + ':'))} | ${sum(s, new RegExp('^picture:client-differs-from-server:' + c + ':'))} |`)
+  }
+  const after = Object.entries(s).filter(([k]) => k.startsWith('shape-effect:missed:proto-read:') && !isEdge(k)).sort((a, b) => b[1] - a[1])
+  md.push('', `On \`proto-read\`, ${after.reduce((n, [, v]) => n + v, 0)} misses came after an ordinary write to the row (${after.slice(0, 4).map(([k, v]) => k.slice(31) + ' ' + v).join(', ')}): data copies the row's own keys, so the value a \`__proto__\` write gave went away with no record.`)
+  for (const [k, v] of Object.entries(s)) if (/shape-client-differs-from-server:/.test(k)) md.push(`- ${k.split(':')[0]}: a client lens first differs from the server after ${k.split(':').slice(2).join(':')}: ${v}`)
+  for (const [k, v] of Object.entries(s)) if (/^shape-effect:model-differs:/.test(k)) md.push(`- the row differs from the model: ${k.replace('shape-effect:model-differs:', '')} ${v}`)
+}
+
 // ── part 3 ──
 for (const o of sims.filter((x) => x.part === 'split')) {
   const s = o.stats
@@ -78,14 +131,14 @@ for (const o of sims.filter((x) => x.part === 'filter')) {
   md.push('', `The docs consumer's set was wrong after ${g(s, 'F1:docs:set-wrong-after-record')} (F1) and ${g(s, 'F2:docs:set-wrong-after-record')} (F2) of ${g(s, 'records')} records. The key consumer kept ${g(s, 'F1:key:entries-kept')} (F1) and ${g(s, 'F2:key:entries-kept')} (F2) field values at the end of all seeds.`)
 }
 // ── part 5 ──
-md.push('', '## Part 5: a version per row', '', '| sibling share | guarded writes | row guard refused | of which only a sibling changed | field guard refused | equals refused | equals passed after a change and back |', '|---|---|---|---|---|---|---|')
+md.push('', '## Part 5: a version per row', '', '| sibling share | guarded writes | row guard refused | of which only a sibling changed (of the refusals; of the guarded writes) | field guard refused | equals refused | equals passed after a change and back |', '|---|---|---|---|---|---|---|')
 for (const o of sims.filter((x) => x.part === 'versions')) {
   const s = o.stats
-  md.push(`| ${o.sibling} | ${g(s, 'guarded')} | ${g(s, 'row:refused')} (${pct(g(s, 'row:refused'), g(s, 'guarded'))}) | ${g(s, 'row:refused-sibling-only')} (${pct(g(s, 'row:refused-sibling-only'), g(s, 'row:refused'))}) | ${g(s, 'field:refused')} | ${g(s, 'equals:refused')} | ${g(s, 'equals:passed-aba')} |`)
+  md.push(`| ${o.sibling} | ${g(s, 'guarded')} | ${g(s, 'row:refused')} (${pct(g(s, 'row:refused'), g(s, 'guarded'))}) | ${g(s, 'row:refused-sibling-only')} (${pct(g(s, 'row:refused-sibling-only'), g(s, 'row:refused'))}; ${pct(g(s, 'row:refused-sibling-only'), g(s, 'guarded'))}) | ${g(s, 'field:refused')} | ${g(s, 'equals:refused')} | ${g(s, 'equals:passed-aba')} |`)
 }
 // ── planted bugs ──
 md.push('', '## Planted bugs (each must fail at least 100 of 1,000 seeds)', '', '| run | planted bug | seeds | seeds failed | first kinds |', '|---|---|---|---|---|')
-for (const o of muts) md.push(`| ${o.part}${o.depth ? ' depth ' + o.depth : ''} | ${o.mutate} | ${o.seeds} | **${o.failedSeeds}** | ${Object.keys(o.failKinds).slice(0, 4).join(', ')} |`)
+for (const o of muts) md.push(`| ${o.part}${o.depth ? ' depth ' + o.depth : ''}${o.mode && o.mode !== 'main' ? ' ' + o.mode : ''} | ${o.mutate} | ${o.seeds} | **${o.failedSeeds}** | ${Object.keys(o.failKinds).slice(0, 4).join(', ')} |`)
 // ── timing ──
 const range = (xs) => { const lo = Math.min(...xs), hi = Math.max(...xs); return lo === hi ? String(lo) : `${lo} to ${hi}` }
 md.push('', '## Timed (range over the runs; each process alone under the timing lock; medians of 15 interleaved rounds)', '')

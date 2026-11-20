@@ -1,20 +1,35 @@
 # E-58: tables from the raw lines
 
-Made by `node summarize.mjs` from `results/*.jsonl`. Each seeded line ran once under the heavy lock; a seed gives the same line every time.
+Made by `node summarize.mjs` from `results/*.jsonl`. Each seeded line ran under the heavy lock; a seed gives the same line every time. Where a run was made again, the tables use its newest line (see "Runs made again").
 
 ## Seeded runs: seeds that broke a checked rule
 
-| run | seeds | seeds failed | seconds |
-|---|---|---|---|
-| oracle depth 1 main | 1000 | 0 | 7.553 |
-| oracle depth 1 shape | 1000 | 0 | 10.7 |
-| oracle depth 2 main | 1000 | 0 | 9.684 |
-| oracle depth 2 shape | 1000 | 0 | 16.553 |
-| split | 1000 | 0 | 0.573 |
-| filter | 1000 | 0 | 0.975 |
-| versions sibling 0.2 | 1000 | 0 | 0.162 |
-| versions sibling 0.5 | 1000 | 0 | 0.147 |
-| versions sibling 0.8 | 1000 | 0 | 0.134 |
+In the shape and edge runs a broken rule is counted by the write that caused it, not failed.
+
+| run | seeds | seeds failed | seconds | lines |
+|---|---|---|---|---|
+| oracle depth 1 main | 1000 | 0 | 6.463 | 2 |
+| oracle depth 1 shape | 1000 | 0 | 10.7 | 1 |
+| oracle depth 2 main | 1000 | 0 | 10.288 | 2 |
+| oracle depth 2 shape | 1000 | 0 | 16.553 | 1 |
+| split | 1000 | 0 | 0.573 | 1 |
+| filter | 1000 | 0 | 0.975 | 1 |
+| versions sibling 0.2 | 1000 | 0 | 0.162 | 1 |
+| versions sibling 0.5 | 1000 | 0 | 0.147 | 1 |
+| versions sibling 0.8 | 1000 | 0 | 0.134 | 1 |
+| oracle depth 1 edge | 1000 | 0 | 11.403 | 1 |
+| oracle depth 1 merge | 1000 | 0 | 6.479 | 1 |
+| oracle depth 2 edge | 1000 | 0 | 14.794 | 1 |
+| oracle depth 2 merge | 1000 | 0 | 8.417 | 1 |
+
+## Runs made again
+
+Each row: the first line of a run against its newest line. A counter the newer code added is "new"; every counter the first line had must be equal.
+
+| run | counters in the first line | equal in the newest | new counters | seeds failed (first, newest) |
+|---|---|---|---|---|
+| oracle depth 1 main | 354 | 354 | 40 | 0, 0 |
+| oracle depth 2 main | 359 | 359 | 47 | 0, 0 |
 
 ## Part 1, depth 1: 120000 commits, 156762 records, 1000 seeds
 
@@ -125,6 +140,81 @@ Where the engine left the model (each a count of commits, by the write that caus
 - log-near:fold-through-string:element: 13
 - log-near:missed-through-string:element: 8
 
+## Part 2, depth 1: data's reader ran with an unchanged value (lens-commits; added after the review)
+
+The server applies the leader's values; the client applies records that crossed JSON, which makes new objects, so a reader on an object value runs again for any record above it that leaves it equal. "merge": the same seeds, with a row's `op.merge` appended as one field record per merged key.
+
+| mode | where | readers ran | of which unchanged: a new equal object | of which unchanged: a phantom undefined | the new equal objects by write (top 6) |
+|---|---|---|---|---|---|
+| main | server | 326993 | 16209 | 14886 | field-equal-copy 8270; row-equal-copy 6658; op-merge 557; field-set 352; element-set 170; batch 126 |
+| main | client, road 1 | 159798 | 7106 | 10986 | field-equal-copy 3086; row-equal-copy 2717; op-merge 947; field-set 128; batch 88; element-set 76 |
+| merge | server | 326440 | 15656 | 14886 | field-equal-copy 8270; row-equal-copy 6658; field-set 352; element-set 170; batch 126; row-replace 56 |
+| merge | client, road 1 | 158853 | 6161 | 10986 | field-equal-copy 3086; row-equal-copy 2717; field-set 128; batch 88; element-set 76; row-replace 44 |
+
+merge, depth 1: 0 of 1000 seeds failed; 5331 merges; "under" missed 78365 changes below a row.
+
+## Part 2, depth 2: data's reader ran with an unchanged value (lens-commits; added after the review)
+
+The server applies the leader's values; the client applies records that crossed JSON, which makes new objects, so a reader on an object value runs again for any record above it that leaves it equal. "merge": the same seeds, with a row's `op.merge` appended as one field record per merged key.
+
+| mode | where | readers ran | of which unchanged: a new equal object | of which unchanged: a phantom undefined | the new equal objects by write (top 6) |
+|---|---|---|---|---|---|
+| main | server | 281384 | 14261 | 6475 | field-equal-copy 8572; row-equal-copy 5009; field-set 246; op-merge 204; element-set 137; batch 50 |
+| main | client, road 1 | 147157 | 6761 | 5566 | field-equal-copy 4024; row-equal-copy 2288; op-merge 221; field-set 98; element-set 60; batch 33 |
+| merge | server | 281185 | 14062 | 6475 | field-equal-copy 8572; row-equal-copy 5009; field-set 246; element-set 137; batch 50; row-replace 27 |
+| merge | client, road 1 | 146940 | 6544 | 5566 | field-equal-copy 4024; row-equal-copy 2288; field-set 98; element-set 60; batch 33; row-replace 21 |
+
+merge, depth 2: 0 of 1000 seeds failed; 5393 merges; "under" missed 33130 changes below a row.
+
+## Edges of data's rule, depth 1 (1000 seeds; added after the review)
+
+Writes: batch(edge:append-at-end) 158; batch(edge:length-write) 307; batch(edge:proto-key) 467; batch(edge:proto-key-nested) 472; edge:append-at-end 322; edge:length-write 665; edge:proto-key 1058; edge:proto-key-nested 1109.
+
+Lenses: `length` reads an array's length (`r0.list.length`); `proto-read` reads `r0.p`, which only a `__proto__` write can give; `not-there` includes `r0.q.z`. Counts are lens-commits.
+
+| lens | data's reader missed a change | of which right after an edge write | the "near" log reader missed a change | a client joining now first differs from the server |
+|---|---|---|---|---|
+| length | 80 | 80 | 90 | 0 |
+| proto-read | 383 | 248 | 399 | 266 |
+| not-there | 219 | 219 | 238 | 258 |
+| element | 187 | 187 | 201 | 1 |
+| element-field | 72 | 72 | 80 | 0 |
+
+On `proto-read`, 135 misses came after an ordinary write to the row (field-set 36, nested-set 25, element-set 21, field-to-primitive 14): data copies the row's own keys, so the value a `__proto__` write gave went away with no record.
+- road2: a client lens first differs from the server after batch: 6
+- road2: a client lens first differs from the server after batch(edge:append-at-end): 2
+- road2: a client lens first differs from the server after batch(edge:length-write): 10
+- road2: a client lens first differs from the server after batch(edge:proto-key): 26
+- road2: a client lens first differs from the server after batch(edge:proto-key-nested): 42
+- road2: a client lens first differs from the server after op-merge: 11
+- wire: a client lens first differs from the server after batch: 1
+- wire: a client lens first differs from the server after op-merge: 16
+- wire: a client lens first differs from the server after row-equal-copy: 1
+
+## Edges of data's rule, depth 2 (1000 seeds; added after the review)
+
+Writes: batch(edge:append-at-end) 143; batch(edge:length-write) 309; batch(edge:proto-key) 471; batch(edge:proto-key-nested) 508; edge:append-at-end 308; edge:length-write 592; edge:proto-key 1092; edge:proto-key-nested 1044.
+
+Lenses: `length` reads an array's length (`r0.list.length`); `proto-read` reads `r0.p`, which only a `__proto__` write can give; `not-there` includes `r0.q.z`. Counts are lens-commits.
+
+| lens | data's reader missed a change | of which right after an edge write | the "near" log reader missed a change | a client joining now first differs from the server |
+|---|---|---|---|---|
+| length | 35 | 35 | 42 | 0 |
+| proto-read | 211 | 130 | 231 | 147 |
+| not-there | 97 | 97 | 117 | 116 |
+| element | 67 | 67 | 69 | 1 |
+
+On `proto-read`, 81 misses came after an ordinary write to the row (field-set 21, nested-set 14, batch 12, element-set 12): data copies the row's own keys, so the value a `__proto__` write gave went away with no record.
+- road2: a client lens first differs from the server after batch: 1
+- road2: a client lens first differs from the server after batch(edge:append-at-end): 2
+- road2: a client lens first differs from the server after batch(edge:length-write): 12
+- road2: a client lens first differs from the server after batch(edge:proto-key): 20
+- road2: a client lens first differs from the server after batch(edge:proto-key-nested): 24
+- road2: a client lens first differs from the server after op-merge: 5
+- wire: a client lens first differs from the server after nested-set: 1
+- wire: a client lens first differs from the server after op-merge: 5
+- wire: a client lens first differs from the server after row-equal-copy: 4
+
 ## Part 3: a write across partitions (1000 seeds)
 
 - A. 20000 root replaces over 2 to 8 partitions, 101760 partition commits. A callback on two rows saw a mixed state in 20000 (100.0 %); a loop that wakes after 1 to 4 commits in 12629 (63.1 %); a whole-resource callback in 20000, 106128 mixed states in all (5.31 a replace).
@@ -144,11 +234,11 @@ The docs consumer's set was wrong after 108117 (F1) and 107881 (F2) of 200000 re
 
 ## Part 5: a version per row
 
-| sibling share | guarded writes | row guard refused | of which only a sibling changed | field guard refused | equals refused | equals passed after a change and back |
+| sibling share | guarded writes | row guard refused | of which only a sibling changed (of the refusals; of the guarded writes) | field guard refused | equals refused | equals passed after a change and back |
 |---|---|---|---|---|---|---|
-| 0.2 | 118637 | 84986 (71.6 %) | 9162 (10.8 %) | 75824 | 60278 | 15546 |
-| 0.5 | 118554 | 85089 (71.8 %) | 27566 (32.4 %) | 57523 | 45338 | 12185 |
-| 0.8 | 119097 | 85424 (71.7 %) | 54021 (63.2 %) | 31403 | 24313 | 7090 |
+| 0.2 | 118637 | 84986 (71.6 %) | 9162 (10.8 %; 7.7 %) | 75824 | 60278 | 15546 |
+| 0.5 | 118554 | 85089 (71.8 %) | 27566 (32.4 %; 23.3 %) | 57523 | 45338 | 12185 |
+| 0.8 | 119097 | 85424 (71.7 %) | 54021 (63.2 %; 45.4 %) | 31403 | 24313 | 7090 |
 
 ## Planted bugs (each must fail at least 100 of 1,000 seeds)
 
@@ -169,6 +259,8 @@ The docs consumer's set was wrong after 108117 (F1) and 107881 (F2) of 200000 re
 | split | splitrows | 1000 | **1000** | C:mixed |
 | filter | prevrow | 1000 | **1000** | F1:row, F1:row:set, F2:row, F2:row:set |
 | versions | noancestor | 1000 | **1000** | field:lost-update |
+| oracle depth 1 merge | prev | 1000 | **1000** | prev:root, prev:element-field, prev:nested, prev:element |
+| oracle depth 1 merge | wirefield | 1000 | **1000** | wire:state:row, wire:missed:row, wire:state:not-there, wire:missed:not-there |
 
 ## Timed (range over the runs; each process alone under the timing lock; medians of 15 interleaved rounds)
 
