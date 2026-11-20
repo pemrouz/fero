@@ -82,3 +82,21 @@
 {"exp":"E-57","part":"b-merge","bench":"cost-past","node":"v22.22.0","claim":"B6","records":10000,"rows":10000,"openUsPerRecord":1.292,"stepUs":{"1 view":25.611,"10 views":32.093},"seekMs":{"10000":27.893}}
 {"run":3,"loadavg":"2.59 1.88 1.58 2/128 19297","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/costs.mjs past 100000"}
 {"exp":"E-57","part":"b-merge","bench":"cost-past","node":"v22.22.0","claim":"B6","records":100000,"rows":10000,"openUsPerRecord":0.237,"stepUs":{"1 view":19.884,"10 views":21.116},"seekMs":{"10000":23.343,"100000":49.795}}
+{"run":1,"loadavg":"0.96 0.29 0.26 1/109 28272","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 10000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1285,"data":37538,"index":3699}},"viewNsPerWrite":{"sort":{"data":36253,"index":2414}},"buildMs":{"data":14.6,"index":8},"endCheck":true,"heapMB":30}
+{"run":1,"loadavg":"0.96 0.29 0.26 1/109 28282","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 100000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":1770,"data":599052,"index":5759}},"viewNsPerWrite":{"sort":{"data":597282,"index":3989}},"buildMs":{"data":213.6,"index":63.9},"endCheck":true,"heapMB":167}
+{"run":1,"loadavg":"1.19 0.36 0.28 1/110 28303","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 1000000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2172,"index":13342}},"viewNsPerWrite":{"sort":{"index":11170}},"buildMs":{"index":831.5},"endCheck":true,"heapMB":952}
+{"run":2,"loadavg":"1.20 0.43 0.31 1/113 28344","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 10000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1518,"data":35450,"index":3205}},"viewNsPerWrite":{"sort":{"data":33931,"index":1687}},"buildMs":{"data":14.5,"index":7.5},"endCheck":true,"heapMB":30}
+{"run":2,"loadavg":"1.20 0.43 0.31 1/113 28354","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 100000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":2288,"data":596719,"index":7376}},"viewNsPerWrite":{"sort":{"data":594431,"index":5088}},"buildMs":{"data":228.8,"index":67.6},"endCheck":true,"heapMB":167}
+{"run":2,"loadavg":"1.17 0.45 0.31 1/113 28383","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 1000000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2098,"index":11820}},"viewNsPerWrite":{"sort":{"index":9721}},"buildMs":{"index":873.9},"endCheck":true,"heapMB":956}
+{"run":3,"loadavg":"1.19 0.51 0.34 1/112 28410","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 10000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1669,"data":35325,"index":3626}},"viewNsPerWrite":{"sort":{"data":33656,"index":1956}},"buildMs":{"data":15.6,"index":9.3},"endCheck":true,"heapMB":30}
+{"run":3,"loadavg":"1.25 0.53 0.35 1/112 28420","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 100000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":1773,"data":585011,"index":5585}},"viewNsPerWrite":{"sort":{"data":583238,"index":3812}},"buildMs":{"data":221.9,"index":63.5},"endCheck":true,"heapMB":167}
+{"run":3,"loadavg":"1.47 0.59 0.37 1/112 28430","cmd":"node --expose-gc --no-warnings --max-old-space-size=3500 bench/pageindex-cost.mjs 1000000"}
+{"exp":"E-57","part":"b-merge","claim":"XA-7","bench":"pageindex-cost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2238,"index":12469}},"viewNsPerWrite":{"sort":{"index":10230}},"buildMs":{"index":904.4},"endCheck":true,"heapMB":956}

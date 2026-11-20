@@ -3,8 +3,10 @@
 #   a-served/  served views (class C) and pushdown (class B): A1-A8 and XA-1 to XA-13 (XA-14 is a model job, not here)
 #   b-merge/   across partitions, resources and time: B1-B6 and XB-1 to XB-13
 #   ./run.sh                 both parts in full, one after the other (group A, then group B)
-#   ./run.sh a [step]        group A only; step is one of a-served/run.sh's: sims mutants timing types summary
-#   ./run.sh b [step]        group B only; step is one of b-merge/run.sh's: sims timing model b1 b1m b2 b3 b4 b6 xb
+#   ./run.sh a [step]        group A only; step is one of a-served/run.sh's: sims mutants timing types summary, and
+#                            (added after the skeptic's review) xa2more pagecost
+#   ./run.sh b [step]        group B only; step is one of b-merge/run.sh's: sims timing model b1 b1m b2 b3 b4 b6 xb, and tpages
+# probes/run.sh runs the small probes TRANSFORMS.md cites (see probes/README.md).
 #   ./run.sh summary         both parts' results in short, from the results files already there (runs nothing timed)
 # Env: SP (required): a scratch folder of your own. It holds bin/timing (runs a command alone on the box) and bin/heavy
 # (shares the box, waits for timing runs), and for group B dl/esbuild (E-40's fetch.sh), which bundles data once.

@@ -3,6 +3,8 @@
 #   ./run.sh sims      the seeded runs (A1-A8, XA-2, XA-7, XA-8, XA-9, XA-10, XA-12, XA-13), 1,000 seeds each, under the heavy lock
 #   ./run.sh mutants   the planted bugs: each must make its seeded run fail in at least 100 of 1,000 seeds
 #   ./run.sh timing    the timed costs, RUNS times each, every process alone under the timing lock
+#   ./run.sh xa2more   XA-2 again with the headroom rule, leader kills, one and two standbys, and its planted bugs
+#   ./run.sh pagecost  the shared page index per write (added after the skeptic's review), RUNS times, under the timing lock
 #   ./run.sh types     XA-11: tsc on a view context that has no second resource
 #   ./run.sh summary   the tables (node summarize.mjs)
 #   ./run.sh           all of the above
@@ -30,6 +32,8 @@ export ERRDIR=$W # a process's stderr goes to the scratch folder
 sims() { $HEAVY "$HERE/batch.sh" sims "$R/sims.jsonl" 1 $SEEDS; }
 mutants() { $HEAVY "$HERE/batch.sh" mutants "$R/mutants.jsonl" 1 $SEEDS; }
 timing() { for run in $RUNS; do $TIMING "$HERE/batch.sh" timing "$R/timing.jsonl" $run; done; }
+pagecost() { for run in $RUNS; do $TIMING "$HERE/batch.sh" pagecost "$R/timing.jsonl" $run; done; }
+xa2more() { $HEAVY "$HERE/batch.sh" xa2more "$R/sims.jsonl" 1 $SEEDS; $HEAVY "$HERE/batch.sh" xa2mut "$R/mutants.jsonl" 1 $SEEDS; }
 
 types() {
   TSC=${TSC:-tsc}
@@ -51,8 +55,10 @@ case "$1" in
   sims) versions; sims ;;
   mutants) mutants ;;
   timing) versions; timing ;;
+  pagecost) pagecost ;;
+  xa2more) xa2more ;;
   types) types ;;
   summary) $NODE "$HERE/summarize.mjs" ;;
-  "") versions; types; sims; mutants; timing; $NODE "$HERE/summarize.mjs" ;;
-  *) echo "usage: run.sh [sims|mutants|timing|types|summary]"; exit 1 ;;
+  "") versions; types; sims; mutants; xa2more; timing; pagecost; $NODE "$HERE/summarize.mjs" ;;
+  *) echo "usage: run.sh [sims|mutants|timing|pagecost|xa2more|types|summary]"; exit 1 ;;
 esac

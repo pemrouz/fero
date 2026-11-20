@@ -1,7 +1,7 @@
 // E-57 group A: the seeded runs. One JSON line per run: the claim, the planted bug (E57_MUTATE, empty when real), the
 // seeds, the sums of every counter, the seeds that failed and why.
 //   node --expose-gc --experimental-strip-types run.mjs <claim> [seeds]
-// claims: a1 a2 a3 a4 a5 a6 a7 a8 xa2 xa8 xa9 xa10 xa12 xa13 share sharing (see each preset below)
+// claims: a1 a2 a3 a4 a5 a6 a7 a8 xa2 xa2l xa2sb xa2sbx xa2s2 xa2s2x xa8 xa9 xa10 xa12 xa13 share sharing (see each preset below)
 import { World, newStats } from './world.mjs'
 import { MUT } from '../proto/served.mjs'
 
@@ -27,6 +27,15 @@ const faults = (o) => (w) => {
   if (x < o.disc) { const ls = [...w.links.values()]; if (ls.length) w.disconnect(ls[r() % ls.length]) }
   else if (x < o.kill) { const sv = w.serving(); if (sv.length > 1) { const c = sv[r() % sv.length]; c.backAt = w.t + 10 + (r() % 30); w.kill(c.id) } }
   else if (x < o.lkill) { if (w.leader >= 0 && w.copies.filter((c) => c.alive).length > 1) { const k = w.leader; w.copies[k].backAt = w.t + 10 + (r() % 30); w.kill(k) } }
+}
+// faults with standbys: a kill takes any live copy but the leader (a standby too), while three copies live
+const faultsSB = (o) => (w) => {
+  const r = w.r
+  for (const c of w.copies) if (!c.alive && w.t >= (c.backAt ?? 0)) { w.restart(c.id); return }
+  const x = r() % 100
+  if (x < o.disc) { const ls = [...w.links.values()]; if (ls.length) w.disconnect(ls[r() % ls.length]) }
+  else if (x < o.kill) { const live = w.copies.filter((c) => c.alive); const cand = live.filter((c) => c.id !== w.leader); if (live.length > 2 && cand.length) { const c = cand[r() % cand.length]; c.backAt = w.t + 10 + (r() % 30); w.kill(c.id) } }
+  else if (x < o.lkill) { const voters = w.copies.filter((c) => c.alive && !w.isStandby(c.id)); if (w.leader >= 0 && voters.length > 1) { const k = w.leader; w.copies[k].backAt = w.t + 10 + (r() % 30); w.kill(k) } }
 }
 // the serving copy that holds the most entries (a forced kill: at least one per seed)
 const killBusiest = (w) => { const sv = w.serving(); if (sv.length < 1 || w.copies.filter((c) => c.alive).length < 2) return; const c = sv.sort((a, b) => b.entries.size - a.entries.size)[0]; c.backAt = w.t + 10 + (w.r() % 30); w.kill(c.id) }
@@ -57,6 +66,20 @@ const presets = {
   a8: { ...base, weights: W({ fault: 1000 }), fault: faults({ disc: 70, kill: 90, lkill: 100 }), atStep: (w, i) => { if (i === w.deployAt) { w.deployed = new Set(w.copies.map((c) => c.id)); for (const c of w.copies) if (c.alive) c.deploy(2); w.stats.deploys++ } }, init: (w) => { w.deployAt = 80 + (w.r() % 150) } },
   // XA-2: placement by key, and headroom for failover
   xa2: { ...base, failHeld: true, viewsMax: 12, headroom: 6, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faults({ disc: 50, kill: 100, lkill: 100 }),
+    spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
+  // XA-2, added after the skeptic's review (F2, F24): the headroom rule (views.max / k for k >= 2 serving copies, 0 for
+  // one), (a) with leader kills on three voters, (b) with three voters and one standby (one serving copy while it lives)
+  xa2l: { ...base, failHeld: true, headroomRule: true, viewsMax: 12, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faults({ disc: 50, kill: 80, lkill: 100 }),
+    spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
+  xa2sb: { ...base, failHeld: true, headroomRule: true, copies: 4, standbys: 1, standbysFirst: true, viewsMax: 12, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faultsSB({ disc: 50, kill: 80, lkill: 100 }),
+    spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
+  // (c) as (b), but every live copy except the leader serves (the standby and two voters): the rule the page took
+  xa2sbx: { ...base, failHeld: true, headroomRule: true, copies: 4, standbys: 1, viewsMax: 12, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faultsSB({ disc: 50, kill: 80, lkill: 100 }),
+    spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
+  // (d) and (e): five servers, three voters and two standbys, standbys first (d) or every copy but the leader (e)
+  xa2s2: { ...base, failHeld: true, headroomRule: true, copies: 5, standbys: 2, standbysFirst: true, viewsMax: 12, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faultsSB({ disc: 50, kill: 80, lkill: 100 }),
+    spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
+  xa2s2x: { ...base, failHeld: true, headroomRule: true, copies: 5, standbys: 2, viewsMax: 12, viewsClient: 16, clients: 4, maxOpen: 6, pOpen: 60, pClose: 65, weights: W({ fault: 1000 }), fault: faultsSB({ disc: 50, kill: 80, lkill: 100 }),
     spec: (w) => ({ cls: 'C', method: 'band', arg: { lo: w.r() % 5, hi: 5 + (w.r() % 5) } }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 150 + (w.r() % 100) } },
   // XA-8: an impure view (a threshold from the copy's own clock), through failovers
   xa8: { ...base, impure: true, spec: () => ({ cls: 'C', method: 'recent', arg: null }), thresholdOf: (s) => s.firstTh, weights: W({}), linger: 1000, fault: faults({ disc: 30, kill: 80, lkill: 100 }), atStep: (w, i) => { if (i === w.killAt) killBusiest(w) }, init: (w) => { w.killAt = 60 + (w.r() % 150) } },

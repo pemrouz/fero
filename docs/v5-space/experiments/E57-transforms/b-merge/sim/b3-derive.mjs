@@ -34,7 +34,7 @@ const FENCE = MUTATE !== 'nofence', REMOVES = MUTATE !== 'noremove'
 const BUMP = !PLAN && MUTATE !== 'nobump', BARRIER = !PLAN && MUTATE !== 'nobarrier', VERSION = !PLAN && MUTATE !== 'noversion'
 const TG = 3, LEASE = 12, KEEP = 20
 
-const T = { seeds: 0, idleChecks: 0, unequal: 0, seedsUnequal: 0, staleAfterBump: 0, staleBeforeBump: 0, seedsStale: 0, stepBacks: 0, stepBacksAtChange: 0, stepBacksElsewhere: 0, seedsStepBack: 0, v1AfterV2: 0, seedsV1AfterV2: 0, changes: 0, minChanges: Infinity, takeovers: 0, emptyDiffTakeovers: 0, restartsAfterCut: 0, startsAfterCut: 0, sourceCommits: 0, targetWrites: 0, refused: 0, seedsFailed: 0 }
+const T = { seeds: 0, idleChecks: 0, unequal: 0, seedsUnequal: 0, staleAfterBump: 0, staleBeforeBump: 0, seedsStale: 0, stepBacks: 0, stepBacksAtChange: 0, stepBacksElsewhere: 0, seedsStepBack: 0, v1AfterV2: 0, seedsV1AfterV2: 0, changes: 0, minChanges: Infinity, takeovers: 0, emptyDiffTakeovers: 0, restartsAfterCut: 0, startsAfterCut: 0, sourceCommits: 0, targetWrites: 0, refused: 0, seedsFailed: 0, seedsFailedStaleExcused: 0 }
 let first = null
 
 function oView(rows, ver) { // the query from scratch: by(user) of sum(cents) (v1) or length (v2), typed keys, C5
@@ -203,6 +203,9 @@ function runSeed(seed) {
   // a seed fails on: unequal at an idle point, a stale write accepted, v1 after v2, or a step-back the design
   // forbids (the full design: any; the plan as written: one away from a deriver change)
   if (unequal || stale || v1after || (PLAN ? stepBackElsewhere : stepBack)) T.seedsFailed++
+  // the same bar for both (added after the skeptic's F6): a stale write counts only through the harm it leaves
+  // (unequal at idle), as the full design's restated XB-8 bar excuses one that lands before the bump
+  if (unequal || v1after || (PLAN ? stepBackElsewhere : stepBack)) T.seedsFailedStaleExcused++
 }
 
 const t0 = performance.now()

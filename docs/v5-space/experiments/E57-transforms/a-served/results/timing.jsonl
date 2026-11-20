@@ -64,3 +64,27 @@
 {"exp":"E-57","group":"A","node":"v22.22.0","claim":"A7","bench":"classb","rows":1000,"S1":{"copyUsPerWrite":{"none":4.145,"push":5.608,"local":3.658},"clientUsPerWrite":{"none":3.505,"push":0.048,"local":6.696},"copyUsPerShape":{"push":1.463,"local":-0.487},"clientUsPerShape":{"push":0.048,"local":3.191},"bytesPerWrite":{"push":3.1,"local":108}},"S10":{"copyUsPerWrite":{"none":2.708,"push":15.636,"local":2.526},"clientUsPerWrite":{"none":2.354,"push":0.236,"local":17.017},"copyUsPerShape":{"push":1.293,"local":-0.018},"clientUsPerShape":{"push":0.024,"local":1.466},"bytesPerWrite":{"push":28,"local":108}}}
 {"run":3,"loadavg":"1.11 1.21 1.34 1/140 16603","cmd":"classb.mjs 10000","mutate":""}
 {"exp":"E-57","group":"A","node":"v22.22.0","claim":"A7","bench":"classb","rows":10000,"S1":{"copyUsPerWrite":{"none":3.023,"push":6.22,"local":3.033},"clientUsPerWrite":{"none":2.22,"push":0.019,"local":6.835},"copyUsPerShape":{"push":3.197,"local":0.01},"clientUsPerShape":{"push":0.019,"local":4.615},"bytesPerWrite":{"push":0.1,"local":112.7}},"S10":{"copyUsPerWrite":{"none":2.688,"push":25.856,"local":2.788},"clientUsPerWrite":{"none":2.029,"push":0.037,"local":28.941},"copyUsPerShape":{"push":2.317,"local":0.01},"clientUsPerShape":{"push":0.004,"local":2.691},"bytesPerWrite":{"push":1.3,"local":112.7}}}
+{"run":1,"loadavg":"0.00 0.02 0.17 3/119 28133","cmd":"pagecost.mjs 1000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":1000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":0.902,"best":7.252,"pages":9.858,"both":12.606},"viewUsPerChange":{"best":6.35,"pages":8.956,"both":11.704}}
+{"run":1,"loadavg":"0.00 0.02 0.17 1/113 28141","cmd":"pagecost.mjs 5000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":5000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.132,"best":16.855,"pages":20.606,"both":37.794},"viewUsPerChange":{"best":15.723,"pages":19.474,"both":36.662}}
+{"run":1,"loadavg":"0.00 0.02 0.17 1/113 28149","cmd":"pagecost.mjs 10000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":10000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.098,"best":21.741,"pages":34.24,"both":54.69},"viewUsPerChange":{"best":20.643,"pages":33.142,"both":53.592}}
+{"run":1,"loadavg":"0.00 0.02 0.17 2/116 28160","cmd":"pagecost.mjs 100000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":100000,"writes":1000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.414,"best":156.108,"pages":510.063,"both":673.712},"viewUsPerChange":{"best":154.694,"pages":508.649,"both":672.298}}
+{"run":2,"loadavg":"0.36 0.11 0.20 1/112 28173","cmd":"pagecost.mjs 1000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":1000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":0.816,"best":6.896,"pages":9.117,"both":12.443},"viewUsPerChange":{"best":6.08,"pages":8.301,"both":11.627}}
+{"run":2,"loadavg":"0.36 0.11 0.20 1/112 28181","cmd":"pagecost.mjs 5000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":5000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":0.996,"best":13.21,"pages":20.163,"both":31.376},"viewUsPerChange":{"best":12.214,"pages":19.167,"both":30.38}}
+{"run":2,"loadavg":"0.49 0.14 0.21 1/112 28189","cmd":"pagecost.mjs 10000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":10000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.008,"best":20.837,"pages":30.451,"both":49.764},"viewUsPerChange":{"best":19.829,"pages":29.443,"both":48.756}}
+{"run":2,"loadavg":"0.49 0.14 0.21 1/113 28207","cmd":"pagecost.mjs 100000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":100000,"writes":1000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.345,"best":153.515,"pages":526.635,"both":677.046},"viewUsPerChange":{"best":152.17,"pages":525.29,"both":675.701}}
+{"run":3,"loadavg":"0.60 0.18 0.22 1/115 28223","cmd":"pagecost.mjs 1000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":1000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":0.845,"best":7.537,"pages":9.936,"both":13.79},"viewUsPerChange":{"best":6.692,"pages":9.091,"both":12.945}}
+{"run":3,"loadavg":"0.60 0.18 0.22 1/116 28232","cmd":"pagecost.mjs 5000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":5000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":0.944,"best":13.35,"pages":19.682,"both":29.113},"viewUsPerChange":{"best":12.406,"pages":18.738,"both":28.169}}
+{"run":3,"loadavg":"0.60 0.18 0.22 1/116 28240","cmd":"pagecost.mjs 10000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":10000,"writes":2000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.147,"best":21.778,"pages":30.886,"both":48.643},"viewUsPerChange":{"best":20.631,"pages":29.739,"both":47.496}}
+{"run":3,"loadavg":"0.60 0.18 0.22 1/116 28248","cmd":"pagecost.mjs 100000","mutate":""}
+{"exp":"E-57","group":"A","node":"v22.22.0","claim":"XA-7","bench":"pagecost","rows":100000,"writes":1000,"pageIndexesBuilt":1,"usPerWrite":{"none":1.43,"best":148.026,"pages":513.384,"both":710.497},"viewUsPerChange":{"best":146.596,"pages":511.954,"both":709.067}}

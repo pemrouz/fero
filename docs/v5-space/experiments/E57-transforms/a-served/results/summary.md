@@ -20,6 +20,12 @@ Made by `node summarize.mjs` from `results/*.jsonl`. Every seeded line ran once 
 | xa10 | 1000 | 0 | {} | checks 85924, framesApplied 62075, clientPictures 23287, disconnects 8632, clientRingResumes 562, resumePictures 14699, kills 5481, leaderKills 2536, xa6Checks 23918, admits 20200, ref_stale-client 2751, buildsOnSnapshot 14824, lingerReuses 686, ringResumes 603, ringFrames 681, resumeBytes 87207, pictureBytes 9002798, frames 65286, frameBytes 5539008, encodes 65286, sends 72626, waits 5351 |
 | xa12 | 1000 | 0 | {} | checks 71175, framesApplied 52458, clientPictures 15134, disconnects 11782, clientRingResumes 3583, resumePictures 8415, kills 2893, xa6Checks 30105, admits 15095, tooBig 1641, warn80 23894, buildsOnSnapshot 7979, lingerReuses 3736, ringResumes 3898, ringFrames 3454, resumeBytes 520636, pictureBytes 8896033, frames 56041, frameBytes 5487934, encodes 56041, sends 57197, waits 3985 |
 | xa13 | 1000 | 0 | {} | checks 92888, framesApplied 70935, clientPictures 19493, disconnects 10194, clientRingResumes 2460, resumePictures 11311, kills 3683, leaderKills 1178, xa6Checks 42979, admits 17669, syncs 1965, buildsOnSnapshot 11640, lingerReuses 3219, ringResumes 2650, ringFrames 3332, resumeBytes 444019, pictureBytes 11936874, frames 80174, frameBytes 8008577, encodes 80174, sends 79586, waits 8894 |
+| xa2 | 1000 | 1 | {"refusedHeld":1} | checks 98863, framesApplied 62414, clientPictures 34493, disconnects 15482, clientRingResumes 1956, resumePictures 23282, kills 4425, admits 38121, refusedCap 3789, refusedHeld 1, buildsOnSnapshot 24287, lingerReuses 2608, ringResumes 2235, ringFrames 2093, resumeBytes 220066, pictureBytes 3427889, frames 81080, frameBytes 4032044, encodes 81080, sends 82379, waits 6472 |
+| xa2l | 1000 | 21 | {"refusedHeld":27} | checks 102400, framesApplied 63409, clientPictures 37457, disconnects 13979, clientRingResumes 1534, resumePictures 23477, kills 5027, leaderKills 2100, admits 37484, refusedCap 845, refusedHeld 27, buildsOnSnapshot 27782, lingerReuses 2032, ringResumes 1708, ringFrames 1515, resumeBytes 163717, pictureBytes 3652991, frames 81891, frameBytes 4074452, encodes 81891, sends 81784, waits 6340 |
+| xa2sb | 1000 | 377 | {"refusedHeld":665} | checks 100024, framesApplied 60414, clientPictures 37499, disconnects 13078, clientRingResumes 2111, resumePictures 22852, kills 5745, leaderKills 1902, admits 38242, refusedCap 1326, refusedHeld 665, buildsOnSnapshot 24952, lingerReuses 2592, ringResumes 2377, ringFrames 1446, resumeBytes 194082, pictureBytes 3585143, frames 74020, frameBytes 3682390, encodes 74020, sends 74058, waits 7521 |
+| xa2sbx | 1000 | 6 | {"refusedHeld":8} | checks 112722, framesApplied 74130, clientPictures 37041, disconnects 14359, clientRingResumes 1551, resumePictures 21964, kills 5728, leaderKills 1950, admits 36766, refusedCap 312, refusedHeld 8, buildsOnSnapshot 24360, lingerReuses 2060, ringResumes 1668, ringFrames 1319, resumeBytes 151625, pictureBytes 3503920, frames 87577, frameBytes 4359012, encodes 87577, sends 86931, waits 9161 |
+| xa2s2 | 1000 | 36 | {"refusedHeld":44} | checks 113833, framesApplied 78069, clientPictures 33571, disconnects 12010, clientRingResumes 2193, resumePictures 18972, kills 5946, leaderKills 1909, admits 34728, refusedCap 1391, refusedHeld 44, buildsOnSnapshot 18572, lingerReuses 2698, ringResumes 2391, ringFrames 1491, resumeBytes 197451, pictureBytes 3140974, frames 84894, frameBytes 4241636, encodes 84894, sends 85585, waits 9675 |
+| xa2s2x | 1000 | 5 | {"refusedHeld":9} | checks 111764, framesApplied 74734, clientPictures 35395, disconnects 13674, clientRingResumes 1635, resumePictures 19699, kills 5957, leaderKills 1979, admits 36256, refusedCap 295, refusedHeld 9, buildsOnSnapshot 21692, lingerReuses 2121, ringResumes 1761, ringFrames 1058, resumeBytes 143250, pictureBytes 3273419, frames 85553, frameBytes 4262707, encodes 85553, sends 83385, waits 11816 |
 
 ### Deterministic runs
 
@@ -62,6 +68,8 @@ Made by `node summarize.mjs` from `results/*.jsonl`. Every seeded line ran once 
 | xa12 | nosticky | 1000 | **833** | {"rebuildTooBig":1812} |
 | xa13 | earlysync | 1000 | **934** | {"sync":2890} |
 | xa8 | (impure view) | 1000 | **822** | {"unequal:pic:order":4661,"xa6":4963,"unequal:resume:order":312,"settled":1119,"unequal:frame:order":84} |
+| xa2sbx | fixedhead | 1000 | **841** | {"admit":3334} |
+| xa2sbx | noheadroom | 1000 | **194** | {"admit":294,"refusedHeld":7} |
 
 - `{"mutate":"unsortedkey","claim":"sharing","subscribers":2000,"distinctKeys":25,"builds":50,"entries":50,"subsSent":1372,"joins":1322,"clientShares":628}`
 - `{"mutate":"freecopy","claim":"placement","viewsMax":1000,"headroom":0,"subscribers":2000,"distinctKeys":50,"builds":100,"entriesPerCopy":[0,50,50],"distinctLive":50,"refusedFresh":0,"crossDup":0,"crossDupAfter":50,"afterKill":{"entriesPerCopy":[0,0,50],"refusedHeld":0,"refusedTotal":0,"leaderEntries":0}}`
@@ -348,6 +356,62 @@ Made by `node summarize.mjs` from `results/*.jsonl`. Every seeded line ran once 
 | S10.clientUsPerShape.local | 2.475 to 3.123 |
 | S10.bytesPerWrite.push | 1.3 |
 | S10.bytesPerWrite.local | 112.7 |
+
+### pagecost @ 1000 (3 runs)
+
+| number | range |
+|---|---|
+| writes | 2000 |
+| pageIndexesBuilt | 1 |
+| usPerWrite.none | 0.816 to 0.902 |
+| usPerWrite.best | 6.896 to 7.537 |
+| usPerWrite.pages | 9.117 to 9.936 |
+| usPerWrite.both | 12.443 to 13.79 |
+| viewUsPerChange.best | 6.08 to 6.692 |
+| viewUsPerChange.pages | 8.301 to 9.091 |
+| viewUsPerChange.both | 11.627 to 12.945 |
+
+### pagecost @ 5000 (3 runs)
+
+| number | range |
+|---|---|
+| writes | 2000 |
+| pageIndexesBuilt | 1 |
+| usPerWrite.none | 0.944 to 1.132 |
+| usPerWrite.best | 13.21 to 16.855 |
+| usPerWrite.pages | 19.682 to 20.606 |
+| usPerWrite.both | 29.113 to 37.794 |
+| viewUsPerChange.best | 12.214 to 15.723 |
+| viewUsPerChange.pages | 18.738 to 19.474 |
+| viewUsPerChange.both | 28.169 to 36.662 |
+
+### pagecost @ 10000 (3 runs)
+
+| number | range |
+|---|---|
+| writes | 2000 |
+| pageIndexesBuilt | 1 |
+| usPerWrite.none | 1.008 to 1.147 |
+| usPerWrite.best | 20.837 to 21.778 |
+| usPerWrite.pages | 30.451 to 34.24 |
+| usPerWrite.both | 48.643 to 54.69 |
+| viewUsPerChange.best | 19.829 to 20.643 |
+| viewUsPerChange.pages | 29.443 to 33.142 |
+| viewUsPerChange.both | 47.496 to 53.592 |
+
+### pagecost @ 100000 (3 runs)
+
+| number | range |
+|---|---|
+| writes | 1000 |
+| pageIndexesBuilt | 1 |
+| usPerWrite.none | 1.345 to 1.43 |
+| usPerWrite.best | 148.026 to 156.108 |
+| usPerWrite.pages | 510.063 to 526.635 |
+| usPerWrite.both | 673.712 to 710.497 |
+| viewUsPerChange.best | 146.596 to 154.694 |
+| viewUsPerChange.pages | 508.649 to 525.29 |
+| viewUsPerChange.both | 672.298 to 709.067 |
 
 ## Types (XA-11)
 

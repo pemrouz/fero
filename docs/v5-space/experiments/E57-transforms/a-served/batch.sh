@@ -1,7 +1,7 @@
 #!/bin/sh
 # E-57 group A: one batch of processes, run in turn (run.sh runs this whole file under ONE lock hold, so the batch waits
 # for the box once, not once per process). Each line of the batch is a process; its load average goes before its line.
-#   batch.sh sims|mutants|timing <out.jsonl> <run> <seeds>
+#   batch.sh sims|mutants|timing|pagecost|xa2more|xa2mut <out.jsonl> <run> <seeds>
 HERE=$(cd "$(dirname "$0")" && pwd)
 NODE=${NODE:-node}
 NODEF="$NODE --expose-gc --experimental-strip-types --no-warnings --max-old-space-size=3000"
@@ -31,4 +31,10 @@ case "$1" in
     one bench "" joincost.mjs                                         # A4
     for n in 10000 100000; do one bench "" viewmem.mjs $n; done       # A5, XA-7
     for n in 1000 10000; do one bench "" classb.mjs $n; done ;;       # A7
+  xa2more) # added after the skeptic's review (F2, F24): the headroom rule, leader kills, one and two standbys
+    for c in xa2 xa2l xa2sb xa2sbx xa2s2 xa2s2x; do one sim "" run.mjs $c $SEEDS; done ;;
+  xa2mut) # the planted bugs for the headroom rule: the first formula at one serving copy, and no headroom
+    for m in fixedhead noheadroom; do one sim "$m" run.mjs xa2sbx $SEEDS; done ;;
+  pagecost) # added after the skeptic's review (F1, F23): the shared page index per write, beside best(10)
+    for n in 1000 5000 10000 100000; do one bench "" pagecost.mjs $n; done ;;
 esac

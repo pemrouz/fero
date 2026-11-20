@@ -307,7 +307,7 @@ export class Copy {
   // ── admission: views.max (minus headroom for a view no client held), views.client, the cost budget (XA-9) ──
   admit(ci, held, cost) {
     const cfg = this.w.cfg
-    const room = held || MUT.has('noheadroom') ? cfg.viewsMax : cfg.viewsMax - cfg.headroom
+    const room = held || MUT.has('noheadroom') ? cfg.viewsMax : cfg.viewsMax - (this.w.headroomNow?.() ?? cfg.headroom)
     // a SUB from a client that held this view (a failover moved it here) first evicts lingering entries, oldest first,
     // so repeated failovers inside one linger cannot fill the headroom with entries nobody holds (found by XA-2's sim:
     // 1 refusal of a held view in 1,000 seeds before this rule)

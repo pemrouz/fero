@@ -101,7 +101,22 @@ export class World {
   foldOne(c) { if (c.alive && c.pos < this.logEnd) c.fold(c.pos + 1, this.log[c.pos + 1]) }
 
   // ── placement: rendezvous hashing over the serving copies (alive, not the leader) ──
-  serving() { return this.copies.filter((c) => c.alive && (c.id !== this.leader || MUT.has('onleader'))) } // planted 'onleader': the leader serves views too
+  serving() { // planted 'onleader': the leader serves views too
+    const live = this.copies.filter((c) => c.alive)
+    // standbys first (cfg.standbysFirst, the page's first rule); else every live copy but the leader serves
+    if (this.cfg.standbys && this.cfg.standbysFirst) { const sb = live.filter((c) => this.isStandby(c.id)); if (sb.length) return sb }
+    return live.filter((c) => c.id !== this.leader || MUT.has('onleader'))
+  }
+  // a standby holds a copy and never leads (cfg.standbys: the last copies are standbys; added after the skeptic's F2)
+  isStandby(id) { return id >= this.cfg.copies - (this.cfg.standbys ?? 0) }
+  // headroom kept free for held views. cfg.headroomRule (added after the skeptic's F2): views.max / k with k >= 2
+  // serving copies, and 0 with one serving copy (its failover goes to copies that hold no views); the planted
+  // 'fixedhead' keeps views.max / k at k = 1 too (the page's first formula). Without the rule: cfg.headroom, fixed.
+  headroomNow() {
+    if (!this.cfg.headroomRule) return this.cfg.headroom
+    const k = this.serving().length
+    return k >= 2 || MUT.has('fixedhead') ? Math.floor(this.cfg.viewsMax / Math.max(k, 1)) : 0
+  }
   owner(place) {
     let best = null, bh = -1
     for (const c of this.serving()) { const h = fnv(place + '#' + c.id); if (h > bh) { bh = h; best = c.id } }
@@ -158,11 +173,12 @@ export class World {
     if (!c.alive) return
     for (const l of [...this.links.values()]) if (l.k === k) this.disconnect(l)
     c.kill(); this.stats.kills++
+    ;(this.killTimes ??= []).push(this.t)
     if (k === this.leader) { this.stats.leaderKills++; this.elect() }
     this.rebalance()
   }
   elect() {
-    const live = this.copies.filter((c) => c.alive)
+    const live = this.copies.filter((c) => c.alive && !this.isStandby(c.id)) // a standby never leads
     if (!live.length) { this.leader = -1; return }
     const L = live[this.r() % live.length]
     while (L.pos < this.logEnd) this.foldOne(L) // a new leader has every committed entry
@@ -178,7 +194,7 @@ export class World {
     c.start(this.rowsFor(p0), p0, this.cfg.tvOf ? this.cfg.tvOf(k) : this.curTv(k), this.cfg.depth)
     if (this.cfg.impure) this.clock.set(c.id + '.' + c.inc, this.r() % 40)
     this.stats.restarts++
-    if (this.leader < 0) { this.leader = k; while (c.pos < this.logEnd) this.foldOne(c) }
+    if (this.leader < 0 && !this.isStandby(k)) { this.leader = k; while (c.pos < this.logEnd) this.foldOne(c) }
     this.rebalance()
   }
   curTv(k) { return this.deployed?.has(k) ? this.cfg.tv2 ?? 2 : this.cfg.tv }
@@ -202,13 +218,25 @@ export class World {
     if ((cli < this.cfg.viewsClient) !== ok) { this.stats.admitMismatch++; this.fail('join') }
   }
   onAttach(copy, e, ci, m) { if (!e.place) e.place = m.place }
-  onRefused(client, s, m) { if (m.code === 'too-many-views' && s.held) { this.stats.refusedHeld++; if (this.cfg.failHeld) this.fail('refusedHeld') } }
+  onRefused(client, s, m) {
+    if (m.code === 'too-many-views' && s.held) {
+      this.stats.refusedHeld++
+      // how many copy failures came in the two lingers before this refusal (added after the skeptic's F2 and F24)
+      const n = (this.killTimes ?? []).filter((t) => t > this.t - 2 * this.cfg.linger).length
+      const k = 'refusedHeldAfter' + Math.min(n, 2) + (n >= 2 ? 'plus' : '') + 'Kills'
+      this.stats[k] = (this.stats[k] ?? 0) + 1
+      if (this.cfg.failHeld) this.fail('refusedHeld')
+    }
+  }
   checkAdmit(copy, ci, held, cost, ok) {
     const cfg = this.cfg
     let n = copy.entries.size, cli = 0, costSum = 0
     for (const e of copy.entries.values()) { if (e.holders.has(ci) || (e.lingerAt !== null && e.last === ci)) cli++; costSum += this.costOf(copy.table[e.method], copy) }
-    const room = held ? cfg.viewsMax : cfg.viewsMax - cfg.headroom
+    // the rule written apart from the copy's (a planted 'fixedhead' changes only the copy's)
+    const ks = this.serving().length, head = cfg.headroomRule ? (ks >= 2 ? Math.floor(cfg.viewsMax / ks) : 0) : cfg.headroom
+    const room = held ? cfg.viewsMax : cfg.viewsMax - head
     let want = n < room && cli < cfg.viewsClient
+    if (cfg.headroomRule && !held) { const k = 'fresh' + (ok ? 'Admitted' : 'Refused') + 'At' + Math.min(this.serving().length, 3) + 'Serving'; this.stats[k] = (this.stats[k] ?? 0) + 1 }
     if (cfg.budget) want = want && costSum + cost <= cfg.budget
     this.stats.admits++
     if (want !== ok) { this.stats.admitMismatch++; this.fail('admit') }

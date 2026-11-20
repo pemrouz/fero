@@ -5,7 +5,8 @@
 #   ./run.sh timing    the timed costs, RUNS times each, each process alone under the timing lock
 #   ./run.sh model     B5: E-30's model extended (Python 3), under the heavy lock
 #   ./run.sh           all of the above
-#   ./run.sh <name>    one part: b1 b1m b2 b3 b4 b6 xb pure t-b1 t-b2 t-b3 t-b4 t-b6 t-xb1 t-xb4 model
+#   ./run.sh tpages    a page reader's shared index per write (added after the skeptic's review), timed
+#   ./run.sh <name>    one part: b1 b1m b2 b3 b4 b6 xb model tpages
 # Env: SP (a scratch folder, required: it holds bin/timing, bin/heavy and dl/esbuild, as E-55's run.sh), NODE
 # (default node on PATH: Node 22.22.0), DATA (data's folder, default ../data next to this repo),
 # RUNS (default "1 2 3"), SEEDS (default 1000). Raw JSON lines land in results/.
@@ -88,6 +89,10 @@ timing() { # every timed number: RUNS runs, each process alone under the timing 
     for m in 10000 100000; do $T "$R/timing.jsonl" $run $NODEF bench/costs.mjs past $m; done
   done
 }
+tpages() { # added after the skeptic's review (F1): a page reader's shared index of every row, per write
+  T="one $TIMING"
+  for run in $RUNS; do for n in 10000 100000 1000000; do $T "$R/timing.jsonl" $run $NODEF bench/pageindex-cost.mjs $n; done; done
+}
 model() { # B5 (no bytecode caches left in E-30, E-20 or this folder)
   export PYTHONDONTWRITEBYTECODE=1
   : # B5: E-30's model extended, on E-16's engine (Python 3); every bound, the planted bug, the ablation
@@ -109,8 +114,8 @@ versions() {
 
 case "$1" in
   bundle) bundle ;;
-  b1|b1m|b2|b3|b4|b6|xb|timing|model) bundle; $1 ;;
+  b1|b1m|b2|b3|b4|b6|xb|timing|model|tpages) bundle; $1 ;;
   sims) bundle; versions; b1; b1m; b2; b3; b4; b6; xb ;;
-  "") bundle; versions; b1; b1m; b2; b3; b4; b6; xb; model; timing ;;
-  *) echo "usage: run.sh [sims|timing|model|b1|b1m|b2|b3|b4|b6|xb]"; exit 1 ;;
+  "") bundle; versions; b1; b1m; b2; b3; b4; b6; xb; model; timing; tpages ;;
+  *) echo "usage: run.sh [sims|timing|model|tpages|b1|b1m|b2|b3|b4|b6|xb]"; exit 1 ;;
 esac

@@ -1,0 +1,12 @@
+data: the DATA folder (63fea66)
+mixed-type az/za (1% "x")          PRESENT   20/20 seeds end with deleted rows still shown; worst seed 613 stale keys
+control: numbers-only az           absent    0/20 seeds with stale rows
+mixed-type between (1% "x")        absent    0/20 seeds differ from the query; worst 0
+za ties broken by arrival          PRESENT   same 10 tied rows: [r0,r1,r2] vs [r9,r8,r7]
+limit(3) by arrival                PRESENT   [r0,r1,r2] vs [r9,r8,r7] (by definition)
+sum float history-dependent        PRESENT   after add .1,.2,.3 and remove .1,.2: 0.3000000000000001 vs a fresh sum 0.3
+sum NaN poisons after removal      PRESENT   rows {a:1}; sum reads NaN
+max over mixed types by order      PRESENT   same rows, two orders: "x" vs 42
+distinct() on object rows          PRESENT   2 different rows give 1 bucket(s): ["[object Object]"]
+3-arg reduce shares object init    PRESENT   caller's init after two views: {"n":4,"s":6}
+length(fn) keeps empty buckets     PRESENT   view built before: {"r1":{"value":0}}; built after: {}

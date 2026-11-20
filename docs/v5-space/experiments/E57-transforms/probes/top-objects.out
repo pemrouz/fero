@@ -1,0 +1,2 @@
+top(1) over object rows, lo first: [ 'lo' ]  hi first: [ 'hi' ]
+top(2) over number rows: [ 'y', 'z' ]

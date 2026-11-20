@@ -1,0 +1,18 @@
+{"run":1,"loadavg":"0.07 0.09 0.12 2/118 2466"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1425,"za10":19663},"other":{"none":843,"za10":1002},"b256":{"none":328,"za10":6472}},"viewNsPerWrite":{"sort":18239,"other":159,"b256":6143},"buildMs":10.3,"heapMB":44}
+{"run":1,"loadavg":"0.07 0.09 0.12 1/118 2479"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":1605,"za10":139916},"other":{"none":1045,"za10":2319},"b256":{"none":734,"za10":89486}},"viewNsPerWrite":{"sort":138311,"other":1274,"b256":88752},"buildMs":154.5,"heapMB":294}
+{"run":1,"loadavg":"0.22 0.12 0.13 1/111 2489"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2474,"za10":1307343},"other":{"none":1671,"za10":2514},"b256":{"none":1203,"za10":1923038}},"viewNsPerWrite":{"sort":1304868,"other":843,"b256":1921835},"buildMs":3400,"heapMB":2729}
+{"run":2,"loadavg":"1.18 0.61 0.31 2/113 2607"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1390,"za10":19847},"other":{"none":864,"za10":1123},"b256":{"none":382,"za10":6825}},"viewNsPerWrite":{"sort":18458,"other":260,"b256":6442},"buildMs":10.8,"heapMB":44}
+{"run":2,"loadavg":"1.17 0.62 0.32 1/114 2632"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":1930,"za10":152362},"other":{"none":1080,"za10":2487},"b256":{"none":697,"za10":92706}},"viewNsPerWrite":{"sort":150432,"other":1408,"b256":92009},"buildMs":160.2,"heapMB":294}
+{"run":2,"loadavg":"1.14 0.63 0.32 1/113 2642"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2274,"za10":1387467},"other":{"none":2876,"za10":2564},"b256":{"none":1239,"za10":1914677}},"viewNsPerWrite":{"sort":1385194,"other":-312,"b256":1913438},"buildMs":3589.7,"heapMB":2729}
+{"run":3,"loadavg":"1.49 0.97 0.50 2/115 2682"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":10000,"nsPerWrite":{"sort":{"none":1217,"za10":19602},"other":{"none":935,"za10":1297},"b256":{"none":329,"za10":6563}},"viewNsPerWrite":{"sort":18384,"other":362,"b256":6234},"buildMs":10.7,"heapMB":44}
+{"run":3,"loadavg":"1.49 0.97 0.50 1/114 2706"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":100000,"nsPerWrite":{"sort":{"none":1479,"za10":159790},"other":{"none":1012,"za10":2433},"b256":{"none":823,"za10":93131}},"viewNsPerWrite":{"sort":158311,"other":1421,"b256":92309},"buildMs":160.6,"heapMB":294}
+{"run":3,"loadavg":"1.81 1.06 0.53 1/110 2716"}
+{"probe":"critic-ordcost","node":"v22.22.0","rows":1000000,"nsPerWrite":{"sort":{"none":2488,"za10":1371894},"other":{"none":1786,"za10":3033},"b256":{"none":1160,"za10":1885150}},"viewNsPerWrite":{"sort":1369406,"other":1247,"b256":1883990},"buildMs":3536.7,"heapMB":2730}
