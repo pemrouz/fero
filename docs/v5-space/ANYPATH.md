@@ -1,12 +1,12 @@
 # Reads and writes at any path
 
-Written 2026-11-20, and revised the same day after a skeptic's review. Docs only; nothing here is built. **What was asked, in our words:** in `data` and in earlier fero, a write could land at any level of a resource, and code that watched any part of it got that part's state and changes right, whatever level the write came at. That kept the protocol small and easy to compose. v5's pages talk a lot about rows, because rows decide partitions. Does v5 keep the property everywhere, or do rows bring traps and special cases? Where v5 differs: must it, what does it cost a user, and what should change? The evidence is [E-58](experiments/E58-any-path/README.md), run on `data`'s real engine, and the sources named on each line.
+Written 2026-11-20, and revised the same day after a skeptic's review. The owner took the picks the same day, with pick 2 changed from "the log stops at the row" to the records "on the path" ([V5-15](../DECISIONS.md)); the page now gives pick 2 as decided and keeps its first pick as history (section 7). Docs only; nothing here is built. **What was asked, in our words:** in `data` and in earlier fero, a write could land at any level of a resource, and code that watched any part of it got that part's state and changes right, whatever level the write came at. That kept the protocol small and easy to compose. v5's pages talk a lot about rows, because rows decide partitions. Does v5 keep the property everywhere, or do rows bring traps and special cases? Where v5 differs: must it, what does it cost a user, and what should change? The evidence is [E-58](experiments/E58-any-path/README.md), run on `data`'s real engine, and the sources named on each line.
 
 **Words.** A **resource** is one named, replicated map of rows; its **root** is the whole of it. A **row** is one entry: a key and a JSON-like value. A **field** is a key inside a row's value; a **nested field** is a field inside a field. A **partition** is the rows one **leader** (one server) keeps in one order: at **depth 1** (the default) each row is its own partition; at **depth 2** the first key is the partition, here called a **room**, and the second key the row. A **copy** is a server's full replica; a **client** only uses the resource. A **lens** is an address, such as `shop.data.w.stock`. A **link** is a live connection from a lens into this process (`connect`); its **picture** is the state it gets first. A **record** is one change on the log: a key path and a value. A **commit** is one leader's batch of records. **The log** is every record, in order (`changes()`). To **fold** is to apply records to rows. A **version** is a record's place in its partition's log; a row's version is that of its last write. **`c.diff`** is a link's list of changed rows in one commit, one entry per row, each with `prev`, the row before. **`e.value`** is, on a log entry, the value the record wrote, set only for a whole-row write. **`-N`** is "N commits back", a start for `changes()` and `past()`; **`past(pos)`** is a lens as it was. The **record form** of `derive` runs a function on each source record ([TRANSFORMS.md](TRANSFORMS.md) 3.4). A **`batch`** is several changes to one partition, all or none. A **saga** is a change across partitions made of ordinary writes, one step at a time. A **tombstone** is a kept note that a row was removed. **E-55** and **E-56** are small working prototypes, on `data`'s engine, of the lens and of `connect`.
 
-**Where a write lands, seen from a lens.** On a lens `w.stock`: a write to `w` is **above**, to `w.stock` **at**, to `w.stock.x` **below**, to `w.price` **beside**. **data's rule** is how `data`'s own per-path reader treats a write (data:api/index.ts:164-224): at or below the lens, a record relative to the lens; above it, compare the lens's value before and after, then send an update, a remove, or nothing when they are the same object; beside it, nothing. **Under** means at or below only: the word [API.md](API.md):641 uses today.
+**Where a write lands, seen from a lens.** On a lens `w.stock`: a write to `w` is **above**, to `w.stock` **at**, to `w.stock.x` **below**, to `w.price` **beside**. **data's rule** is how `data`'s own per-path reader treats a write (data:api/index.ts:164-224): at or below the lens, a record relative to the lens; above it, compare the lens's value before and after, then send an update, a remove, or nothing when they are the same object; beside it, nothing. **Under** means at or below only: the word [API.md](API.md):641 used before V5-15.
 
-**Marks.** *(measured, source)*: timed, three runs, each process alone on the box; the range over the runs. *(checked, source)*: a seeded run, a probe, a tsc run in section 8, or a read of the source at the line given. *(reasoned)*: an argument; nothing ran it. *(a guess)*: nobody measured it. *(from memory)*: an outside fact not checked here. `data:` is the sibling `data` repo at commit 63fea66. A pair of numbers from E-58 is depth 1, then depth 2, each 1,000 seeds. **E-58's shares come from a made-up mix of writes**; its zeros, its holes and its planted bugs do not depend on the mix.
+**Marks.** *(measured, source)*: timed, three runs, each process alone on the box; the range over the runs. *(checked, source)*: a seeded run, a probe, a tsc run in section 8, or a read of the source at the line given. *(reasoned)*: an argument; nothing ran it. *(a guess)*: nobody measured it. *(from memory)*: an outside fact not checked here. `data:` is the sibling `data` repo at commit 63fea66. `API.md:NNN` names a line of API.md at commit 17adf71, before it was rewritten for V5-13 to V5-15 (`git show 17adf71:docs/v5-space/API.md`); `CONNECT.md:NNN` and `TRANSFORMS.md:NNN` name lines of those pages as they stand. A pair of numbers from E-58 is depth 1, then depth 2, each 1,000 seeds. **E-58's shares come from a made-up mix of writes**; its zeros, its holes and its planted bugs do not depend on the mix.
 
 ---
 
@@ -28,14 +28,14 @@ Section 4 has the counts.
 
 **The picks.**
 - **P1** One rule for the **state forms** (`get`, a link's value and its callback, a loop turn, `past(pos).value`): data's rule, written into API 3.10. "Changed" means a new object, and a link skips a value the same as the one it last gave.
-- **P2** The **log forms** (`changes()`, a count `-N`, stepping through `past`) **stop at the row**. A lens below a row has none of them, and the type error names the row's lens. `-N` counts commits with a record at or under the lens: a key count, not "the unit a callback sees". This closes API.md question 19.
+- **P2** Every lens has every read verb, a field too. The **log forms** (`changes()`, a count `-N`, stepping through `past`) take the records **on the lens's path**: at, below or above it, never beside it. Below a row the reader takes its part from a record above it, folds a record below it into the value it kept, and gives an entry only when that value changed: data's rule applied to the log. `-N` counts the commits whose records reached the lens: at or under it, or above it and changing its value. At a row or wider nothing in the log is above the lens, so that is the count by key; on a field it is found by reading the row's log back. Replaying a field from an old place starts with a `past` read of its row. This replaces "the unit a callback sees" and closes API.md question 19. *This page first picked "the log forms stop at the row"; the owner chose "on the path" (V5-15 pick 2; section 7).*
 - **P3** Keep the root refused, with a type message that names the way. Add `room.set(rows)` and `room.remove()`: one batch the leader expands. They are the only ways to write a room.
 - **P4** The record form with rows (`derive(…, { rows: true })`) in the first build, for filters on row content, and a dev warning when `fn` reads `e.value` on a field record. P-16 and P-17 stay as written. This flips TRANSFORMS.md question 8.
 - **P5** The version stays per row, said plainly. On a field lens, `if: { equals }`, `absent` and `present` test the field, and `set(fn)` on a field uses them.
 - **P6** One shape rule at the leader: a missing parent is `absent-path`, as today; a string, number or `null` parent, a hole, or a named step on an array is `bad-shape` (new); a key `__proto__` is `bad-key`, at `at()` too.
 - **P7** Small ones: no `ttl` or `while` on a field write; `partition` on every diff entry; cut a depth-2 commit to the link's rows; build `c.recs()` from the log's bytes; append a row's `op.merge` as one field record per merged key.
 
-**Picks that change an approved or decided text** (for the owner): P2 changes the wording of [CONNECT.md](CONNECT.md) pick I8, which says "a room, a row in it, or a field"; P4 flips TRANSFORMS.md question 8; P5 changes API.md 3.7, where `set(fn)` needs "no new rule at the leader": the leader would now compare a field's value. CONNECT and TRANSFORMS are approved in general. P3, P6 and P7 conflict with no decision; P6 keeps DESIGN-V5.md 4.3's `absent-path`.
+**Picks that change an approved or decided text** (written for the owner; V5-15 now records all seven): P2 replaces "the unit a callback on the same lens sees" in [CONNECT.md](CONNECT.md) pick I8 and its section 3.4 (V5-13 pick 4) with the count above, and keeps I8's "a room, a row in it, or a field"; as first picked, it also took "or a field" out of I8. P4 flips TRANSFORMS.md question 8; P5 changes API.md 3.7, where `set(fn)` needs "no new rule at the leader": the leader would now compare a field's value. CONNECT and TRANSFORMS are approved in general. P3, P6 and P7 conflict with no decision; P6 keeps DESIGN-V5.md 4.3's `absent-path`.
 
 ---
 
@@ -88,7 +88,7 @@ Section 4 has the counts.
 | 7 | `c.diff`: one entry per row | `data` gives a reader one change per row per commit (its SCHEDULE clause 8) | **must** (data's) | mildly: T7 |
 | 8 | `e.value` only for a whole-row write (API.md:646) | the log keeps records as written; a row needs a fold | **no** | yes: T6 |
 | 9 | Early answer stages only for a plain whole-row write (API.md 3.5) | a field write can be refused `absent-row`, and more under P6 | **must**, by V5-11 ruling 6: a write that can be refused takes no early stage | mildly: a field writer cannot await `received` |
-| 10 | `-N`, versions and `past` inside one partition (CONNECT.md:39); with P2, the log forms stop at the row | one order per partition | the partition: must. The row: a choice (P2) | no: the types refuse them wider and lower |
+| 10 | `-N`, versions and `past` inside one partition (CONNECT.md:39); with P2, on every lens inside it, a field too, on its path | one order per partition | the partition: must | no: the types refuse them wider. Below a row the reader folds its own part, a run-time rule the types cannot show |
 | 11 | The wire sends whole partitions in the first build (API.md:125) | work below a partition waits | for now | cost, not results: a field link at depth 2 downloads its room |
 | 12 | Snapshots, compaction and tombstones per row | resume by "rows newer than mine plus tombstones" (CONNECT.md 4) | no; sound | no: a field remove is a row update, so a resume sends the row without the field *(reasoned)* |
 | 13 | Size limits per row: a record 1 MB, a row 64 MB (API.md:1708) | a record must fit one replication round of the leader's log | records: must | a room has no limit of its own; P3's room write is one entry |
@@ -106,9 +106,9 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 - *In E-58's mix.* "Under" missed 79,368 (74.0 %) and 33,497 (78.2 %) of the changes below a row. E-55's link ran a field link 2.60 and 2.32 times per change, 104,247 and 34,747 times for a write beside it. data's rule missed 0, and its records rebuilt every value. Taking the records at, above or below a lens ("on the path"; E-58 calls it "near", which is not the `near` hint V5-12 removed) missed 0, and a reader that folds only its lens from them kept the right value after all 240,000 commits *(checked, part 1)*.
 - *`-N`, even at a row.* A count by key does not land where a callback's count does. At `-5`, on lenses at or above a row, the key count and data's callback land on different commits in 27.6 % and 29.8 % of (seed, lens) pairs; data's callback itself differs from "the value changed" in 26.3 % and 20.1 % (a new equal object fires). Below a row the key count differs in 78.4 % and 64.3 % "on the path", 95.5 % and 72.6 % "under" *(checked, E-58 summary)*. So CONNECT.md:215's "the unit a callback sees" is already off at a row.
 - *Options for the log forms.* (a) "Under", as written: wrong below a row. (b) "On the path": exact, but a record above a field carries a whole row. The reader must read its part from `e.rec.value` at the path below the record's key, and apply a record below the lens to the value it kept: it always folds. One more rule word, and a run-time rule the types cannot show. (c) **Stop at the row**: `changes()`, a count `-N` and stepping through `past` exist on the root, a room and a row, not below. Nothing in the log is ever above a row (a room write expands into row records, P3), so "under" is exact everywhere it is allowed *(reasoned; E-58: "under" missed 0 at the root, a room and a row)*. A field's changes come from `connect`; code that wants a field's log reads its row's log and folds its field, as in (b).
-- *Pick (P1, P2): data's rule for the state forms; (c) for the log forms.* `-N` is "the N-th last commit with a record at or under this lens", and the page says it is not the callback's unit. API.md question 19 closes: a lens below a row has no log. `past(pos).value` stays on every lens; it is a state form.
+- *Pick (P1, P2): data's rule for the state forms; (b) for the log forms, as the owner decided (V5-15 pick 2).* fero's log reader does (b)'s fold, not the app: below a row it takes its part from a record above it, folds a record below it into the value it kept, and gives an entry only when that value changed. The entry carries that value (section 8's `FieldEntry`): this page's reading, which API.md takes as its question 25, not part of V5-15. `-N` counts the commits whose records reached the lens: at or under it, or above it and changing its value. At a row or wider nothing is above, so that is the count by key; on a field it is found by reading the row's log back. Replaying a field from an old place starts with a `past` read of its row. "The unit a callback sees" goes. API.md question 19 closes: every lens has the log, a field too. `past(pos).value` stays on every lens; it is a state form. *This page first picked (c): at a row or wider "under" is exact, no new rule word is needed, and the types show the special case. The owner asked whether a field could keep a log of its own, as every other lens does, and chose (b).*
 - *Cost.* data's rule costs −2.6 to +8.0 ns a link a commit at 10 links and +6.7 to +11.2 ns at 100, over E-55's rule; it calls the user's function 0.59 times a commit instead of 10, and 5 instead of 100 *(measured, E-58 T2: number fields; object fields run more, T11)*.
-- *Against (c).* A field lens loses a verb the other lenses have: one stated special case, though the types show it. Like (b), it changes CONNECT.md pick I8's wording ("or a field" goes). `-5` on a row can replay commits that left the row the same.
+- *Against (b), the pick.* A record above a field carries a whole row, so the reader must fold it to find its part. Below a row, 72,971 of 180,271 and 24,988 of 67,826 of the records it took (37 % to 40 %) left its value equal and gave nothing *(checked, E-58 part 1)*. "An entry only when the value changed" is a run-time rule the types cannot show. `-N` on a field reads the row's log back, a cost not priced (section 6). `-5` on a row can replay commits that left the row the same. *Against (c), the first pick:* a field lens loses verbs every other lens has, a special case for users, though the types show it.
 
 **T4. Writes at the root or at a room.**
 - *What holds in any mix.* A write across partitions lands one partition at a time, so a reader that watches two rows can see one changed and the other not *(reasoned)*. E-58 part 3 shows it: a two-row callback saw a half-done state in all 20,000 root replaces and all 20,000 moves between rooms. That 100 % follows from how the run is built (the two rows always change in separate commits). The measured part: a loop that wakes every 1 to 4 commits (a made-up interval) saw a half-done state in 63.1 % of replaces and 39.1 % of moves, and a whole-resource callback saw 5.31 a replace. A room replaced as one batch: 0 *(checked, E-58 part 3)*.
@@ -160,7 +160,7 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 
 **T9. `ttl` on a field.** API.md:270 says a ttl and a lease belong to a row, but the field write's options (API.md:1205-1213) and a field `batch` item (API.md:1133-1135) carry `ttl` and `while`. *Pick (P7):* take them off the field forms (section 8) and refuse them at the leader. *Against:* none found; an expiring field is a row's job.
 
-**T10. `c.recs()` is not the log.** Two field writes to one row in one commit become one whole-row record in `c.recs()`, since `data` merges per row; `changes()` gives the two field records *(checked, data:kernel/node.ts:621-660; E-58 road 2)*. Both kept every client state exact, once the shapes were valid *(checked)*. *Pick (P7):* build `c.recs()` from the log's bytes, which [LAYERS.md](LAYERS.md):652 wants for speed anyway. *Against:* `recs()` then holds field records; a forwarder that wants one record per row must merge.
+**T10. `c.recs()` is not the log.** Two field writes to one row in one commit become one whole-row record in `c.recs()`, since `data` merges per row; `changes()` gives the two field records *(checked, data:kernel/node.ts:621-660; E-58 road 2)*. Both kept every client state exact, once the shapes were valid *(checked)*. *Pick (P7):* build `c.recs()` from the log's bytes, which [LAYERS.md](LAYERS.md) 4.4 ("Encode once") wants for speed anyway. *Against:* `recs()` then holds field records; a forwarder that wants one record per row must merge.
 
 **T11. An object value's link runs again on every copy but the leader.**
 - *Evidence.* data's rule compares the lens's value before and after by reference (data:api/index.ts:216). A record that crossed the wire is a new object. So on a client, and on a copy that is not the leader, a link on an object or list value runs again for any whole-row record that left it the same. On a client fed through `data`'s lane, 100 `op.merge({ b })` sent as whole rows ran a link on the unchanged `r0.a` 100 times; sent as one field record per merged key, 0 times *(checked, E-58 probe F)*. In E-58's mix, below a row, the client's reader ran for a new equal object 3,454 and 1,220 times, against 2,916 and 1,115 on the server; with `op.merge` sent as field records, 2,550 and 1,068 on both *(checked, E-58 merge runs)*. T2 wrote number fields only, so its 0.59 calls a commit is for numbers.
@@ -177,13 +177,13 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 **API.md.**
 - 3.4: "a write needs a row" becomes "a write needs a partition or less". The root is refused with a message that names the way; a room takes `set(rows)` and `remove()` as one batch, and no other spelling (P3). The shape rule (P6). `ttl` and `while` on rows only (P7).
 - 3.7: `if: { version }` is the row's; on a field lens `equals`, `absent` and `present` test the field; `set(fn)` on a field uses them (P5). A row's `op.merge` appends field records (P7).
-- 3.10 (CONNECT.md's read surface): one paragraph. The state forms use data's rule, "changed" means a new object, and a link skips a value equal to the last (P1). The log forms stop at the row, and `-N` is a key count (P2). Question 19 closes.
+- 3.10 (CONNECT.md's read surface): one paragraph. The state forms use data's rule, "changed" means a new object, and a link skips a value equal to the last (P1). Every lens has the log forms, a field too: they take the records on the lens's path, and below a row the reader gives an entry only when the lens's value changed; the entry carries that value (API.md's pick, its question 25, not part of V5-15). `-N` counts the commits whose records reached the lens: by key at a row or wider, by reading the row's log back on a field (P2). Question 19 closes.
 - 3.11: the record form with rows, and the warning (P4). P-16 and P-17 keep `e.value` and gain the warning.
-- Section 6 (the declarations): the lines in this page's section 8. Section 8 (the codes): `bad-shape` new; `bad-key` adds `__proto__`; `bad-path` adds a room written another way, a log read below a row, and a lens into an array by name; a remove that finds nothing answers as done.
+- Section 6 (the declarations): the lines in this page's section 8. Section 8 (the codes): `bad-shape` new; `bad-key` adds `__proto__`; `bad-path` adds a room written another way and a lens into an array by name; a remove that finds nothing answers as done.
 
-**LAYERS.md.** L2: the shape rule; the room batch expanded at the leader, with a size rule; `op.merge` as field records. L3: counting `-N` by key, at a row or wider. L4: data's rule on every link, and skipping a value equal to the last one. L5: `derive` with rows folds its share.
+**LAYERS.md.** L2: the shape rule; the room batch expanded at the leader, with a size rule; `op.merge` as field records. L3: the log reader on the path below a row; counting `-N` by key at a row or wider, and on a field by reading the row's log back. L4: data's rule on every link, and skipping a value equal to the last one. L5: `derive` with rows folds its share.
 
-**CONNECT.md and TRANSFORMS.md.** CONNECT.md:60 and 215: `-5` counts the commits with a record at or under a room or a row; "the unit a callback sees" goes. TRANSFORMS.md question 8 flips to "rows in the first build".
+**CONNECT.md and TRANSFORMS.md.** CONNECT.md:60 and 215: `-5` counts the commits whose records reached the lens, at or under it, or above it and changing its value; "the unit a callback sees" goes, and I8's "a room, a row in it, or a field" stays. TRANSFORMS.md question 8 flips to "rows in the first build".
 
 **data** (read only here; reports for its owner). (1) A row add should not send `undefined` to a path the row lacks (data:api/index.ts:198-201). (2) A path read below a string should give `undefined`, not a character (data:kernel/node.ts:220-227). (3) Clause 10c cleans a parent that is not an object, but not the row itself: a string row spreads into junk (data:kernel/node.ts:277). (4) A reader on an array's `length` gets nothing when an element is added at the end, nor a reader on an element when `length` is written (data:api/index.ts:219). (5) A write at the key `__proto__` sets the copy's prototype instead of a field (data:kernel/node.ts:292). fero needs none of the five if its leader refuses those shapes first *(reasoned)*.
 
@@ -195,7 +195,7 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 |---|---|---|
 | E-58's leader is a stand-in in one process: no Raft, no loss, no reordering | the rules are checked; a build's own link and log reader are not | run E-58's oracle against the first build's link and log reader |
 | the shares come from a made-up mix | the zeros, the holes and the planted bugs hold in any mix; the shares (writes above or beside a lens, missing parents, sibling writes) do not | count write levels in E-22's patterns (the 22 app patterns' runs), or in a real app's log |
-| the cost of counting `-N` by key on a real log | a cold partition beside a hot one can mean many keys read (CONNECT.md:217) | a bench on E-19's slot layout (the bench of slot-shaped positions) |
+| the cost of counting `-N` on a real log: by key at a row or wider, and on a field by reading the row's log back (P2) | a cold partition beside a hot one can mean many keys read (CONNECT.md:217); a field's count folds the row's records until it finds N changes of the field, up to all of `history` *(reasoned)* | a bench on E-19's slot layout (the bench of slot-shaped positions), with a field lens beside a busy sibling field |
 | the size rule for a room write, and the cost of skipping rows that did not change | one entry for a large room; a deep compare per row | E-35's big-record run (big records on the shared journal) with a 10,000-row room |
 | the cost of `equals` at the leader, and its size on the wire | a deep compare per guarded field write, and the old value in each request | a bench beside E-56's version store; a hash as the guard |
 | a deep compare in a link for object values (T11, c) | it would stop links that run again for nothing on clients | T2 again, with object fields |
@@ -206,8 +206,10 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 
 ## 7. Questions for the owner
 
+The owner took the seven picks on 2026-11-20, with question 2 answered the other way; [V5-15](../DECISIONS.md) records them. The questions stand as they were put, but for question 2, which now says what was decided.
+
 1. **Write data's rule into API 3.10 as the one rule for the state forms?** **Pick: yes.** It missed nothing at any level in E-58. *Against:* "changed" means a new object, so on every copy but the leader a link on an object value runs again after a whole-row write (T11); +7 to +11 ns a link a commit at 100 links.
-2. **Stop the log forms (`changes()`, `-N`, stepping through `past`) at the row, and drop "the unit a callback sees"?** **Pick: yes.** "Under" misses every change a whole-row write makes to a field; at a row or wider it is exact, and no new word is needed. *Against:* a field lens loses `changes()`; the other way, records "on the path", keeps it, but each entry above the field carries a row, and the reader must fold. Both change CONNECT.md pick I8's wording.
+2. **The log forms (`changes()`, `-N`, stepping through `past`): stop them at the row, or take the records on the lens's path? And drop "the unit a callback sees"?** This page first picked "stop at the row": "under" is exact at a row or wider, and no new word is needed. The owner asked whether a field could keep a log of its own, as every other lens does, and chose **"on the path"**, recorded as V5-15 pick 2. So every lens has every read verb, a field too. Below a row the reader takes its part from a record above it, folds a record below it into the value it kept, and gives an entry only when that value changed; E-58 checked that reading: 0 missed, and the right value after all 240,000 commits. `-N` counts the commits whose records reached the lens; on a field it is found by reading the row's log back, and replaying a field from an old place starts with a `past` read of its row. "The unit a callback sees" goes. *Against:* each record above a field carries a whole row and the reader must fold it; below a row, 37 % to 40 % of the records it took in E-58's mix gave nothing; a field's `-N` is not priced. Stopping at the row would have cost a field the verbs every other lens has.
 3. **Add `room.set(rows)` and `room.remove()` as the only room writes, and keep the root refused?** **Pick: yes.** The leader knows the keys, and one batch showed 0 half-done states. *Against:* a new write level, big entries that need a size rule, a tombstone per row, and rows sent again whole wake links on every copy but the leader.
 4. **Bring the record form with rows into the first build, with a dev warning, and leave P-16 and P-17 as written?** **Pick: yes.** It flips TRANSFORMS.md question 8: without it a filter on content left the final set wrong in 58 % of E-58's seeds. *Against:* more first-build work; the deriver holds about 330 B a row of its share and folds 0.63 to 1.5 µs a record.
 5. **Keep one version per row, and make `equals`, `absent` and `present` the field guards, also inside `set(fn)`?** **Pick: yes.** The row version refused 8 % to 45 % of guarded field writes only because a sibling changed, in E-58's mix. *Against:* `equals` passes after a change and back, it carries the old value, and it changes API.md 3.7's "no new rule at the leader".
@@ -227,7 +229,7 @@ Rules 2, 4 and 10 are the partition, and they break nothing inside a partition. 
 //   room.set(rows), room.remove()   NEW: a room (a partition at depth 2) replaced or emptied as one batch
 //   f.data.set, f.data.remove       still refused, now with a message that names the way
 //   a field write                   no ttl and no while: they belong to a row. if: { equals } and absent compare the field
-//   changes() and a count back      stop at the row: a lens below a row has neither (P2)
+//   changes() and a count back      on every lens inside a partition, a field too: the records on its path (P2)
 //   a diff entry                    NEW: its partition, at every depth, as a log entry has
 //   derive(…, { rows: true })       in the first build: fn also gets the row after the record, and before it
 declare module 'fero' {
@@ -255,14 +257,13 @@ declare module 'fero' {
   /** A marked write (API.md 3.11): the write and "source record e is applied" land in one log entry; it counts once. */
   export interface MarkOpts { from: Entry<any>; if?: Cond; once?: undefined }
   type NoRoot = 'the root spans partitions, which share no order: write each row or room, or empty it all with fero.drop(name)'
-  type RowLog = 'the log stops at the row: read the row lens changes() and pick the field, or follow the value with connect'
 
   // ── the lens: a property read is a step, a call is a verb ──
   type Child<K extends Kind, D extends Depth> = K extends 'root' ? (D extends 2 ? 'part' : 'row') : K extends 'part' ? 'row' : 'field'
   type Tree<Row, D extends Depth> = D extends 2 ? Record<Key, Rows<Row>> : Rows<Row>
   type Val<T, Row, K extends Kind, D extends Depth> = K extends 'row' | 'field' ? T | undefined : K extends 'part' ? Rows<Row> : Tree<Row, D>
   export type Lens<T, Row, K extends Kind, D extends Depth> = Reads<Val<T, Row, K, D>, Row, D>
-    & (K extends 'root' ? RootLog : K extends 'field' ? FieldLog : PartLog)
+    & (K extends 'root' ? RootLog : K extends 'field' ? PathLog<FieldEntry<Row, T | undefined>> : PathLog<Entry<Row>>)
     & (K extends 'root' ? RootWrites : K extends 'part' ? PartWrites<Row> : K extends 'row' ? RowWrites<T> : FieldWrites<T>)
     & Steps<T, Row, K, D>
   type Steps<T, Row, K extends Kind, D extends Depth> = K extends 'root' | 'part'
@@ -310,12 +311,14 @@ declare module 'fero' {
     /** The log of every partition: a place only. */
     changes(opts?: { from?: Cursor | Date }): AsyncIterable<Entry<any>>
   }
-  export interface PartLog {
-    /** The log, on a room or a row: every record at or under this lens (none is ever above it). -5 counts back the
-     *  commits that hold one: a key count, not the commits a callback on this lens runs for. */
-    changes<const F extends Cursor | Date | Version | number = Cursor>(opts?: { from?: F } & BackOpt<F>): AsyncIterable<Entry<any>>
+  /** The log on a lens inside one partition, a field too: the records on its path, at, below or above it, never
+   *  beside it. On a room or a row nothing is ever above, so it is every record at or under the lens. Below a row
+   *  the reader takes its part from a record above, folds a record below into the value it kept, and gives an entry
+   *  only when that value changed. -5 counts back the commits whose records reached the lens: by key on a room or
+   *  a row; on a field, found by reading the row's log back. */
+  export interface PathLog<E> {
+    changes<const F extends Cursor | Date | Version | number = Cursor>(opts?: { from?: F } & BackOpt<F>): AsyncIterable<E>
   }
-  export interface FieldLog { readonly changes: Steer<RowLog> }
   export interface Commit<Row> { readonly diff: readonly Change<Row>[] }
   export interface Change<Row> {
     readonly type: 'add' | 'update' | 'remove'; readonly key: Key
@@ -330,6 +333,10 @@ declare module 'fero' {
     readonly partition: Key
     readonly version: Version
   }
+  /** An entry on a lens below a row: a record on its path that changed the lens's value. The reader keeps that
+   *  value, so the entry carries it: `value` is the lens's value right after the record (undefined: gone). `rec`
+   *  is the record as written, which may be a whole row above the lens. */
+  export interface FieldEntry<Row, V> extends Omit<Entry<Row>, 'value'> { readonly value: V }
 
   // ── the resource ──
   export interface Resource<Row, D extends Depth = 1> {
@@ -369,6 +376,7 @@ await shop.data.w.stock.set((n) => (n ?? 0) - 1, { once: 'sale-7' })            
 await shop.batch([{ key: ['w'], value: op.merge({ price: 10 }), ttl: '1h' }, { key: ['w', 'stock'], value: 2 }])
 shop.data.w.stock.connect((stock) => console.log(stock))                              // runs when stock changed, never for w.price
 for await (const e of shop.data.w.changes({ from: -5 })) console.log(e.rec.key)       // the row's log: its field records too
+for await (const e of shop.data.w.stock.changes({ from: -5 })) { const n: number | undefined = e.value; console.log(n) }  // a field's log, on its path
 chat.data.connect((rooms, c) => { for (const d of c.diff) console.log(d.partition, d.key, rooms[d.partition]) })  // NEW: d.partition
 await derive(orders, totals, (e, { row, prev }) => {                                   // the record form with rows
   if (row?.paid && !prev?.paid) totals.data[row.user].set(op.incr(row.cents), { from: e })  // counts once: a field write too
@@ -376,7 +384,7 @@ await derive(orders, totals, (e, { row, prev }) => {                            
 ```
 
 ```ts
-// file: wrong.ts — the wrong uses this page refuses. Each line under a @ts-expect-error must fail there, for the reason given
+// file: wrong.ts — the wrong uses this page refuses. Each line under a @ts-expect-error must fail there, for the reason given; item 11 must compile
 import { fero, derive } from 'fero'
 type Item = { stock: number; price: number }
 type Msg = { text: string; at: number }
@@ -402,8 +410,8 @@ chat.data.room1.set({}, { ttl: '1m' })
 chat.data.room1.set({ m1: undefined })
 // @ts-expect-error 10: the row before and after come only with { rows: true }
 derive(shop, shop, (e, { row }) => console.log(e.version, row))
-// @ts-expect-error 11: the log stops at the row: a field has no changes(); the type's text names the row's lens
-shop.data.w.stock.changes()
+// 11 must compile (V5-15 pick 2; this page first refused it): a field has the log too, on its path, and a count back
+shop.data.w.stock.changes({ from: -5 })
 // @ts-expect-error 12: a count back names commits of one partition, so not on the root
 shop.data.changes({ from: -5 })
 // @ts-expect-error 13: a count back is negative
@@ -461,7 +469,7 @@ Run from the repo root, with tsc on `PATH`:
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/ANYPATH.md)" docs/v5-space/ANYPATH.md
 ```
 
-**Result, run here on 2026-11-20** (Node v22.22.0, TypeScript 6.0.2): `ok: 3 blocks type-check (tsc Version 6.0.2)`, then `stripped: 14 marked lines, 14 fail at their own line, 0 errors elsewhere`. Each stripped line fails for the reason its comment gives:
+**Result, run here on 2026-11-20** (Node v22.22.0, TypeScript 6.0.2): `ok: 3 blocks type-check (tsc Version 6.0.2)`, then `stripped: 13 marked lines, 13 fail at their own line, 0 errors elsewhere`. Each stripped line fails for the reason its comment gives. Item 11 was a fourteenth marked line until pick 2 changed (V5-15); it now must compile, and "0 errors elsewhere" checks that it does:
 
 | wrong.ts line (item) | The wrong use | tsc |
 |---|---|---|
@@ -471,9 +479,9 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 | 18 (6) | `touch` on a field | TS2339: no `touch` |
 | 20, 22, 24 (7, 8, 9) | a room set to one row; a room write with `ttl`; a room row given as `undefined` | TS2322: a string is not a `Msg`; TS2353: no `ttl` there; TS2322: `undefined` is not a `Msg` |
 | 26 (10) | the row and its `prev` without `{ rows: true }` | TS2345: "target signature provides too few arguments"; TS7006 and TS7031 on the same line, as its parameters lose their types |
-| 28 (11) | `changes()` on a field | TS2349: not callable; the type's text says the log stops at the row and names the row's lens |
+| 28 (11) | none now: `changes({ from: -5 })` on a field | compiles. As first picked it failed with TS2349, not callable, its type's text naming the row's lens; ok.ts reads the field's entries, whose `value` is the field's type |
 | 30, 32 (12, 13) | `-5` on the root; a positive count on a row | TS2322: the root takes a cursor or a time; TS2322: the type's text says a count back is negative |
 | 34 (14) | `set(fn)` given its own `if` | TS2769: no overload matches, since `set(fn)` brings its own guard; TS7006 on the same line |
 
-- **What the types cannot say** *(reasoned)*. That a link runs only when its value changed: a run-time rule, in the comments only. That a room write fits the size rule. That a field write's parent is an object, that an array step is an index, and that no key is `__proto__`: the leader checks them (P6), since a row's shape at run time is not its type.
+- **What the types cannot say** *(reasoned)*. That a link runs only when its value changed, and that a log reader below a row gives an entry only when its value changed: run-time rules, in the comments only. That a room write fits the size rule. That a field write's parent is an object, that an array step is an index, and that no key is `__proto__`: the leader checks them (P6), since a row's shape at run time is not its type.
 - **Not checked here: that any of it runs.** What ran is E-58, on `data`'s engine and E-55's prototype store.
