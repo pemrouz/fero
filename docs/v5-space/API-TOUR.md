@@ -1,36 +1,40 @@
 # fero v5's API: a tour for review
 
-Written 2026-11-16 for the owner, and **rewritten 2026-11-18 for the connect lens** ([V5-12](../DECISIONS.md)). It walks through [API.md](API.md), which was rewritten the same day around the lens. Read this first. API.md is the full reference, and [LENS.md](LENS.md) holds the evidence.
+Written 2026-11-16 for the owner, rewritten 2026-11-18 for the connect lens (V5-12), and **rewritten again 2026-11-20 for V5-13 to V5-15** ([DECISIONS.md](../DECISIONS.md)). It walks through [API.md](API.md), which was rewritten the same day for those three decisions. Read this first. API.md is the full reference; [CONNECT.md](CONNECT.md), [TRANSFORMS.md](TRANSFORMS.md) and [ANYPATH.md](ANYPATH.md) hold the evidence.
 
-**What you asked for.** First, an API that is easier to guess, without hurting speed: no hidden copies, trips, decodes or whole-resource work. Then, after reading the first tour, the lens you had explored before data's rewrite: `resource.a.b.c` builds an address; `connect()` pipes the state and then its changes to a target; calls are a space apart from keys; operators before and after the call split server work from local work; and `r.a.b.c.method()` runs at that path's leader (LENS 1.5).
+**What you asked, since the last tour.**
+- **Reads.** You found the mix of `here`, `tap`, `connect` and `changes` unclear, and asked why a root method was `f.methods.x` while a method on a path was `f.data.k.x`. You then proposed one `connect` with options: the state and the diff on each call, `disconnect()` with a lifetime option beside it, a start at a commit id or a few commits back, a read once by awaiting, and `for await`. You also asked what a commit id looks like, and whether Merkle trees help (V5-13).
+- **Transformations.** They made earlier versions hard, so you asked for a plan worked out and checked in full, and whether data needs a new version for it (V5-14).
+- **Paths.** You asked whether v5 keeps what data and earlier fero had: a write at any level of a resource, and every reader of any part seeing that part right. When the first answer stopped the log at the row, you asked whether a field could keep a log of its own, as every other lens does (V5-15).
 
-**How this pass was made.** LENS.md took three proposals, written from one facts brief, and picked one shape. [E-55](experiments/E55-lens-prototype/README.md) built that shape small on data's real engine: about 1,000 lines, data at commit 63fea66. A skeptic then read LENS, E-54 and E-55 and made 24 findings, all applied. You approved all fourteen of LENS section 7's picks (V5-12). API.md was rewritten around them, and this tour follows API.md.
+**How this pass was made.**
+- READS.md proposed five read verbs, one job each. CONNECT.md then weighed three designs against your one `connect`, with two judges and a review of 21 findings. It rests on [E-56](experiments/E56-one-connect/README.md), which built `connect` on E-55's prototype and measured commit ids, hash chains and Merkle trees.
+- TRANSFORMS.md started from a history of 70 sources of complexity in fero v2 to v4 and in data. It built every piece small on data's real engine ([E-57](experiments/E57-transforms/README.md): each claim against a seeded oracle with planted bugs) and took a review of 30 findings.
+- ANYPATH.md checked writes and readers at every level with [E-58](experiments/E58-any-path/README.md), a seeded oracle on data's real engine, and took a review of 19 findings.
+- You approved V5-13 and V5-14 in general, and V5-15 with its pick 2 changed to "on the path". API.md was rewritten for all three, and this tour follows API.md.
 
 **What is sure.**
-- Every code block in API.md compiles with TypeScript 6.0.2 against data's shipped types: 38 blocks. Its 81 lines that must not compile do not, each for the reason its comment gives (API 12, run 2026-11-18).
-- Every `ts` block in this tour compiles against API.md's own declarations, and its 7 lines that must not compile do not, each for the reason its comment gives (section 7, run 2026-11-18).
-- The lens was built small. Of E-55's 27 claims, 10 pass, 10 pass in part, sit at the edge of their bar or are stand-ins, 1 misses, 3 are records with no bar, and 3 were not run (LENS 6).
-- Nothing of fero v5 is built. The 22 patterns, in the lens's spelling, compile and did not run (E-55 claim 25).
-- Two skeptics read API.md's rewrite, LAYERS.md's and this tour (20 and 21 findings, many the same). Each one that held is applied. The design calls they forced are questions 20 to 24 (section 5.2).
-- One correction to the decisions record: V5-12's context line named E-55's one miss as the `Proxy` step (claim 1). LENS 6 and E-55 count claim 11 as the miss (2.3 below), and claim 1 as a pass in part. The pages follow LENS and E-55, and so does the note "V5-12 amended" appended to [DECISIONS.md](../DECISIONS.md).
+- Every code block in API.md compiles with TypeScript 6.0.2 against data's shipped types: 42 blocks. Each of its 139 lines that must not compile fails at its own line (API 12, run 2026-11-20).
+- Every `ts` block in this tour compiles against API.md's own declarations, and each of its 21 lines that must not compile fails at its own line (section 8, run 2026-11-20).
+- Built small, on data at commit 63fea66: the lens ([E-55](experiments/E55-lens-prototype/README.md)); `connect` with its ends and the `ended` guard (E-56); served views, pages, `derive`'s view form, `lookup` and the store fed by slot (E-57: 0 wrong answers on the final code); writes and readers at every level (E-58: 0 wrong states). None of them built fero's log reader (E-58 checked an "on the path" reader on its stand-in), the positions or `past` as a value.
+- Nothing of fero v5 is built. The 22 patterns compile in the new spelling; none ran.
+- **API.md's third rewrite and this tour had two reviews the same day**, one against the decisions and one of the mechanics, and each finding that held is applied. CONNECT.md, TRANSFORMS.md and ANYPATH.md each had a skeptic before, and each finding that held is applied there.
 
-**How numbers are marked**, as in API.md. **E-55 claim n** is one of LENS section 6's claims, measured on E-55's prototype: the lens's and data's share in one process, never a whole fero write. **E-nn** is another experiment. **LENS n**, **PATHS n** (and **PA-n**), **MEMORY 9.n** and **V5-n** are those pages and decisions. **Reasoned**: an argument; nothing ran it. **A guess**: a number nobody measured.
+**How numbers are marked**, as in API.md. **E-nn** is an experiment; **E-55 claim n**, **E-56 probe n**, **E-57 A1, XA-n, B1, XB-n** and **E-58 part n** are parts of one. Their costs are the lens's and data's share in one process, never a whole fero write. **CONNECT n**, **TRANSFORMS n**, **ANYPATH n**, **READS n**, **LENS n**, **PATHS n** and **V5-n** are sections of those pages and the decisions. **(measured)**: timed, the range over three runs. **(checked)**: a seeded run, a model or tsc ran it. **(reasoned)**: an argument; nothing ran it. **(a guess)**: a number nobody measured. **(from memory)**: an outside fact not checked here. A number with no mark is cited from a page that marks it.
 
-**Words.**
-- A **trip** is one message there and its answer back.
-- A **commit** is the moment a write is on disk on most of the copies. Only then can anyone see it (V5-5). A **stage** is how far your own write has got when you hear back: `received`, `replicated`, then committed.
-- A **partition** is the rows that one **leader** (one server) keeps in one order and can change together.
-- To **fold** is to apply the log's records to the rows in memory. data does it, on every copy and on clients.
-- A **lens** is an address inside a resource, such as `shop.data.widgets.stock`. It holds no data and does no work.
-- A **step** is one property read on a lens (`.widgets`). A **verb** is a call on a lens (`.get()`, `.set(4)`).
-- A **link** is one live connection from a lens to this process: a `here()`, a `tap`, or a `connect` to a target.
-- Rows are **held on purpose** when this process serves the resource, said `hold: 'all'`, or has a live `here()` or `tap` on them.
-- A **picture** is the rows a link selects, at the moment it starts.
-- **SUB** is v5's one subscribe message, and **GET** its one read message. A **selection** is what one SUB brings into this process: a partition, the whole resource, or a view a server serves. Equal lenses share one.
-- **The net** is JavaScript's garbage collector, as the last way a link ends.
-- A **rule** is one thing a builder of fero must get right (V5-6). The base design has 416. A **user rule** is one thing a user of fero must know.
+**Words.** Each is said again where it first matters.
+- A **resource** is a named, shared map of rows. A **partition** is the rows one **leader** (one server) keeps in one order. The first key of a path is always the partition. At `depth: 2` a partition is a **room** of rows.
+- A **commit** is the moment a write is on disk on most of the **copies**, the servers that hold the resource. Only then can anyone see it (V5-5).
+- A **lens** is an address inside a resource, such as `shop.data.widgets.stock`. It holds no data and does no work. A **verb** is a call on a lens.
+- A **link** is one live connection from a lens into this process. Its **picture** is the rows it selects, at the moment it starts. Rows are **held on purpose** when this process serves the resource, said `hold: 'all'`, or has a live link on them. Only those serve a read here.
+- **Live state** is the newest rows, folded: a slow reader skips to the newest. **The log** is every record, in order: it waits for a slow reader.
+- A **version** is a record's place in its partition's log, as short text such as `38S9`. A **cursor** is a reader's place, across partitions: text you save and give back.
+- Seen from a lens on `w.stock`, a write to `w` is **above** it, to `w.stock` **at** it, to `w.stock.x` **below** it, and to `w.price` **beside** it. A record **on the path** is at, below or above.
+- A **served view** is a live answer over every row that the server names in `methods:` and keeps on one copy for every client that asks.
+- A **trip** is one message there and its answer back. **SUB** is v5's one subscribe message, **GET** its one read message.
+- A **rule** is one thing a builder of fero must get right (V5-6); the base design has 416. A **user rule** is one thing a user must know.
 
-## 1. The shape, in about ten lines that do something real
+## 1. The shape, in about twenty lines that do something real
 
 ```ts
 // file: server.ts — a seed and methods make a server
@@ -38,8 +42,10 @@ import { fero, op } from 'fero'
 const shop = await fero('shop', {
   data: { widgets: { stock: 10, price: 5 } },                                                  // the first rows
   methods: {
-    sell: { at: 'row', run: (n: number, ctx) => ctx.at.stock.set(op.incr(-n, { min: 0 })) },   // called on a row
-    low: (max: number, ctx) => ctx.data.lt('stock', max),                                      // the root only: a view
+    sell: { at: 'row', run: (n: number, ctx) => ctx.at.stock.set(op.incr(-n, { min: 0 })) },   // an action, called on a row
+    low: { view: (max: number, ctx) => ctx.data.lt('stock', max).az('stock', 10) },            // a served view: bounded
+    byPrice: { pages: (_: null, ctx) => ctx.data.az('price'), size: 50 },                      // one sorted list, in pages
+    ping: () => 'pong',                                                                        // a bare function: at the root
   },
   history: '1h',                                                                               // an hour of the log
 })
@@ -50,575 +56,546 @@ export type Shop = typeof shop                                     // export the
 // file: client.ts — only the name: a client
 import { fero } from 'fero'
 import type { Shop } from './server.ts'                            // a type only: the server's code never loads
-const client = await fero<Shop>('shop')                            // a client. It holds nothing yet
-console.log(await client.data.widgets.stock.get())                 // 10. Read once: one trip, nothing kept
-const live = client.data.widgets.here()                            // hold widgets here, live: one SUB
-live.tap((c) => console.log('stock', c.now.value?.stock))          // the picture (10), then once per commit (9)
-const sold = await client.data.widgets.sell(1)                     // a method on a path: at widgets' leader
-console.log(sold.value)                                            // 9. Back when it is on disk
+const shop = await fero<Shop>('shop')                              // a client. It holds nothing yet
+const n = await shop.data.widgets.stock.get()                      // ONCE: one GET; nothing kept
+const row = shop.data.widgets.connect()                            // LIVE: one SUB, shared by equal lenses; a handle
+const shown = shop.data.widgets.stock.connect((s, c) => draw(s, c.version))   // LIVE, AND CALL ME: the picture, then each commit
+for await (const e of shop.data.widgets.changes({ from: -5, to: 'latest' })) console.log(e.version)   // THE LOG, from 5 commits back
+const was = await shop.data.widgets.past(-1)                       // AS IT WAS: a value; nothing to end
+const sold = await shop.data.widgets.sell(1)                       // a method on a path: runs at widgets' leader
+const low = shop.data.low(5).connect()                             // a view the server named: an address, then a link
+await row.ready
+console.log(n, row.value?.stock, was.value?.stock, sold, await shop.data.ping())   // a root method sits on f.data
+row.disconnect(); shown.disconnect(); low.disconnect()             // every link ends by your code
 ```
 
-**Three places, one job each.**
-- `data` is the address of everything. A step builds an address. A verb on it reads (`get`), keeps it live (`here`, `tap`, `connect`), writes (`set`) or calls a method (`sell`).
-- `rows` is the fast sync read of a whole resource this process holds: a server's, or one opened with `hold: 'all'`. A partition held by `here()` is read through its handle: `live.value`, `live.rows`.
-- `methods` holds the calls with no path: `client.methods.low(5)`.
+**Two places, one job each** (V5-13 pick 6). `f.data` is the address of everything: steps, reads, links, writes, and every method call, the root's too. `f.rows` is the fast sync read of a whole resource this process holds: a server's, or one opened with `hold: 'all'`. A partition held by `connect()` is read through its handle, `h.value`.
 
-**Seven rules a user learns** (LENS 2.0). The first tour had three.
-1. **A path is an address.** Building one sends nothing and reads nothing. It is not a promise: `await lens` gives the lens back.
-2. **`get()` reads once. `here()` keeps it live. `connect(target, …)` keeps it live for the target.**
-3. **Left of `here()`: plain data, and it may run on a server. Right of it: your code, here.**
-4. **The wire sends whole partitions.** Hold anything inside a partition and you hold that partition (first build).
-5. **A link ends at `close()`, with its scope, when its target closes, or when nobody uses it. You read what is held through what `here()` gave you.** A `connect` never makes rows readable.
-6. **A `connect` function takes its target as an argument and changes nothing else.** Anything else belongs in `tap`.
-7. **A method says where it may be called (`at:`), and checks what it is given.** A client picks the path and the argument.
+**Seven rules a user learns** (CONNECT 8.5; V5-13; `pages` in rule 7 is V5-14 pick 4, and "first build" in rule 5 is V5-12 pick 2).
+1. **A path is an address.** Building one sends nothing. It is never a promise, and neither is a handle.
+2. **`get()` reads a value once. `connect()` keeps the newest state here, and calls you or loops. `changes()` is every record from a place, and it waits for you. `past()` is one partition as it was: a value.**
+3. **A version names a record, and so the commit that holds it; a cursor, a time and `-N` name a place. `from` starts at it, `past` reads right after it, `to` stops after it.** A version and `-N` work inside one partition; save the cursor to resume.
+4. **Left of `connect()`: plain data, which may run on a server. Right of it: your code, here.**
+5. **The wire sends whole partitions** (first build).
+6. **Every live thing ends by your code:** `disconnect()`, `break`, a signal, `until`, or the count. Never the collector. A link's rows are read only while it is live; after the end, `ended`. A `past` is a value: nothing to end.
+7. **A method says where it may be called (`at:`, `view` or `pages`), never takes a fero word, and checks what it is given.**
 
-**The first tour's three rules still hold.** A sync read never leaves this process and never guesses: if this process does not hold the row on purpose, it throws `not-held`. A change is sent whether you `await` it or not, and shows, to you and to everyone, when it commits. Awaiting a change means committed.
+Transformations add ten user rules (2.7). Paths follow data's rule (2.4) and one shape rule at the leader (2.5). The types show neither, and no record counts them as user rules. **The first tour's rules still hold**: a sync read never leaves this process and never guesses (a row not held on purpose throws `not-held`), and a change is sent whether you `await` it or not, and shows, to everyone, when it commits.
 
-## 2. The choices that matter most
+## 2. The decided changes, first
 
-Each one says what it looks like now, what it looked like before (API.md of 2026-11-16, or v4), why it is easier, and what it costs. **Rules** are LENS 4.4's rows, all reasoned and none modelled; this tour puts each row under the choice it belongs to (section 2.12 adds them up). **Speed** is E-55's unless marked.
+Each says what it looks like now, what it looked like before (the 2026-11-18 page, unless marked), why, and what it costs. **Rules** are the source pages' counts, all reasoned and none modelled; 2.10 adds them up.
 
-### 2.1 A path is an address
+### 2.1 Four read verbs, one job each (V5-13 picks 1 and 3)
 
-- **Now.** `shop.data.widgets.stock` is a lens. Each step is a lens too. A name is a key until it is called: `a.b.set(5)` is the verb `set`, and `a.b.set.set(5)` writes the field named `set`. `f.at(...keys)` builds the same lens with no `Proxy`, for keys in a variable and for hot loops.
+- **Now.** One verb per job, named by what you get.
   ```ts
-  // file: address.ts — a path is an address: no trip, no read, nothing kept
-  import { fero } from 'fero'
-  import type { Shop } from './server.ts'
-  const shop = await fero<Shop>('shop')
-  const stock = shop.data.widgets.stock                     // two steps: an address. Not a promise
-  const n = await stock.get()                               // a verb: read once
-  const same = await shop.at('widgets', 'stock').get()      // the same address, with no Proxy
-  // @ts-expect-error a lens is not a promise: `await` gives the lens back, not a value
-  const wrong: number | undefined = await stock
-  // @ts-expect-error a step names a field of the row, so a wrong name does not compile
-  shop.data.widgets.stok.get()
-  console.log(n, same, wrong)
-  ```
-- **Before.** In the 2026-11-16 API.md, `f.data.*` was data's own proxy, with no types: a wrong field name compiled. Reads went through `f.rows.k` or `await f.get(k)`. In v4 too, `f.data.k` was a handle and not a value, and no line said so. data's handle keeps every child for its parent's life: 318 to 1,333 B per key (LENS 2.1).
-- **Why easier.**
-  - One address then reads, writes, calls and streams (LENS 0). A component handed `stock` can use it without knowing where it sits.
-  - Keys, verbs and methods are separate spaces: 47 of 47 cases pass on the prototype (E-55 claim 4).
-  - **A lens is never a promise** (V5-12 pick 11). On E-55's first build a lens had `then`, so `await lens` read it. Then an `async` helper that returned the root lens downloaded the whole resource: 100,000 rows, 6.8 MB of JSON, in one GET (E-55 review). Now `await lens` gives the lens back. Seven names that JavaScript and common libraries probe on any object read as `undefined`: `then`, `toJSON`, `constructor`, `$$typeof`, `asymmetricMatch`, `nodeType` and `subscribe`. A key with one of those names takes `at()`.
-  - Paths are typed. A wrong field, a wrong value, a method below its declared path and `await lens` used as a value do not compile (E-55 claim 5; API 12).
-  - The lens stays a full lens, not only an address (V5-12 pick 10).
-- **Cost.**
-  - Rules: +3 for the lens and the call space, and 0 to +1 for `at()`, which turns a number key into its string and refuses other keys with `bad-key`.
-  - Memory: a step keeps 0 to 0.3 B per key, against data's 318 to 1,333 B today (E-55 claim 2).
-  - Speed: a step costs 49 to 99 ns with one key. With keys spread over 1,000,000 rows it costs 162 to 222 ns, median 205, against a bar of 150: the one cell of claim 1 that misses. That is the case `at()` is for: −79 to +33 ns over the direct read (E-55 claim 1).
-  - **A lens is for wiring, not for a hot loop.** Two steps and a verb cost 0.17 to 0.29 µs, against 0.014 to 0.06 µs for a `Map` read (E-55 claim 1). So `rows` stays the fast read, and a lens you use often goes in a variable.
-  - What gets worse: `typeof lens` is `'function'`, `JSON.stringify` skips a lens, and `structuredClone` throws on one. Plain assignment cannot be typed: E-55 tried four ways (claim 5). So typed code writes with `set` (2.7).
-
-### 2.2 A client holds nothing until a line says what
-
-- **Now.** A bare `fero('users')` holds no rows. It holds what its live `here()`s and `tap`s name, for as long as they live. `hold: 'all'`, or the line `users.data.here()`, holds every row. A size is a cache of the pictures of links that have closed, never read from.
-  ```ts
-  // file: hold.ts — what a client keeps
-  import { fero } from 'fero'
-  type User = { name: string }
-  const users = await fero<User>('users')                    // holds nothing: every download is a line you write
-  const me = users.data.u42.here()                           // now u42's partition is held on purpose, and live
-  const all = await fero<User>('users', { hold: 'all' })     // v4's way, said out loud: every row, then every write
-  const warm = await fero<User>('users', { hold: '200MB' })  // keeps pictures of closed links, inside 200 MB
-  await me.ready
-  console.log(me.value?.name, all.rows.u42?.name, warm.name)
-  ```
-- **Before.** In the 2026-11-16 API.md, `'all'` was the default, as in v4. `hold: 'asked'` held what you read or followed, and a size was `'asked'` inside a bound. The first tour called the default "the closest call" (its question 8). v4: a bare client downloads the whole resource; `replicas: N` and `ScopedError` for less.
-- **Why easier.** V5-12 pick 1 (LENS 2.2). Every download is now a line you wrote. Under the old default, a bare `fero(name)` in a job downloaded the resource and then received every write anyone made to it, and nothing in the line said so.
-  - **A size is not a subscription** (review F14). If a warm picture stayed subscribed, the server would send, and this process decode and fold, every change to every warm partition for nobody. Closed, it costs nothing. Reopened, it sends its position: if the server can still resume from there, only the changes since cross; if not, a new picture does (reasoned, not built).
-  - `f.rows` now works only on a server or with `hold: 'all'` (API 3.9; question 15).
-- **Cost.**
-  - Rules: no row of its own; +1 for the size's rule (a closed link's picture is not subscribed, and a reopen resumes or takes a new picture).
-  - The price you accepted (LENS 7 Q1): v4's first example and about 20 example READMEs change, and `client.rows.widgets` after a bare open throws `not-held`.
-  - Speed: a cold client makes 2 to 3 trips and one commit (its session) when built well, and nothing more until a line asks (PATHS 3.2). `hold: 'all'` costs the whole resource once, then every write anyone makes, decoded and folded here. At 1,000,000 small rows the first fold alone is seconds of this process's main thread (computed from PATHS 2.1).
-
-### 2.3 Read once, or keep it live: `get`, `here`, `connect`
-
-- **Now.** Three verbs, one on each line.
-  ```ts
-  // file: links.ts — read once, keep it live, keep a target up to date
+  // file: verbs.ts — four read verbs, one job each
   import { fero } from 'fero'
   type Msg = { text: string; stars: number }
-  const chat = await fero<Msg, 2>('chat')                          // a room is a partition, a message a row (2.9)
-  const m7 = await chat.data.room1.m7.get()                        // read once: one trip; nothing kept
-  const room = chat.data.room1.here()                              // hold room1, live: one SUB, shared by equal lenses
+  const chat = await fero<Msg, 2>('chat')                                 // depth 2: a room is a partition, a message a row
+  const m7 = await chat.data.room1.m7.get()                               // get: a value once. One GET; nothing kept
+  const room = chat.data.room1.connect()                                  // connect: room1 live here. A handle; one SUB
   await room.ready
-  console.log(m7?.text, room.rows.m7?.text)                        // a sync read goes through the handle
-  const label = chat.data.room1.m7.text.connect(el, 'textContent') // el.textContent now and at each commit
-  chat.data.room1.connect(ws, (ws, c) => ws.send(c.text()))        // the target is passed in; a socket's link ends when it closes
-  room.close(); label.close()                                      // an element does not say when it goes: close, or use a scope
+  console.log(m7?.text, room.value.m7?.text)                              // a sync read, through the handle
+  const link = chat.data.room1.connect((rows, c) => draw(rows, c.diff))   // connect(fn): the picture, then once per commit
+  for await (const [rows, c] of chat.data.room2.connect()) { draw(rows, c.version); break }   // a loop: the newest each turn
+  for await (const e of chat.data.room1.changes({ from: -5, signal })) console.log(e.version, e.rec)   // changes: every record
+  const was = await chat.data.room1.past(-1)                              // past: the room as it was, a value
+  room.disconnect(); link.disconnect(); console.log(was.value.m7?.text)
+  // @ts-expect-error a read once is get(), not connect({ once }): that would subscribe the whole partition
+  chat.data.room1.m7.connect({ once: true })
+  // @ts-expect-error from on connect would turn a shared live link into a private reader that waits: use changes({ from })
+  chat.data.room1.connect(draw, { from: -5 })
+  // @ts-expect-error a handle has no then(): `await` gives the handle back, never the row; read once with get()
+  const row: Msg | undefined = await chat.data.room1.m7.connect()
   ```
-  - `get()` is served here only from rows held on purpose; else it makes one trip. A GET carries the highest position this process has seen.
-  - `here()` gives a handle: `ready`, `rows`, `value`, `close()`. The same word holds a row, a partition, the whole resource (`f.data.here()`) or a view a server serves (`f.methods.low(5).here()`).
-  - `connect(target, fn | 'prop')` is `here()` tied to a target. fero holds the target weakly and passes it to your function.
-- **Before.** In the 2026-11-16 API.md, `await users.get('u7')` brought the row's partition and kept it live for the life of the handle, and `get(k, { hold: false })` read once. `users.follow('u42')` gave a `Follow` handle; `follow({ prefix })` walked partition names; a served view was `.open()`ed. In v4, `await f.data` gathered from every member. data's `connect(anchor, fn)` today checks the anchor and then ignores it (code data:api/index.ts:357-361).
-- **Why easier.**
-  - V5-12 pick 11 (a read is `get()`), and V5-12's list of what goes: `follow`, `.open()` and `get`'s `hold: false` (LENS 2.2, 2.6). One word, `here()`, means "hold it live", whatever it holds.
-  - **`get()` holds nothing.** 100,000 misses made 100,000 GETs, 0 SUBs, and kept 0 rows (E-55 claim 20). The old `get` hid a follow: a slow leak the line did not show.
-  - **A read is served here only from rows held on purpose** (V5-12; review F1). Rows that only a `connect` keeps never serve a read, since when they go is the collector's choice. On E-55's first build the same program made 0 GETs or 1, by when a collection ran. Over 1,000 seeded runs, each ending dropped links at a random moment, a program showed 9.7 different patterns of reads served here or by a trip. With the rule: 1 (E-55 claim 14).
-  - Equal lenses share one SUB, one decode and one `c.text()` per commit: exactly one of each for 2,000 links (E-55 claim 9). So 1,000 sockets in one room on one webserver cost one subscription.
-  - The picture, then each commit, with no gap and no overlap: 0 wrong in 1,000 seeds in one process, and in 1,000 seeds across 4,337 disconnects over a real port (E-55 claim 7).
+  - `get()` reads once and holds nothing: one GET, or no trip where the rows are held on purpose. It takes `{ fresh }` (ask the leader), `{ version: true }`, `{ when }` (wait until a test passes, holding the partition meanwhile), `{ signal }` and `{ timeout }`.
+  - `connect()` keeps the lens's partition live here, in three forms: a handle (`value`, `ready`, `cursor`, `closed`, `disconnect`); `connect(fn)`, which calls `fn(value, c)` on the picture and then once per commit; and a loop, the newest state each turn. `c.diff` holds the commit's changes, each with `prev` and its row's `version`.
+  - `changes()` is the log: every record on the lens's path from a place, then live. It waits for its reader. `past(pos)` is one partition as it was: a value, walked with `for…of` and `step(n)`, with nothing to end.
+- **Before.** `get()`; `here()` for a handle; `tap((c) => …)` for a call per commit; a weak `connect(target, fn)`; `changes()`; and `asOf(pos)`, a reader you moved and closed. In v4, data's `tap` chose its argument by reading the function's source text.
+- **Why.** It is your one `connect` for live state, with its three forms (CONNECT 2.1). The log and the past keep their own verbs: `from`, `at` and `once` on `connect` are type errors that name `changes()`, `past()` and `get()`. Three things were built your way first:
+  - `get()` built as `connect({ once })` subscribed the whole partition: 65,671 B and 1,000 rows folded to read one number, against 1 B by a GET (E-56 probe 1) *(checked)*.
+  - A handle you could `await` lost every link that passed through code that resolves values: 1,000 of 1,000 left open, with no handle to end them (E-56 probe 1) *(checked)*. So a handle has no `then`.
+  - `from` on `connect` turned the same slow loop from 1 to 50 waiting rows into a queue of about 45,600 commits. That is a judgement, not a measurement: 7,777 such loops ran with 0 wrong answers (CONNECT 2.4).
 - **Cost.**
-  - Rules: −1 for `get` (gone: the hidden follow and its drop order); +1 for the read rule and the GET's position; +1 because a partition held inside a held whole resource sends no SUB of its own; +1 because a resume starts from the server's position. So +2.
-  - `get()` held on purpose: no trip. Not held: one trip, every time, and nothing kept. It takes the trip even when rows that only a `connect` keeps are in memory (E-55 claim 20; PATHS 4.4).
-  - `here()` on a partition: one SUB, the partition once, then one shared message per change. Here, about 3.2 µs to decode and 0.2 to 1.9 µs to fold a small row (PATHS 4.5). A 100-row room's first picture, with 100,000 rows in all: 26 to 28 µs on the prototype (E-55 claim 6).
-  - A second `here()`, `tap` or `connect` on a held selection: a lookup and a count, 39 to 45 ns; a second `here()` 163 to 169 ns (E-55 claims 6, 9).
-  - `connect`: registering the target costs 0.13 to 0.33 µs, and 0.58 to 0.67 µs inside one long turn of the event loop that made about 150,000. Per commit, a weak link costs +28 to +35 ns over a strong sink, and 10,000 weak links cost 2.2 times 10,000 strong sinks. That is E-55's one miss: the bar was 1.1 (claim 11).
-  - Not tested: the GET's position against copies that lag. E-55 had one server (API 11.2).
+  - Rules: CONNECT's share is 0 to +16 over READS.md's pick; the read surface as a whole, with V5-12's rows, is +10 to +41 on the 416 (CONNECT 8.5).
+  - Speed: a callback costs 161 to 189 ns a commit over no link. A loop costs +166 to +241 ns over a callback when commits merge in bursts, and holds 1 to 50 waiting rows when it runs 10 times slower than the writes (E-56 probe 2) *(measured)*. Equal lenses share: 2,000 handles on one row and 100 writes made 1 SUB and 100 decodes (E-56 probe 4) *(checked)*.
+  - What gets worse. One word has three forms and two return types; a loop over a callback handle is a type error. A loop turn has no `c.recs()` or `c.text()`. A partition's state can run ahead of its turn's diff, in 2.9 % of merged turns (E-56 probe 4). "Replay the last 5 with state, then live" is two calls with a seam: `past(-5, { to: 'latest' })`, then `connect()`. And words you approved two days earlier are renamed again.
 
-### 2.4 How a link ends: never by the collector alone
+### 2.2 Every link ends by your code (V5-13 picks 2 and 5)
 
-- **Now.** A link ends at the first of five things.
+- **Now.** A link ends at the first of: `disconnect()`, its `signal`, its `until`, `break` in a loop, the count, or the process's clean stop. The collector never ends one.
   ```ts
-  // file: ends.ts — a link ends at the first of five
-  import { fero, scope } from 'fero'
-  type Msg = { text: string; stars: number }
-  declare const feed: { push(text: string): void; on(ev: 'end', fn: () => void): void }
-  const chat = await fero<Msg, 2>('chat')
-  chat.data.room1.here().close()                                         // 1. close(): at once
-  const page = scope(() => { chat.data.room2.here() })                   // 2. a scope: all made inside end at dispose()
-  page.dispose()
-  chat.data.room3.connect(ws, (ws, c) => ws.send(c.text()))              // 3. the target closes: a socket, say
-  chat.data.room4.connect(feed, (feed, c) => feed.push(c.text()), { closes: 'end' })   //    or an event you name
-  // 4. the count: equal links share one SUB; the last one out unsubscribes after `linger.ms`
-  // 5. the collector: only the net, and only for a connect whose target other code dropped. A dev warning names the link's path
-  ```
-  fero knows when a Node `EventEmitter` (sockets, streams, the `ws` library), a `WebSocket` or a `MessagePort` closes. Any other target is left alone unless the call names its event. Views made right of `here()` end with their handle. **`here()` and `tap` are strong: only your code ends them**, never the collector. A handle you drop without `close()` or a scope is a leak for the life of the process, never a result that changes (API 3.10, its reading).
-- **Before.** Your first form: weak references, so that no code has to end a link (LENS 1.5). The 2026-11-16 API.md: a `follow` or an `.open()`ed view ended at `close()`. v4's V4-54 let the collector release a method handler's views, and wrote down what that cost.
-- **Why easier.** V5-12's rules: a link ends at `close()`, its scope, its target's own close, or a count with a linger, and the collector is only a net. V5-12 rejected the collector as the way a link ends.
-  - **The collector may never run.** In a headless Chromium, 0 of 1,000 links whose DOM nodes were removed ended within 30 s, idle, busy, or with a commit every 10 ms (E-55 claim 13). In Node the first link ended after 7 ms to 16 s, and in one harness old targets in a busy process were never collected (LENS 2.2).
-  - Until it runs, the server keeps sending and this process keeps decoding. One commit with 1,000 dropped, uncollected targets cost 0.80 to 0.90 ms, and all 1,000 functions still ran (E-55 claim 12).
-  - **Three rules make the net harmless** (LENS 2.2). A link checks its target before each delivery, so a dead target is never called. A read is served here only from rows held on purpose (2.3). And a `connect` function changes only its target. With all three, a program gave 1 result over 1,000 seeded runs. When half the dropped links also wrote a shared counter, it gave 433 different results per 1,000 seeds (E-55 claim 14).
-  - The function gets its target as an argument. A function that names its own target in its body keeps that target alive for good (E-55 claim 15).
-  - Views right of `here()` now end with their handle: 59,958 view sinks over 1,000 seeds, 0 calls after the end, 0 views left. The first build leaked them (E-55 claim 26).
-- **Cost.**
-  - Rules: +3 for `here`, `connect` and how they end; +1 for "a `connect` function changes only its target"; 0 to +1 for listening for a close only on the named kinds. So +4 to +5.
-  - Two user rules, 5 and 6. fero cannot check rule 6 for a plain object. For a DOM node the dev warning sees a detached node that is still being fed.
-  - **A dead link the net has not found costs what a live one does, and the line does not show it**: its selection goes on crossing, decoding and folding for 7 ms to never. `close()`, a scope or the count is the fix. How long a dead link's SUB lives is the one thing the collector still decides: a cost, never a result (E-55 review).
-  - A new process key, `linger.ms`, 1000 by default: a guess (API 9).
-
-### 2.5 `tap`: one argument per commit
-
-- **Now.** `tap((c) => …)` is called once per commit, with one argument, by reference.
-  ```ts
-  // file: tap.ts — one argument per commit, by reference
+  // file: ends.ts — every link ends by your code, at the first of these
   import { fero } from 'fero'
   type Msg = { text: string; stars: number }
   const chat = await fero<Msg, 2>('chat')
-  const sink = chat.data.room1.tap((c) => {
-    if (c.first) console.log('the picture so far comes first, as adds')
-    for (const ch of c.changes) draw(list, [ch.type, ch.key, ch.row, ch.prev])   // this commit's changes
-    console.log(c.now.rows.m7?.text)                                             // the latest state: a lookup, not a copy
-  })
-  // a tap is strong: it lives, and holds room1, until sink.close() or its scope ends. The collector never ends it
+  const h = chat.data.room1.connect()
+  h.disconnect(); h.disconnect()                                          // 1. disconnect(): at once. Bound, and safe twice
+  chat.data.room2.connect(draw, { signal })                               // 2. a signal aborts: a request, a job, a component
+  chat.data.room3.connect((_, c) => ws.send(c.text()), { until: ws })     // 3. a socket says it closed
+  chat.data.room4.connect(draw, { until: res, signal })                   //    the first of the two ends it; the other's listener goes
+  for await (const [rows] of chat.data.room5.connect()) { draw(rows); break }   // 4. break ends a loop's link
+  // 5. the count: equal links share one SUB; the last one out unsubscribes after `linger.ms`
+  const room = chat.data.room6.connect()
+  await room.ready
+  const kept = { ...room.value }                                          // to keep rows, copy them while the link is live
+  room.disconnect()                                                       // from here, room.value throws 'ended'
+  // @ts-expect-error a DOM node never says it was removed, so until refuses it: disconnect where your code removes it
+  chat.data.room1.m7.connect(draw, { until: el })
+  // @ts-expect-error an HTTP request may say it closed while its client stays: pass the response
+  chat.data.room1.connect(draw, { until: req })
+  // @ts-expect-error tap is gone: connect(fn) does its job
+  chat.data.room1.tap(draw)
   ```
-  `c.recs()` and `c.text()` give the wire-shaped records and their JSON text, for code that forwards them. Rows handed to a sink are frozen.
-- **Before.** In v4 and in the 2026-11-16 API.md, data reads the function's source text to choose (code data:ops/misc.ts:598-611). `tap(() => …)` gets nothing. `tap((rec) => …)` gets one cloned record per row change, at 1.5 to 1.8 µs each, and never the latest copy (E-55 review).
-- **Why easier.** You asked whether `tap`'s argument gives changes, nothing, or the latest copy (LENS 1.6). Now it gives both, by reference, in one shape. The same `c` comes after a target in `connect`. It is part of the approved shape (V5-12 pick 14) and of data's change D4 (pick 9).
-  - **Rows handed to a sink are frozen** on their first hand-out (V5-12; review F15). Without it, one sink that changed a row would corrupt the store and every other sink of that commit.
-  - `c.recs()` and `c.text()` are built once per commit and shared: 100 builds for 100,000 deliveries (E-55 claim 9).
+  - **Three rules make several ends safe.** Every end is safe twice and removes the other ends' listeners. `until` takes only things that can say they already closed (a Node socket, stream or HTTP response, a WebSocket). The first call comes a microtask after `connect()` returns. Taking any one away broke a case (E-56 probe 4) *(checked)*.
+  - **The ended rule.** A partition's value is readable only while its link is live; after the end, a read throws `ended`. To keep rows, copy them while the link is live.
+  - **No weak links, no net, no `scope`.** In development fero prints one line when an open link's handle is collected and the link has no `signal`, `until` or parent. `f.cluster.snapshot().open` lists the open links by path (API.md's name: question 26).
+- **Before.** `connect(target, fn)` held its target weakly, so the collector could end it. `scope(fn)` gathered links for `dispose()`; `closes` named a target's close event; `close()` ended a handle; and a handle's rows stayed readable after `close()`.
+- **Why.**
+  - **The collector may never run.** In a headless Chromium it collected 0 of 1,000 removed DOM nodes in 30 s (E-55 claim 13). A weak link cost 2.2 times a strong sink (claim 11). `scope` lost links made after an `await` (READS 1).
+  - **An HTTP request is not a close.** On Node 22.22.0 a request whose body was read said it closed at 19 ms, while its client stayed until 315 ms (E-56 probe 5) *(checked)*. So pass the response.
+  - **A read after the end had four answers.** As first built, it gave a different answer on a client with no linger, with a 50 ms linger, on a server, and with another link on the same rows. With a guard per link, every such read threw `ended` (E-56 probe 4) *(checked)*.
 - **Cost.**
-  - Rules: −1, in data: the choice by source text goes. The freeze was owed already (DATA-07), so 0 here.
-  - **A tap is not free.** One that reads nothing adds 92 to 198 ns a commit over no sink, and 63 to 122 ns of that is data's own delivery to any sink. The bar was 50: missed, and the lens's own share (31 to 103 ns) is not resolved against it (E-55 claim 10, the review's harness).
-  - Reading `c.changes` or `c.now` adds nothing the harness could see. `c.recs()` adds 166 to 216 ns. Freezing a changed row adds 163 to 220 ns.
-  - It removes 1.5 to 1.8 µs a change for a tap that names a parameter.
-  - The first `c.changes` walks the picture so far: O(rows held), in your code.
+  - **A link nobody ends runs until the process stops**, and the line does not show it: 1,000 such links cost 0.80 to 0.90 ms a commit (*measured* for weak links whose targets were never collected, E-55 claim 12; the same work here, *reasoned*). The dev warning needs the collector to run, and a handle kept in a variable never warns.
+  - `{ signal }`: 0.11 to 0.16 µs to join one listener per signal and 0.05 to 0.07 µs to leave, at 1,000 to 10,000 links. `{ until }`: +0.39 to +0.59 µs a link (E-56 probe 4b) *(measured)*.
+  - Copying rows to keep them is O(rows), on the line. A React hook that keeps a room's rows must drop them in its cleanup (CONNECT 10).
+  - The `ended` guard is one flag check in the view's read trap *(reasoned)*. Its cost in a real build is owed.
 
-### 2.6 The line: plain data left of `here()`, your code right of it
+### 2.3 Positions: a version inside one partition, a cursor across (V5-13 pick 4)
 
-- **Now.** Three kinds of thing may stand left of `here()`.
-  - **A. a partition**: `chat.data.room1.here()`.
-  - **B. plain-data operators inside one partition**: `chat.data.room1.gt('stars', 0).za('stars', 10).here()`. In the first build the partition crosses whole and the operators run here.
-  - **C. a view over the whole resource that the server named in `methods:`**: `shop.methods.low(5).here()`, under a cap on live served views.
+- **Now.** A **version** is short text that keeps log order under plain `<`, such as `38S9`. The same text is `ack.version`, `c.version`, a diff entry's and a log entry's version, and `if: { version }`, so code compares with `===`. Inside one partition, a commit's id is the version of its last record there. Across partitions there is no single id; a place is a **cursor**. The log and the past also take `-N` (a negative literal, N commits back) and a `Date`.
   ```ts
-  // file: line.ts — plain data left of here(), your code right of it
+  // file: positions.ts — a version names a record, and so its commit, inside one partition; a cursor names a place anywhere
   import { fero } from 'fero'
-  import type { Shop } from './server.ts'
-  type Msg = { text: string; stars: number }
-  const chat = await fero<Msg, 2>('chat')
-  const best = chat.data.room1.gt('stars', 0).za('stars', 10).here()   // B: may run on a server, later
-  const mine = chat.data.room1.here().filter((m) => m.stars > 2)       // A, then a function right of here(): here
-  // @ts-expect-error a function cannot stand left of here(): code cannot travel
-  chat.data.room1.filter((m: Msg) => m.stars > 2).here()
-  const shop = await fero<Shop>('shop')
-  const low = shop.methods.low(5).here()                               // C: the server keeps the view; its changes cross
-  await Promise.all([best.ready, mine.ready, low.ready])               // a sync read waits for the first picture
-  console.log(best.rows, mine.rows, low.rows)
+  type Item = { stock: number }
+  const parts = await fero<Item>('parts')                                 // a client of a resource with no methods: it may write
+  const ack = await parts.data.widgets.set({ stock: 3 })                  // ack.version: such as '38S9', in log order under <
+  const h = parts.data.widgets.connect((row, c) => console.log(c.version === ack.version, c.cursor))   // the same text
+  for await (const e of parts.data.widgets.changes({ from: ack.version, to: 'latest' })) console.log(e.version)   // from that commit
+  const r = parts.data.changes({ from: saved ?? 'earliest', to: 'latest' })   // every partition: from a saved cursor
+  for await (const e of r) { console.log(e.partition, e.version); keep(r.cursor) }   // save the cursor as you go
+  const hour = await parts.data.widgets.past(new Date(Date.now() - 3_600_000))   // a time is a Date
+  const back = await parts.data.widgets.past(-5)                          // 5 commits back: a negative literal
+  h.disconnect()
+  console.log(hour.version < ack.version, back.cursor)
+  // @ts-expect-error a version names one partition's commit and does not say whose: on the root, save a cursor
+  parts.data.changes({ from: ack.version })
+  // @ts-expect-error a count back names one partition too: on the root, give a Date
+  parts.data.changes({ from: -5 })
+  // @ts-expect-error a time is a Date, never a bare number: in one partition a number would be a count back
+  parts.data.widgets.changes({ from: Date.now() - 60_000 })
   ```
-  Untyped code that puts a function left of `here()` is refused `unencodable`. A whole-resource operator left of `here()` on a client is refused `not-held`, and the hint names a method, or `f.data.here()` with the operator right of it. Past the cap, a served view is refused `too-many-views`.
-- **Before.** The 2026-11-16 API.md named four of the seven places a computation can run with four unrelated words: `f.data.gt(…)` for a local view, `f.follow(of)` for some partitions, a method's `.open()` for a served view, and `derive()`. Part of a partition had no name at all (LENS 2.3). v4: views over held rows, and a method that returns a view streams (example 09).
-- **Why easier.** You asked for operators before and after the call, one for server work and one for local work (LENS 1.5). V5-12 picks 2 and 5.
-  - **Class C needs a method.** A view a client makes up over every row is work on every write, on a server: 100 distinct filters cost 9 to 18 µs a record, and `group` 2,574 µs a record at 1,000,000 rows (E-05). `methods:` is the door (V4-5): with it, clients change rows only through the methods, and now they ask only for the views the methods name.
-  - **And a cap.** Each distinct argument is its own served view, at 9.9 KB to 12.8 MB of server memory each (E-55 claim 16). A client that called `low(i)` in a loop could make the server keep as many as it liked.
-  - **Class B waits.** A view costs about the same on either side. Pushing it down moves its CPU and memory to the server and saves each reader the partition's bytes: a first picture of 677 to 765 B against 6 KB to 6.6 MB (E-55 claim 16). It needs three things that do not exist yet: a cap that covers shapes, the SUB's `view` selector modelled (claim 22), and the order channel on the wire (data's record of each row's place in an ordered view). With a plain keyed copy, 239 of 1,000 seeded runs gave a different answer; with the order kept, 0 (claim 17). With those three, class B can come later with no change to any app line.
+  | You give | It names | `changes({ from })` | `past(pos)` reads | `to` |
+  |---|---|---|---|---|
+  | a version | a record, and so the commit that holds it | starts **at** that commit: it comes again, whole | right after that commit | stops after it |
+  | a cursor | the place after what a reader saw | starts after it: nothing comes twice | the state there | stops there |
+  | `-5` | the place before the 5th last commit that reached this lens | those 5 commits, then live | the state before them | |
+  | a `Date` | the place before the first batch stamped after that writer time | from that batch | the state before it | stops there |
+- **Before.** A version was opaque text. A commit had no id and no place. A time was a bare number, and the log stopped at `until: 'latest'`.
+- **Why.** You asked what a commit id looks like, and whether Merkle trees help.
+  - Every partition has one leader and one order, so a position already says what is missing. A version's text kept log order with 0 errors in 1,000,000 seeded pairs (E-56 positions) *(checked)*.
+  - **No Merkle trees.** Kept per write, a Merkle tree that keeps only its leaf sums cost +254 to +309 ns at 1,000 rows; a tree rehashed on each write cost +598 to +605 ns at 1,000 rows and +1,395 to +1,747 at 1,000,000. None came under the 0.2 µs bar for a version kept per write. And a resume by "the rows newer than mine, plus tombstones" beat a Merkle walk in all 8 cases: 1.7 to 5.3 times fewer bytes, in 1 trip against 3 to 5 (E-56 positions) *(measured; the bytes checked)*.
+  - A version and `-N` are refused on the root by the types: across partitions there is no one order.
 - **Cost.**
-  - Rules: +2 for the line; +1 to +2 for the cap. Owed when modelled: +4 to +6 for the `view` selector, which the old `.open()` owed too. Later: +5 (4 to 7) for class B.
-  - User rules 3 and 4. **Rule 4 is a cost the line hides**: `chat.data.room1.m7.text.connect(…)` holds all of `room1`. With a row per partition (depth 1) the row is the partition, so there the first build is exact.
-  - Operators right of `here()`: a filter about 1 µs per affected view (E-05); an ordered view with a window 1.6 to 62 µs a change, by partition size (E-55 claim 16).
-  - A served view: its own work on a server, once for all equal calls; a client receives only its changes. Not built on the prototype (E-55 claim 27).
-  - Two new resource keys, `views.client` and `views.max`, 16 and 1,000: guesses (API 9).
+  - **A version does not say whose it is.** Most wrong ones are refused `bad-position`, but one from another slot can land on this partition's own record and give a quiet wrong answer (CONNECT 3.2) *(reasoned)*. So **save the cursor to resume**; show, compare and guard with the version.
+  - A cursor is 28 to 35 characters for one partition (E-56) *(checked)*, and 4 to 13 KB for a whole resource *(reasoned)*.
+  - `-N` makes the server count back, since versions have gaps: about 0.6 to 2 ms at 10^6 partitions when writes spread evenly, and up to all of `history` for a cold partition beside a hot one (CONNECT 3.4) *(reasoned)*. Owed on a real log.
+  - `c.version` and `c.cursor` are built only when read, and are not measured (bar: 50 ns a commit). A `Date` is approximate across partitions: 100 ms early to 300 ms late with 250 ms of clock skew (E-21).
+  - A folded resume, `connect({ resume })`, would close 2.1's seam. It is not taken now, and is modelled first in E-31's model (V5-13 pick 7).
 
-### 2.7 Writes on the path
+### 2.4 Any path: every lens reads, a field too (V5-15 picks 1 and 2)
 
-- **Now.** The path write is the main spelling.
+- **Now.**
+  - **data's rule is the one rule for the state forms** (`get`, a link's value and its callback, a loop turn, `past(pos).value`): a write at or below the lens gives a change; a write above it counts only when the lens's value changed (a new object counts); a write beside it gives nothing.
+  - **Every lens has every read verb**, a field too. The log forms (`changes()`, `-N`, stepping through `past`) take the records **on the lens's path**. A reader below a row takes its part from a record above it (a whole row, or a field that holds the lens), folds a record below it into the value it kept, and gives an entry only when its value changed.
   ```ts
-  // file: writes.ts — the path write is the main spelling
+  // file: anypath.ts — every lens has every read verb, a field too (V5-15)
+  import { fero } from 'fero'
+  type Item = { stock: number; price: number }
+  const shop = await fero<Item>('shop')
+  const stock = shop.data.w.stock                                         // a field lens
+  const s = await stock.get()                                             // its value, once
+  const h = stock.connect((n) => draw(n))                                 // runs when stock changed, never for a write to price
+  for await (const e of stock.changes({ from: -3, signal })) console.log(e.value)   // its own log: the value after each change
+  const was = await stock.past(-1)                                        // starts with a past read of its row
+  await shop.data.w.set({ stock: 4, price: 9 })                           // above: the link runs only if stock changed
+  await shop.data.w.price.set(10)                                         // beside: the field link gets nothing
+  console.log(s, was.value)
+  h.disconnect()
+  ```
+  - On a field, `e.value` is the field's value right after the record (API.md's pick: question 25). `-N` counts commits whose records reached the lens: at or under it, or above it and changing its value. On a field it is found by reading the row's log back. Replaying a field from an old place starts with a `past` read of its row.
+- **Before.** No rule said when a reader below a write hears of it. `changes()` read the records "under the lens", and `-N` was "the unit a callback sees". ANYPATH.md's first answer stopped the log at the row; you asked whether a field could keep a log of its own, and the pick changed. On E-55's prototype a field link ran on every write to its row.
+- **Why.**
+  - "Under the lens" missed 74 % and 78 % of the changes below a row. "On the path" missed 0, and held the right value after all 240,000 commits (E-58 part 1) *(checked)*.
+  - Stopping the log at the row would give a field fewer verbs than every other lens: a special case for users.
+  - With data's rule, 2,000 seeds of writes at every level gave 0 wrong states, 0 missed changes and 0 wrong values-before, on 13 lenses, on a server and on a client that held only some partitions (E-58 parts 1 and 2) *(checked)*.
+- **Cost.**
+  - Speed: +6.7 to +11.2 ns a link a commit at 100 links over E-55's rule, and the user's function runs 5 times a commit where it ran 100 (E-58 T2, number fields) *(measured)*.
+  - **"Changed" means a new object.** A record that crossed the wire is a new object, so on a client and on every copy but the leader, a link on an object value runs again after a whole-row write that left it equal (E-58 T11) *(checked)*.
+  - Builders get a new reader for the log below a row, with a run-time rule the types cannot show. A field's `-N` reads the row's log back, which is not priced.
+  - Rules: V5-15's changes are not priced: 13 items, about 0 to +13 at 0 to +1 each *(a guess; LAYERS 0.2)*.
+
+### 2.5 Writes at any path, and rooms (V5-15 picks 3, 5, 6 and 7)
+
+- **Now.** Inside one partition a write may land at any level: a room, a row, a field, a nested field.
+  ```ts
+  // file: writes.ts — writes at any path inside one partition, and rooms (V5-15)
   import { fero, op } from 'fero'
   type Item = { stock: number; price: number }
-  const parts = await fero<Item>('parts')                                  // a resource with no methods: a client may write
-  const w = parts.data.gizmos.set({ stock: 7, price: 9 })                  // a whole row: a handle with early stages
-  await w.received                                                         // optional: the leader has it
-  await parts.data.widgets.stock.set(op.incr(-1, { min: 0 }))              // an op: the leader computes it
-  await parts.data.widgets.set((row) => row && { ...row, price: 12 })      // read, decide, write; tried again on a conflict
-  await parts.data.gizmos.remove()
-  await parts.set(['widgets', 'stock'], 4)                                 // the array form of the same kind of write
-  ```
-  `f.set(path, v)` and `f.remove(path)` stay as the array form. Plain assignment (`f.data.k = row`) stays on untyped handles. A typed client of a resource with methods has no writes at all (2.8). A write above a row, at the root or on a partition at depth 2, is refused `bad-path`.
-- **Before.** In the 2026-11-16 API.md, the verbs were on the resource: `shop.set('k', row)`, `shop.get(k)`, `shop.remove(k)`. v4's lens call `shop.data.set('k', row)` stayed as a second name for the same write (the first tour's 2.3). v4 itself had the built-in `methods.update(change, { confirm })`, `insert`, `remove` and `read`, and `f.data.set`, `update` and `patch`.
-- **Why easier.** You preferred `shop.data.a.b.c.set()` (LENS 1.5). V5-12 drops `f.data.set`, and pick 6 says typed code writes with `set`.
-  - The address is one thing and the verb another (LENS 2.5).
-  - `f.set(path, v)` stays because it needs no `Proxy`, and `ctx.set`, `batch` items and libraries use it.
-  - Plain assignment cannot be typed: TypeScript cannot give a property one type to read (a lens) and another to write (a value). E-55 tried four ways (claim 5).
-  - Everything the first tour said about a write's handle stands (2.13).
-- **Cost.**
-  - Rules: −1. The lens calls as a second name go.
-  - Speed: the same record and the same message as before. The steps add 0.18 to 0.73 µs to a 0.7 to 1.3 µs local data write; a kept lens adds −0.03 to +0.42 µs; `at()` about 0 (E-55 claim 3). A whole fero write is far more: v4's issue path alone is 7.7 to 8.3 µs (PATHS 2.6), and the commit about 1 ms (MEMORY 9.3).
-  - What stays: three spellings (assignment, `lens.set(v)`, `f.set(path, v)`).
-
-### 2.8 Methods on a path, with `at:`
-
-- **Now.** `shop.data.widgets.sell(1)` runs at the leader of `widgets`' partition. A method says where it may be called. A bare function may be called only at the root: `shop.methods.low(5)`. To be called on a path it says which kind, `{ at: 'row' | 'partition' | 'any', run }`, and the server refuses any other path with `bad-path`. `ctx.at` is the lens the call was made on.
-  ```ts
-  // file: methods.ts — a client typed by the server, with `import type`
-  import { fero } from 'fero'
-  import type { Shop } from './server.ts'                 // a type only: the server's code never loads
-  const shop = await fero<Shop>('shop')
-  await shop.data.widgets.sell(1)                         // at widgets' leader: one trip, one commit
-  await shop.data.widgets.sell(1, { once: 'order-981' })  // at most once, even across retries
-  await shop.data.widgets.call('sell', 1)                 // by name: the way out of a clash with a verb
-  // @ts-expect-error `sell` is declared `at: 'row'`: it is not offered at the root
-  await shop.methods.sell(1)
-  // @ts-expect-error nor below the row
-  await shop.data.widgets.stock.sell(1)
-  // @ts-expect-error nor through call(): it is checked against `at:` too
-  await shop.data.widgets.stock.call('sell', 1)
-  // @ts-expect-error V4-5: the typed client of a resource with methods has no set
-  await shop.data.widgets.stock.set(4)
-  ```
-  **Type a client by the server's type, not its handle.** The server says `export type Shop = typeof shop`; the client says `import type { Shop } from './server.ts'` and `fero<Shop>('shop')`. Check types before you bundle. A resource with no methods can be typed by its rows alone, `fero<Item>('parts')`, as in 2.7.
-- **Before.** The 2026-11-16 API.md had `{ near: true, run }` (the argument is the row key) or `{ near: 'sku', run }`: a hint kept with the resource's settings, so a client learned it and sent the call to that row's leader. The server exported its handle (`export const shop`), and a client was typed as `fero<typeof shop>`. v4: `{ retry: true }`, no placement, and types by hand.
-- **Why easier.** You asked that `r.a.b.c.method()` run at that path's leader (LENS 1.5). V5-12 picks 3, 12 and 13.
-  - The caller's line carries the row, so there is no hint to store or learn.
-  - **The server checks the path.** On E-55's first build every method was on every lens. `widgets.left.sell(1)` then ran `ctx.at.left.set(…)` on the field `left` and turned `left: 5` into `{ left: {…} }`: a client changed a row's shape through the door. On the changed build, 202 of 202 calls on a path the method did not declare were refused, with 0 commits (E-55 review, claim 18). Types do not stop an untyped or hostile client; the server's check does.
-  - On a lens, fero's own verbs win; `lens.call(name, arg)` reaches a method named like one (pick 3). The types check `call` against `at:` as they check the name; for untyped code the server refuses a wrong path with `bad-path`.
-  - **`import type` and a type check** (LENS 1.3). In Node, `import { Shop }` by mistake is a SyntaxError when the modules link, and `tsc` says TS1484. But esbuild with `verbatimModuleSyntax` ships the server for it, method code and all (E-55 claim 24). So run `tsc --noEmit` or the lint rule `consistent-type-imports` before bundling. A browser build of fero in which a server role throws comes later (pick 12).
-- **Cost.**
-  - Rules: 0 for the call on a path (routing by the path and `ctx.at` come in; the hint's two forms go), and +1 for the path check (review F8). So +1.
-  - User rule 7: a method checks its argument, since a client picks it as it picks the path.
-  - Speed: on a path, one trip and one commit, the least a call can cost (PA-25). In E-55's stand-in (the leader table and the forwarding are written in the bench), 1,000 path calls made 1,000 trips and 1,000 commits; after a leader moved, one redirect, then one trip again. With no path, a call makes 0.66 extra trips with three servers and 0.80 with five (E-55 claim 18). The path check is a lookup (reasoned).
-  - A call with `once` still costs three commits in a row and up to two trips to `#calls`' leader; the path does not save them (PATHS 3.4).
-  - Two costs of the shape. A verb fero adds later could shadow a method somebody wrote (LENS 2.4). And a type-only import still makes the client's type check load the server file's whole import graph (LENS 1.3, reasoned).
-
-### 2.9 `depth: 2`: the first key is the partition
-
-- **Now.** The first key of a path is always the partition. `depth` says where the row begins, and it is fixed when the resource is founded.
-  ```ts
-  // file: depth.ts — the first key is always the partition
-  import { fero } from 'fero'
   type Msg = { text: string; at: number }
-  const users = await fero('users', { server: true })                    // depth 1, the default: users.data.u42 is a row and its own partition
-  const chat = await fero<Msg, 2>('chat', { server: true, depth: 2 })    // chat.data.room1 is a partition; chat.data.room1.m7 a row
-  await chat.data.room1[fero.id()].set({ text: 'hi', at: fero.now() })   // a row write: no key string to build or split
-  const room = chat.data.room1.here()                                    // one partition, held live
-  console.log(users.name, room.rows)
+  const shop = await fero<Item>('shop')                                   // a client of a resource with no methods: it may write
+  const chat = await fero<Msg, 2>('chat')                                 // depth 2: a room is a partition
+  await shop.data.w.set({ stock: 4, price: 9 }, { ttl: '1h' })            // a row, whole, with its ttl
+  await shop.data.w.stock.set(2, { if: { equals: 4 } })                   // a field guard: this field only
+  await shop.data.w.stock.set((n) => (n ?? 0) - 1)                        // set(fn) on a field: guarded by the field
+  await shop.data.w.set(op.merge({ price: 10 }))                          // one field record per merged key
+  await chat.data.room1.set({ m1: { text: 'hi', at: 1 }, m2: { text: 'yo', at: 2 } })   // replace a room: one batch
+  await chat.data.room2.remove()                                          // empty a room: one batch
+  // @ts-expect-error the root spans partitions, which share no order: write each row or room, or fero.drop(name)
+  await shop.data.set({ w: { stock: 1, price: 1 } })
+  // @ts-expect-error a ttl belongs to a row: not on a field write
+  await shop.data.w.stock.set(1, { ttl: '1m' })
+  // @ts-expect-error a room is replaced by rows, not by one row
+  await chat.data.room1.set({ text: 'hi', at: 1 })
   ```
-- **Before.** The 2026-11-16 API.md had `partition: { before: '/' }`, with keys like `'room1/m7'` built by hand, and `follow({ prefix })` walked the partition names. v4 hashed partitions and hid them.
-- **Why easier.** You asked whether `[prefix][suffix]` should be the default (LENS 1.1). V5-12 pick 4: yes to the shape.
-  - With one level of rows, `chat.data.room1.m7` would be a field of the row `room1`. A message as a field loses what a row has: its own version and conditions, its own `ttl` and size limit, early stages, `e.value` in `changes`, and views over it. And a field write copies its room on every copy: 0.43 ms at 1,000 messages, 3.6 ms at 10,000 (LENS 1.1, measured in its facts brief).
-  - `{ before }` was the same idea spelled as a text rule, and it needed an index from partition to rows on every copy (PA-17).
-  - Every process routes by hashing the first key, as fero v2 did, with nothing to learn.
-  - Two levels always would make `users.data.u42.name` a row, so a user could not be read or expired as one thing (reasoned).
-  - The partition function stays, built later (pick 4).
+  - **A room takes `room.set(rows)` and `room.remove()`, and nothing else.** Each is one batch, which the leader expands into row records from the keys it holds, and each answers at the commit only. The root stays refused, and its type error names the way: write each row or room, or `fero.drop(name)`.
+  - **One version per row, said plainly.** `if: { version }` is always the row's. On a field lens, `if: { equals }`, `absent` and `present` test the field, also inside `set(fn)`.
+  - **One shape rule at the leader.** A missing parent field is `absent-path`. A parent that is a string, a number or `null`, an index past an array's end, or a named step on an array is `bad-shape` (new). A key `__proto__` is `bad-key`, at `at()` too.
+  - A field write takes no `ttl` or `while`: those belong to a row. `op.merge` on a row that exists is sent as one field record per merged key.
+- **Before.** "A write needs a row": a write to the root or to a room was refused `bad-path`. One version per row went unsaid, and `set(fn)` guarded a field write with the row's version. Shapes that data fills in went through, and `ttl` compiled on a field write.
+- **Why.**
+  - **Across partitions a write stays refused.** Partitions share no order, so a root write split into one commit per partition shows half of it to a reader of two rows. A loop that woke every 1 to 4 commits saw a half-done state in 63.1 % of root replaces and 39.1 % of moves between rooms; with a room replaced as one batch, 0 (E-58 part 3) *(checked)*.
+  - **A room write has no race.** The leader knows the room's keys, so no writer can add a row between your read and your removes, and you need not hold the room to learn its keys.
+  - **Field guards.** A row version refused 8 % to 45 % of guarded field writes only because a sibling field changed, in E-58's mix of writes (part 5) *(checked)*.
+  - **The shape rule.** data fills such shapes in, or lets them through. Five of them break the state or the wire, and three get past data's own reader rule (E-58's shape runs) *(checked)*. With the rule, every write v5 takes keeps data's rule exact *(reasoned)*.
 - **Cost.**
-  - Rules: −1 to 0. The text rule and its escape go; the index was owed anyway.
-  - Speed, on today's data (E-55 claim 19). **Partitions of 100 to 10,000 rows pass**: the fold costs 0.78 to 1.10 times a flat store with PA-17's index; each partition takes 1.2 KB to 805 KB less memory; a 100-row room's first picture takes 0.012 to 0.017 ms at 100,000 to 1,000,000 rows in all, where a flat store with no index walks every row (30 to 40 ms). **One-row partitions miss**: about 0.9 KB more each, and 1.3 to 1.5 times the fold, until data's two-level store (D3, pick 9). A key grows 2 B. A row write costs about the same either way: 2.1 to 3.9 µs at depth 2, 2.0 to 3.4 µs flat.
-  - A depth-2 seed does not give the row type: you name it, `fero<Msg, 2>` (API 6).
+  - A room write is one log entry. In data's fold alone, it was 2.3 to 5.9 times less work than the same rows as separate commits (E-58 T1) *(measured)*. A size rule for it is owed, and `room.remove()` leaves one tombstone per row.
+  - An `equals` guard carries the old value in each request, where a version is a few bytes, and the leader now compares a field's value. This amends API.md 3.7's "no new rule at the leader". Its cost is owed.
+  - Code ported from data or v4 that relied on the fill-in must write the parent whole: about 1 in 9 commits in E-58's mix *(checked; the share is the mix's)*.
+  - A remove that finds nothing answers as done (API.md's pick: question 30).
 
-### 2.10 `derive` as a pattern, paced
+### 2.6 Methods: root calls on `f.data`, and three kinds (V5-13 pick 6, V5-14 pick 4)
 
-- **Now.** The mark is a write option, `{ from: e }`: "this write applies source record `e`". `derive()` and `consumer().run()` are shown first. The four lines they are made of come second.
+- **Now.** A root method is called on the root lens: `f.data.ping()`. A method comes in three kinds: an **action** (a function, or `{ at, run }` to be called on a path), a **served view** (`{ view }`: an address you `get` or `connect`), and **pages** (`{ pages }`: one sorted list read a page at a time).
   ```ts
-  // file: derive.ts — totals from orders, exactly once: the library first, then what it is made of
-  import { fero, op, derive, lock } from 'fero'
-  type Order = { user: string; cents: number }
-  const orders = await fero<Order>('orders')                       // a client of the source: it holds nothing
-  const totals = await fero<number>('totals', { server: true })    // a server of the target
-  await derive(orders, totals, (e) => {                            // paced, run once, with bare marks for idle slots
-    if (e.value) totals.data[e.value.user].set(op.incr(e.value.cents), { from: e })
-  })
-  // what derive() is made of, shown for a second target: exact only paced, and only in one process, so under a lock
-  const spent = await fero<number>('spent', { server: true })
-  await lock('derive:spent', async () => {
-    for await (const e of orders.data.changes({ from: spent.marks('spent') }))
-      if (e.value) spent.data[e.value.user].set(op.incr(e.value.cents), { from: e })   // not awaited: writes pipeline
-  })
-  ```
-- **Before.** The 2026-11-16 API.md: `derive(orders, totals, (e, out) => { if (e.value) out.set(e.value.user, op.incr(e.value.cents)) })`. `out`'s writes returned nothing, and the mark was hidden inside `out`. Who runs a derive was open (its Q-B8). v4 had no `derive`.
-- **Why easier.** You asked why `derive` needs a separate function (LENS 1.7). It does not need to be a primitive. V5-12 pick 7 puts the mark on the write line, where you can see it.
-  - **But the plain pipe is not exactly once.** The four lines are exact only with two more things (V5-12's rules; review F2).
-  - **fero paces them.** A client holds at most 512 waiting writes; past that a plain write is refused `backpressure`. The loop does not await, so it would never see the refusal, and a later write would move the mark past the lost record. So a marked write is never refused for backpressure: it waits, and the reader its `e` came from stops yielding. In E-55's seeded stand-in for E-30's model, the four lines as written lost outputs in 998 of 1,000 seeds; paced, 0 lost and 0 doubled (E-55 claim 21).
-  - **They run in one process.** With `server: true`, every server of `totals` that runs the four lines derives. The marks keep the answer right, but the work is done once per server. `derive()` and `consumer()` split the source's shares. So who runs a derive is now the app's choice, and Q-B8 closes (LENS 4.3).
-  - `derive()` also sends bare marks (`target.mark(e)`: a mark with no write), so a part of the target that gets no output for a while does not hold the restart point back. It is about fifteen lines of library over public calls (LENS 1.7, 2.8). `consumer().run()` has no target, so it sends none: it restarts from its own place in the source, moved only once its marked writes are answered (API 3.11's reading; question 24).
-  - **One open point: a source record with several outputs.** As the rule is written, a second marked write of the same `e` to the same part of the target would be skipped at the mark the first one raised, and nothing commits the two together. Until it is modelled: one marked write per source record per target (question 21).
-  - **Is there exactly-once behaviour, as in Kafka?** (LENS 1.2.) Yes, for writes into fero, in three layers, each with a limit. A resend counts once inside a session. A `once` name counts once for a day. A mark counts once per source record, while the source keeps its log and the loop is paced in one process. Like Kafka, not for an email or a payment made inside your code. Weaker than Kafka: no atomic write across partitions. Simpler: no coordinator and no two-phase commit (E-30).
-- **Cost.**
-  - Rules: 0 to +2 for `{ from: e }`, `marks()` and `mark()` (E-30's 5 rules exist); +1 for the marked write that waits. So +1 to +3.
-  - Speed: a 29 B mark, and a share of one commit per output partition. Not awaited, marked writes ran at 122,000 to 134,000 a second, against 239 to 240 a second awaited one by one (E-55 claim 21).
-  - The source needs `history` (default 0). Past it, the deriver stops with `expired` and never skips a record (LAYERS 8.8).
-  - A marked write answers at its commit only, since it can be skipped at its mark (V5-11 ruling 6). It cannot also carry a `once` name: API.md's types now refuse `{ from: e, once }`. LENS 4.4 counted it as composing with `once` and `if` (question 20).
-  - Owed: E-30's model with marks written by app code, and the pacing rule in a real client. Claim 21 is a seeded stand-in: no Raft, no lost log tails.
-
-### 2.11 `asOf`: looking back, on a reader
-
-- **Now.** `lens.asOf(position)` gives that lens as it was: read-only, folded in this process from the log. The position is a version, a cursor or a writer time (V5-4). `step` and `seek` move the reader. It is built after the first build (API.md's and LAYERS' reading; question 22).
-  ```ts
-  // file: asof.ts — a row as it was: a reader, folded here
+  // file: methods.ts — root methods sit on f.data; three kinds of method
   import { fero } from 'fero'
   import type { Shop } from './server.ts'
   const shop = await fero<Shop>('shop')
-  const sold = await shop.data.widgets.sell(1)               // the answer carries the version of its write
-  const past = await shop.data.widgets.asOf(sold.version)   // one log-mode SUB from the nearest snapshot; folded here
-  console.log(past.value?.stock)                            // the row as it was at that version
-  past.step(-1)                                             // one commit back: it moves this reader
-  console.log(past.value?.stock)                            // the row just before that write's commit
-  past.close()                                              // memory grows with the window, so close it
+  const pong = await shop.data.ping()                                     // a root action: called on the root lens
+  await shop.data.widgets.sell(1, { once: 'order-981' })                  // an action on a row, at most once
+  const low = shop.data.low(5)                                            // a view: an address; nothing is sent yet
+  const top = await low.get()                                             // one picture
+  const live = low.connect()                                              // or live, kept on one copy
+  const page = await shop.data.byPrice(null).page()                       // pages: one read; it holds nothing
+  console.log(pong, top, page.rows, page.next)
+  live.disconnect()
+  // @ts-expect-error f.methods is gone: a root method is called on f.data
+  shop.methods.ping()
+  // @ts-expect-error a served view is an address, not a promise: get() it, or connect() it
+  const rows: readonly { stock: number }[] = await shop.data.low(5)
+  await fero.of<{ stock: number }>()('names', { methods: {
+    // @ts-expect-error a method may not take a fero word where it is called: 'bad-name' when the server opens
+    connect: { at: 'row', run: (k: number, ctx) => ctx.at.stock.set(k) },
+  } })
   ```
-- **Before.** Nothing in the 2026-11-16 API.md: only forks, tapes and restore. You asked whether to step back by reversing old records, and whether to use O(log n) or O(1) persistent data (LENS 1.4).
-- **Why easier.** V5-12 pick 8 (E-54). No record carries the value before, and none needs to: the log is already the history (V5-1). No persistent structure belongs on the live write path. A hash-tree root kept per write adds 3.3 to 5.7 µs to a 0.79 to 1.4 µs fold and keeps 1.3 to 1.7 KB a version, and the collector goes from 0.5 % to 15 to 22 % of the time. A hash tree used only as the store still adds 1.1 to 2.2 µs a write. A prior value in the log would add 80 to 150 % to a record's bytes (E-54). On a reader, fat nodes win: a sorted list of versions per row. No server keeps versions, and no write pays for a reader it does not have.
+  - **A method may not take a fero word where it would be called**: at the root, the read verbs, the operators, `set`, `remove` and the probe names; on a row, the read verbs, `set`, `remove` and `touch`. The types refuse it where it is declared, and the server refuses it at open, `bad-name`.
+  - **A client gets the method table at open.** An unknown name is refused here, with no trip: `no-such-method`. `lens.call(name, arg)` stays for a name held in a variable.
+- **Before.** `f.methods.x(arg)`. On a lens, fero's names won, and `lens.call` was the way out. A view was a method that returned one, then `here()`'d, and it could be awaited.
+- **Why.** You asked why a root method was `f.methods.x` and a path method `f.data.k.x`. Now one rule covers both: a method is called on the lens where it runs, and the root is a lens (READS 4). "fero's names win" hid a method behind a verb without a word. And a library that probes objects by name now fails loudly, where before it could send a call.
+- **Cost.** A word fero adds in a later version breaks an app that used it as a method's name, loudly, at its next start. In a rolling deploy a stale or missing table must never refuse a valid call: that is reasoned, and a sim is owed (Q-B10).
+
+### 2.7 Where a transform runs: the line, served views and pages (V5-14 picks 1 to 4 and 7)
+
+- **Now.** **One line, the live verb, decides where a transform runs.** Right of `connect()`, any code runs here, on rows held on purpose. Left of it stands plain data only (`eq`, `in`, `gt`, `az`, `za`, `by`, …), which a copy may run inside one partition later (class B). Over every row a client gets only a view the server names, or `{ pages }`. Across partitions there is no merger.
+  ```ts
+  // file: views.ts — the line: your code right of connect(); views the server names; pages; the one join
+  import { fero } from 'fero'
+  type Fan = { name: string; team: string; points: number }
+  type Order = { user: string; sku: string; cents: number }
+  const server = await fero.of<Fan>()('fans', { methods: {                // on a server: the views it names
+    best: { view: (n: number, ctx) => ctx.data.za('points', Math.min(n, 100)) },   // a window: bounded
+    byTeam: { view: (_: null, ctx) => ctx.data.by('team').sum('points') },          // buckets: one number each
+    ranked: { pages: (_: null, ctx) => ctx.data.za('points'), size: 20 },           // one sorted list, in pages
+  } })
+  const fans = await fero<typeof server>('fans')                          // a client, typed by the server
+  const top = fans.data.best(10).connect((rows, c) => draw(rows, c.order))   // on one copy; only its changes cross
+  const teams = fans.data.byTeam(null).connect()                          // a Map from team to number
+  const p1 = await fans.data.ranked(null).page()                          // one page; it holds nothing
+  const orders = await fero<Order, 2>('orders'), products = await fero<{ price: number }>('products')
+  const big = orders.data.ada.connect().filter((o) => o.cents > 100)      // right of connect(): your code, here
+  big.lookup(products.data, 'sku').connect((rows) => draw(rows))          // the one join: undefined loading, null none
+  await teams.ready
+  console.log(teams.value.get('red'), p1.next, top.cursor)
+  // @ts-expect-error a function cannot stand left of connect(): code cannot travel; connect() first
+  orders.data.ada.filter((o: Order) => o.cents > 100).connect()
+  // @ts-expect-error an operator over every row, on a client that holds nothing: call a view the server named
+  orders.data.za('cents', 10).connect()
+  await fero.of<Fan>()('more', { methods: {
+    // @ts-expect-error a served view must be bounded: a window, one value, or buckets
+    low: { view: (max: number, ctx) => ctx.data.lt('points', max) },
+  } })
+  ```
+  - **Placement.** Each served view lives on one copy, chosen by a hash over every copy but the leader. The leader, which takes the writes, never builds one while another copy can serve it. When the leader is the only copy, as with one server process, the records do not say; API.md's pick is that the leader serves (question 32).
+  - **The cap.** At most 64 served views per copy (`views.max`), each weighted by its cost class: O(1), O(log n) or O(n) a change. A client holds at most 16 per copy (`views.client`). With k ≥ 2 serving copies, `views.max / k` is kept free on each for clients whose copy died; with one, none. Past a cap: `too-many-views`.
+  - **The row guards.** Until data 5's ordered index, an ordered view over more than 5,000 rows and `{ pages }` over more than 2,000 are refused when built, `view-too-big` *(the numbers are guesses)*.
+  - **A view must be** bounded (a window, one value, or buckets); blind to the caller (a per-user view takes the user as its argument, and `allow` checks it); a function of its argument and the rows (no clock, no random number); and of one resource.
+  - **`lookup`** is the one join, right of the line: for each left row, the other resource's row with that key, kept live: `undefined` while loading, `null` when there is none. **Bucket answers are a `Map`** with typed keys: `teams.value.get('red')`.
+- **Before.** A served view lived on whichever server took the SUB, under a cap of 1,000 per resource and 16 per client, both guesses. TRANSFORMS' first plan made one served view per page cursor. Dashboards used `group(fn)`, ties broke by arrival, and sums were plain floats. In fero v2 to v4 and in data, transformations were 70 sources of complexity and bugs (TRANSFORMS 2).
+- **Why.**
+  - **Off the leader, on every other copy.** Serving from standbys first refused a held view in 377 of 1,000 seeds with one standby; with every copy but the leader serving, 5 and 6 of 1,000 (E-57) *(checked)*.
+  - **So few.** Every live served view sees every write to its resource. At 50,000 writes a second, one core has about 18 µs a write left for views. A bucket or sum view costs 1.8 to 4.9 µs a change, and a leaderboard 5.7 to 6.7 µs at 1,000 rows and 134 to 155 µs at 100,000 (E-57 A1, pagecost) *(measured)*. Served views are for a few shared answers per resource, not a query per user.
+  - **Pages.** One view per cursor cost 0.7 to 8.3 MB a page and was refused by the 17th page. With one shared index, a page read is 10 to 16 µs and 32 B on the copy (E-57 XA-7) *(measured)*.
+  - **`by(field)`** costs 0.66 to 1.84 µs a change at 10^6 rows, where `group(fn)` took 78 to 94 ms (E-57 B2) *(measured)*. `lookup`: 537,670 checks, 0 unequal (E-57 B4) *(checked)*.
 - **Cost.**
-  - Rules: +3, in a reader library; none in the kernel.
-  - Speed, on data's real fold (E-55 claim 23). To open, it folds every record from the nearest snapshot to the position: 3.6 to 4.4 µs a record, of which the version lists are +1.5 to 2.0 µs. So a million records since the snapshot take about 4 s (a reasoned sum). To hold: 103 B a version at 100,000 rows, 285 B at 1,000,000. A step or a jump: 10 to 12 ns. A row at any version: 0.6 to 1.4 µs. 0 wrong answers in 1,680 checks against a refold.
-  - Prefer it on a partition lens. `f.data.asOf(p)` folds every partition.
-  - It needs the log to reach back: `history` on the resource, or the tier. Past it: `expired`. A step is one commit, never part of one.
+  - Rules: about +26 (21 to 45) on the 416 for the first build (TRANSFORMS 8.3). Users learn ten more rules (TRANSFORMS 8.4; API 3.10).
+  - **Three bars are missed, and stated.** A view build over 10^6 rows stalls its copy 0.2 to 1.9 s until data builds in slices (XA-1). A client that held a view can still be refused after failures, in 1 to 21 of 1,000 seeds by configuration (XA-2; TRANSFORMS 3.8; V5-14's consequences quote 5 to 21, its standby and leader-kill runs). The chunked ordered index costs 9.5 to 15.1 µs a write at 10^6 rows, against a guessed 3 (XB-1).
+  - **A `{ pages }` index costs every write while it lives**: 8.3 to 9.1 µs at 1,000 rows, 29 to 33 at 10,000, 509 to 525 at 100,000, on today's data (E-57 pagecost) *(measured)*.
+  - A new leader hands its views on: 1,796 to 3,271 hand-offs per 1,000 seeds with standbys (E-57) *(checked)*.
+  - Owed: the `view` selector in E-31's model, paging across a failover, and a data upgrade under live views.
 
-### 2.12 What the rules add up to
+### 2.8 data's merge contract, and data 5.0.0 (V5-14 pick 6)
 
-| Choice | Rules (LENS 4.4's rows; reasoned) | User rules (LENS 2.0) |
+- **Now.** **data 5.0.0 is one large major version, in TypeScript.** D1 (path subscriptions through a keyed index) and D2 (the callable lens that keeps nothing) come first. Then the merge contract (C1 to C10), the new operators (N1 to N5: `eq`, `in`, `by` and their kin), D3 (two-level stores), D4 (one sink shape) and D6 to D9, among them the ordered index. No Rust.
+  - **The merge contract** makes every view a function of its rows only, not of the order they came in: ties break by row key; one total order per direction; one numeric projection; an exact sum over every finite double; typed bucket keys (`1` and `'1'` are two buckets); and `limit` and `reverse` over unordered rows are marked "arrival" and stay right of the line.
+- **Before.** V5-12 pick 9 asked data for D1 to D4, in TypeScript, and kept Rust for L0 and L1. Today's data breaks the contract in many places: with 1 % strings in a number column, deleted rows stayed in a sorted view in 20 of 20 seeds (TRANSFORMS 2) *(checked)*.
+- **Why.** You asked whether data needs a new version. It does: two copies, a rebuilt view, a failed-over view and a client must agree as values. Built small in E-57, every check held with 0 unequal, and each planted bug was caught in 159 to 1,000 of 1,000 seeds *(checked)*. No Rust: rows stay JavaScript objects and user functions are JavaScript, and a plain Rust map fold measured no faster (E-54).
+- **Cost.** About 33 changes, 20 of them breaking, and about 5,000 to 10,000 lines written or changed against an engine of 7,699 lines *(a guess, against a count; TRANSFORMS 0)*: by lines it may touch as much code as the engine has. data's own users meet the breaking changes too. data's five path-rule holes (E-58) are listed in STATUS for its owner; fero needs none fixed, since its leader refuses those shapes first (V5-15).
+
+### 2.9 `derive` in two forms (V5-14 pick 5, V5-15 pick 4)
+
+- **Now.**
+  ```ts
+  // file: derive.ts — derive in two forms: the view form, and the record form, with rows or without
+  import { fero, op, derive } from 'fero'
+  type Order = { user: string; cents: number; paid: boolean }
+  const orders = await fero<Order>('orders', { server: true })            // a server of the source holds every row
+  const totals = await fero<number>('totals', { server: true })
+  await derive(orders.data.by('user').sum('cents'), totals)               // the view form: totals equals the view
+  const counts = await fero<number>('counts', { server: true })
+  await derive(orders, counts, (e) => {                                   // the record form: once per record, by marks
+    if (e.value) counts.data[e.value.user].set(op.incr(1), { from: e })   // e.value: whole-row writes only
+  })
+  const paid = await fero<number>('paid', { server: true })
+  await derive(orders, paid, (e, { row, prev }) => {                      // with rows: the row after and before the record
+    if (row?.paid && !prev?.paid) paid.data[row.user].set(op.incr(row.cents), { from: e })   // a field write counts too
+  }, { rows: true })
+  // @ts-expect-error the view form takes one value per bucket: group's buckets are as big as the rows
+  await derive(orders.data.group('user'), totals)
+  ```
+  - **The view form, `derive(view, target)`**: the target's rows equal a bucket view of the source, one value per bucket, over a string or number field. It reads rows, not history, so it needs no `history` and survives the log being cut. It takes the lock `derive:<target>`, with the code version in the lock row; **bumps** every target group (one fenced no-op write each); reads the source's position after the bumps (the **read barrier**); writes the difference; then follows. Only the deriver writes the target; any other write is refused `derived`.
+  - **The record form, `derive(source, target, fn)`**: `fn` runs once per source record and writes with `{ from: e }`, a mark that makes it exact across restarts. It needs the source's `history`. It sees the record, not the row: `e.value` is set only for a whole-row write.
+  - **The record form with rows**, `{ rows: true }`, is in the first build: `fn` also gets the row after the record and before it, so a field write counts too. A dev warning names the line when the plain record form reads `e.value` on a field record.
+- **Before.** Only the record form, with marks. V5-14 pick 8 kept the first build to records only; V5-15 pick 4 replaced it the same day. A record with several outputs was open (question 21).
+- **Why.**
+  - The view form as first planned (a lock, fenced writes, a full difference) failed 514 of 1,000 seeds: the target was wrong at idle in 28 and handed back to older code in 452. With the bump, the barrier and the code version: 0 of 1,000, through 11,810 deriver changes (E-57 B3) *(checked)*.
+  - A filter on `e.value` alone left the final set wrong in 582 and 584 of 1,000 seeds of E-58's mix (part 4) *(checked)*. With rows, such a filter is exact.
+  - Several outputs of one record: the mark carries the write's number within its record, and a record's outputs to one slot go out in order. E-30's model, widened to two outputs in one slot, held on all 12 bounds; without the number or the order, an output is lost (E-57 B5) *(checked)*.
+- **Cost.**
+  - The view form: 0.748 target writes per source commit, and a restart takes 48.7 to 51.8 ms at 10^5 source rows and 10^3 buckets (E-57 B3) *(measured)*. Its log is a log of states, so a reader that counts its records miscounts.
+  - The record form with rows: one fold a record, 0.63 to 1.5 µs, and about 330 B a row of the deriver's share (E-57 A1; E-05) *(measured)*. A build of it is owed.
+  - Past 256 outputs of one record to one slot: `too-many-outputs`. Two buckets with one name at run time stop the view form with `bucket-collision` *(reasoned; not run)*.
+
+### 2.10 What the rules add up to
+
+| Source | Rules on the base's 416 (reasoned; LAYERS 0.2) | User rules |
 |---|---|---|
-| 2.1 a path is an address | +3 to +4 | 1 |
-| 2.2 a client holds nothing | +1 | |
-| 2.3 `get`, `here`, `connect` | +2 | 2 |
-| 2.4 how a link ends | +4 to +5 | 5, 6 |
-| 2.5 `tap`'s argument | −1 | |
-| 2.6 the line | +3 to +4 | 3, 4 |
-| 2.7 writes on the path | −1 | |
-| 2.8 methods on a path | +1 | 7 |
-| 2.9 `depth: 2` | −1 to 0 | |
-| 2.10 `derive`, paced | +1 to +3 | |
-| **the first build** | **+12 to +18 on 416: 3 to 4 %** (V5-12) | **seven** |
-| 2.11 `asOf`, after the first build | +3, in a reader library | |
-| owed: the `view` selector, when modelled | +4 to +6 | |
-| later: class B | +5 (4 to 7) | |
+| the read surface: the lens's rows (V5-12, LENS 4.4, +12 to +18), READS 7 (−2 to +7) and CONNECT 8.5 (0 to +16) | +10 to +41 | seven (section 1) |
+| transformations, first build (V5-14; TRANSFORMS 8.3) | +21 to +45, about +26 | ten (2.7) |
+| paths (V5-15; ANYPATH) | 13 items, not priced: about 0 to +13 *(a guess)* | none counted; data's rule and the shape rule apply (2.4, 2.5) |
+| **the first build** | **+31 to +86: 447 to 502**, before V5-15's items | |
+| outside it: the `view` selector, modelled; the `past` reader | +4 to +6; +3 | |
+| later: class B; a folded resume; the browser build | +4 (3 to 6); +2 to +3; +1 | |
 
-- **The rows and their sum are LENS 4.4's.** Which choice each row sits under is this tour's.
-- **By V5-6's measure the lens costs rules, and cannot win on rules alone.** The trade (LENS 4.4; API 5.5): the seven places a computation can run are said with one address and one line, `here()`; a `get` no longer hides a follow; and `f.data.*` is typed.
-- **What you no longer have to know:** `follow`, `.open()`, `{ before }`, the two meanings of `tap`, `f.data.set`, the follow hidden in `get`, and `near` as a hint to learn.
-- **What stays, said plainly:** `hold` still has three values (nothing, `'all'`, a size). A write still has three spellings. A method on a path still declares one word, `at:`, where `near: true` stood.
-- **data changes for it, in TypeScript, none in Rust** (V5-12 pick 9; LENS 4.5): D1 (path subscriptions through a keyed index) and D2 (the callable lens that keeps nothing) first, then D3 (two-level stores) and D4 (one sink shape). Each is useful to data alone.
+- With TRANSFORMS' central +26, the first build is about 452 to 483 (LAYERS 0.2; arithmetic).
+- **By V5-6's measure these choices cost rules, and cannot win on rules alone.** The trade: one verb per read job; links that end by code you can see; one text for a position everywhere; views that agree as values on every copy; and every lens reading and writing right at any level.
+- **What you no longer have to know:** `here`, `tap`, the weak `connect` and its rule, `scope`, `closes`, `asOf` with its `seek` and `close`, `f.methods`, `f.snapshot`, `c.changes`, `c.now`, "fero's names win", and the operator `top`.
+- **What stays, said plainly:** `hold` has three values (nothing, `'all'`, a size); a write has three spellings (assignment on an untyped handle, `lens.set(v)`, `f.set(path, v)`); and `connect` has three forms.
 
-### 2.13 Choices from the first tour that stand
+## 3. Choices from the earlier tours that stand
 
-The lens changes their spelling, not their meaning.
+V5-13 to V5-15 changed their spelling, not their meaning. Each says the choice, why, and its cost, in short; the 2026-11-18 tour had the long form.
 
 ```ts
-// file: handle.ts — one write, three moments; many writes, together
+// file: address.ts — a path is an address: no trip, no read, nothing kept
 import { fero } from 'fero'
-type Reading = { c: number }
-const temps = await fero<Reading>('temps')                                    // a client: it holds nothing, and only writes
-const w = temps.data.a.set({ c: 20 })                                         // the write leaves with this turn's other writes
-await w.received                                                              // the leader has it          0.15 ms
-await w.replicated                                                            // most copies have it        0.36 ms
-const ack = await w                                                           // committed, on disk         0.97 ms
-const rows: [string, Reading][] = [['b', { c: 21 }], ['c', { c: 19 }]]
-for (let i = 0; i < rows.length; i += 256)                                    // a bulk load: a few hundred at a time
-  await Promise.all(rows.slice(i, i + 256).map(([k, v]) => temps.at(k).set(v)))
-console.log(ack.version)
+type Item = { stock: number; price: number }
+const shop = await fero<Item>('shop')
+const stock = shop.data.widgets.stock                     // two steps: an address. Not a promise
+const n = await stock.get()                               // a verb: read once
+const same = await shop.at('widgets', 'stock').get()      // the same address, with no Proxy
+// @ts-expect-error a lens is not a promise: `await` gives the lens back, not a value
+const wrong: number | undefined = await stock
+// @ts-expect-error a step names a field of the row, so a wrong name does not compile
+shop.data.widgets.stok.get()
+console.log(n, same, wrong)
 ```
 
-- **One handle, three moments** (V5-5, V5-11). `await w` is always the commit. `received` and `replicated` are progress reports for your own write, and nobody sees the write before it commits. Times: TypeScript, one box, median (MEMORY 9.3). Only a plain whole-row write has early moments. An op, a condition, a field write, a `once` name, a marked write, `set(fn)`, a batch and a method call answer at the commit only, and the types say so.
-- **Sending writes together is the default.** Writes made in one turn of the event loop leave in one message per leader and share disk syncs. `await` in a loop is the one slow shape: 16 writes take about 15.5 ms one by one and about 1 ms together (PA-40, computed). A client holds at most 512 waiting writes, or 64 MB. Past that a plain write's handle rejects `backpressure`, an assignment throws it, and a marked write waits (2.10).
-- **Read, decide, write: three safe forms**: an op, a condition (`if: { absent: true }`), and `lens.set(fn)`. On the prototype, a plain read then a plain set sold the last item twice in 120 of 120 races ([E-22](experiments/E22-api-prototype/README.md)). A method is not a transaction, even on a path.
-- **A resource is its own small cluster** (V5-2). It costs about 8 KB per server while idle (V5-8), so a resource is a table, not a row. A server role is real work, so it belongs in a server file.
-- **Errors: one class, sorted by what to do.** Every failure is a `FeroError` with a `code`, an `outcome` (did it commit?) and a `hint` that names the next call. The lens adds three codes: `bad-path`, `bad-key` and `too-many-views`, and a function left of `here()` is `unencodable`.
-- **`rows` and `snapshot`.** `f.rows.k` is one lookup; `f.snapshot` keeps v4's meaning, a whole picture per access. Both now read only a whole resource held on purpose (question 1).
+- **A path is an address** (V5-12 picks 10, 11). Each step is a lens, and a name is a key until it is called. `f.at(...keys)` builds the same lens with no `Proxy`. Why: one address reads, writes, calls and streams, and a lens with `then` once made an `async` helper download 100,000 rows in one GET (E-55 review). Cost: a step keeps 0 to 0.3 B a key, against data's 318 to 1,333 B today (E-55 claim 2), and costs 49 to 99 ns, or 162 to 222 ns with keys spread over 10^6 rows, the case `at()` is for (claim 1). `typeof lens` is `'function'`; seven probe names read as `undefined`. And typed code writes with `set` (V5-12 pick 6), since TypeScript cannot give a property one type to read and another to write (E-55 claim 5); assignment stays on untyped handles.
+- **A client holds nothing until a `connect()` says what** (V5-12 pick 1). `hold: 'all'` holds every row; a size is a cache of pictures, not subscribed. Why: every download is a line you wrote. Cost: v4's first example and about 20 example READMEs change, and `f.rows` on a bare client is a type error.
+- **A read is served here only from rows held on purpose**, and a GET carries the highest position this process has seen. Why: on E-55's first build a program showed 9.7 patterns of reads served here or by a trip over 1,000 seeds, by when the collector ran; with the rule, 1 (claim 14).
+- **A method on a path runs at that path's leader, and declares `at:`** (V5-12 picks 3, 13). The server refuses another path, `bad-path`: on E-55's changed build, 202 of 202 such calls were refused with 0 commits (claim 18). Cost: on a path, one trip and one commit; at the root, 0.66 extra trips a call with three servers. Type a client with `import type`, and check types before bundling: esbuild with `verbatimModuleSyntax` ships the server's code for `import { Shop }` by mistake (E-55 claim 24).
+- **`depth: 2`: the first key is the partition** (V5-12 pick 4). Why: a message as a field of its room would lose a row's version, ttl and early stages, and a field write copies its room on every copy, 0.43 ms at 1,000 messages (LENS 1.1). Cost: one-row partitions take 1.3 to 1.5 times the fold until data's D3 (claim 19).
+- **The mark is a write option, `{ from: e }`** (V5-12 pick 7). fero paces it: a marked write is never refused `backpressure`, and its reader stops yielding instead. Unpaced, E-55's stand-in lost outputs in 998 of 1,000 seeds; paced, 0 (claim 21). `derive()` and `consumer()` run it once.
+- **One handle, three moments** (V5-5, V5-11). `await w` is always the commit, 0.97 ms; `w.received` (the leader has it, 0.15 ms) and `w.replicated` (most copies have it, 0.36 ms) are progress reports for your own write (TypeScript, one box, median; MEMORY 9.3). Only a plain whole-row write has early moments, and the types say so: a field write, a room write, a condition, a `once` name and a mark answer at the commit only.
+- **Writes made together leave together.** `await` in a loop is the one slow shape: 16 writes take about 15.5 ms one by one and about 1 ms together (PA-40, computed). Past 512 waiting writes, a plain write's handle rejects `backpressure`, and an assignment throws it.
+- **Read, decide, write: three safe forms**: an op, a condition, and `lens.set(fn)`. A plain read then a plain set sold the last item twice in 120 of 120 races ([E-22](experiments/E22-api-prototype/README.md)).
+- **A resource is a table, not a row**: about 8 KB per server while idle (V5-8).
+- **Errors: one class.** Every failure is a `FeroError` with a `code`, an `outcome` (did it commit?) and a `hint` that names the next call. V5-13 to V5-15 add `ended`, `not-ready`, `aborted`, `bad-shape`, `bad-name`, `bad-arg`, `bad-target`, `bad-position`, `view-too-big`, `redeployed`, `stale-client`, `derived`, `bucket-collision` and `too-many-outputs`; `no-method` is now `no-such-method` (API 8).
 
-**What the old spellings became:**
+**What the 2026-11-18 spellings became:**
 
-| 2026-11-16 API.md | Now | Why |
+| 2026-11-18 | Now | Where |
 |---|---|---|
-| `f.follow(of)`, `.open()` | `lens.here()` | one word for "hold it live" (2.3) |
-| `near: true \| 'sku'` | `{ at: 'row' \| 'partition' \| 'any', run }` | a guard the server checks, not a hint to learn (2.8) |
-| `partition: { before: '/' }` | `depth: 2` | the first key is the partition (2.9) |
-| `await f.get(k)` | `await f.data[k].get()`, or `f.at(k).get()` | the read is a verb on the address (2.3) |
-| `changes({ of: k })` | `f.data[k].changes()` | the lens is the selector |
-| `derive`'s `out.set(k, v)` | `target.data[k].set(v, { from: e })` | the mark is on the write line (2.10) |
-| `fero<typeof shop>` with the handle exported | `export type Shop = typeof shop`, `import type`, `fero<Shop>` | the client never loads the server (2.8) |
-| a token's `follow` claim | its `read` claim | the claim keeps its meaning, under a word that still exists (question 18) |
+| `lens.here()` and its handle | `lens.connect()` | 2.1 |
+| `tap((c) => …)`, with `c.changes` and `c.now` | `connect((value, c) => …)`, with `c.diff` | 2.1 |
+| a weak `connect(target, fn)`, `scope`, `closes`, `close()` | `connect(fn, { signal, until })`, `disconnect()` | 2.2 |
+| `asOf(pos)`, with `step`, `seek` and `close` | `past(pos, { to })`, a value | 2.1, 2.3 |
+| `changes({ from, until: 'latest' })` | `changes({ from, to })` | 2.3 |
+| a write to a room, refused | `room.set(rows)`, `room.remove()` | 2.5 |
+| `f.methods.x(arg)` | `f.data.x(arg)` | 2.6 |
+| a method that returns a view, `here()`'d | `{ view }`, an address | 2.6 |
+| `f.snapshot` | `f.rows[k]`, or a spread you write | question 1 |
+| `f.cluster.tap(fn)`, `f.cluster.writes.tap(fn)` | `connect(fn)`, with `disconnect` | API.md's pick (6.2) |
 
-## 3. What every call costs, on one card
+## 4. What every call costs, on one card
 
-| Call | Trips | Commits | Whole-resource work |
+| Call | Trips | Commits | Whole-resource work, or the cost |
 |---|---|---|---|
 | a step, `f.data.a.b` or `f.at(a, b)` | 0 | 0 | none; nothing kept |
-| `f.rows.k`, `held.rows.k`, `held.value` | 0 | 0 | none |
+| `f.rows.k`, `h.value` | 0 | 0 | none: one lookup |
 | `lens.get()`: held on purpose / not | 0 / 1, each time | 0 | none; nothing kept |
-| `lens.get({ fresh: true })` | 1, plus the leader's check | 0 | none |
+| `lens.get({ when })` | as `connect()` while it waits | 0 | the partition, until the test passes |
 | a write: `lens.set`, `f.set(path, v)`, an assignment, `lens.remove` | 1 | 1, shared | none |
-| a write with `once` | 1 | 1 | none; about 221 B for a day |
-| a marked write, `{ from: e }` | 1 | a share of 1 | none; a 29 B mark. Never refused `backpressure` |
-| N writes made together | 1 message per leader | shared | none. At most 512 waiting, or 64 MB; then `backpressure` |
+| a field write with `if: { equals }` | 1 | 1 | the old value in the request; **not priced** |
+| `room.set(rows)`, `room.remove()` | 1 | 1 | one log entry, one tombstone per removed row; **a size rule is owed** |
+| a marked write, `{ from: e }` | 1 | a share of 1 | a 29 B mark; never refused `backpressure` |
+| N writes made together | 1 frame per leader | shared | at most 512 waiting, or 64 MB; then `backpressure` |
 | a method on a path | 1, to its leader | 1 or more | none |
-| a method with no path | 1, +1 per write its server does not lead | 1 or more | none |
-| a call with `once` | 1, plus up to 2 to `#calls`' leader | 3 in a row | none |
-| `lens.here()` on a partition | 1 SUB, shared | 0 | the partition once, then its changes |
-| a second `here()`, `tap` or `connect` on it | 0 | 0 | none: a lookup and a count |
-| `lens.connect(target, …)` | as `here()` | 0 | as `here()`; +28 to +35 ns a commit per weak link |
-| a dead link the net has not found | 0 | 0 | **its selection goes on crossing, for 7 ms to never** |
-| a lens inside a big partition | as `here()` | 0 | **the whole partition** (first build) |
-| `tap((c) => …)` | 0 | 0 | none; 92 to 198 ns a commit |
-| `f.methods.x(arg).here()`, a served view | 1 SUB | 0 | the view's work on a server, once for all equal calls; counted against the cap |
-| `lens.changes({ from })` | 1 to open | 0 | every kept record of the selection |
-| `lens.asOf(position)` | 1 log-mode SUB | 0 | the window's records once, folded here; `f.data.asOf` folds every partition |
+| a root action, `f.data.x(arg)` | 1, +1 per write its server does not lead | 1 or more | none |
+| `lens.connect()` on a partition | 1 SUB, shared | 0 | the partition once, then its changes |
+| another `connect()` on a held selection | 0 | 0 | a second handle, 163 to 169 ns; the lookup and count inside it, 39 to 45 ns (E-55 claim 6, for V5-12's `here()`) |
+| `connect(fn)` / a loop over `connect()` | 0 | 0 | 161 to 189 ns a commit / +166 to +241 ns over a callback |
+| a field link under data's rule | 0 | 0 | +6.7 to +11.2 ns a link a commit at 100 links |
+| **a link nobody ended** | 0 | 0 | **its changes go on crossing and folding until the process stops** |
+| a lens inside a big partition | as `connect()` | 0 | **the whole partition** (first build) |
+| operators right of `connect()` | 0 | 0 | a filter about 1 µs a change; `by().sum()` 0.66 to 1.84 µs at 10^6 rows |
+| `lookup(other, field)` | 1 per new key named | 0 | 2.9 to 3.9 µs a left change |
+| a served view, `f.data.best(10).connect()` | 1 SUB | 0 | **its work on its copy, on every write to the resource**; counted against the cap |
+| `{ pages }`: `page(after)` | 1 | 0 | 10 to 16 µs on the copy; **its index costs every write while it lives** |
+| `lens.changes({ from })` | 1 to open | 0 | every kept record on the path |
+| `changes({ from: -5 })` | 1 to open | 0 | the server counts back; **not priced on a real log** |
+| `lens.past(pos)` | 1 log read | 0 | a snapshot load, then 3.6 to 4.4 µs a record, folded here once |
+| `derive(view, target)` | 1 SUB to the source | 0.748 target writes per source commit | the view, on the deriver |
+| `derive(source, target, fn)` | 1 delivery a record | a share of 1 per output partition | a 29 B mark; with `{ rows: true }`, one fold a record |
 | opening a client, by default | 2 to 3 | 1 | none: it holds nothing |
-| `hold: 'all'`, or `f.data.here()` | 1 SUB | 0 | **the whole resource, once; then every write to it** |
+| `hold: 'all'`, or `f.data.connect()` | 1 SUB | 0 | **the whole resource, once; then every write to it** |
 | opening with a server role | | | **the whole log, a disk, a vote** |
-| listing `f.rows` or a handle's `rows`; v4's `f.snapshot` | 0 | 0 | **every held row** |
-| a saga | | 6 to 7 in a row | none |
-| a queue message; a `service` ask | | 3 | none |
+| listing `f.rows` or a partition's `value` | 0 | 0 | **every held row** |
 
-A write's own path is 2 trips and 1 disk sync, which is the least any correct design can do (PATHS 0). API.md section 4 has the full card, with sources. **Three whole-resource costs do not show in the line, so learn them**: `hold: 'all'` (an option, not a line of code), v4's `f.snapshot` (no brackets), and a lens inside a partition, which holds the whole partition (API 4).
+A write's own path is 2 trips and 1 disk sync, the least any correct design can do (PATHS 0). API.md section 4 has the full card, with `once`, sagas and queues, and the sources. **Four costs do not show in the line, so learn them**: `hold: 'all'` (an option, not a line of code), a lens inside a partition (it holds the whole partition), a served view or a `{ pages }` index (its copy pays on every write), and a link nobody ended.
 
-## 4. Explained badly before, and the same now
+## 5. Explained badly before, and the same now
 
 These did not change. They only get a plainer sentence.
 
-1. **Assignment and `set`.** "Assignment is `set` without the answer." Now only on untyped handles; typed code writes with `set`.
+1. **Assignment and `set`.** "Assignment is `set` without the answer." Only on untyped handles; typed code writes with `set`.
 2. **Roles.** "A process that brings something serves. A process that only names the resource is a client."
-3. **The options.** Ask of each: who remembers it? This process (`linger`), the resource (`depth`, `views`, `history`), or this open (`hold`, `server`).
-4. **"A rung per resource, never per write", and then answers per call.** Two different things. Every write commits the same way: on disk at a majority. A stage is only how far your own write has got when you hear back.
-5. **`fresh`.** "A local read can be a moment behind another process's write. `fresh` asks the leader." Most apps never need it.
-6. **`outcome`.** "Did it commit?" Most apps only log it.
-7. **Versions and cursors.** A version is a row's place in its partition's order. A cursor is a bookmark. Both are text you pass back.
-8. **"A check-then-set must carry a condition or be an op."** Or be `set(fn)`. One leader judges every write on the newest state, so your read is a copy that can be old. A method on a path does not change that.
-9. **`batch`.** Not "for speed". It means "all or none", inside one partition.
-10. **Five words to start**: resource, row, partition, path (the lens), method. Slots, groups, attempts and sessions are plumbing; they show only in `f.cluster`.
-11. **`here` and `changes`.** Rows, or records. `here()` keeps chosen rows up to date here, and a slow reader sees the newest state. `changes()` hands you every record, in order, and a slow reader waits.
+3. **The options.** Ask of each: who remembers it? This process (`linger.ms`), the resource (`depth`, `views`, `history`), or this open (`hold`, `server`).
+4. **A commit and a stage.** Every write commits the same way: on disk at a majority. A stage is only how far your own write has got when you hear back.
+5. **Versions and cursors.** A version names a record, and so the commit that holds it, inside one partition. A cursor is a bookmark anywhere. Both are text you pass back.
+6. **"A check-then-set must carry a condition or be an op."** Or be `set(fn)`. One leader judges every write on the newest state, so your read is a copy that can be old.
+7. **`batch`.** Not "for speed". It means "all or none", inside one partition. A room write is the same kind of thing for a whole room.
+8. **`connect` and `changes`.** Live state, or the log. `connect()` keeps the newest state here, and a slow reader skips ahead. `changes()` hands you every record, in order, and a slow reader waits.
 
-## 5. Questions for you
+## 6. Questions for you
 
-### 5.1 The first tour's sixteen questions: where each stands
+API.md 11.1 numbers the questions 1 to 33, and this tour keeps its numbers: 1 to 14 are the first tour's, 15 to 24 came with the 2026-11-18 page, and 25 to 33 are new picks of API.md where V5-13 to V5-15 leave room. Q-B1 and Q-B3 are the first tour's 15 and 16.
 
-Numbers 1 to 14 are the first tour's, and API.md 11.1 keeps them. The first tour's 15 and 16 are now API.md 11.2's Q-B1 and Q-B3, because API.md 11.1 uses 15 to 24 for new questions. "Closed" means a pick of V5-12 answers it by name. "Settled in use" means an approved decision already writes the answer, though you have not ruled on the question by name; API.md 11.1 marks the same three the same way.
+### 6.1 Decided
 
-| # | The question | Where it stands | By |
-|---|---|---|---|
-| 1 | `rows` for reads; what should `snapshot` be? | **open** (5.2) | |
-| 2 | verbs on the resource, or on `data`? | **closed**: the path write `f.data.k.set(v)` is the main spelling; `f.set(path, v)` is the array form; `f.data.set` goes | V5-12, its list of what goes; LENS 2.5 |
-| 3 | `near` now, or after the first build is timed? | **closed**: `near` goes; a method on a path runs at its leader and declares `at:` | V5-12 picks 3 and 13 |
-| 4 | `set(key, fn)`: add it? | **settled in use**: `lens.set(fn)`. The give-up after 8 tries stays a guess (Q-B6) | V5-12 approved LENS section 2's shape, and LENS 2.5 writes it |
-| 5 | `changes`, `log` or `read`? | **settled in use**: `changes()`, now a verb on the lens | V5-12, which drops `changes`'s `of:` and paces the `changes()` reader |
-| 6 | what a write does when the client is full | **in part**: a marked write waits and pauses its reader. The rest is **open** (5.2) | V5-12's rules |
-| 7 | must some process say `server: true` to create a resource? | **open** (5.2) | |
-| 8 | a client's default `hold` | **closed**: nothing, until a `here()` or a `tap`; `'all'` and a size stay as options | V5-12 pick 1 |
-| 9 | a `get` that misses: follow, or read once? | **closed**: `get()` reads once and holds nothing; `hold: false` goes | V5-12 pick 11, and its list of what goes |
-| 10 | no `set` on the typed client of a resource with methods? | **closed**: yes, in the types | V5-12 (LENS 2.4); V4-5 |
-| 11 | `{ retry: true }` on a call? | **open** (5.2) | |
-| 12 | a write with a `once` name has no early moments | **settled in use**: a named write can be refused, so it answers at its commit only | V5-11 ruling 6 |
-| 13 | the partition function in the first build? | **closed**: in the API, built later; `{ before }` goes for `depth` | V5-12 pick 4 |
-| 14 | the small names | **open** (5.2) | |
-| 15 | V5-11's gap: an early answer, then a refusal that is not about the row | **open**, for the design: API 11.2 Q-B1 (5.2) | |
-| 16 | who serves fero's own resources | **open**, for the design: API 11.2 Q-B3 (5.2) | |
+- **1.** `f.rows` and `f.snapshot`: decided, V5-13 pick 6 (`f.snapshot` goes; `f.rows` stays where every row is held).
+- **2.** Verbs on the resource or on `data`: decided, V5-12 (the path write; `f.set(path, v)` as the array form).
+- **3.** `near` on a method: decided, V5-12 picks 3 and 13 (a method on a path runs at its leader and declares `at:`).
+- **5.** `changes`, `log` or `read`: closed by V5-13 pick 1 (`changes()` is the log verb).
+- **8.** A client's default `hold`: decided, V5-12 pick 1 (nothing, until a `connect()` says what).
+- **9.** A `get` that misses: decided, V5-12 and V5-13 pick 1 (it reads once; `get({ when })` holds only while it waits).
+- **10.** No writes on a door client's types: decided, V5-12.
+- **12.** No early stages with a `once` name: decided, V5-11 ruling 6 (a mark and a room write have none either).
+- **13.** The partition function: decided, V5-12 pick 4 (in the API, built later).
+- **15.** `f.rows` on a client: decided, V5-13 pick 6 (only on a server or with `hold: 'all'`).
+- **16, its served-view half.** The caps: decided, V5-14 pick 2 (64 per copy, weighted by cost, with headroom). The other keys stay below.
+- **19.** `changes()` below a partition: decided, V5-15 pick 2 (the records on the lens's path).
+- **21.** Several marked outputs of one record: settled by TRANSFORMS 3.4 (E-57 B5), approved in general with V5-14; it is not one of V5-14's eight numbered picks (the mark carries the write's number). The model with marks from app code is still owed.
+- **Q-B8.** Who runs a `derive`: decided, V5-12 (the app's choice; `derive()` splits the shares).
 
-Six closed, three settled in use, one in part, six open.
+### 6.2 Still open
 
-### 5.2 Still open
+Each has API.md's pick. **Say yes, and both pages mark it closed.**
 
-Each has a pick. 1 to 14 are the first tour's numbers, and 15 to 24 are API.md 11.1's new ones. 15 to 19 are choices the rewrite made; 20 to 24 are calls the two skeptics' findings forced.
+- **4. `lens.set(fn)`.** **Pick: yes.** It is settled in use, but you have not ruled on it by name. On a field lens it is guarded by the field (V5-15 pick 5). The give-up after 8 tries is a guess (Q-B6).
+- **6. A plain write when the client is full** (512 waiting, or 64 MB). **Pick:** a verb's handle rejects `backpressure`, and an assignment throws it; a marked write waits. The other way, one stderr line, loses writes without the code knowing.
+- **7. Must some process say `server: true` to create a resource?** **Pick: yes, as v4.** The other way is an admin act, `fero create shop`, so no app file becomes a server by mistake: safer, and one more step before the first line works.
+- **11. `{ retry: true }` on a call.** **Pick: keep it, beside `once`.** Without it, a call that is safe to run twice pays `once`'s three commits.
+- **14. The small names.** Settled by V5-13 to V5-15: `connect`, `disconnect`, `changes`, `past`, `c.diff`, `c.version`, `c.cursor`, `to`, `{ view }`, `{ pages }`, `room.set`, `bad-shape`. **Still API.md's: `views.rows`, `sync()`, `ClusterShape.open` and `FieldEntry`**, beside the older list (`once`, `not-held`, `consumer`, `at`, `depth`, `{ from: e }`, `marks`, `call`, `linger.ms`, …). **Pick: as written**; each is a one-word change.
+- **16, the other half. The link keys.** **Pick:** `linger.ms` 1000, `views.client` 16 per client per copy, and `views.rows` 1,000 buckets: all guesses.
+- **17. `bad-path` for a write at the root or a room written any other way.** **Pick: reuse `bad-path`.** The other way is a code of its own.
+- **18. `f.get(k)`, `f.data.snapshot()` and a token's `follow` claim go; `ctx.use(other)` stays.** **Pick: as API.md has it.** The claim is renamed `read`. No decision removed `ctx.use`, and without it a handler's writes to a second resource fall outside the `once` re-run rule.
+- **20. A marked write with a `once` name.** **Pick: not allowed**; the types refuse `{ from: e, once }`. The mark already counts the write once per source record.
+- **22. When `past` is built.** **Pick: after the first build.** It needs nothing from the kernel. V5-13 gave it no slot.
+- **23. Behind the door: `mark`, `claim`, and `touch` on a row only.** **Pick:** a bare mark and a claim are writes, so a door client has neither; `touch` is a row's verb (V5-15 pick 7 agrees for `ttl` and `while`).
+- **24. How `consumer().run()` restarts.** **Pick:** from its share's own cursor, with no bare marks; a mark goes under the name its reader was started with, else the target's own name.
+- **25. What a log entry below a row carries.** V5-15 says when the entry comes, not what it shows. **Pick:** `e.value` is the lens's value right after the record (`FieldEntry`), since the reader keeps it anyway. ANYPATH's T1-T3 and its section 8 sketch read it the same way. The other way keeps `e.value` as "what a whole-row record wrote" at every level, and you fold the field out of `e.rec` by hand.
+- **26. The open-links list.** **Pick:** `f.cluster.snapshot().open`, each with its path, kind, count and start time.
+- **27. Roles in the types.** **Pick:** every server marker types the handle `'server'`; a handle typed by its rows only, with no marker, is a bare client, so its `f.rows` and root operators do not compile. The other way keeps "either role" for `fero<Row>(name)`.
+- **28. Operators on a server's root.** **Pick:** they run here, functions too, on a server, with `hold: 'all'` and in a handler's `ctx.data`. A partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types give the root no operators**, since a name there is a room: a server declares a view instead, and code over every row reads `f.data.connect()`'s value. The other way types a depth-2 root's operators and says how an operator name and a room name share the root.
+- **29. How `moved` and `stale-client` show.** **Pick:** `moved` stays inside fero, a reason the client follows by itself; `stale-client` is a refusal the app sees.
+- **30. A remove that finds nothing.** **Pick:** it answers as done (ANYPATH 4, *reasoned*).
+- **31. `f.cluster.tap(fn)` and `f.cluster.writes.tap(fn)` become `connect(fn)`.** **Pick:** yes, with `disconnect`: one live verb everywhere. V5-13 names only lenses. The other way keeps `tap` there.
+- **32. Who serves a view when the leader is the only copy.** V5-14 puts views on every copy but the leader; with one server process there is no such copy. **Pick (LAYERS 10's reading):** the leader serves, and pays the build's stall on the write path, until a second copy is ready; health says so. Not run. The other way: no served views until a second copy exists.
+- **33. Codes for two refusals V5-15 names without a code.** **Pick:** `bad-arg` for a `ttl` or `while` on a field write, and `too-large` for a room write past the size rule, once that rule exists. The other way is a code of its own for each.
+- **Q-B1 (the first tour's 15). An early answer, then a refusal not about the row.** **Pick:** through a closed write gate or a full disk fero keeps retrying; a revoked token ends `forbidden`. **Decides:** E-48's model with a gate and a revoke.
+- **Q-B3 (the first tour's 16). Who serves fero's own resources.** **Pick:** any process that serves a resource serves the system ones too. **Decides:** LAYERS section 10 item 5.
+- **Q-B10 and Q-B11 (new).** A stale or missing method table, in a rolling deploy or before any server answered, must never refuse a valid call; **decides:** a sim with servers on two table versions. A data upgrade under live served views and derivers: entries and the deriver's lock row carry the data build *(reasoned)*; **decides:** a rolling deploy with the build in the key.
 
-- **1. `rows` for reads. What should `snapshot` be?**
-  **Pick: `snapshot` keeps v4's meaning**, a whole frozen picture per access, at v4's cost; new code reads through `rows` or a handle. Then every `snapshot` in fero is a picture, and no v4 line changes its result. With the lens, both read only a whole resource held on purpose: a server's, or `hold: 'all'`'s. The other way makes `snapshot` a second name for the live `rows`: old lines get fast for free, but one word then means two things.
-- **4, 5 and 12. Say yes, and both pages mark them closed**: `lens.set(fn)` (4), `changes()` as the name (5), and no early moments for a named write (12). The give-up after 8 tries stays a guess until a timed hot-key run (API 11.2 Q-B6).
-- **6. What should a plain write do when the client is full** (512 waiting writes, or 64 MB)?
-  **Pick: a verb's handle rejects `backpressure`, and an assignment throws it.** A marked write waits instead, as V5-12 says. An assignment has no handle, so a throw is the only way the code can know. The other way, one line on stderr, loses writes without telling the code.
-- **7. Must some process say `server: true` to create a resource?**
-  **Pick: yes, as v4.** One file run three times is a cluster, with no ceremony. The patterns keep that line in a server file. The other way: an admin act (`fero create shop`) founds the resource on the project's server machines, so that no app file can become a server by mistake. Safer, and one more step before the first line works.
-- **11. `{ retry: true }` on a call: keep v4's cheap resend?**
-  **Pick: yes, beside `once`.** They mean different things. Without `retry`, a call that is safe to run twice pays `once`'s three commits, or the app writes its own retry.
-- **14. The small names**: `once`, `not-held`, `consumer`, `if: { lock }`, `copies` and `standbys`, `fero.of<Row>()`, `e.value`, a queue's `key`, `ping.ms`, `rendezvous` as a list, `handback.max`, `bulk.rate`. The lens's own names (`here`, `connect`, `at`, `depth`, `{ from: e }`, `marks`, `asOf`, `call`, `closes`, `scope`) came with V5-12's picks.
-  **Pick: as written.** Any of them can be renamed; each is a one-word change.
-- **15. `f.rows` on a client.**
-  **Pick: only with `hold: 'all'`**, as LENS 2.2 writes it; a partition held by `here()` is read through its handle. The other way lets a live `f.data.here()` count too, since it also holds the whole resource on purpose.
-- **16. The lens's config keys** (API 9).
-  **Pick: `linger.ms`** as a process key, 1000 by default (a guess); **`views.client` and `views.max`** as resource keys, 16 and 1,000 (guesses). LENS names a linger and a cap, but no keys and no numbers. The cap's numbers should come from the first served view on the prototype (E-55 claim 27).
-- **17. `bad-path` for a write above a row** (at the root, or on a partition at depth 2).
-  **Pick: reuse `bad-path`**: in both cases a call was made on a path that cannot take it. LENS defines it for methods only; the other way is a code of its own.
-- **18. `f.get(k)`, `f.data.snapshot()`, `view.snapshot()` and a token's `follow` claim go; `f.remove(path)` and `f.touch(path)` stay as array forms; `ctx.use(other)` stays.**
-  **Pick: as API.md has it.** None of these is in V5-12's list. The read is a verb on the address, a view is read through its handle, and the claim is renamed `read` because `follow` is gone. A draft of the rewrite dropped `ctx.use` with derive's `out`; a skeptic found that no decision names it, and that without it a handler's writes to a second resource fall outside the `once` re-run rule and the caller's session. So it stays.
-- **19. `changes()` on a lens below a partition.**
-  **Pick: the partition's records cross (rule 4), and the reader gets only those under the lens.** The other way gives the whole partition's records.
-- **20. A marked write with a `once` name.** API.md's types let `{ from: e }` take `if` and `ttl`, and refuse `once` (the first draft's types let it through by mistake; fixed, with lines that must fail). LENS 4.4 counted the mark as composing with `once` and `if`, at 0 to +2 rules.
-  **Pick: not allowed.** A mark already makes the write count once per source record, for as long as the source keeps its log; a `once` name lasts only a day. That is the low end of LENS 4.4's row (reasoned). The other way allows both, and the leader checks both, in a stated order.
-- **21. One source record with several marked outputs.** As LENS 2.8's rule is written, a second marked write of the same `e` to the same output slot would be skipped at the mark the first raised. And nothing commits a record's outputs together any more: the old `out` staged them into one entry, and separate marked writes do not. E-30's model sent one output per record and slot, so it never met this.
-  **Pick: until it is modelled, one marked write per source record per target. Then: the mark also carries the write's number within its record**, so the leader skips only what it applied. The other ways: a `batch` that takes `{ from: e }` (it covers one partition, and a slot holds many), or a mark per output partition.
-- **22. When is `asOf` built?** V5-12 counts it outside the first build's rules and gives it no slot.
-  **Pick: after the first build.** It needs nothing from the kernel, so it can come at any time. (API.md's first draft had it in the first build, and LAYERS had it later; both now say later.)
-- **23. Behind the door: `mark` and `claim`; and `touch` on a row only.**
-  **Pick: a bare mark and a claim are writes**, so a client of a resource with methods has neither, and the typed client does not show them. **`touch` is on a row lens only**, since a ttl is a row's. LENS speaks to none of the three.
-- **24. How `consumer().run()` restarts, and which name a mark goes under.** LENS 2.8 says `run` sends bare marks, but `run` has no target to send one to.
-  **Pick: `run` restarts from its share's own cursor**, moved only once the marked writes up to it are answered, and sends no bare marks. **A mark goes under the name its reader was started with** (`marks(name)`, or the consumer's name), else under the target's own name. The other way gives `run` a target, as the old `out.use(target)` did.
-- **Q-B1 (the first tour's 15). An early answer, then a refusal that is not about the row.** After a leader change, a resent plain write is judged again, and by then the write gate may be closed, a disk may be full, or the token may be revoked.
-  **Pick:** through a closed gate or a full disk, fero keeps retrying, so the handle ends at the commit, a `timeout` or `unknown`. A revoked token is the one exception: the handle ends `forbidden`, because retrying cannot clear it and `unknown` would be false. **Decides:** E-48's model with a gate and a revoke.
-- **Q-B3 (the first tour's 16). Who serves fero's own resources** (sessions, locks, sagas, calls, a queue), now that there is no project level?
-  **Pick:** any process that serves a resource also serves the system ones; a library's resource takes `server: true` like any other. **Decides:** [LAYERS.md](LAYERS.md) section 10 item 5. No call changes with it.
+API.md 11.2 lists six more gaps of the design (Q-B2, Q-B4 to Q-B7, Q-B9). None changes a call.
 
-API.md 11.2 lists seven more gaps of the design (Q-B2 and Q-B4 to Q-B9). None changes a call, and Q-B8 (who runs a `derive`) is closed by 2.10.
+### 6.3 Still owed, by decision
 
-### 5.3 Still owed before the lens ships
+**Nothing here changes a line of the API unless it fails.**
+- **V5-13:** the cost of `c.version` and `c.cursor` (bar: 50 ns a commit); counting back for `-N` on a real log, a cold partition beside a hot one included; `past` as a value in a real build; the `ended` guard in a real build; the per-row version store that `if: { version }`, diff entries and `c.version` rest on, kept inside the row's entry and timed (CONNECT 3.6; +10.5 to +276 ns a write as a separate `Map`, E-56 positions) *(measured)*. From CONNECT 9: whether the dev warning fires in a browser, and whether React needs `useSyncExternalStore`.
+- **V5-13 pick 7:** a folded resume, `connect({ resume })`, in E-31's model with a client-held base, before it is offered.
+- **V5-14:** the `view` selector in [E-31](experiments/E31-subscribe/README.md)'s model; paging across a failover; a data upgrade under live views (Q-B11). And the guessed defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 frames and the row guards.
+- **V5-15:** the cost of an `equals` guard at the leader, and its size on the wire; a size rule for room writes; a build of the record form with rows; the "on the path" reader for the log below a row; a field's `-N`, read from the row's log back.
+- **From V5-12:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27); E-30's model with marks written by app code; the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
+- **data 5.0.0** (V5-14 pick 6): D1 and D2 first, D1 with a pin (claim 8 sits at its bar), then the merge contract, the operators, D3, D4 and D6 to D9.
 
-From LENS 7 Q14 and V5-12's consequences, with API 11.2's additions. **Nothing here changes a line of the API unless it fails.**
-- **The `view` selector in [E-31](experiments/E31-subscribe/README.md)'s model** (E-55 claim 22): failover, a reload, a slot move, a slow reader, a resume by a new picture, in at most 8 rules.
-- **The 22 patterns end to end** (claim 25): E-22's prototype ported to the lens's spelling, 100 seeds each. API.md's lines compile; none ran.
-- **A served view with its cap, on the prototype** (claim 27).
-- **E-30's model with marks written by app code** (claim 21 is a seeded stand-in), with the leader's order rule per writer per output slot across a slot move, a source record with two outputs in one output slot (question 21), the name a mark goes under, and `run()`'s restart (question 24).
-- **The pacing rule in a real client**: a marked write that waits, and a `changes()` reader that stops yielding.
-- **A GET that carries the highest position seen, against copies that lag**, and rule Y for `get()`. The prototype had one server.
-- **data's changes** (V5-12 pick 9): D1, the keyed index, needs a pin when it is built, since claim 8 sits at its bar (median 1.25 over 15 runs, the changed build's own 1.36, bar 1.3); D3 before small depth-2 partitions are cheap (claim 19); D4, since data's delivery is most of a tap's cost (claim 10).
-
-## 6. Stated from reasoning; say if any is wrong
+## 7. Stated from reasoning; say if any is wrong
 
 No experiment ran these. API.md marks each one.
-- **When `await fero(name)` comes back.** A client, by default: once it has reached a server and learned the leaders. With `hold: 'all'`: once the first picture of every row has arrived. With no server up: after `connect.wait`, and then a sync read throws `not-held` until rows come (v4 printed `{}`).
+- **When `await fero(name)` comes back.** A client, by default: once it has reached a server and learned the leaders. With `hold: 'all'`: once the first picture of every row is folded. With no server up: after `connect.wait`; then a sync read throws `not-held` until rows come (v4 printed `{}`).
 - **"Now", for `changes()`, is the call**, not the first turn of the loop (Q-B7).
-- **A size is a cache of pictures**, not subscribed, never read from (not built).
-- **The cap on served views and its numbers** (not built: claim 27).
-- **Two `here()`s in one scope ride one link** (LENS 2.6).
-- **A method declared `at: 'any'`** runs at the partition's leader when called inside one partition, and on any server at the root (API's reading of LENS 2.4).
-- **With two servers the second does not vote.** A server past `copies + standbys` (5) is a spare that holds no copy until healing gives it one.
+- **A size is a cache of pictures**, not subscribed, never read from.
+- **A version from another slot can give a quiet wrong answer** (CONNECT 3.2), and a whole-resource cursor is 4 to 13 KB.
+- **A method declared `at: 'any'`** runs at the partition's leader inside one partition, and on any server at the root.
+- **A spare server**, past `copies + standbys`, holds no copy, and answers a served view's SUB `moved`.
 
 **Follow-ups this pass leaves for other files.**
-- **[LAYERS.md](LAYERS.md)** was rewritten for V5-12 on the same day; it carries what LENS 4.3 lists (its header table says where).
-- **Done in the same commit series:** [DECISIONS.md](../DECISIONS.md) has the note "V5-12 amended" (the one miss is claim 11); [LENS.md](LENS.md) line 3 and [VERDICT.md](VERDICT.md) 11.7 now say the owner decided (V5-12) and the three pages were rewritten on 2026-11-18; LENS 2.8 points to API.md section 3.11 for how `consumer().run()` restarts (question 24).
-- **The examples ladder.** Rungs 03, 04, 08, 10, 12, 13, 16 and 17 change their lesson, and so does every rung whose client reads rows, since a bare client now holds nothing (about 20 READMEs; API 5.1).
-- **Owed tests**: `console.log(f.rows)` prints the rows (a bare `Proxy` would print `{}`); two pins on `f.rows.k`, one for a row already read and one for a row just written; and D1's pin.
+- **[LAYERS.md](LAYERS.md)** was updated for V5-13 to V5-15 the same day. It carries API.md's own picks, questions 25 to 33, in its section 10 item 46.
+- **The examples ladder.** `f.snapshot` is gone, so 89 lines in 52 example files change (READS 9). Rungs 03, 04, 08, 10, 12, 13, 16 and 17 change their lesson, and so does every rung whose client reads rows, since a bare client now holds nothing (about 20 READMEs; API 5.1).
+- **Owed tests:** `console.log(f.rows)` prints the rows; two pins on `f.rows.k`; D1's pin.
 
-## 7. How this page is checked
+## 8. How this page is checked
 
-Every `ts` block on this page whose first line is `// file: <name>` is written to a fresh folder beside API.md's own `fero.d.ts` and `env.d.ts`, and type-checked with `tsc` against data's shipped types. API.md's `env.d.ts` gives the stand-ins (`el`, `ws`, `list`, `draw`). Each `@ts-expect-error` line fails the check if it ever compiles.
+Every `ts` block on this page whose first line is `// file: <name>` is written to a fresh folder beside API.md's own `fero.d.ts` and `env.d.ts`, and type-checked with `tsc` against data's shipped types. API.md's `env.d.ts` gives the stand-ins (`draw`, `ws`, `el`, `req`, `res`, `signal`, `saved`, `keep`). Then, in a copy where each `@ts-expect-error` of this page is a plain comment, each line it marks must fail at its own line, and nothing else may: the strip proof, as on API.md.
 
 ```js check
-// API-TOUR.md checker: this page's "// file: <name>" blocks, type-checked with tsc against
-// API.md's own fero.d.ts and env.d.ts, in a fresh folder. DATA names data's folder.
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
+// API-TOUR.md checker: this page's "// file: <name>" blocks, with API.md's own fero.d.ts and env.d.ts, are written to
+// a fresh folder and type-checked with tsc against data's shipped types (DATA names data's folder). Then, in a copy
+// where each of this page's @ts-expect-error is a plain comment, each line it marks must fail, and nothing else may.
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -627,29 +604,47 @@ const data = process.env.DATA ?? join(here, '../../../../../../data')
 // a block may sit indented inside a list item: its own indent is taken off every line
 const blocks = (file) => [...readFileSync(file, 'utf8').matchAll(/^( *)```ts\n\1(\/\/ file: (\S+)[^\n]*\n[\s\S]*?)^\1```/gm)]
   .map(([, pad, body, name]) => [name, body.replace(new RegExp('^' + pad, 'gm'), '')])
-const out = mkdtempSync(join(tmpdir(), 'fero-tour-'))
-const files = []
-const put = (name, body) => { writeFileSync(join(out, name), body); files.push(name) }
-for (const [name, body] of blocks(join(dirname(tour), 'API.md'))) if (name === 'fero.d.ts' || name === 'env.d.ts') put(name, body)
-for (const [name, body] of blocks(tour)) put(name, body)
-const compilerOptions = {
-  target: 'es2022', module: 'esnext', moduleResolution: 'bundler', strict: true, noEmit: true,
-  types: [], lib: ['es2022'], paths: { fero: ['./fero.d.ts'], data: [join(data, 'types/public.d.ts')] },
+const base = blocks(join(dirname(tour), 'API.md')).filter(([name]) => name === 'fero.d.ts' || name === 'env.d.ts')
+const own = blocks(tour)
+const root = mkdtempSync(join(tmpdir(), 'fero-tour-'))
+const compilerOptions = { target: 'es2022', module: 'esnext', moduleResolution: 'bundler', strict: true, noEmit: true,
+  types: [], lib: ['es2022', 'dom'], paths: { fero: ['./fero.d.ts'], data: [join(data, 'types/public.d.ts')] } }
+const put = (dir, strip) => {
+  const marked = []
+  mkdirSync(dir)
+  for (const [name, body] of base) writeFileSync(join(dir, name), body)
+  for (const [name, body] of own) {
+    const lines = body.split('\n')
+    if (strip) lines.forEach((l, i) => {
+      if (l.includes('// @ts-expect-error')) { marked.push(`${name}:${i + 2}`); lines[i] = l.replace('@ts-expect-error', '(must fail below)') }
+    })
+    writeFileSync(join(dir, name), lines.join('\n'))
+  }
+  writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions, files: [...base, ...own].map(([name]) => name) }))
+  return marked
 }
-writeFileSync(join(out, 'tsconfig.json'), JSON.stringify({ compilerOptions, files }))
-console.log(`${files.length - 2} blocks of this page → ${out}`)
-execFileSync('tsc', ['-p', join(out, 'tsconfig.json')], { stdio: 'inherit' })
-console.log(`ok: ${files.length - 2} blocks type-check (tsc ${execFileSync('tsc', ['-v']).toString().trim()})`)
+put(join(root, 'page'), false)
+console.log(`${own.length} blocks of this page → ${join(root, 'page')}`)
+execFileSync('tsc', ['-p', join(root, 'page', 'tsconfig.json')], { stdio: 'inherit' })
+console.log(`ok: ${own.length} blocks type-check (tsc ${execFileSync('tsc', ['-v']).toString().trim()})`)
+const marked = put(join(root, 'stripped'), true)
+let out = ''
+try { execFileSync('tsc', ['-p', join(root, 'stripped', 'tsconfig.json')], { encoding: 'utf8' }) } catch (e) { out = e.stdout }
+const errors = out.split('\n').filter((l) => /^\S+\(\d+,\d+\): error/.test(l))
+const at = errors.map((l) => l.replace(/^(\S+?)\((\d+),\d+\).*$/, (_, f, n) => `${f.split('/').pop()}:${n}`))
+for (const l of errors) console.log('  ' + l.split('/').pop().slice(0, 150))
+const missed = marked.filter((m) => !at.includes(m)), stray = at.filter((a) => !marked.includes(a))
+console.log(`stripped → ${join(root, 'stripped')}: ${marked.length} marked lines, ${marked.length - missed.length} fail at their own line, ${stray.length} errors elsewhere`)
+if (!marked.length || missed.length || stray.length) { console.log({ missed, stray }); process.exit(1) }
 ```
 
-Run from the repo root (`DATA` names data's folder; the default is this machine's):
+Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the default is this machine's):
 
 ```sh
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/API-TOUR.md)" docs/v5-space/API-TOUR.md
 ```
 
-**Result, run here on 2026-11-18, after the two skeptics' fixes** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 14 blocks type-check (tsc Version 6.0.2)`.
-- There are 7 `@ts-expect-error` lines: two in `address.ts`, one in `line.ts` and four in `methods.ts`. With all 7 stripped from a copy of the generated folder, tsc reports 7 errors, each at the stripped line and for the reason its comment gives: `await stock` used as a value, "Type 'Lens<number, …>' is not assignable to type 'number | undefined'"; `stok`, "Property 'stok' does not exist … Did you mean 'stock'?"; `shop.methods.sell(1)`, `stock.sell(1)` and `stock.set(4)`, "Property 'sell' (or 'set') does not exist"; `stock.call('sell', 1)`, "Argument of type '"sell"' is not assignable to parameter of type 'never'".
-- **One fails for a reason the types cannot say in words**: a function left of `here()` fails with "This expression is not callable", as in API.md (its section 12).
-- **One gap the first check found is now closed in API.md's types**: `lens.call(name, arg)` compiled for any method name on any lens. It now takes only the methods that kind of lens may call (2.8).
+**Result, run here on 2026-11-20, after the V5-13 to V5-15 rewrite** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 11 blocks type-check (tsc Version 6.0.2)`, then `21 marked lines, 21 fail at their own line, 0 errors elsewhere`.
+- **Where the 21 are:** three each in `verbs.ts`, `ends.ts`, `positions.ts`, `writes.ts`, `methods.ts` and `views.ts`, two in `address.ts`, and one in `derive.ts`. Each fails for the reason its comment gives: `connect({ once })` and `{ from }` on `connect` against the options whose text names `get()` and `changes()` (TS2769, TS2322); an awaited handle is not a row (TS2739); `until` with a DOM node or an HTTP request is not `Closes` (TS2322); `tap`, a root `set`, a function or a root operator left of `connect()` are not callable (TS2349); a version or `-5` on the root, and a bare number as a time, against `Pos` and its "a time is a Date" text (TS2322); `ttl` on a field (TS2769); a room set to one row (TS2322); `f.methods` (TS2339); an awaited served view (TS2740); a method named `connect` and an unbounded view, on the method (TS2322); `derive` of `group` (TS2345); `await stock` and `stok`, as before.
+- **Two fail for a reason the types cannot say in words**: a root `set` and a function left of `connect()` fail with "This expression is not callable", as in API.md (its section 12).
 - **Not checked here: that any of it runs.** Nothing on this page is built.
