@@ -1,0 +1,2 @@
+{"exp":"E-57","claim":"XA-11","tsc":"Version 6.0.2","exit":0,"errors":""}
+{"exp":"E-57","claim":"XA-11","config":"expect-error lines stripped","errors":"_stripped.ts(47,46): error TS2339 _stripped.ts(49,41): error TS2339 _stripped.ts(51,61): error TS2339 "}

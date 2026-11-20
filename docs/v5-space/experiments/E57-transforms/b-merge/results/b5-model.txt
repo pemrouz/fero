@@ -1,0 +1,140 @@
+# E-57 B5 model runs, 2026-11-20T03:37:10Z, Python 3.13.17, load 1.18 1.33 1.41
+srchi-slot-w short: 64,897 states, 4.2s: all hold
+    DONE: 13,728 judged states, 0 cannot reach the goal
+srchi-slot-w gcrash: 337,773 states, 23.3s: all hold
+    DONE: 68,882 judged states, 0 cannot reach the goal
+srchi-slot-w drop: 136,078 states, 9.0s: all hold
+    DONE: 28,331 judged states, 0 cannot reach the goal
+srchi-slot-w long: 194,691 states, 13.0s: all hold
+    DONE: 41,184 judged states, 0 cannot reach the goal
+srchi-slot-w deep: 12,019 states, 0.6s: all hold
+    DONE: 3,500 judged states, 0 cannot reach the goal
+srchi-slot-w bmove: 7,029 states, 0.4s: all hold
+    DONE: 2,210 judged states, 0 cannot reach the goal
+srchi-slot-w bmove2: 42,877 states, 2.4s: all hold
+    DONE: 11,178 judged states, 0 cannot reach the goal
+srchi-slot-w two-short: 4,885 states, 0.2s: all hold
+    DONE: 1,100 judged states, 0 cannot reach the goal
+srchi-slot-w two-gcrash: 16,937 states, 0.9s: all hold
+    DONE: 3,706 judged states, 0 cannot reach the goal
+srchi-slot-w two-drop: 10,200 states, 0.5s: all hold
+    DONE: 2,230 judged states, 0 cannot reach the goal
+srchi-slot-w two-deep: 8,407 states, 0.4s: all hold
+    DONE: 2,268 judged states, 0 cannot reach the goal
+srchi-slot-w two-bmove: 47,281 states, 2.7s: all hold
+    DONE: 10,172 judged states, 0 cannot reach the goal
+## planted: the mark without the write's number (E-30's srchi-slot as it is)
+srchi-slot two-short: 7,069 states, 0.3s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 1), ('m', ('c', ('d', 'a1', 0, 'b1'), 0, ('a1', 0, 1, 0), 2, 0)))
+     6. commit b1 ('w', ('d', 'a1', 0, 'b1'), ('a1', 0, 1, 0), 0, 0, 'b1')
+     7. learn (('o', 2),)
+     8. apply (('g', 0), ('m', ('c', ('d', 'a1', 0, 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     9. commit b0 ('w', ('d', 'a1', 0, 'b0'), ('a1', 0, 0, 1), 0, 0, 'b0')
+    10. learn (('o', 0),)
+    11. learn (('o', 1),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+srchi-slot two-gcrash: 15,656 states, 0.6s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 1), ('m', ('c', ('d', 'a1', 0, 'b1'), 0, ('a1', 0, 1, 0), 2, 0)))
+     6. commit b1 ('w', ('d', 'a1', 0, 'b1'), ('a1', 0, 1, 0), 0, 0, 'b1')
+     7. learn (('o', 2),)
+     8. apply (('g', 0), ('m', ('c', ('d', 'a1', 0, 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     9. commit b0 ('w', ('d', 'a1', 0, 'b0'), ('a1', 0, 0, 1), 0, 0, 'b0')
+    10. learn (('o', 0),)
+    11. learn (('o', 1),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+srchi-slot two-drop: 14,454 states, 0.7s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 1), ('m', ('c', ('d', 'a1', 0, 'b1'), 0, ('a1', 0, 1, 0), 2, 0)))
+     6. commit b1 ('w', ('d', 'a1', 0, 'b1'), ('a1', 0, 1, 0), 0, 0, 'b1')
+     7. learn (('o', 2),)
+     8. apply (('g', 0), ('m', ('c', ('d', 'a1', 0, 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     9. commit b0 ('w', ('d', 'a1', 0, 'b0'), ('a1', 0, 0, 1), 0, 0, 'b0')
+    10. learn (('o', 0),)
+    11. learn (('o', 1),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+srchi-slot two-deep: 546 states, 0.0s: LOST (9 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', 0, 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     5. commit b0 ('w', ('d', 'a1', 0, 'b0'), ('a1', 0, 0, 1), 0, 0, 'b0')
+     6. learn (('o', 0),)
+     7. learn (('o', 1),)
+     8. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+     9. commit gc ('cur', 'a1', 1)
+srchi-slot two-bmove: 22,008 states, 0.9s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 0), ('m', ('c', ('d', 'a1', 0, 'P'), 0, ('a1', 0, 0, 0), 2, 0)))
+     6. commit b0 ('w', ('d', 'a1', 0, 'P'), ('a1', 0, 0, 0), 0, 0, 'P')
+     7. learn (('o', 2),)
+     8. apply (('g', 1), ('m', ('c', ('d', 'a1', 0, 'R'), 0, ('a1', 0, 1, 1), 1, 0)))
+     9. commit b1 ('w', ('d', 'a1', 0, 'R'), ('a1', 0, 1, 1), 0, 0, 'R')
+    10. learn (('o', 0),)
+    11. learn (('o', 1),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+## the order rule dropped
+srchi-slot-w two-short: 7,896 states, 0.3s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 0), ('m', ('c', ('d', 'a1', (0, 1), 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     6. commit b0 ('w', ('d', 'a1', (0, 1), 'b0'), ('a1', 0, 0, 1), 0, (0, 1), 'b0')
+     7. learn (('o', 0),)
+     8. learn (('o', 1),)
+     9. apply (('g', 1), ('m', ('c', ('d', 'a1', (0, 0), 'b1'), 0, ('a1', 0, 1, 0), 2, 0)))
+    10. commit b1 ('w', ('d', 'a1', (0, 0), 'b1'), ('a1', 0, 1, 0), 0, (0, 0), 'b1')
+    11. learn (('o', 2),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+srchi-slot-w two-deep: 561 states, 0.0s: LOST (9 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 9 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. apply (('g', 0), ('m', ('c', ('d', 'a1', (0, 1), 'b0'), 0, ('a1', 0, 0, 1), 1, 0)))
+     5. commit b0 ('w', ('d', 'a1', (0, 1), 'b0'), ('a1', 0, 0, 1), 0, (0, 1), 'b0')
+     6. learn (('o', 0),)
+     7. learn (('o', 1),)
+     8. commit (('mine', (0, 1)), ('p', 0), ('s', 'a1'))
+     9. commit gc ('cur', 'a1', 1)
+srchi-slot-w two-bmove: 23,571 states, 1.0s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start ()
+     2. emit (('o', 0),)
+     3. emit (('o', 1),)
+     4. emit (('o', 2),)
+     5. apply (('g', 0), ('m', ('c', ('d', 'a1', (0, 0), 'P'), 0, ('a1', 0, 0, 0), 2, 0)))
+     6. commit b0 ('w', ('d', 'a1', (0, 0), 'P'), ('a1', 0, 0, 0), 0, (0, 0), 'P')
+     7. learn (('o', 2),)
+     8. apply (('g', 1), ('m', ('c', ('d', 'a1', (0, 1), 'R'), 0, ('a1', 0, 1, 1), 1, 0)))
+     9. commit b1 ('w', ('d', 'a1', (0, 1), 'R'), ('a1', 0, 1, 1), 0, (0, 1), 'R')
+    10. learn (('o', 0),)
+    11. learn (('o', 1),)
+    12. commit (('mine', (0, 1, 2)), ('p', 0), ('s', 'a1'))
+    13. commit gc ('cur', 'a1', 1)
+{"exp":"E-57","part":"b-merge","claim":"B5","bench":"mark-bytes","node":"v22.22.0","entries":1000000,"bytesPerEntry":{"sequence (today)":29,"sequence x 256 + w (packed)":29,"[sequence, w] (a pair)":93},"onTheWire":"the write number is a small integer: one more varint byte per marked write while w < 128 (reasoned)"}
