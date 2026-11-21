@@ -1,0 +1,105 @@
+diff -ru a/kernel/node.ts b/kernel/node.ts
+--- a/kernel/node.ts
++++ b/kernel/node.ts
+@@ -431,10 +431,12 @@
+ 
+   // Write at key(+path). Missing key with empty path = add; missing key with
+   // a path is an error (no implicit row creation through a deep write).
+-  write(key: RowKey, path: Path, value: unknown, at?: number): void {
++  // E-62: `ver`, when given, is the record's version; it is kept in the row's own entry (Store.vers) even when the
++  // write changes nothing, since the row's version is its last write's (V5-15 pick 5)
++  write(key: RowKey, path: Path, value: unknown, at?: number, ver?: number): void {
+     const rt = this.runtime
+     if (!rt.canWriteNow()) {
+-      rt.queueWrite(() => this.write(key, path, value, at))
++      rt.queueWrite(() => this.write(key, path, value, at, ver))
+       return
+     }
+     // Mode branch keeps the packed lane at ONE probe (slotOf) and the
+@@ -453,10 +455,12 @@
+       const s = st.slotOf(key)
+       if (s === undefined) {
+         this.writeAdd(key, path, value, at)
++        if (ver !== undefined && st.vers !== null) st.vers[st.slotOf(key) as number] = ver // an add: one more probe
+         return
+       }
+       slot = s
+       prev = st.rowAt(s)
++      if (ver !== undefined && st.vers !== null) st.vers[s] = ver
+     }
+     const before = leafAt(prev, path)
+     if (Object.is(before, value)) return // no-phantom-events, enforced once
+diff -ru a/kernel/store.ts b/kernel/store.ts
+--- a/kernel/store.ts
++++ b/kernel/store.ts
+@@ -38,6 +38,10 @@
+   declare obj: Record<string, T> | null // adopted lane — null once promoted
+   declare okeys: string[] | null // adopted iteration order (Object.keys at adopt)
+   declare ident: boolean // adopted-ARRAY lane: key i ≡ slot i, no keySlot/slotKey
++  // E-62 (a scratch change, not data's): each row's version kept in its own entry, a column beside `slots`
++  // indexed by the same slot. null until keepVersions(); then the write path stores one number per write and the
++  // read is one more array load after the keySlot probe it already makes. Packed lane only.
++  declare vers: Float64Array | null
+ 
+   constructor() {
+     this.slots = []
+@@ -48,6 +52,30 @@
+     this.obj = null
+     this.okeys = null
+     this.ident = false
++    this.vers = null
++  }
++
++  // E-62: start keeping a version per row (promotes an adopted store first: the column needs slots)
++  keepVersions(): void {
++    if (this.ident) this.materializeKeys()
++    if (this.obj !== null) this.promote()
++    if (this.vers === null) this.vers = new Float64Array(Math.max(16, this.slots.length * 2))
++  }
++
++  private growVers(): void {
++    const v = this.vers as Float64Array
++    if (this.slots.length <= v.length) return
++    const n = new Float64Array(v.length * 2)
++    n.set(v)
++    this.vers = n
++  }
++
++  // E-62: the version of a live row, or undefined
++  verOf(key: RowKey): number | undefined {
++    const v = this.vers
++    if (v === null) return undefined
++    const s = this.keySlot.get(key)
++    return s === undefined ? undefined : v[s]
+   }
+ 
+   // ── ADOPTED-ARRAY (IDENT) MODE (M6 Phase 3) ────────────────────────────────
+@@ -110,6 +138,7 @@
+     }
+     this.obj = null
+     this.okeys = null
++    if (this.vers !== null) this.growVers()
+   }
+ 
+   get size(): number {
+@@ -204,6 +233,7 @@
+     this.slots.push(row)
+     this.slotKey.push(key)
+     this.keySlot.set(key, slot)
++    if (this.vers !== null) this.growVers()
+     if (typeof key === 'number' && key >= this.nextKey) this.nextKey = key + 1
+     return undefined
+   }
+@@ -224,10 +254,12 @@
+   compact(): void {
+     const slots: (T | undefined)[] = []
+     const slotKey: RowKey[] = []
++    const v = this.vers
+     for (let i = 0; i < this.slots.length; i++) {
+       const k = this.slotKey[i]
+       if (this.keySlot.get(k) === i) {
+         this.keySlot.set(k, slots.length)
++        if (v !== null) v[slots.length] = v[i]
+         slots.push(this.slots[i])
+         slotKey.push(k)
+       }
