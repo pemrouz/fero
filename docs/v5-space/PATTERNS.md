@@ -121,7 +121,7 @@ await asker.ask({ path: 'a.png' })
 2. `ask()` looks for a live answerer. With none, it fails `no-answerer` at once. Otherwise it writes the request as a row, with a ttl (a time to live) as long as its timeout. Commit 1.
 3. A worker **claims** the request: the leader of its partition leases the row to that worker. Commit 2. The worker runs your function.
 4. The worker writes the reply, only if no reply exists yet. Commit 3. The asker follows its own reply rows, so it gets the reply. The worker then removes the request, after the asker has its answer.
-5. **If your function throws**, the worker gives the request back, and a worker takes it again, as a queue job (V5-17). Each such try costs two more commits: the release and the next claim. The request ends at its time to live, the asker's timeout; then the asker gets `timeout`. After `deliveries` tries, 5 by default, the request is answered as failed instead: the ask rejects `threw`, with the last message (*API.md's reading*, its question 41).
+5. **If your function throws**, the worker gives the request back, and a worker takes it again, as a queue job (V5-17). Each such try costs two more commits: the release and the next claim. The request ends at its time to live, the asker's timeout; then the asker gets `timeout`. After `deliveries` tries, 5 by default, the request is answered as failed instead: the ask rejects `threw`, with the last message (V5-19).
 6. The asker's links to the presence rows and to its reply rows are the library's: it opens and ends them, and they show in `f.cluster.value.links` (V5-17).
 
 **What it promises, and what it does not.**
@@ -132,7 +132,7 @@ await asker.ask({ path: 'a.png' })
 - **The server dies during a call.** The caller gets `unknown`: the call may have run, and fero does not send it again. `{ retry: true }` sends it again: use it only for a handler that is safe to run twice, as `quote` is. `{ once: 'q-17' }` names the call instead. fero first claims that name in `#calls`, so the call runs at most once, from any process, for a day. A retry gets the first answer.
 - **The leader changes.** The call is redirected once, then goes straight to the new leader ([E-55] claim 18, on a prototype; checked).
 - **A worker dies mid-request.** Its claim lapses, and another worker takes the request. With an answerer killed in half the runs: 383 answers and 17 timeouts of 400 asks, never two answers ([E-22]; checked).
-- **The answer function throws.** The request goes back, and this worker or another takes it again (step 5). A request that always throws is tried 5 times, then the ask rejects `threw`, unless the asker's timeout runs out first: then it rejects `timeout`. Make the function safe to run again (V5-17; *API.md's reading* for the count).
+- **The answer function throws.** The request goes back, and this worker or another takes it again (step 5). A request that always throws is tried 5 times, then the ask rejects `threw`, unless the asker's timeout runs out first: then it rejects `timeout`. Make the function safe to run again (V5-17; V5-19 for the count).
 - **The only worker just died.** It still looks alive for up to `session.ms` (10 s), so asks time out instead of failing at once ([E-22] D7).
 - **A request comes twice.** fero's own resends count once within a session ([E-20]). A second `ask` from your code is a second request.
 

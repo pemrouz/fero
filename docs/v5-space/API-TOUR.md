@@ -437,7 +437,7 @@ console.log(n, known ? Object.keys(known) : 'no server yet', inFlight); watch.di
 - **Cost.**
   - Rules: about −1 to +1, in L4 (LAYERS 5.4; reasoned).
   - A `get()` on rows held here: the lens's walk, 0.17 to 0.29 µs (E-55 claim 1), plus a promise, about 50 to 90 ns on a stand-in: about 3 to 5 times a handle's lookup. In a hot loop, read `h.value`.
-  - v4's examples: 46 lines in 33 files read the cluster with `snapshot()` or `tap`. 23 of them also read a field v5's shape lacks (`peers`, `epoch`, `me.uuid`, `me.hosts`, `me.origin`, `partitions`); what replaces `peers` and the three `me` fields is owed.
+  - v4's examples: 46 lines in 33 files read the cluster with `snapshot()` or `tap`. 23 of them also read a field v5's shape lacks (`peers`, `epoch`, `me.uuid`, `me.hosts`, `me.origin`, `partitions`); what replaces the three `me` fields is owed, and `me.peers` (V5-19) lists only members, where v4's `peers` also counted clients.
 
 ### 2.11 What the rules add up to
 
@@ -459,7 +459,7 @@ console.log(n, known ? Object.keys(known) : 'no server yet', inFlight); watch.di
 ### 2.12 Your answers that change the API (V5-17)
 
 - **Now.**
-  - **A service's answer that throws is taken again** (question 38). The request goes back, as a queue job does, until the asker's timeout runs out; then the asker gets `timeout`. API.md adds the queue's count: after `deliveries` tries, 5 by default, the ask rejects `threw` with the last message (question 41, still open).
+  - **A service's answer that throws is taken again** (question 38). The request goes back, as a queue job does, until the asker's timeout runs out; then the asker gets `timeout`. API.md adds the queue's count: after `deliveries` tries, 5 by default, the ask rejects `threw` with the last message (question 41, V5-19).
   - **`past` is in the first build** (question 22), beside `get`, `connect` and `changes`, in a reader library.
   - **Two refusals have codes of their own** (question 33): `field-ttl` for a `ttl` or `while` on a field write, and `room-too-large` for a room write past the size rule, which is still owed.
   - **The open-links list is `f.cluster.value.links`** (question 26).
@@ -573,7 +573,7 @@ These did not change. They only get a plainer sentence.
 
 ## 6. Questions for you
 
-API.md 11.1 numbers the questions 1 to 41, and this tour keeps its numbers: 1 to 14 are the first tour's, 15 to 24 came with the 2026-11-18 page, 25 to 33 were API.md's picks where V5-13 to V5-15 leave room, 34 to 40 are meanings the declarations left out, found by the patterns walk-through ([PATTERNS.md](PATTERNS.md)), and 41 is new with V5-17. **You answered them one at a time on 2026-11-21 (V5-17).** Q-B1 and Q-B3 are the first tour's 15 and 16.
+API.md 11.1 numbers the questions 1 to 41, and this tour keeps its numbers: 1 to 14 are the first tour's, 15 to 24 came with the 2026-11-18 page, 25 to 33 were API.md's picks where V5-13 to V5-15 leave room, 34 to 40 are meanings the declarations left out, found by the patterns walk-through ([PATTERNS.md](PATTERNS.md)), and 41 is new with V5-17. **You answered them one at a time on 2026-11-21 (V5-17), and questions 4 and 41 the same day (V5-19).** Q-B1 and Q-B3 are the first tour's 15 and 16.
 
 ### 6.1 Decided
 
@@ -622,13 +622,16 @@ API.md 11.1 numbers the questions 1 to 41, and this tour keeps its numbers: 1 to
 - **33.** `field-ttl` and `room-too-large`, codes of their own.
 - **38.** When a service's answer function throws, the request goes back to be taken again, as a queue job does, until the asker's timeout runs out; the asker then gets `timeout`.
 
+**Decided by V5-19**, the same day.
+- **4.** `lens.set(fn)` stays, by that name. On a field lens it is guarded by the field (V5-15 pick 5). The give-up after 8 tries is a guess (Q-B6).
+- **41.** A service request is taken at most `deliveries` times, 5 by default, as a queue job is; after the last throw the ask rejects `threw` with the last message. `deliveries` is a setting of the service's resource: the founding open stores it, and another value is refused `config-differs`. An ask whose timeout runs out first gets `timeout`.
+- **Also:** `f.cluster.value.me.links` is renamed `me.peers` (the members this process is connected to), so `links` names only the open links.
+
 ### 6.2 Still open
 
 Each has API.md's pick. **Say yes to any but 28, and both pages mark it closed.** Question 28 waits for a study first, as you asked, so a yes cannot close it yet.
 
-- **4. `lens.set(fn)`.** **Pick: yes.** It is settled in use, but you have not ruled on it by name, and V5-17 does not name it. On a field lens it is guarded by the field (V5-15 pick 5). The give-up after 8 tries is a guess (Q-B6).
 - **28. Operators on a server's root.** **It waits for a study** (V5-17): you pointed out that moving from one group per resource to many may break what it assumes, and asked for a study before building. That audit, [GROUPS.md](GROUPS.md), has reported; the question now waits for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress) (V5-18). The question as it stands: **Pick:** they run here, functions too, on a server, with `hold: 'all'` and in a handler's `ctx.data`. A partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types give the root no operators**, since a name there is a room: a server declares a view instead, and code over every row reads `f.data.connect()`'s value. The other way types a depth-2 root's operators and says how an operator name and a room name share the root. **On a spare server**, which holds no copy yet, the pick is API 3.3's: an operator over every row there first takes every row, as `hold: 'all'` does, so the line works on every server and only its cost depends on the deployment. The other way refuses it `not-held` there, as on a bare client; the line would then work on five servers and throw on the sixth.
-- **41 (new with V5-17). How many times a service request is taken.** V5-17's consequences ask the pages to say which rule ends a request that keeps throwing. **Pick (API.md's reading): the queue's.** A request is taken at most `deliveries` times, 5 by default, as in E-22's queue library; after the last throw the ask rejects `threw` with the last message, and no worker takes it again. Each try after a throw costs two more commits *(reasoned)*. The other way: no count, so a request that always throws is taken by every worker in turn until its timeout, and the asker always gets `timeout`.
 - **Q-B1 (the first tour's 15). An early answer, then a refusal not about the row.** **Pick:** through a closed write gate or a full disk fero keeps retrying; a revoked token ends `forbidden`. **Decides:** E-48's model with a gate and a revoke.
 - **Q-B3 (the first tour's 16). Who serves fero's own resources.** **Pick:** any process that serves a resource serves the system ones too. **Decides:** LAYERS section 10 item 5.
 - **Q-B10 and Q-B11 (new).** A stale or missing method table, in a rolling deploy or before any server answered, must never refuse a valid call; **decides:** a sim with servers on two table versions. A data upgrade under live served views and derivers: entries and the deriver's lock row carry the data build *(reasoned)*; **decides:** a rolling deploy with the build in the key.
@@ -642,7 +645,7 @@ API.md 11.2 lists six more gaps of the design (Q-B2, Q-B4 to Q-B7, Q-B9). None c
 - **V5-13 pick 7:** a folded resume, `connect({ resume })`, in E-31's model with a client-held base, before it is offered.
 - **V5-14:** the `view` selector in [E-31](experiments/E31-subscribe/README.md)'s model; paging across a failover; a data upgrade under live views (Q-B11). And the guessed defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 frames and the row guards.
 - **V5-15:** the cost of an `equals` guard at the leader, and its size on the wire; a size rule for room writes; a build of the record form with rows; the "on the path" reader for the log below a row; a field's `-N`, read from the row's log back.
-- **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers`, `me.uuid`, `me.hosts` and `me.origin`; the `ended` guard on `f.cluster.value`; the promise's cost on a real `get()`; what an operator over every row costs on a spare server, which first downloads the resource.
+- **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers` (`me.peers`, V5-19, lists only members; v4's also counted clients), `me.uuid`, `me.hosts` and `me.origin`; the `ended` guard on `f.cluster.value`; the promise's cost on a real `get()`; what an operator over every row costs on a spare server, which first downloads the resource.
 - **From V5-12:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27); E-30's model with marks written by app code; the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
 - **V5-17:** the times of the lock, consumer and service cost rows; the merger study (MERGE.md) before question 28 (V5-18); `past` built in the first build.
 - **data 5.0.0** (V5-14 pick 6): D1 and D2 first, D1 with a pin (claim 8 sits at its bar), then the merge contract, the operators, D3, D4 and D6 to D9.

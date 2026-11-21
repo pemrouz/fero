@@ -413,7 +413,7 @@ console.log(sold.value, made.version, up?.version, priced.version)
 
 - An **op** (`op.incr`, `push`, `merge`, `max`, `min`, `now`) is computed by the leader on the newest state. The answer carries the result in `value`. Ops are values, so they work in assignment too, on an untyped handle: `f.data.widgets.stock = op.incr(-1)`.
 - A **condition** (`if: { absent | present | version | equals | lock | expired }`) is checked by the leader. If it fails, the write is refused `conflict`, with the row's `current` version. `version` is always the row's: one version per row (V5-15 pick 5). **On a field lens, `equals`, `absent` and `present` test that field**, so a write to a sibling field does not refuse it.
-- **`lens.set(fn)`** *(proposed)* reads the value and its version, calls your function, and writes the result `if` the row is unchanged. If another write got there first, it reads again and calls your function again. `undefined` means "write nothing". After 8 tries it gives up with `conflict` (the number is a guess). **It can give up**; React's `setState(fn)`, which it looks like, cannot.
+- **`lens.set(fn)`** (V5-12; [V5-19][dec] keeps the name) reads the value and its version, calls your function, and writes the result `if` the row is unchanged. If another write got there first, it reads again and calls your function again. `undefined` means "write nothing". After 8 tries it gives up with `conflict` (the number is a guess). **It can give up**; React's `setState(fn)`, which it looks like, cannot.
   - On a row it is short for two calls that exist: `lens.get({ version: true })`, then `lens.set(next, { if: { version } })`.
   - **On a field it is guarded by the field** (V5-15 pick 5): it sends `if: { equals: now }`, or `if: { absent: true }` when it read `undefined` (an `equals: undefined` would drop out of the JSON and leave the write unguarded). So a write to a sibling field does not make it try again. **This amends what this section said before, "no new rule at the leader"**: the leader now compares a field's value at a path. `equals` lets a write through after a change and back, which is safe for `set(fn)`, since it reads only the field; and it carries the old value in each request, where a version is a few bytes. **Owed:** the cost of an `equals` guard at the leader (V5-15's consequences).
   - **A row that does not exist** is passed as `undefined`, and the write goes `if: { absent: true }`.
@@ -1187,13 +1187,13 @@ The owner answered section 11.1's questions on 2026-11-21 ([V5-17][dec]). Most k
 
 | The 2026-11-20 page | Now | Question |
 |---|---|---|
-| a service's answer function that throws: the ask rejects `threw` at once, and no other worker runs the request | the request goes back to be taken again, as a queue job does; it ends when the asker's timeout runs out, and the asker gets `timeout`. After `deliveries` tries, 5 by default, the ask rejects `threw` (*this page's reading*, question 41) | 38 |
+| a service's answer function that throws: the ask rejects `threw` at once, and no other worker runs the request | the request goes back to be taken again, as a queue job does; it ends when the asker's timeout runs out, and the asker gets `timeout`. After `deliveries` tries, 5 by default, the ask rejects `threw` ([V5-19][dec], question 41) | 38 |
 | `past` after the first build | `past` in the first build, with the other three read verbs: about +3 rules (LAYERS 0.2) | 22 |
 | `bad-arg` for a `ttl` or `while` on a field write; `too-large` for a room write past the size rule | `field-ttl` and `room-too-large`, codes of their own | 33 |
 | `f.cluster.value.open` | `f.cluster.value.links` | 26 |
 
 - **The answers that kept this page's pick** are listed in section 11.1, each with its question. Where the page said *this page's pick* or *this page's reading* for one of them, it now says V5-17.
-- **Question 28 stays open** until the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) reports. That audit has reported, and [V5-18][dec] now has question 28 wait for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress). Question 41 is new.
+- **Question 28 stays open** until the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) reports. That audit has reported, and [V5-18][dec] now has question 28 wait for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress). Question 41 was new; [V5-19][dec] closed it the same day, with question 4.
 
 ## 6. The declarations
 
@@ -1206,6 +1206,7 @@ What every code block on this page compiles against. They merge three type sketc
 - **Gone:** `Held`'s `rows`, `View`, `Value`, `Sel`, `LocalOps`, `Link.close`, `Commit.changes` and `now`, `tap`, `here`, `asOf`, `seek`, `scope`, `Scope`, `ConnectOpts` and its `closes`, `Position`, `f.methods` (`RootCalls` moved onto the root lens), `f.snapshot`, the operator `top`, and the code `no-method` (now `no-such-method`).
 - **V5-16, the same day.** New: `ClusterView.value` and `WritesView.value`; `connect((value) => …, { signal, until })` on both; `ClusterShape`'s `id`, `members` and `groups` typed `| undefined` until a server answers. Gone: `Handle.rows` (`f.rows`), `Ctx.rows`, `ClusterView.snapshot` and `WritesView.snapshot`. After its two reviews: every field of `ClusterShape`, `HealthRow` and `WriteRow` is read-only, as a frozen value is; `hold` is in a client's open only (`ClientOpen`), not in a server's; and a stream (`rows: false`) has `cluster` too.
 - **V5-17, 2026-11-21.** `ClusterShape.open` is now `ClusterShape.links`. `Code` gains `field-ttl` and `room-too-large`. `service()` takes `deliveries`. Comments give the defaults of `LockOpts.renew` and of `consumer()`'s options, the unit of `Runner.lag`, what a refused `saga()` gives and that its steps may span resources, and that a service's `deliveries` is a setting of its resource.
+- **V5-19, the same day.** `ClusterShape.me.links` is now `me.peers`: the members this process has a live connection to, so `links` names only the open links. The `service()` comment and the `threw` row cite V5-19 for the delivery count.
 
 **How the types know a role.** `Resource<Row, M, D, R>` carries the row type, the methods, the depth and what the types know of the role: `'server'`, `'client'` (a bare client, which holds what its links name) or `'all'` (a client that said `hold: 'all'`). A server marker in the open makes `'server'` (section 3.1). `fero<Shop>(name)` turns a server's type into `'client'`, or `'all'` with `{ hold: 'all' }`. A client of a resource with methods has no writes on its lenses, rooms or root (V4-5). A bare client has no operators over every row. No role has a sync lookup of every row (V5-16): `f.data.connect()` gives a handle on every role. A handle typed by its rows only (`fero<Row>(name)`) has no methods in its type, so it may write, and calls through `call()` are untyped.
 
@@ -2041,7 +2042,8 @@ export interface ClusterShape {
   readonly writable: boolean
   readonly me: {
     readonly id: string; readonly role: 'server' | 'client' | 'solo'; readonly listen: string | false
-    readonly caughtUp: boolean; readonly lag: number; readonly links: readonly string[]
+    readonly caughtUp: boolean; readonly lag: number
+    readonly peers: readonly string[]   // the members this process has a live connection to (V5-19)
   }
   readonly members: Readonly<Record<string, {
     readonly listen: string; readonly state: 'live' | 'draining' | 'retiring' | 'gone'; readonly up: boolean
@@ -2224,9 +2226,9 @@ export interface Writable { set(value: any, opts?: any): Judged; remove(opts?: a
 export declare function limiter(name: string, opts: LibOpts & { max: number; per: Duration }): Promise<{ take(key: string, n?: number): Promise<{ left: number; reset: Time }> }>
 /** A request is a row of the service's own resource. When the answer function throws, the request goes back to be taken
  *  again, as a queue job does (V5-17), up to `deliveries` tries, 5 by default; after the last, the ask rejects 'threw'
- *  (this page's reading, question 41). An ask whose timeout runs out first rejects 'timeout'. `deliveries` is a setting of
+ *  (V5-19). An ask whose timeout runs out first rejects 'timeout'. `deliveries` is a setting of
  *  the service's resource: the open that founds it stores it, an open that leaves it out takes it, and an open that passes
- *  another value is refused 'config-differs' (section 3.1; this page's reading). */
+ *  another value is refused 'config-differs' (section 3.1; V5-19). */
 export declare function service<Req = unknown, Res = unknown>(name: string, opts?: LibOpts & { deliveries?: number }): Promise<Service<Req, Res>>
 export interface Service<Req, Res> {
   answer(fn: (req: Req, info: { from: string }) => Res | Promise<Res>, opts?: { group?: string; concurrency?: number }): Runner
@@ -2410,7 +2412,7 @@ Every failure is a `FeroError`. `code` says what, `outcome` says whether it may 
 | `rule` | L2 | `rules.write` returned a reason | `reason` |
 | `rule-threw`, `rule-timeout` | L2 | a rule threw, or held the leader too long | |
 | `call-diverged` | L2 | a different change under a `once` name already used | |
-| `threw` | L4, L5 | a method's handler threw its own error, and writes it made before stay; a service's answer function threw on the request's last try (*this page's reading*, question 41) | `reason` |
+| `threw` | L4, L5 | a method's handler threw its own error, and writes it made before stay; a service's answer function threw on the request's last try (V5-19) | `reason` |
 | `locked` | L5 | the lock is held past `wait` | |
 | `limited` | L5 | over the limit | `retryAfter` |
 | `no-answerer` | L5 | no live answerer, by this process's view of who is alive | |
@@ -2957,12 +2959,12 @@ if (m) { await sendMail(m.job.to); await m.ack() }
 
 ### 11.1 For the owner
 
-The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 closes 26 of them.** Each kept this page's pick, except four that went the other way: 22, 26, 33 and 38 (section 5.7). **Still open: question 28**, which waited for the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) and now, by [V5-18][dec], waits for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress), **and question 41**, new with V5-17. Question 4 is settled in use; V5-17 does not name it. The other twelve were closed before V5-17: V5-11 and V5-12 closed seven of the first fourteen, V5-13 to V5-16 closed 1, 5, 15 and 19 and the served-view half of 16, and TRANSFORMS 3.4 settled 21. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 were this page's picks where V5-13 to V5-15 leave room; 34 to 40 came from the patterns walk-through ([PATTERNS.md](PATTERNS.md)). Each says by what. [API-TOUR.md](API-TOUR.md) section 6 lists them the same way.
+The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 closes 26 of them.** Each kept this page's pick, except four that went the other way: 22, 26, 33 and 38 (section 5.7). **Still open: question 28**, which waited for the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) and now, by [V5-18][dec], waits for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress). [V5-19][dec] closed two more the same day: question 4, settled in use but never named, and question 41, new with V5-17. The other twelve were closed before V5-17: V5-11 and V5-12 closed seven of the first fourteen, V5-13 to V5-16 closed 1, 5, 15 and 19 and the served-view half of 16, and TRANSFORMS 3.4 settled 21. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 were this page's picks where V5-13 to V5-15 leave room; 34 to 40 came from the patterns walk-through ([PATTERNS.md](PATTERNS.md)). Each says by what. [API-TOUR.md](API-TOUR.md) section 6 lists them the same way.
 
 1. **`f.rows` for reads; what is `f.snapshot`?** **Closed by V5-13 pick 6 and V5-16**: `f.snapshot` goes (pick 6); `f.rows` goes too (V5-16, which supersedes pick 6's "`f.rows` stays"): every row is read in sync through `f.data.connect()`'s handle.
 2. **Verbs on the resource (`f.set`), or on `f.data` (`f.data.set`)?** **Closed by V5-12**: the path write is the main spelling; `f.set(path, v)` stays as the array form; `f.data.set` is the root's refused write.
 3. **`near` on a method.** **Closed by V5-12 picks 3 and 13**: a method on a path runs at that path's leader and declares `at:`.
-4. **`set(key, fn)`: add it?** **Settled in use** (V5-12, LENS 2.5): `lens.set(fn)`. On a field lens it is guarded by the field (V5-15 pick 5). The owner has not ruled on it by name, so a "no" still removes it.
+4. **`set(key, fn)`: add it?** **Closed by V5-19**: `lens.set(fn)` stays, by that name (V5-12, LENS 2.5). On a field lens it is guarded by the field (V5-15 pick 5).
 5. **`changes`, `log` or `read`** for the record reader. **Closed by V5-13 pick 1**: `changes()` is one of the four read verbs, the log.
 6. **What a write does when the client is full** (512 waiting, or 64 MB). **Closed by V5-17**: a verb's handle rejects `backpressure`, and an assignment throws it; a marked write waits and pauses its reader (V5-12).
 7. **Must some process say `server: true` to create a resource?** **Closed by V5-17**: yes. Opening a name as a server creates it, as in v4.
@@ -3011,7 +3013,7 @@ The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 clo
 
 **New with V5-17.**
 
-41. **How many times a service request is taken.** V5-17 sends a request whose answer function threw back to be taken again, and its consequences ask the pages to say which rule ends it. **This page's reading: the queue's rule.** A request is taken at most `deliveries` times, 5 by default, as a queue's job is in E-22's library; `service(name, { server: true, deliveries })` changes it. It is a setting of the service's resource, as section 3.1 says of every resource option: the founding open stores it, a later open that leaves it out takes it, and one that passes another value is refused `config-differs`, so a client cannot change it. Where a queue moves such a job to its dead-letter resource, a service answers the asker instead: after the last try throws, the ask rejects `threw`, with the last message in `reason`, and no worker takes the request again. An ask whose timeout runs out first gets `timeout`, as V5-17 says. Each try after a throw costs two more commits, a release and a new claim *(reasoned, from E-22's queue library)*. The other way: no count, so a request that always throws is taken by every worker in turn until its timeout, and the asker always gets `timeout`.
+41. **How many times a service request is taken.** V5-17 sends a request whose answer function threw back to be taken again, and its consequences ask the pages to say which rule ends it. **Closed by V5-19: the queue's rule.** A request is taken at most `deliveries` times, 5 by default, as a queue's job is in E-22's library; `service(name, { server: true, deliveries })` changes it. It is a setting of the service's resource, as section 3.1 says of every resource option: the founding open stores it, a later open that leaves it out takes it, and one that passes another value is refused `config-differs`, so a client cannot change it; `fero.alter` changes it. Where a queue moves such a job to its dead-letter resource, a service answers the asker instead: after the last try throws, the ask rejects `threw`, with the last message in `reason`, and no worker takes the request again. An ask whose timeout runs out first gets `timeout`, as V5-17 says. Each try after a throw costs two more commits, a release and a new claim *(reasoned, from E-22's queue library)*. Rejected: no count, so a request that always throws is taken by every worker in turn until its timeout, and the asker always gets `timeout`.
 
 ### 11.2 For the design
 
@@ -3034,7 +3036,7 @@ Each is a gap the records leave. None changes a call.
 - **V5-13 pick 7:** a folded resume on a live link, `connect({ resume })`, in E-31's model with a client-held base, before it is offered.
 - **V5-14:** the `view` selector in [E-31]'s model (E-57 XA-14, not run); paging across a failover; a data upgrade under live views (Q-B11). **Three missed bars, stated:** a view build over 10^6 rows stalls its copy 0.2 to 1.9 s until data builds in slices (XA-1); a client that held a view can still be refused after failures, in 1 to 21 of 1,000 seeds by configuration (XA-2; TRANSFORMS 3.8; V5-14's consequences quote 5 to 21, its standby and leader-kill runs); the chunked ordered index costs 9.5 to 15.1 µs a write at 10^6 rows against a guessed 3 (XB-1). And the defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 and the row guards are guesses.
 - **V5-15:** the cost of an `equals` guard at the leader, and its size on the wire; a size rule for room writes; a build of the record form with rows; the "on the path" reader for the log below a row, with its run-time rule; a field's `-N`, read from the row's log back, unpriced.
-- **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers`, `me.uuid`, `me.hosts` and `me.origin`, which 23 of the 46 example lines that read the cluster use (section 5.1); the `ended` guard on `f.cluster.value` in a real build; the promise's cost on a real `get()`, measured here only on a stand-in; what an operator over every row costs on a spare server, which first downloads the resource (section 3.3; TRANSFORMS 10 item 10).
+- **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers` (`me.peers`, [V5-19][dec], lists only members; v4's also counted clients), `me.uuid`, `me.hosts` and `me.origin`, which 23 of the 46 example lines that read the cluster use (section 5.1); the `ended` guard on `f.cluster.value` in a real build; the promise's cost on a real `get()`, measured here only on a stand-in; what an operator over every row costs on a spare server, which first downloads the resource (section 3.3; TRANSFORMS 10 item 10).
 - **V5-17:** the times of the lock, consumer and service rows of section 4; a service's delivery count (question 41) in E-22's checks; the merger study (MERGE.md) before question 28 is answered (V5-18); and `past` built in the first build, with claim 23 run on it (V5-13's list above).
 - **From V5-12, still owed:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27; E-57 A built one on its own harness); E-30's model with marks written by app code, including the reader name a mark goes under and `run()`'s restart from its share's cursor (questions 20 and 24, now V5-17's rules); the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
 - **data's changes** (V5-14 pick 6): data 5.0.0, D1 and D2 first (D1 needs a pin: claim 8 sits at its bar), then the merge contract C1 to C10 with its SCHEDULE clause and version bump, N1 to N9, D3, D4, D6 to D9, F1 to F3 (TRANSFORMS 9.1).
@@ -3294,6 +3296,9 @@ const back5 = -5, last5 = chat.data.room1.changes({ from: back5 })       // a co
 f.cluster.value.links.forEach((l) => console.log(l.path, l.count))  // the links this process has open, by path
 // @ts-expect-error the open-links list is `links` (V5-17): `open` is gone
 f.cluster.value.open
+const peers: number = f.cluster.value.me.peers.length   // the members this process is connected to (V5-19)
+// @ts-expect-error `me.links` is now `me.peers` (V5-19): `links` is only the open links
+f.cluster.value.me.links
 const inFlight: number = f.cluster.writes.value.length   // this process's own writes: a sync read
 f.cluster.connect((shape) => draw(shape.health), { signal })   // the shape a microtask after the call, then each change
 // @ts-expect-error snapshot() is gone (V5-16): the cluster is this process's own state; read f.cluster.value
@@ -3533,7 +3538,7 @@ Run from the repo root, with tsc on `PATH` (`DATA` names data's folder; the defa
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/API.md)" docs/v5-space/API.md
 ```
 
-**Result, run here on 2026-11-21, after the V5-17 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `147 marked lines, 147 fail at their own line, 0 errors elsewhere`. The one new line is the cluster's `open`, now `links`.
+**Result, run here on 2026-11-21, after the V5-19 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `148 marked lines, 148 fail at their own line, 0 errors elsewhere`. V5-17 added the line for the cluster's `open`, now `links`; V5-19 added the one for `me.links`, now `me.peers`.
 - **Where the 147 are:** 139 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
 
 | `types.ts` group | The wrong uses | tsc |
