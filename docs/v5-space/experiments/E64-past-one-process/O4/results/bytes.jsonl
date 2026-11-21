@@ -1,0 +1,8 @@
+{"loadavg":"2.90 2.28 2.74 4/190 9665","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/bench.mjs bytes 1000000 1"}
+{"exp":"E-64","opt":"O4","bench":"bytes","records":1000000,"K":1,"log_b_per_record":54.7,"msg_b_per_record":33.6,"msgs_per_record":0.923,"msgs_per_frame":472.6,"cross_shard_per_record":0}
+{"loadavg":"3.21 2.37 2.77 5/193 9690","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/bench.mjs bytes 1000000 4"}
+{"exp":"E-64","opt":"O4","bench":"bytes","records":1000000,"K":4,"log_b_per_record":54.7,"msg_b_per_record":36.4,"msgs_per_record":1.179,"msgs_per_frame":300.5,"cross_shard_per_record":0.2559}
+{"loadavg":"3.28 2.40 2.77 5/194 9720","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/bench.mjs bytes 1000000 16"}
+{"exp":"E-64","opt":"O4","bench":"bytes","records":1000000,"K":16,"log_b_per_record":54.7,"msg_b_per_record":37.1,"msgs_per_record":1.243,"msgs_per_frame":265.4,"cross_shard_per_record":0.3198}
+{"loadavg":"3.50 2.46 2.79 5/191 9743","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/bench.mjs bytes 1000000 64"}
+{"exp":"E-64","opt":"O4","bench":"bytes","records":1000000,"K":64,"log_b_per_record":54.7,"msg_b_per_record":37.3,"msgs_per_record":1.259,"msgs_per_frame":257,"cross_shard_per_record":0.3359}

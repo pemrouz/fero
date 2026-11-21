@@ -1,0 +1,2 @@
+{"loadavg":"4.76 5.29 4.50 6/190 5068","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/bench.mjs bytes 1000000"}
+{"exp":"E-64","opt":"O2","bench":"bytes","records":1000000,"log_b_per_record":54.3,"proj2_prev_b_per_record":13.9,"proj2_share":0.256,"proj3_prev_b_per_record":23,"row_prev_b_per_record":111.4,"proj3_share":0.423,"row_share":2.053,"records_needing_prev":0.851,"enriched2_b_per_record":53.3}

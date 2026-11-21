@@ -1,0 +1,6 @@
+{"failing":"A","case":"sim: picture before the move, old queue kept","truth":20,"rows":20}
+{"failing":"A","case":"new host at its head, picture installed alone (rules 1, 3, 4)","truth":20,"rows":15}
+{"failing":"A","case":"fourth rule: picture installed with the other half","truth":20,"rows":20}
+{"failing":"B","case":"sim: picture before the move, old queue kept","truth":20,"rows":20}
+{"failing":"B","case":"new host at its head, picture installed alone (rules 1, 3, 4)","truth":20,"rows":25}
+{"failing":"B","case":"fourth rule: picture installed with the other half","truth":20,"rows":20}
