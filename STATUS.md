@@ -212,6 +212,7 @@ One line each. The full record, with the context and the rejected options, is [d
 - **V5-14** Transformations: one line decides where a transform runs; over every row only a server-named view or `{ pages }`; no merger across partitions; `derive` in two forms, `lookup` the one join; data's merge contract makes views depend on rows only; a cost-weighted cap of 64 views per copy, placed by hash off the leader; data 5.0.0 in TypeScript, no Rust (TRANSFORMS.md 11).
 - **V5-15** Reads and writes at any path: data's rule for the state forms; every lens has every read verb, the log below a row takes the records on its path; `room.set`/`room.remove` the only room writes, the root refused; the record form with rows in the first build; field guards `equals`/`absent`/`present`; one shape rule at the leader (ANYPATH.md 7, pick 2 changed by the owner).
 - **V5-16** One sync read: `.value`, only where it is sure (a live handle's, a `past`'s, `f.cluster`'s); `f.rows`, `ctx.rows` and the cluster's `snapshot()` go, with no `f.value` and no `.value` on a lens; every row in sync is read through `f.data.connect()`'s handle; supersedes V5-13 pick 6's "`f.rows` stays" ([docs/DECISIONS.md](docs/DECISIONS.md)).
+- **V5-17** The owner's answers to API.md's open questions: 26 answered, the page's pick on 22 of them and the other way on four (a service's throw is retried; `past` is in the first build; two refusals get their own codes; the open-links list is `links`); question 28 waits for the many-groups audit ([docs/DECISIONS.md](docs/DECISIONS.md)).
 
 ## History
 

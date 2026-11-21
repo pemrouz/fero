@@ -3217,3 +3217,39 @@ Decision:
 REJECTED: `.value` on a lens (it clashes with a row or field named `value`, and on a client it would work only while some other link held the data). `f.rows` kept on servers (once a resource has more servers than copies and standbys, a spare holds no rows, so the deployment, not the line, would decide whether it works). `f.value` with `hold: 'all'` and a role for it (the skeptic found it no faster than a handle, more types to declare, and needed by 0 of the 22 patterns).
 
 Consequences: About −1 to +1 builder rules at L4. 46 lines in 33 v4 example files read the cluster and change; 23 of them read fields v5 lacks (`peers` and others). A `get()` on rows already here costs about 0.2 to 0.4 µs against a sync read's lookup (a stand-in, measured), which is why the sync read stays on handles. Owed: how often `lag` counts as a change of the cluster, what replaces `peers` and three `me` fields, and a measure of the download a spare server makes for an operator over every row (API.md's reading). API.md's picks on the name of the open-links list (question 26) and the cluster's `connect` (question 31) stay open. CONNECT.md, LENS.md and READS.md still say `f.rows`; they are records of their day, and this entry supersedes them.
+
+## V5-17 — The owner's answers to API.md's open questions (2026-11-21; API.md section 11.1, asked one at a time)
+
+Context: API.md section 11.1 held the questions the V5-13 to V5-16 rewrites raised or left open, each with the page's pick and the other way. The owner answered them one at a time. Question 28 (operators over every row on a server that lacks some slots) was not answered: the owner pointed out that moving from one group per resource to many may invalidate assumptions, and asked that this be studied before building. An audit of single-group assumptions is under way, and question 28 waits for it.
+
+Decision (the page's pick unless marked):
+1. Q32: when a group has no copy but its leader, the leader serves its views until a second copy is ready, and health says so.
+2. Q6: a write to a full client queue rejects `backpressure` (a verb's promise) or throws it (an assignment).
+3. Q7: opening a name as a server creates the resource, as in v4.
+4. Q38 (the other way): when a service's answer function throws, the request goes back to be taken again, as a queue job does; it ends when its time to live (the asker's timeout) runs out, and the asker then gets `timeout`.
+5. Q35: a refused saga rejects with the refused step's own error, once the undo has committed; a retry under the same `once` name gets the same refusal.
+6. Q36: a saga may span resources.
+7. Q34: a lock renews itself every third of its lease by default; `renew: false` leaves it to `l.renew()`.
+8. Q39: a library opens, ends and lists the live links it needs itself (presence and reply rows for a service, the queue's partition for a waiting take).
+9. Q25: a log entry below a row carries the lens's value right after the record in `e.value`.
+10. Q27: the types follow the role: any server marker types a server, and a handle opened with none is a client.
+11. Q22 (the other way): `past` is in the first build, with the other three read verbs.
+12. Q20: a marked write may not carry a `once` name.
+13. Q23: behind the door a client has no bare mark and no claim; `touch` is a row's verb.
+14. Q24: `consumer().run()` restarts from each share's cursor and sends no bare marks; a mark counts under its reader's name, else the target's.
+15. Q37: `consumer()` defaults: 16 shares, fixed for the group's life; a 10 s lease renewed every third; 100 entries a batch; `from: 'earliest'`; `lag` counts records.
+16. Q40: leases renew every third of their lease; the cost rows as API.md states them, with the timings owed.
+17. Q11: `{ retry: true }` stays beside `once`.
+18. Q29: fero follows `moved` itself; `stale-client` reaches the app.
+19. Q30: a remove that finds nothing answers as done.
+20. Q31: `f.cluster.connect` and `f.cluster.writes.connect` follow a lens's link rules.
+21. Q33 (the other way): the two V5-15 refusals get codes of their own: `field-ttl` for a `ttl` or `while` on a field write, `room-too-large` for a room write past the size rule.
+22. Q17: a write at the root, or to a room by any way but `room.set` and `room.remove()`, is refused `bad-path`.
+23. Q18: `get` is a verb on a lens only (the path, then the verb; it takes options, never a key); `f.remove(path)` and `f.touch(path)` stay as array forms; a token's `follow` claim is renamed `read`; `ctx.use(other)` stays.
+24. Q26 (the other way): the open-links list is `f.cluster.value.links`.
+25. Q16: `linger.ms` 1000, `views.client` 16 and `views.rows` 1,000 stay as defaults, marked as guesses, until measured.
+26. Q14: every name the page listed stays.
+
+REJECTED: each question's other way, as API.md section 11.1 states it, except the four marked above, where the page's pick was rejected instead.
+
+Consequences: About +3 builder rules for `past` in the first build (LAYERS 9.4's count). A service's retried request needs the queue's delivery count and dead-letter rule, or it is retried by every worker until its timeout; the pages must say which. Two new error codes. Question 28 stays open until the many-groups audit reports.
