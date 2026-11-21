@@ -3278,3 +3278,17 @@ Which thread judges writes waits for E-63's measurement; a clean leave with no s
 REJECTED: one group per resource and no move in the first slice (the 21 breaking assumptions would be fixed later, under a live API); restating SC-08(b); keeping 2 standbys with many groups; answering whole-resource reads with the live part only; waiting for the home group; settings in force per group; own-partition-only handlers; restating DEP-04 or F-05; the push form of the hand-back; system resources pinned to the home servers; secrets in a system resource.
 
 Consequences: GROUPS.md's BREAKS items become design changes: about +6 to +26 builder rules (reasoned), and models owed before the first slice: the cut move with a real carried set, growth from 1 to 16 groups timed, placement by load and memory across groups, settings adoption, the home records on every copy, the protocol readings above. LAYERS and API.md are to be rewritten for many groups once MERGE.md, E-59 and E-63 report.
+
+## V5-19 — The questions V5-17's pages raised (2026-11-21; API.md section 11.1 question 41 and three follow-ups, asked one at a time)
+
+Context: Applying V5-17 to the pages left four things for the owner. V5-17 had a service's throwing answer retried until the asker's timeout, but did not say whether the number of tries is capped, nor where that number lives. Question 4 (`lens.set(fn)`) had been settled in use since V5-12 but never ruled on by name. And `f.cluster.value` had two fields named `links`: the open links V5-17 named, and an older `me.links` whose meaning was never written.
+
+Decision:
+1. Q41: a service request is taken at most `deliveries` times, 5 by default, as a queue job is. After the last try throws, the ask rejects `threw` with the last message; no worker takes it again. An ask whose timeout runs out first rejects `timeout`.
+2. `deliveries` is a setting of the service's resource: the founding open stores it, a later open that leaves it out takes it, another value is refused `config-differs`, and `fero.alter` changes it.
+3. Q4: `lens.set(fn)` stays, by that name.
+4. `me.links` is renamed `me.peers`: the ids of the members this process has a live connection to. `links` in `f.cluster.value` means only this process's open links.
+
+REJECTED: retrying until the timeout with no count (a request that always throws would hold a worker until then and end as a bare `timeout`); `deliveries` per call; renaming `set(fn)` to `update(fn)` or dropping it; dropping `me.links`, or keeping two fields named `links`.
+
+Consequences: API.md section 11.1 question 41 and question 4 close; the `service()` comment, the `threw` row and section 5.7 lose "this page's reading". The delivery count is still owed a check in E-22's queue library. No rule count changes: the count is the queue's existing rule.

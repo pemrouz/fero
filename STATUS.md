@@ -214,6 +214,7 @@ One line each. The full record, with the context and the rejected options, is [d
 - **V5-16** One sync read: `.value`, only where it is sure (a live handle's, a `past`'s, `f.cluster`'s); `f.rows`, `ctx.rows` and the cluster's `snapshot()` go, with no `f.value` and no `.value` on a lens; every row in sync is read through `f.data.connect()`'s handle; supersedes V5-13 pick 6's "`f.rows` stays" ([docs/DECISIONS.md](docs/DECISIONS.md)).
 - **V5-17** The owner's answers to API.md's open questions: 26 answered, the page's pick on 22 of them and the other way on four (a service's throw is retried; `past` is in the first build; two refusals get their own codes; the open-links list is `links`); question 28 waits for the many-groups audit ([docs/DECISIONS.md](docs/DECISIONS.md)).
 - **V5-18** Many groups from the first build (tested where servers hold part of a resource; the slot move last in the slice, cut to one commit for SC-08(b)'s 10 ms), with GROUPS.md's and LAYERS section 10's answered readings; the way past one process is designed now (MERGE.md), and three questions wait for MERGE.md, E-59 and E-63 ([docs/DECISIONS.md](docs/DECISIONS.md)).
+- **V5-19** The questions V5-17's pages raised: a service request is taken at most `deliveries` times (5, a setting of the service's resource), then rejects `threw`; `lens.set(fn)` stays by name; `me.links` becomes `me.peers`, so `links` means only the open links ([docs/DECISIONS.md](docs/DECISIONS.md)).
 
 ## History
 
