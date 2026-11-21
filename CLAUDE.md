@@ -15,6 +15,7 @@ This root IS the v4 tree (branch `v4`, package `fero` 4.0.0, promoted 2026-08-16
 - **This repo is public.** Never copy the owner's messages into it, not even a phrase: say what was asked in your own words. Keep out how the assistant's sessions run (permissions, scheduling, tooling), AI product names, personal data and scratch paths.
 - **Speak in simple English.** Short sentences, everyday words, one idea at a time. Say the plain thing first, then the detail. Explain a fero term the first time you use it.
 - **Commit granularly**: one logical change per commit, a Conventional-Commits-ish subject, the WHY in the body. Present each change in chat before committing, then commit and keep moving.
+- **Commits name no tool.** No co-author or session trailers in a message. Sessions commit as `fero-bot <2184177+pemrouz@users.noreply.github.com>`.
 - **`npm test` on every change.** A bug fix ships with the regression test that catches it. Perf on every hot-path change.
 - **Other sessions share this tree.** Validate in a scratch worktree (with `../data` reachable next to it), commit path-scoped, never reset or stash another session's edits.
 - **Keep STATUS.md in sync with the code.** A fixed bug leaves it; a new bug or idea enters it with its evidence; a decision gets one line there and its full record in [docs/DECISIONS.md](docs/DECISIONS.md) (append-only: supersede, never delete).
