@@ -3260,7 +3260,7 @@ Context: The owner asked that moving from one group per resource to many be stud
 
 Decision:
 1. Every resource is founded with several groups in the first build, and the slice is tested on 6 or more servers so some servers hold only part of a resource. The slot move comes last in the same slice, once it is modelled and timed. This supersedes LAYERS 10 item 12's one-group slice.
-2. Whole-resource work past one process: the way past it is designed now, probably for the first build too; the owner first wants to understand the merger and its alternatives (MERGE.md, in progress), including whether `derive` can work from the stream of changes alone.
+2. Whole-resource work past one process: the way past it is designed now, likely for the first build; the owner first wants to understand the merger and its alternatives (MERGE.md, in progress), including whether `derive` can work from changes alone.
 3. `standbys` defaults to 0 once a resource has two or more groups.
 4. SC-08(b) stays 10 ms at p99: the slot move is cut to one commit (E-17b's fused core, the carried set sent before the fence), modelled and timed with a real carried set before it ships.
 5. While one group is down, reads over every row wait, and health names the group; a sync read never guesses.
