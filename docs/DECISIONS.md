@@ -3253,3 +3253,28 @@ Decision (the page's pick unless marked):
 REJECTED: each question's other way, as API.md section 11.1 states it, except the four marked above, where the page's pick was rejected instead.
 
 Consequences: About +3 builder rules for `past` in the first build (LAYERS 9.4's count). A service's retried request needs the queue's delivery count and dead-letter rule, or it is retried by every worker until its timeout; the pages must say which. Two new error codes. Question 28 stays open until the many-groups audit reports.
+
+## V5-18 — Many groups from the first build, and the build slice's open readings (2026-11-21; GROUPS.md's questions and LAYERS section 10's, asked one at a time)
+
+Context: The owner asked that moving from one group per resource to many be studied before building, since it could invalidate decisions. GROUPS.md audited every decision and page: 84 places lean on one group, 21 break with many. LAYERS section 10 also held readings the first build needs. The owner answered the questions that do not wait on running studies, one at a time.
+
+Decision:
+1. Every resource is founded with several groups in the first build, and the slice is tested on 6 or more servers so some servers hold only part of a resource. The slot move comes last in the same slice, once it is modelled and timed. This supersedes LAYERS 10 item 12's one-group slice.
+2. Whole-resource work past one process: the way past it is designed now, probably for the first build too; the owner first wants to understand the merger and its alternatives (MERGE.md, in progress), including whether `derive` can work from the stream of changes alone.
+3. `standbys` defaults to 0 once a resource has two or more groups.
+4. SC-08(b) stays 10 ms at p99: the slot move is cut to one commit (E-17b's fused core, the carried set sent before the fence), modelled and timed with a real carried set before it ships.
+5. While one group is down, reads over every row wait, and health names the group; a sync read never guesses.
+6. Every copy keeps and hands out the home group's records, so a new client reaches live groups while the home group is down (a stale entry answers `moved`); a move's target that never wrote the slot may give up without the home group.
+7. A new group gets all its voters before any slot opens in it; a resource grows by size and by load (a counted rule); it starts split from a size hint at founding, import and restore; a growth-time target is set after a timed growth from 1 to 16 groups.
+8. A settings change is in force once every group has adopted it, and `fero.alter` waits for that.
+9. A row handler may write other partitions; the extra trips and the lack of order across groups are stated.
+10. Small and sleeping projects take a smaller `election.ms`, so a cold wake meets DEP-04; the risk of needless elections is measured before it ships.
+11. The hand-back cap is 4 by default, so F-05 holds, and the taker pulls its leaderships back, at most the cap at a time.
+12. System resources are resources like any other: the first server that needs one creates it, and placement and healing treat it as an app resource.
+13. The operator provides the door's secret and revocation list through config, as in v4; fero keeps no secret in its log.
+14. LAYERS' readings for the directory's answers, the resource check on a shared link, a one-time read and the unsubscribe, the method table, `SYNC` and `PAGE`, a field's `-N`, the deriver's token, and a room write's size (one Raft batch, else `room-too-large`) are taken, and each is modelled before the build.
+Which thread judges writes waits for E-63's measurement; a clean leave with no spare waits for E-59; GROUPS.md's questions on a view past the ceiling, where served views live, and servers that hold some groups wait for MERGE.md, as does API.md question 28.
+
+REJECTED: one group per resource and no move in the first slice (the 21 breaking assumptions would be fixed later, under a live API); restating SC-08(b); keeping 2 standbys with many groups; answering whole-resource reads with the live part only; waiting for the home group; settings in force per group; own-partition-only handlers; restating DEP-04 or F-05; the push form of the hand-back; system resources pinned to the home servers; secrets in a system resource.
+
+Consequences: GROUPS.md's BREAKS items become design changes: about +6 to +26 builder rules (reasoned), and models owed before the first slice: the cut move with a real carried set, growth from 1 to 16 groups timed, placement by load and memory across groups, settings adoption, the home records on every copy, the protocol readings above. LAYERS and API.md are to be rewritten for many groups once MERGE.md, E-59 and E-63 report.
