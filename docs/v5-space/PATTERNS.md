@@ -3,7 +3,8 @@
 This page walks through six jobs that most apps need, and shows how fero v5 does each one. The six are: answering a request, consuming a log, a work queue, a lock, a saga across resources, and keeping one resource derived from another. Each job's section has the same parts, so you can jump to the part you want.
 
 - **Nothing here is built.** The code type-checks against the declarations in [API.md](API.md) (its section 6); section 11 of this page shows how. [E-22] ran all of API.md's patterns on a prototype, with older names for the calls, and with leader changes forced in.
-- **The names and calls are API.md's** as of 2026-11-20 (decisions V5-1 to V5-15 in [DECISIONS.md][dec]). Where API.md is silent and this page picks, it says *this page's reading*.
+- **The names and calls are API.md's** as of 2026-11-21 (decisions V5-1 to V5-17 in [DECISIONS.md][dec]). Where API.md is silent and this page picks, it says *this page's reading*.
+- **Amended 2026-11-21 for V5-17**, the owner's answers to API.md's open questions. A service's answer that throws now sends the request back to be taken again (section 4). The readings this page took for locks, sagas and consumers are now decisions, and say V5-17.
 - **How each claim is marked.** (measured): timed. (checked): a model checker, a simulation with fixed random seeds, or the TypeScript compiler ran it. (reasoned): an argument, or sums on measured parts. (a guess): nobody measured it. (from memory): an outside fact not checked here.
 - **Where the numbers come from.** E-nn is an experiment under [experiments/](experiments). PATHS 3.7, LAYERS 8.8, MEMORY 9.3 and TRANSFORMS 3.4 are sections of [PATHS.md](PATHS.md), [LAYERS.md](LAYERS.md), [MEMORY.md](MEMORY.md) and [TRANSFORMS.md](TRANSFORMS.md).
 - **L1 to L5 are the layers** of [LAYERS.md](LAYERS.md), named under each "What happens". L1 keeps the log and its copies (Raft). L2 judges writes and turns records into rows: conditions, ops, marks, writer time. L3 is the reads that stay: live links, `changes()` and cursors. L4 is the surface: `fero()`, the lens and its verbs. L5 is the libraries, built only from L4's calls.
@@ -57,7 +58,7 @@ A pattern is a small library on top of rows and the log. It is not a new part of
 
 | If you used | fero's pattern | The difference |
 |---|---|---|
-| NATS request-reply | a method, or `service()` (section 4) | A method is one trip, to the server that holds the row. A service writes each request and reply to disk: three commits per ask, where NATS core keeps a request only in memory (from memory). So a request outlives a worker's crash, and another worker takes it. The asker may still time out first: with a worker killed in half the runs, 17 of 400 asks did in [E-22]. |
+| NATS request-reply | a method, or `service()` (section 4) | A method is one trip, to the server that holds the row. A service writes each request and reply to disk: three commits per ask, where NATS core keeps a request only in memory (from memory). So a request outlives a worker's crash, and another worker takes it; a request whose answer throws is taken again too (V5-17). The asker may still time out first: with a worker killed in half the runs, 17 of 400 asks did in [E-22]. |
 | a Kafka consumer group | `consumer()` (section 5) | Exactly once into fero comes from a mark in the target's own log, with no transaction coordinator. It holds while the source keeps its log back to the mark, and while fero paces the loop. Kafka needs transactions and `sendOffsetsToTransaction`. In return, a Kafka transaction's outputs to several partitions show together to `read_committed` readers (from memory). fero's do not (API.md 3.11). |
 | an SQS-style queue | `queue()` (section 6) | The lease plays SQS's visibility timeout, counted in writer time. Jobs come out first in, first out within a partition. Once another worker takes a job, the first worker's late ack is refused, since its token is old. Like an SQS standard queue, a job may still run twice. SQS's FIFO queues keep order within a message group, and drop a resent message within 5 minutes (from memory). |
 | a Redis lock (`SET NX PX`, Redlock) | `lock()` (section 7) | Each holder gets a rising token, and the leader of the row you write refuses an older one. A Redis lock gives no token to check (from memory). |
@@ -101,10 +102,10 @@ type Thumb = { url: string }
 await service<Thumb, Thumb>('thumbs', { server: true })
 // ── worker.ts, run as many as you like: each takes requests and answers them
 const worker = await service<Thumb, Thumb>('thumbs')
-worker.answer(async (req) => ({ url: await resize(req.url) }), { concurrency: 4 })
+worker.answer(async (req) => ({ url: await resize(req.url) }), { concurrency: 4 })   // a throw: taken again
 // ── app.ts, an asker
 const asker = await service<Thumb, Thumb>('thumbs')
-const small = await asker.ask({ url: 'a.png' }, { timeout: '5s' })  // one answer, or 'timeout', or 'no-answerer'
+const small = await asker.ask({ url: 'a.png' }, { timeout: '5s' })  // one answer; or 'timeout', 'no-answerer' or 'threw'
 console.log(small.url)
 // @ts-expect-error the request is checked against the service's type
 await asker.ask({ path: 'a.png' })
@@ -120,15 +121,18 @@ await asker.ask({ path: 'a.png' })
 2. `ask()` looks for a live answerer. With none, it fails `no-answerer` at once. Otherwise it writes the request as a row, with a ttl (a time to live) as long as its timeout. Commit 1.
 3. A worker **claims** the request: the leader of its partition leases the row to that worker. Commit 2. The worker runs your function.
 4. The worker writes the reply, only if no reply exists yet. Commit 3. The asker follows its own reply rows, so it gets the reply. The worker then removes the request, after the asker has its answer.
+5. **If your function throws**, the worker gives the request back, and a worker takes it again, as a queue job (V5-17). Each such try costs two more commits: the release and the next claim. The request ends at its time to live, the asker's timeout; then the asker gets `timeout`. After `deliveries` tries, 5 by default, the request is answered as failed instead: the ask rejects `threw`, with the last message (*API.md's reading*, its question 41).
+6. The asker's links to the presence rows and to its reply rows are the library's: it opens and ends them, and they show in `f.cluster.value.links` (V5-17).
 
 **What it promises, and what it does not.**
 - A method runs where its row lives, on the newest committed state. It is not a transaction. A check-then-set inside it must still be an op (such as `op.incr`) or a condition (`if: { … }`), so that the leader judges it. In [E-22], a plain read then a plain set sold the last item twice in 120 of 120 races (checked).
-- A service gives each request at most one answer. It does not promise one run. A worker that pauses past its lease may run a request that another worker also runs. Only the first reply is kept.
+- A service gives each request at most one answer. It does not promise one run. A worker that pauses past its lease may run a request that another worker also runs, and a throw runs it again. Only the first reply is kept.
 
 **When something breaks.**
 - **The server dies during a call.** The caller gets `unknown`: the call may have run, and fero does not send it again. `{ retry: true }` sends it again: use it only for a handler that is safe to run twice, as `quote` is. `{ once: 'q-17' }` names the call instead. fero first claims that name in `#calls`, so the call runs at most once, from any process, for a day. A retry gets the first answer.
 - **The leader changes.** The call is redirected once, then goes straight to the new leader ([E-55] claim 18, on a prototype; checked).
 - **A worker dies mid-request.** Its claim lapses, and another worker takes the request. With an answerer killed in half the runs: 383 answers and 17 timeouts of 400 asks, never two answers ([E-22]; checked).
+- **The answer function throws.** The request goes back, and this worker or another takes it again (step 5). A request that always throws is tried 5 times, then the ask rejects `threw`, unless the asker's timeout runs out first: then it rejects `timeout`. Make the function safe to run again (V5-17; *API.md's reading* for the count).
 - **The only worker just died.** It still looks alive for up to `session.ms` (10 s), so asks time out instead of failing at once ([E-22] D7).
 - **A request comes twice.** fero's own resends count once within a session ([E-20]). A second `ask` from your code is a second request.
 
@@ -136,7 +140,7 @@ await asker.ask({ path: 'a.png' })
 - A method on a path: one trip, to the row's leader. A trip on one box is about 40 µs at the median. [E-01] measured that for a bare message in Node, not for a method call (measured).
 - Each write the handler makes adds one commit: about 1 ms at the median, with its disk sync shared with other writes (MEMORY 9.3; reasoned).
 - With `once`: three commits in a row (claim the name in `#calls`, run, store the result), and up to two more trips (API.md 3.8).
-- A service ask: three commits in a row. In E-22's simulation, 6.0 ms at the median against 2.15 ms for one write (checked, in simulated time).
+- A service ask: three commits in a row. In E-22's simulation, 6.0 ms at the median against 2.15 ms for one write (checked, in simulated time). Each try after a throw: two more commits (reasoned).
 
 **Use something else when.** The work is long, or must outlive the asker: a work queue (section 6). Many callers watch the same answer live: a served view (API.md 3.10).
 
@@ -182,11 +186,11 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 **What happens** (L5, over L3's log reader and L2's fences; LAYERS 6.2, 6.3, 8.8).
 1. A plain reader, `changes({ from })`, opens one subscription at a copy, then gets each record as it commits. You save `r.cursor` yourself.
 2. `consumer(orders, 'billing')` writes a member row in `#groups`, bound to this process's session.
-3. The source's partitions are split into **shares**. Each share has one owner at a time. A lease row in `#locks` holds it, and that row's version is the share's token. ([E-22]'s library used 16 shares; a partition stays in its share for good.)
+3. The source's partitions are split into **shares**. Each share has one owner at a time. A lease row in `#locks` holds it, and that row's version is the share's token. (16 shares by default, fixed for the group's life, as [E-22]'s library had it: a partition stays in its share for good. V5-17.)
 4. A new owner reads the share's cursor from `#groups`. It writes that cursor back once, under its own token, before it reads the log. After that, an older owner's late write of the cursor is refused `fenced`.
-5. It reads its shares' log from that cursor. `commit()` writes the cursor of each share the batch read, under that share's token: one commit per share (API.md question 40).
+5. It reads its shares' log from that cursor. `commit()` writes the cursor of each share the batch read, under that share's token: one commit per share (V5-17).
 6. `run(fn)` writes no cursor per batch. Each output carries `{ from: e }`, so its mark lands in the same log entry as the output, at the target's leader. That leader keeps the highest mark it has applied, per reader name and source slot. It skips a write at or below that mark, and answers it as done.
-7. `run(fn)` still keeps each share's cursor, so a restart knows where to read from. It writes the cursor now and then, and moves it only once the marked writes up to it are answered. So a restart may read some records again; their writes are skipped at their marks (API.md P-08, LAYERS 6.3, PATHS 4.14; *API.md's reading*).
+7. `run(fn)` still keeps each share's cursor, so a restart knows where to read from. It writes the cursor now and then, and moves it only once the marked writes up to it are answered. So a restart may read some records again; their writes are skipped at their marks (API.md P-08, LAYERS 6.3, PATHS 4.14; the restart from the share's cursor is V5-17's).
 8. fero paces `run`: a marked write is never refused `backpressure`. Instead the reader stops giving records until the line of waiting writes is short again (V5-12).
 
 **What it promises, and what it does not.**
@@ -205,7 +209,8 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 
 **Cost.**
 - A reader: one trip to open; then each kept record crosses the wire once. A cursor is 22 to 79 B for 1 to 10 partitions ([E-19]; measured).
-- `commit()`: one commit per share the batch read, so one for a batch from one share (API.md P-08 and question 40; reasoned from [E-22]'s library).
+- `commit()`: one commit per share the batch read, so one for a batch from one share (API.md P-08; V5-17; reasoned from [E-22]'s library).
+- Each share's lease: 10 s by default, renewed every third of it, so 3 commits a lease for each share a member owns (V5-17; the times are owed).
 - `run()`: one marked write per output. Writes sent together go in the same commits. The target keeps each mark in 29 B: one mark per reader, source slot and target slot, however many records flow ([E-30]; measured).
 - Speed: marked writes that are not awaited ran at 122,000 to 134,000 a second. Awaited one by one, they ran at 239 to 240 a second ([E-55] claim 21; measured on a prototype whose commit was a 4 ms timer, not a disk).
 
@@ -240,7 +245,7 @@ await resizes.add({ path: 'b.png' })
 2. A take is a **claim** at the leader of the queue's partition. The leader leases the first rows that are due and have no live lease. It writes the lease and the count of tries. Commit 2. The claim's version is its token. An empty take writes nothing.
 3. `work` runs your function. A return acks: the row is removed under the token. Commit 3. A throw sends the job back, to be taken again.
 4. After `deliveries` tries, the job is written to `resizes.dead`, then removed from the queue.
-5. A take with `wait` follows the queue's partition, and wakes when a job is added. It writes nothing while it waits.
+5. A take with `wait` follows the queue's partition, and wakes when a job is added. It writes nothing while it waits. That link is the library's: it opens and ends it, and the link shows in `f.cluster.value.links` (V5-17).
 
 **What it promises, and what it does not.**
 - At most one live lease per job. No job is lost until it is acked. First in, first out within a partition. Priorities hold within a partition, and a delayed job is never taken before its time, by writer time (API.md P-09, P-22).
@@ -283,7 +288,7 @@ await ledger.data['run-43'].set({ by: 1 }, { if: { lock: 'payroll' } })
 
 **What happens** (L5, on L2's conditions; API.md section 7, "Locks").
 1. `lock('payroll')` writes the row `payroll` of `#locks`, only if it is absent or its lease has lapsed. One commit. That write's version is the token. Tokens rise for ever.
-2. While you hold it, the lease is renewed. (*This page's reading* of `lock()`'s `renew` option, which API.md declares but does not explain. [E-22]'s library renewed every third of the lease.)
+2. While you hold it, fero renews the lease every third of it, as [E-22]'s library did (V5-17). With `renew: false` you call `l.renew()` yourself, and the lock is lost if you do not.
 3. A protected write carries `if: { lock: l }`: the lock's name and token. The leader of that write's partition keeps, per lock, the newest token it has seen, even after the lock row is gone. It refuses an older token with `fenced`. It reads no other resource: leaders do not follow `#locks` ([E-24]).
 4. When your function returns or throws, the row is removed under the token. `l.signal` aborts, so the links you gave it end.
 5. A process that waits watches the row. Past `wait`, it gives up with `locked`.
@@ -302,7 +307,7 @@ await ledger.data['run-43'].set({ by: 1 }, { if: { lock: 'payroll' } })
 
 **Cost.**
 - Taking the lock: one conditional write, so one commit, about 1 ms at the median on one box (MEMORY 9.3; reasoned).
-- Each renewal: one more commit.
+- Keeping it: one commit per renewal, so 3 a lease, and one more to release (V5-17; the times are owed).
 - A fenced write: an ordinary write, plus one check at its leader.
 - Memory: every group that a fenced write reaches keeps the newest token for that lock, even after the lock row is gone. The records do not say how big that table grows, or when an entry may go (not measured).
 
@@ -312,7 +317,7 @@ await ledger.data['run-43'].set({ by: 1 }, { if: { lock: 'payroll' } })
 
 **The job.** Change rows in two places, so that both changes stay or neither does. Here: take 2 widgets from `stock` and write the order `o-981`.
 
-**The code.** A step takes one lens: any lens that can write. So the steps may sit in different resources. (*This page's reading*: to a saga, another resource's partition is one more partition in one more group. [E-24]'s model placed every partition that way.)
+**The code.** A step takes one lens: any lens that can write. So the steps may sit in different resources. (V5-17: a saga may span resources. To a saga, another resource's partition is one more partition in one more group, as [E-24]'s model placed every partition.)
 
 ```ts
 // file: sagas.ts — a saga across two resources: both steps stay, or neither does
@@ -342,7 +347,7 @@ await saga([{ at: shop.data.widgets.stock, value: 9 }])
 4. Run each step at its own leader, fenced by its partition's lock token. One commit each, one after another.
 5. Write `done`, answer, then release the locks.
 
-**If a step is refused** (here, the stock would go below 0), the saga is undone. It writes `undo`, undoes the steps backwards, then writes `undone`. It undoes every step, applied or not: the failed one and those after it too. That way each of the saga's partitions gets a write fenced by its lock's token, which raises the fence there. So a paused holder's late step is refused at every partition ([E-24]).
+**If a step is refused** (here, the stock would go below 0), the saga is undone. It writes `undo`, undoes the steps backwards, then writes `undone`. It undoes every step, applied or not: the failed one and those after it too. That way each of the saga's partitions gets a write fenced by its lock's token, which raises the fence there. So a paused holder's late step is refused at every partition ([E-24]). Once the undo has committed, the call rejects with the refused step's own error, here `conflict`, with a `reason` that says the saga was undone. A retry under the same `once` name gets the same refusal (V5-17).
 
 **What it promises, and what it does not.**
 - Every saga ends all applied or all undone, by its holder or a later one, even with paused holders. Model-checked on seven bounds, up to 2.9 million states ([E-24]; checked).
@@ -395,7 +400,7 @@ await derive(orders, paid, (e, { row }) => row)
 5. Follow `orders`: one fenced write per changed bucket per commit.
 
 **What happens: the record form.**
-1. Read `paid.marks(name)`, where `name` is the deriver's name: `derive`'s `name` option (*this page's reading*: by default the target's own name). For each source slot, it gives the lowest mark over `paid`'s slots. That is the cursor.
+1. Read `paid.marks(name)`, where `name` is the deriver's name: `derive`'s `name` option; with none, the target's own name, as V5-17 rules for marks. For each source slot, it gives the lowest mark over `paid`'s slots. That is the cursor.
 2. Read `orders`' log from there, for the shares this deriver owns. With `{ rows: true }` it also keeps its share of `orders`' rows in memory, so `fn` gets the row after the record and the row before it.
 3. Run `fn` per record. Each output is a marked write, not awaited. A record with no output gets a bare mark, so idle slots keep up.
 4. At `paid`'s leader, a write at or below the stored mark is skipped and answered as done. Any other is applied, and its mark raised, in one log entry.
@@ -426,7 +431,7 @@ await derive(orders, paid, (e, { row }) => row)
 ## 10. Every pattern of API.md, and which of the six it builds on
 
 The six lean on each other too:
-- a service is a small queue of requests;
+- a service is a small queue of requests: a request whose answer throws is taken again, as a job is;
 - a consumer and `derive` hold their shares with lease rows, as a lock does;
 - `derive` is a consumer that writes with marks.
 
@@ -512,7 +517,7 @@ Run it from the repo root, with `tsc` on `PATH` and data next to this repo (or `
 node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' docs/v5-space/PATTERNS.md)" docs/v5-space/PATTERNS.md
 ```
 
-**Result, run here on 2026-11-20** (Node 22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 8 blocks type-check (tsc Version 6.0.2)`, then `7 marked lines, 7 fail at their own line, 0 errors elsewhere`.
+**Result, run here on 2026-11-21, after the V5-17 amendment** (Node 22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 8 blocks type-check (tsc Version 6.0.2)`, then `7 marked lines, 7 fail at their own line, 0 errors elsewhere`.
 - **The seven that must fail**, one in each block but `consume.ts`, each for the reason its comment gives: a write on a typed client of a resource with methods (`answer.ts`, TS2339); a request and a job of the wrong shape (`answer-service.ts`, `work-queue.ts`, TS2353); `received` on a marked write (`consume-once.ts`, TS2339); a lock's name where its token belongs (`locks.ts`, TS2769); a saga step on a lens that cannot write (`sagas.ts`, TS2739); `{ row }` without `{ rows: true }` (`derived.ts`, TS2769; with no overload to match, `e` and `row` get no type, so the same line also gives TS7006 and TS7031).
 - **Not checked here: that any of it runs.** Nothing on this page is built.
 
