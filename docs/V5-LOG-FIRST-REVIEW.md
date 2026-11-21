@@ -1,6 +1,6 @@
 # v5 log-first: a second opinion
 
-The same independent reviewer as [V5-REPLICATION.md](V5-REPLICATION.md), asked to critique the log-first rewrite of [DESIGN-V5.md](DESIGN-V5.md) (commit 75128c1). Saved as written; DESIGN-V5 answers its conditions in the draft after it.
+The same independent reviewer as [V5-REPLICATION.md](V5-REPLICATION.md), asked to critique the log-first rewrite of [DESIGN-V5.md](DESIGN-V5.md) (commit a97f74a). Saved as written; DESIGN-V5 answers its conditions in the draft after it.
 
 
 **Verdict in three lines.** The skeleton is sound: seal-then-CAS is the right fence, and Raft + BookKeeper loglets + a Delos chain is a published, checkable trio (Neon's safekeepers and Pulsar-over-BookKeeper are this shape in production). As written it is not ready for phase 1: recovery is under-specified exactly where BookKeeper's real bugs lived, two actors reconfigure one loglet, and splits/merges in phase 2 re-create the "many interacting mechanisms" problem. Take it over (b) only if the hosted shape is the primary product; for a self-hosted library, (b) is still the cheaper, safer kernel.

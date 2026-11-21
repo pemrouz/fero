@@ -6,7 +6,7 @@ Companion to [DESIGN-V5.md](DESIGN-V5.md). Part 1 maps every hard case recorded 
 
 ## Part 2: hard cases v5 brings
 
-These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, healing by each shard's leader, an optional planner, log replicas and slot moves) is known to get wrong when built carelessly. Each is a property the TLA+ spec checks (phase 1) and a monitor the simulator runs (phase 2). The log-first list (L-01 to L-38) is in git history (commit 0ad07a8); each L case that still applies is folded into a row below, with its number.
+These are the cases Raft per shard (a Raft group per shard, `#meta` as a shard, healing by each shard's leader, an optional planner, log replicas and slot moves) is known to get wrong when built carelessly. Each is a property the TLA+ spec checks (phase 1) and a monitor the simulator runs (phase 2). The log-first list (L-01 to L-38) is in git history (commit 21fa2c4); each L case that still applies is folded into a row below, with its number.
 
 | id | Case | v5's answer (DESIGN-V5) |
 |---|---|---|

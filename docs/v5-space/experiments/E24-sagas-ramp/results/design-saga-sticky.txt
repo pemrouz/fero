@@ -1,4 +1,4 @@
-# An earlier version of models/saga.py (git dde8804..fc5165c) in which a step refused by its
+# An earlier version of models/saga.py (git 127cc90..caa7a02) in which a step refused by its
 # condition was refused again for every later holder (a refusal was final). That run
 # (2026-11-09T12:34:19Z) stopped at a planned pause after the lines below; they were
 # copied verbatim from results/design-saga.txt before the corrected model's run replaced it.

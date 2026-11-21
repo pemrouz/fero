@@ -1,6 +1,6 @@
 # Backtest: decisions
 
-Source: docs/DECISIONS.md (v4, `main` d7c9efe). Each row is a hard case v4 met, with v5's answer. Each row carries its latest verdict: from the fixed-slots re-check where the case touches slots, positions or moves (marked "fixed slots"), else from the Raft-per-shard re-check where it touches L0 or L1 (marked "Raft per shard", compared with the log-first draft), otherwise from the earlier drafts (a row marked `open → x` was re-judged against the second). Cases still open after the re-check are answered in DESIGN-V5 section 7. Every row becomes a named test in phase 1.
+Source: docs/DECISIONS.md (v4, `main` 3e3fa79). Each row is a hard case v4 met, with v5's answer. Each row carries its latest verdict: from the fixed-slots re-check where the case touches slots, positions or moves (marked "fixed slots"), else from the Raft-per-shard re-check where it touches L0 or L1 (marked "Raft per shard", compared with the log-first draft), otherwise from the earlier drafts (a row marked `open → x` was re-judged against the second). Cases still open after the re-check are answered in DESIGN-V5 section 7. Every row becomes a named test in phase 1.
 
 **Counts:** gone 125 · n/a 46 · open 11 · same 232
 

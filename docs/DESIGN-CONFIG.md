@@ -2,7 +2,7 @@
 
 *Status: the study (2026-09-15) and the decisions it led to (2026-09-19,
 §11). The landing is DECISIONS V4-10; this document is its record. The study's
-code claims were checked against the tree at `fc6201c` and against copts at
+code claims were checked against the tree at `dea7265` and against copts at
 `../copt` by running it; copts has since been published as `optcascade` 1.0.0
 (the same API). Where the study and §11 differ, §11 is what was built.*
 

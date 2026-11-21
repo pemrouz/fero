@@ -8,7 +8,7 @@ This file is the history: the v4 status log (2026-08-01 to 2026-10-09), then the
 
 *fero v4 = fero v3 migrated onto data v4 (the sibling `data` repo = data v3 +
 the W1–W17 wishlist, ALL LANDED — see ../data/STATUS.md). Scaffolded
-2026-08-01 as a full copy of `v3/` (fero-v2 tip `1d94ad6`); PROMOTED TO THE
+2026-08-01 as a full copy of `v3/` (fero-v2 tip `0cce54b`); PROMOTED TO THE
 REPO ROOT 2026-08-16 (package `fero` 4.0.0; the v2 surface + frozen v3 tree
 live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
@@ -579,7 +579,7 @@ inside the outer apply.
   not widened.
 - 2026-09-28 — THE EXAMPLE SERIES IS COMPLETE (DECISIONS V4-12): 26 rungs,
   01 → 43, every `Next:` a real link and 43 ending "That is the series."
-  The eighteen commits of 2026-09-22 (ffce4ae…175cf96) landed 04-17 (rows,
+  The eighteen commits of 2026-09-22 (97eebf0…72d7370) landed 04-17 (rows,
   views, numbers, ordered, methods, live, confirm, validation, durable,
   cluster-of-three, failover, static-topology, scoped, lww-honesty) and the
   debugger series 20-23 (inside, journal, time-travel, live) with no ledger
@@ -608,7 +608,7 @@ inside the outer apply.
   and fixed (2026-09-22), then attacked once more at HEAD before landing:
   the final skeptics found the capstone's clean stop hanging under load (a
   shell bug — the listener kept accepting during the WAL flush and
-  `#accept` had no `destroyed` guard; fixed in 717441e with a regression test
+  `#accept` had no `destroyed` guard; fixed in fde3501 with a regression test
   in tests/tcp.test.ts, ISSUES I-21), its prune audit counting rows
   instead of checking what survived, 40's check never running `join.ts`,
   and five README claims to tighten; all applied, three mutations re-proven,

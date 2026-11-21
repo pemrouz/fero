@@ -1,6 +1,6 @@
 #!/bin/sh
 # Nothing is downloaded for this experiment. It needs the two sibling repositories at the commits it ran on:
-#   fero  68a5b8e (this repository; tree.sh copies api/substrate.ts, kernel/env.ts and kernel/codec.ts)
+#   fero  5f382bc (this repository; tree.sh copies api/substrate.ts, kernel/env.ts and kernel/codec.ts)
 #   data  63fea66 (SCHEDULE_VERSION 4), https://github.com/pemrouz/data
 # On a fresh machine, fetch data like this (DATA names its folder; the default is ../data, next to this repo):
 set -e

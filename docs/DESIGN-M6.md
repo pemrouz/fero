@@ -1,7 +1,7 @@
 <!-- The M6 working design reference (CHECKPOINT.md precedent). Produced 2026-07-12 by a
      three-design judge panel (minimal-machinery / explicit-handover / invariant-first lenses,
      three focus judges, adversarial fatals repaired in synthesis). Line-number seams cite the
-     tree at commit 1cc08b1; drift is expected as slices land — the mechanisms, not the line
+     tree at commit a8b90a3; drift is expected as slices land — the mechanisms, not the line
      numbers, are the contract. Slice 5 lifts §6 residuals into IDEAS and writes the DECISIONS
      record; this file then stays as the milestone archive. -->
 

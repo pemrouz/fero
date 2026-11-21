@@ -1,6 +1,6 @@
 {
  "builtAt": "2026-10-22T14:40:55.653Z",
- "head": "acddc76",
+ "head": "043e0d2",
  "branch": "v4",
  "version": "4.0.0",
  "dependencies": [
@@ -46,7 +46,7 @@
  "kernel": {
   "modules": 23,
   "bytes": 982358,
-  "head": "a77f706"
+  "head": "f13ae04"
  },
  "npm": {
   "fero": "1.7.1",

@@ -2,7 +2,7 @@
 // rule (§10.10, built 2026-10-12). The generators are in sim/leave-harness.ts; this file runs each family over its
 // range and pins two things apart:
 //   SAFETY  — ASSERTED on every schedule: no monitor fired (one-view-per-epoch above all) and no two nodes ended
-//             WRITABLE in different views at a quiet point. The kernel before the rule (v4 at 35d7300, "the base"
+//             WRITABLE in different views at a quiet point. The kernel before the rule (v4 at 76aabab, "the base"
 //             below) was safe on every family here but four, which were pinned RED as the exact seeds or end state
 //             they split on: evictTwo (two suspects evicted at once, the third voter cut on its grant), evictTwoB
 //             (the same with the stale voter granting a never-voted member's higher ballot), keptBallot (a ballot kept

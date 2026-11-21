@@ -218,7 +218,7 @@
      },
      "v": "fails",
      "gap": 0,
-     "basis": "V4 (referee): a v4 member whose fold is empty at boot applies its data: seed, and tombstones are collected within a heartbeat, so a fresh joiner's seed row looks new and last-writer-wins spreads it: a deleted row came back in 2 runs of 2 on v4 63e0679 (STATUS.md), this requirement's own regression case. The spreading is the R lww merge; the skip-seed-on-join fix is not in the row and V4 takes no fix (AMENDMENTS 3)"
+     "basis": "V4 (referee): a v4 member whose fold is empty at boot applies its data: seed, and tombstones are collected within a heartbeat, so a fresh joiner's seed row looks new and last-writer-wins spreads it: a deleted row came back in 2 runs of 2 on v4 6090274 (STATUS.md), this requirement's own regression case. The spreading is the R lww merge; the skip-seed-on-join fix is not in the row and V4 takes no fix (AMENDMENTS 3)"
     },
     {
      "when": {

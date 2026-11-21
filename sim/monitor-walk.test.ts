@@ -392,7 +392,7 @@ test('a monitor stops at its first violation, as v4 did: a view fed behind a sta
   //! one-view-per-epoch. n02 holds a bad view (a standing violation), then n05 installs an epoch-9 view X, then n02
   // changes to an epoch-9 view Y. While n02 is bad, every pass stops at n02 and never reads n05, so nothing records
   // X. When n02 moves to Y, it is read first and records Y for epoch 9; then n05 is read, and X is the DIFFERENT
-  // view. v4 (8aab625) names n05. A walk that keeps looking after the first violation lets n05 record X first and
+  // view. v4 (f5ec46b) names n05. A walk that keeps looking after the first violation lets n05 record X first and
   // names n02 instead. The two walks here share Due.walk, so comparing them alone would miss that: this pins the
   // row to v4's answer.
   const go = (full: boolean) => walk(full, () => {

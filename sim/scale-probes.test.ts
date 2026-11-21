@@ -632,7 +632,7 @@ test('M10 resync-end and M11 resync-behind: lawful on the crossing schedule (the
 // still ships the ones above its lane tail, so most arrive; the one folded after a later row had been tapped live is
 // below the spoke's tail and never comes while P lives: on the base tree lane T at the spoke read 1-13, 15-50 on
 // seeds 1 and 4 (k124, seq 14), 1-14, 16-50 on seeds 2 and 3 (k125, seq 15) — the row P holds and the spoke lacks —
-// and no monitor fired (there was no M12). On the tree BEFORE stage 2 (the parent of 237bab1) the same probe lost
+// and no monitor fired (there was no M12). On the tree BEFORE stage 2 (the parent of 45d2654) the same probe lost
 // more: seqs 10-13 on seeds 1, 3, 4 and 10-15 on seed 2 — the holder's HAVEQ round at the re-admit latched the
 // partition before the admit digest's suffix landed, and the live copy that then arrived staged and was discarded at
 // ACQDONE as covered by the cut. So V4-40 did not open this hole; it made the latch the only repair path. Now the

@@ -43,7 +43,7 @@ How X3's bar is read here (reasoned): a TS kernel's follower also turns wire byt
 ## How it was measured
 
 - Every timed number ran under `$SP/bin/timing` (the box alone apart from processes that skip the lock), 3 timing runs, each a batch of all the benches in one hold of a few minutes; every bench line is preceded by the load average at its start ([results/](results)). Within a run each measure is repeated 5 times after a warm-up and the run's median is kept; the tables give the median of the 3 run medians and (in brackets) their range.
-- Box: 4 vCPU Firecracker VM, 15 GB RAM, Ubuntu 24.04, kernel 6.18.44; Node 22.22.0 (V8 12.4.254.21) and 26.13.0 (V8 14.6.202.34); Rust 1.97.0; napi-rs 3.16.1; deno_core 0.413.0; rquickjs 0.14.0; data 63fea66; fero 68a5b8e for `kernel/codec.ts`.
+- Box: 4 vCPU Firecracker VM, 15 GB RAM, Ubuntu 24.04, kernel 6.18.44; Node 22.22.0 (V8 12.4.254.21) and 26.13.0 (V8 14.6.202.34); Rust 1.97.0; napi-rs 3.16.1; deno_core 0.413.0; rquickjs 0.14.0; data 63fea66; fero 5f382bc for `kernel/codec.ts`.
 - `./run.sh build` compiles everything under the heavy lock, `./run.sh timing` runs the 3 timing batches, `python3 -I summarize.py` writes [results/tables.md](results/tables.md). [fetch.sh](fetch.sh) fetches esbuild and the crates.
 
 ## Results

@@ -3,7 +3,7 @@
  "node": "v26.1.0",
  "fero": {
   "version": "4.0.0",
-  "head": "acddc76"
+  "head": "043e0d2"
  },
  "commands": {
   "cafe": "FERO_RENDEZVOUS=127.0.0.1:33019 FERO_CONFIG=off nice -n 15 node cafe.ts",

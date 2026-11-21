@@ -5,7 +5,7 @@ this first; the build waits for the yes in §14. Three proposals and three
 skeptic critiques went into it (a protocol angle, a storage angle, an operator
 angle). Where a skeptic disagreed with a proposal, this record sides with the
 evidence and says so. Every file:line below was read on the tree at
-`e9c1a77`. Three of the panel's probes were re-run here, read-only, through
+`1904b62`. Three of the panel's probes were re-run here, read-only, through
 the low-priority runner; §2 says which. The DECISIONS number is assigned at
 landing.*
 
@@ -1050,7 +1050,7 @@ recipe does not bite.
 
 *The V4-40 question, answered.* No: stage 2 did not introduce the
 repair variant, and the acquire variant is as old as the latch (M6).
-Evidence from the parent of 237bab1, unpacked and run: the same probe
+Evidence from the parent of 45d2654, unpacked and run: the same probe
 P2 loses MORE rows there — lane T seqs 10-13 on seeds 1, 3 and 4, and
 10-15 on seed 2 — because at the re-admit the holder's HAVEQ round
 latched the partition before the admit digest's suffix landed, and the

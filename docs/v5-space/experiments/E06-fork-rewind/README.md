@@ -8,7 +8,7 @@
 
 ## Method
 
-Everything goes through fero v4's real seam ([tree.sh](tree.sh): `api/substrate.ts` and `kernel/env.ts` from fero 68a5b8e, data 63fea66 linked beside them; nothing in fero or data is changed). The persistent map is **Immutable.js 5.1.9** from npm ([fetch.sh](fetch.sh) checks npm's sha512 integrity): its `Map` is a hash array mapped trie, so a copy shares all but the changed path. Code in [bench/](bench).
+Everything goes through fero v4's real seam ([tree.sh](tree.sh): `api/substrate.ts` and `kernel/env.ts` from fero 5f382bc, data 63fea66 linked beside them; nothing in fero or data is changed). The persistent map is **Immutable.js 5.1.9** from npm ([fetch.sh](fetch.sh) checks npm's sha512 integrity): its `Map` is a hash array mapped trie, so a copy shares all but the changed path. Code in [bench/](bench).
 
 - **The resource.** n small rows (~100 B each, as E-05) loaded through the seam as a replica loads them (fero frames decoded, folded by the lane). Most runs have no view; one variant per size has one `group` view with a sink, because E-05 found that view costs O(rows per bucket) per commit.
 - **The tape.** 20,000 recorded inputs (fewer where noted), each two records like a booking call: a field update of one row and a whole-row rewrite of another. No input adds rows, so the state stays at n rows. Inputs fold one record at a time through `substrate.applyRec`, as fero v4 folds commits.

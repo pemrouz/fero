@@ -1,11 +1,11 @@
 {
- "rev": "102baf2",
+ "rev": "ecae98f",
  "when": "2026-08-23T15:07:26.058Z",
  "wallMs": 7790,
  "pass": 21,
  "total": 21,
  "baseline": {
-  "rev": "5cb5300",
+  "rev": "5dcd3b2",
   "when": "2026-07-12T11:48:31.750Z"
  },
  "scenarios": [

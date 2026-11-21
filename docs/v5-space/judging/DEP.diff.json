@@ -286,7 +286,7 @@
     "v": "fails",
     "basis": "cited",
     "ev": [],
-    "why": "Step 1: v4 collects a deleted row's tombstone within a heartbeat. Step 2: a fresh member applies every seed key its empty fold lacks ('fresh keys ride in'). Step 3: it cannot tell a deleted key from one the cluster never had, so the seed row comes back and LWW spreads it. STATUS.md: 2 runs of 2 on v4 63e0679, and every scale-out of a seeded resource hits it.",
+    "why": "Step 1: v4 collects a deleted row's tombstone within a heartbeat. Step 2: a fresh member applies every seed key its empty fold lacks ('fresh keys ride in'). Step 3: it cannot tell a deleted key from one the cluster never had, so the seed row comes back and LWW spreads it. STATUS.md: 2 runs of 2 on v4 6090274, and every scale-out of a seeded resource hits it.",
     "proof": "structural"
    },
    "j2": {

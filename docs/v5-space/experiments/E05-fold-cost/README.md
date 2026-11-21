@@ -11,7 +11,7 @@
 
 ## Method
 
-Everything goes through fero v4's real seam. [tree.sh](tree.sh) copies `api/substrate.ts`, `kernel/env.ts` and `kernel/codec.ts` from fero (68a5b8e) into a scratch tree and links `data` (63fea66, `SCHEDULE_VERSION` 4) beside them, so the seam's `import '../../data/api/index.ts'` resolves as it does in fero. Nothing in fero or data is changed. The harness is in [bench/](bench).
+Everything goes through fero v4's real seam. [tree.sh](tree.sh) copies `api/substrate.ts`, `kernel/env.ts` and `kernel/codec.ts` from fero (5f382bc) into a scratch tree and links `data` (63fea66, `SCHEDULE_VERSION` 4) beside them, so the seam's `import '../../data/api/index.ts'` resolves as it does in fero. Nothing in fero or data is changed. The harness is in [bench/](bench).
 
 - **Rows.** A "small row" is about 100 bytes: `{ name, email, region, room, n, active, tags: ['a','b'] }`. It is 114 B as JSON and 125 B as one insert record in fero's codec. Rows are loaded the way a replica gets them: insert records encoded into fero frames of 256, decoded with the codec (`Frame.records()`, `rec()`), and folded with data's hot lane. So row strings are real decoded strings.
 - **Views.** `none`; `group`: one `group` view by region (16 buckets) with one sink; `filter100`: 100 `filter` views (one per room, each matching 1 % of rows), each with one sink. A sink stands for a live subscriber. Views are built after the rows are loaded (data's bulk path; see the group finding below for why).

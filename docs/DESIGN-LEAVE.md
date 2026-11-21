@@ -16,11 +16,11 @@ Every number here comes from one of these sources. Nothing was re-measured for t
   re-check 1, fix round 2, re-check 2. `membership-r3.json` holds fix round 3 and re-check 3.
   Below they are called R1, R2, R3, and each part by its name in the file (`review`, `recheck`,
   `fix1`, `recheck1`, and so on).
-- **The branch**: `w1/membership` at `6de8eee`, 19 commits on `43ea245`, +1749/−99 over 11 files
+- **The branch**: `w1/membership` at `6de8eee`, 19 commits on `3be9183`, +1749/−99 over 11 files
   (`commits.txt`, `lane.diff`). Line numbers marked *branch* are in its `kernel/membership.ts`.
-- **The base**: the untouched `v4` tree (`w1/base` at `97bd6be`). Line numbers marked *base* are in
-  its `kernel/membership.ts`. It differs from the branch's start point `43ea245` only by the
-  client-follows-feeder change (`688aea6`), which has nothing to do with leaves.
+- **The base**: the untouched `v4` tree (`w1/base` at `6efd602`). Line numbers marked *base* are in
+  its `kernel/membership.ts`. It differs from the branch's start point `3be9183` only by the
+  client-follows-feeder change (`06ae29b`), which has nothing to do with leaves.
 - **The decision on record**: V4-6 in `docs/DECISIONS.md` (lines 522-643), with its 2026-09-14
   amendment.
 
@@ -56,7 +56,7 @@ wedge. The branch is not merged. On 2026-10-08 the owner chose to park it and de
 | 09:35-10:05 | Fix round 2: the lowest leaver pledges too; a ballot commits only at its proposer; a restored leaver waits; four more rules | `18c0e39` … `7766fa5` | R2 `recheck2`: **fix-first**. One crash plus one restart freezes membership for good at n=3, n=4; seeds 740, 1077 wedge where the base heals. |
 | 11:52-12:07 | Fix round 3: a restored leaver grants; the stayers lead around a rejoiner; the sweep gets teeth | `0aa9279` … `6de8eee` | R3 `recheck3`: **fix-first**. A cut-off proposer commits alone on pledges and restarted leavers give a stale stayer a second writable view; the n=3 crash twin stays read-only. |
 
-Only `be78891` (a client follows its feeder) has landed on `v4`, as `688aea6`.
+Only `be78891` (a client follows its feeder) has landed on `v4`, as `06ae29b`.
 
 What the owner has to decide is in §9 (how to continue) and §7 (the crash-at-two question). The
 rest of this record is the evidence.
@@ -640,7 +640,7 @@ the base first (§9), neither of which exists yet.
 
 "Live" means every survivor (and every leaver that came back) ends in one view holding exactly them,
 writable. "Safe" means no monitor fired and no two nodes ended writable in different views. Every
-row is from the reports; the trees are the base (`43ea245`), round 1 (`02f65ed`), round 2
+row is from the reports; the trees are the base (`3be9183`), round 1 (`02f65ed`), round 2
 (`7766fa5`) and round 3 (`6de8eee`).
 
 **Family 1: the fixer's generator.** n 2..5, one to three leavers at once, slow links, a stalled
@@ -1993,7 +1993,7 @@ branch's breadth and sees none of its holes, which is what §8.1 said.
 
 ### §10.10 The rule for a vote above my view, and the release (2026-10-10; §10.9 step 2)
 
-Line numbers below are in today's `kernel/membership.ts` (`v4` at `145a70b`; the branch
+Line numbers below are in today's `kernel/membership.ts` (`v4` at `87e8d6b`; the branch
 `w5c/release` adds only harness and docs commits on top of it) unless marked *scratch*, which means
 the scratch kernel of this section: `docs/leave-release.diff`, built on a copy of that tree outside
 any git tree, measured and never committed. A **hold** is a vote that warns (defined in §10.10.1).
@@ -2119,7 +2119,7 @@ fixed in the diff: a HELLO that names holds is an announcement). And two build n
     The build is step 3 (§10.10.9); the kernel is unchanged.
 
 **What is proven, and what is open — in plain words.** PROVEN means: measured on the scratch kernel
-that `docs/leave-release.diff` builds (apply it to `v4` at `145a70b` plus this branch's harness
+that `docs/leave-release.diff` builds (apply it to `v4` at `87e8d6b` plus this branch's harness
 commits), by the harness in `sim/leave-harness.ts`, whose test file pins today's kernel and whose
 numbers on the scratch kernel are the table of §10.10.8 — every number there is a run of that file
 or of the three in-tree suites on that tree. Proven that way: the three red pins of today's kernel
@@ -2864,11 +2864,11 @@ these items open, each with the reviewer's probe in its scratch folder (`rsk2/`,
    1.0 (V4-14).
 
 **2026-10-12, BUILT (V4-55 — written V4-51 until the eighth round, when V4-51 and V4-52 had landed from another lane
-and V4-53 and V4-54 were taken by this wave's other lanes; branch `w6/relbuild` on v4 at 35d7300: nine commits for the build itself — this note
-first said eleven; `git rev-list --count 35d7300..7551d18` says nine — and the reviews below each count their own on
+and V4-53 and V4-54 were taken by this wave's other lanes; branch `w6/relbuild` on v4 at 76aabab: nine commits for the build itself — this note
+first said eleven; `git rev-list --count 76aabab..7551d18` says nine — and the reviews below each count their own on
 top; the counts in THIS note are the build's at the time, 46 membership pins, 18 harness pins, 964 tests, and the
 tree's are in the review notes).** The rule of §10.10 is in the
-kernel, applied by hand commit by commit (`docs/leave-release.diff` was built on 145a70b and no longer applies after
+kernel, applied by hand commit by commit (`docs/leave-release.diff` was built on 87e8d6b and no longer applies after
 the knock window; it stays as the measured record). What landed, in the kernel's words: `Vote.prior` (§10.10.7) and
 `Vote.f` (the disown); `holds()` with its common-case fast path and the gate word `held`; form (β) at the voter (`o` on
 the PROPOSE, a ballot over a view below mine refused) and no ballot outliving an install; `hm` on a refusal, `j` on the
@@ -3028,6 +3028,6 @@ mutant reads `P(3,5)` beside the NACK). The seventh review's minor was the recor
 whole tree; it is in the lane's report, written from the tree. The number: V4-51 and V4-52 landed from another lane
 while this branch was under review, and V4-53 and V4-54 are this wave's other two lanes, so the release rule is V4-55 —
 renamed here, in the README and in the harness. Counts from `git rev-list`: nine commits for the build, five for the
-fifth review, three for the sixth, three for the seventh, four for the eighth — twenty-four on v4 at 35d7300. The tree
+fifth review, three for the sixth, three for the seventh, four for the eighth — twenty-four on v4 at 76aabab. The tree
 now: `kernel/membership.test.ts` 38 → 52, `sim/leave-harness.test.ts` 17 → 21, `kernel/door.test.ts` 34 → 35 —
 954 + 19 = 973 tests on the branch's base. The battery and the perf numbers are in the lane's report.

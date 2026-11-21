@@ -5,14 +5,14 @@ Written 2026-11-17 for three API designers. It answers the owner's feedback on f
 ## How to read this
 
 **Marks.** Every claim carries one:
-- **code** `repo:file:line`. Repos: `fero:` is this repo (the v4 code is api/, kernel/, shell/); `data:` is the sibling data repo (`../data`) at commit 63fea66 (`SCHEDULE_VERSION` 4); `v2:` is fero's git branch `origin/master` (fero 1.7.0, commit cf49b6c), read with `git show origin/master:<file>`.
+- **code** `repo:file:line`. Repos: `fero:` is this repo (the v4 code is api/, kernel/, shell/); `data:` is the sibling data repo (`../data`) at commit 63fea66 (`SCHEDULE_VERSION` 4); `v2:` is fero's git branch `origin/master` (fero 1.7.0, commit 1f3df9a), read with `git show origin/master:<file>`.
 - **docs** `file:line` or a section, in fero's docs/ unless named. `API` is docs/v5-space/API.md, `TOUR` is API-TOUR.md, `LAYERS`, `PATHS`, `SIMPLICITY`, `VERDICT` are the pages of the same name in docs/v5-space/, `DV5` is docs/DESIGN-V5.md, `DEC` is docs/DECISIONS.md.
 - **E-nn**: an experiment under docs/v5-space/experiments/ (its README).
 - **measured here**: run for this brief. The script is named; scripts and raw lines are in ./bench/ (section 9).
 - **reasoned**: an argument from the cited code or docs; nothing ran it.
 - **from memory**: an outside fact nobody checked here. developer.mozilla.org could not be reached from the study box (its host is not in the box's allowed network), so no web page was fetched.
 
-**Machine for "measured here".** 4 shared vCPUs (Intel Xeon 2.10 GHz, a Firecracker VM), 15 GB. **Node v22.22.0** for every run; Node 26 was not used. Timed runs went through the study's `timing` lock. The scratch tree is E-50's (`fero cab0913` api/kernel/shell/utils copied, `data 63fea66` beside it).
+**Machine for "measured here".** 4 shared vCPUs (Intel Xeon 2.10 GHz, a Firecracker VM), 15 GB. **Node v22.22.0** for every run; Node 26 was not used. Timed runs went through the study's `timing` lock. The scratch tree is E-50's (`fero 817a756` api/kernel/shell/utils copied, `data 63fea66` beside it).
 
 **Words used here.**
 - **handle**: data's value from `$(obj)`: a JavaScript `Proxy` over a node of data's graph.

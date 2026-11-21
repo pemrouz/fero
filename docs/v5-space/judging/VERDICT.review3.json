@@ -58,7 +58,7 @@
      "id": "A5",
      "severity": "wording or clarity",
      "claim": "Section 4.2: 'all 4,588 cells of the 31 judged rows reproduced, with 0 mismatches and 29 overrides ... So the code predicts every judged row exactly as judged.' Section 1: '31 rows are judged'.",
-     "evidence": "Of the 1,628 cells of the 11 closure rows, only 72 were scored by judges (cards.json judged_cells). The other 1,556 are the attribution's own predictions, written into cards.json by closure_cards.py, so check-all reproduces them by construction. The real test is 2,960 study cells plus 72 closure cells, 3,032 in all. Before the families judged (attrib at commit 12defff), the attribution predicted 63 of the 72 (family A 25 of 25; family B 38 of 47). The attribution was then edited to reproduce the other 9. All 29 overrides are V4's.",
+     "evidence": "Of the 1,628 cells of the 11 closure rows, only 72 were scored by judges (cards.json judged_cells). The other 1,556 are the attribution's own predictions, written into cards.json by closure_cards.py, so check-all reproduces them by construction. The real test is 2,960 study cells plus 72 closure cells, 3,032 in all. Before the families judged (attrib at commit c50523f), the attribution predicted 63 of the 72 (family A 25 of 25; family B 38 of 47). The attribution was then edited to reproduce the other 9. All 29 overrides are V4's.",
      "fix": "Write: '3,032 judged cells reproduced (the 2,960 study cells and the 72 the closure judges scored); the other 1,556 cells of the closure rows are the model's own predictions.' In section 1, say the 11 closure rows were judged on the 72 cells no judged row supported, plus crossings and mechanism lists."
     },
     {

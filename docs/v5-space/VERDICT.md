@@ -336,7 +336,7 @@ For each requirement part, [attrib/](judging/closure/attrib) names the axes that
 
 Only 3,032 of those cells are a real test: the 2,960 cells of the 20 study rows, and the 72 the closure judges scored. The other 1,556 cells of the closure rows are the attribution's own predictions, written into the cards, so they reproduce by construction.
 
-Before the families judged (the attribution at commit 12defff), it predicted 63 of the 72: all 25 of family A's, and 38 of family B's 47. The other nine were then written into the attribution: SC-06 S on three rows, and the six crossing cells of section 4.5 (computed here, `a5.py`). So the code reproduces every judged cell. Before the blind judging, it had predicted the frontier rows' judged cells 63 times in 72.
+Before the families judged (the attribution at commit c50523f), it predicted 63 of the 72: all 25 of family A's, and 38 of family B's 47. The other nine were then written into the attribution: SC-06 S on three rows, and the six crossing cells of section 4.5 (computed here, `a5.py`). So the code reproduces every judged cell. Before the blind judging, it had predicted the frontier rows' judged cells 63 times in 72.
 
 ### 4.3 Step 2: the search
 
@@ -345,7 +345,7 @@ Before the families judged (the attribution at commit 12defff), it predicted 63 
 2. It drops the mixes a constraint forbids. It predicts each one's cells, mechanisms and pairs, and ranks the rows that are in by rule 3.
 3. It walks four more rounds out from the 25 best.
 
-Since commit bcb9afc the search seeds from all 31 judged rows, not only the 20 study rows. So the 11 closure rows' neighbourhoods are now walked too. Draft 3 had added that "shell" of about 21,500 mixes by hand. Rerun today, the shell adds no row.
+Since commit 7610d79 the search seeds from all 31 judged rows, not only the 20 study rows. So the 11 closure rows' neighbourhoods are now walked too. Draft 3 had added that "shell" of about 21,500 mixes by hand. Rerun today, the shell adds no row.
 
 | Reading | Rows searched | Rows in | Draft 3's ladders |
 |---|---|---|---|
@@ -365,7 +365,7 @@ Sources: [ladder-restated.md](judging/closure/results/ladder-restated.md), [ladd
 
 A predicted cell is only as good as the judged rows behind it. The **ladder** ranks the rows that are in as more guessed cells are allowed.
 
-**The ladder files now apply rule 3 pair by pair.** Rule 3 is not transitive: two rows tie on the novel count when they are fewer than 2 apart. So a row 2 above the fewest can beat a row 1 above it, while it loses to the row with the fewest. Then rule 3 can go round in a circle, and no row beats all the others. Draft 3's ladder files used a shortcut that still printed a row there, and that row was beaten. They also tested only some caps (0 to 3, 5, 8, 12 and so on). Commit bcb9afc fixed `closure.unbeaten()` to apply rule 3 pair by pair. The ladder files now test every cap from 0 to the largest count any row has, and print a run of caps with the same result as one line ("4 to 47"). Where rule 3 circles, the files say "none: rule 3 goes round in a circle". The fresh reader's own pass at every cap (`allcaps.py`) gives the same rows as the rebuilt files.
+**The ladder files now apply rule 3 pair by pair.** Rule 3 is not transitive: two rows tie on the novel count when they are fewer than 2 apart. So a row 2 above the fewest can beat a row 1 above it, while it loses to the row with the fewest. Then rule 3 can go round in a circle, and no row beats all the others. Draft 3's ladder files used a shortcut that still printed a row there, and that row was beaten. They also tested only some caps (0 to 3, 5, 8, 12 and so on). Commit 7610d79 fixed `closure.unbeaten()` to apply rule 3 pair by pair. The ladder files now test every cap from 0 to the largest count any row has, and print a run of caps with the same result as one line ("4 to 47"). Where rule 3 circles, the files say "none: rule 3 goes round in a circle". The fresh reader's own pass at every cap (`allcaps.py`) gives the same rows as the rebuilt files.
 
 **Strict reading** ([ladder-restated-DATA-01_reading.md](judging/closure/results/ladder-restated-DATA-01_reading.md)):
 
@@ -1081,7 +1081,7 @@ Settle the readings, and write the models COMP2 rests on. Then build the thinnes
 
 **What changed from draft 3.**
 - **The referee's rulings (RR-12 to RR-19; section 11.3).** COMP2's open MUSTs went from 98 to 99: P-10 and F-02 opened, and DATA-09 is now met by the design rule. Its met MUSTs went from 34 to 33, so the loose-reading gap to TiKV-TS is 23 open MUSTs, not 24. PERF-04's gap went from 0.39 to 0.07, so the PERF-04 rows' sums went from 1.71 to 1.39, and PD now ranks above CELL in outcome A. The design rule is now ruled and recorded, not "unruled".
-- **The search fix (commit bcb9afc).** The search now seeds from all 31 judged rows, and the ladders apply rule 3 pair by pair at caps 4 and 6 too. The strict circle now starts at 4, not 5. The loose ladder now counts 7,973 rows in, not 15,432. The hand-built shell is now part of the search.
+- **The search fix (commit 7610d79).** The search now seeds from all 31 judged rows, and the ladders apply rule 3 pair by pair at caps 4 and 6 too. The strict circle now starts at 4, not 5. The loose ladder now counts 7,973 rows in, not 15,432. The hand-built shell is now part of the search.
 - **The fresh reader's findings R1 to R14** ([VERDICT.review3.json](judging/VERDICT.review3.json), key "recheck"):
   - R1: three unheld options, not four, could beat COMP2 (0, 4.7, 7.7).
   - R2: with the loss, "open MUSTs first" over the searched mixes picks MIN-P+par in TypeScript (3.2, 6, item 16).
@@ -1186,7 +1186,7 @@ Draft 3 listed eight items to re-rule. A referee ruled on items 1 to 7 (RR-12 to
 - Left to the user: whether to read DATA-01 word for word (section 8, item 15).
 
 **Item 8 in detail.**
-- Commit bcb9afc made `unbeaten()` apply rule 3 pair by pair and report a circle as "none". The search now seeds from all 31 judged rows.
+- Commit 7610d79 made `unbeaten()` apply rule 3 pair by pair and report a circle as "none". The search now seeds from all 31 judged rows.
 - The referee's rebuild found that `closure_ladders.py` passed its own caps without 4 and 6, and fixed it. `closure_cards.py` now copies `pins` into cards.json.
 - The final recheck (FR1) found that the ladder still tested only some caps. `closure.ladder` now tests every cap and prints a run of caps with the same result as one line. The files were rebuilt again.
 - The strict ladder: COMP2 at 0 to 3, a circle from 4 to 47. The loose ladder: TiKV-TS at 0, a circle at 1 to 9 and 12 to 38, and a 10-guess row unbeaten at 10 and 11. The two loss ladders never circle.

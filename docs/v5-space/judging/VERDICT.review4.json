@@ -37,7 +37,7 @@
     "id": "FR5",
     "severity": "changes a reported number or claim",
     "claim": "Section 4.7 and section 9 step 3: 'Each leaves the cells its axis decides unjudged: 11 for D keys, 15 for X ramp, 72 for R vsr.'",
-    "evidence": "These figures are copied from critic-unheld-options.md, written at 22:47 on 2026-11-10. In today's attribution (and in every committed version since ceaf017), the part rules name axis D in 11 parts, X in 19 and R in 93. The tool's own count of guessed cells for COMP2 with the unheld tag is 7 for D keys, 12 for X ramp and 72 for R vsr. No count I tried gives 15 for X ramp.",
+    "evidence": "These figures are copied from critic-unheld-options.md, written at 22:47 on 2026-11-10. In today's attribution (and in every committed version since efb16e8), the part rules name axis D in 11 parts, X in 19 and R in 93. The tool's own count of guessed cells for COMP2 with the unheld tag is 7 for D keys, 12 for X ramp and 72 for R vsr. No count I tried gives 15 for X ramp.",
     "fix": "Recount on today's attribution and say how the count was made: parts whose rules name the axis (11 / 19 / 93), or the tool's guessed cells on COMP2 (7 / 12 / 72)."
    },
    {

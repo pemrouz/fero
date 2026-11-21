@@ -428,11 +428,11 @@ The same recommendation holds there in kind: the refusal form, built second, aft
 
 ## 5. The API it would mean
 
-**How a resource asks for it.** COMP2's API.md ([its section 3](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#3-the-declarations), before the 2026-11-16 rewrite) already has the key, and it carries over to TiKV's shape unchanged.
+**How a resource asks for it.** COMP2's API.md ([its section 3](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#3-the-declarations), before the 2026-11-16 rewrite) already has the key, and it carries over to TiKV's shape unchanged.
 - `durability?: 'persisted' | 'memory' | 'none'` is a resource key. The default is `'persisted'`.
-- It is set per resource, never per write. A per-write `durability` does not compile ([COMP2's API.md §10](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#10-how-this-file-is-checked)). That is the commit level. An answer stage per call is a different thing (section 9.6).
+- It is set per resource, never per write. A per-write `durability` does not compile ([COMP2's API.md §10](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#10-how-this-file-is-checked)). That is the commit level. An answer stage per call is a different thing (section 9.6).
 - Until the rung is built, `fero()` throws `config` for `durability: 'memory'`. So the first slice ships the key, and adding the rung later changes no type.
-- Changing it online goes through `fero.alter`, an open question (Q-A25 in [COMP2's API.md §9](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#9-open-api-questions)).
+- Changing it online goes through `fero.alter`, an open question (Q-A25 in [COMP2's API.md §9](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#9-open-api-questions)).
 
 **What changes from API.md.** API.md is written for COMP2, whose unit across partitions is `saga()`. TiKV's shape has transactions (two-phase commit) instead, and API.md names no call for them yet. The refusal code, `needs-persisted`, is the same (reasoned). API.md's exactly-once comes from client sessions; under {R2} a memory write has no such dedup, so a resent write may apply twice unless it carries an `id` (section 3.3).
 
@@ -440,7 +440,7 @@ The same recommendation holds there in kind: the refusal form, built second, aft
 
 | What | When | Error | Backed by |
 |---|---|---|---|
-| `durability: 'memory'` before the rung is built | at `fero()` | `config` (thrown) | [COMP2's API.md §5](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#5-errors-and-refusal-codes) |
+| `durability: 'memory'` before the rung is built | at `fero()` | `config` (thrown) | [COMP2's API.md §5](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#5-errors-and-refusal-codes) |
 | a write with `if: { fence }` on a memory resource | before it is written | `needs-persisted` | E-47's R2.put, model-checked |
 | a transaction with any key on a memory resource | before its first prewrite | `needs-persisted` | E-47's R2.txn, model-checked |
 | `rows: { while: 'session' }` or `history: 'all'` on a memory resource | at create | `needs-persisted` | API.md's RR-14 list and the costs pass; reasoned |
@@ -450,7 +450,7 @@ The same recommendation holds there in kind: the refusal form, built second, aft
 
 **Allowed on a memory resource, with the weaker "ok"** (section 3.3): `set`, delete, ops such as `incr`, conditions with `if` (other than a fence), and bounds such as `incr` with `min`/`max`. Locks, queues, limiters and consumer groups never put their own state on a memory resource, so nothing about them is refused there.
 
-`needs-persisted` has the outcome `refused`: nothing was written ([COMP2's API.md §5](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#5-errors-and-refusal-codes)).
+`needs-persisted` has the outcome `refused`: nothing was written ([COMP2's API.md §5](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#5-errors-and-refusal-codes)).
 
 **A short sample.** It type-checks against API.md's own declarations (`fero.d.ts`, `env.d.ts`) with TypeScript 6.0.2, as API.md §10 checks its blocks (run here; a planted `durability: 'mem'` fails). The refusal itself is a runtime check, not a type.
 
@@ -728,13 +728,13 @@ A skeptic's review found 13 problems in the first draft. Each was checked agains
   - No decision rejected the ladder itself. The v5 draft replaced it "by majority commits" ([DESIGN-V5.md](../DESIGN-V5.md), "What is replaced").
 - **The v5 draft kept one early stage**, `confirm: 'sent'` (DESIGN-V5 §3.2). That is S1's `received` stage.
   - A plain write's promise resolves once its leader has appended it. The answer carries the attempt id, never an offset. The write stays pending and is resent after a failover. Others see it only once it commits. Writes with conditions or ops cannot use it.
-  - Decision 21a (chosen) deferred it to phase 5, since "`sent` needs its own failover rule" (§3.2). Decision 23a, a reviewer's list of cuts that the drafter called "my pick" but never marked "Chosen", cut it outright. The commit that added 23a gives no reason (computed: `git show fc81eb7`), and [SPACE.md](SPACE.md) calls 23a a proposal.
-- **The study's map** lists Q `mix` as "chosen per resource (or per write) | the draft, v4's per-write ladder" ([SPACE.md](SPACE.md)). API.md's first draft dropped per-write choice because Raft has "one commit point per resource" and 23a cut `sent`. Its Q-A9 said to reopen the question "with PERF-02's and PERF-05's default-config rows" (computed: `git show 173a90f:docs/v5-space/API.md`).
+  - Decision 21a (chosen) deferred it to phase 5, since "`sent` needs its own failover rule" (§3.2). Decision 23a, a reviewer's list of cuts that the drafter called "my pick" but never marked "Chosen", cut it outright. The commit that added 23a gives no reason (computed: `git show ad6496d`), and [SPACE.md](SPACE.md) calls 23a a proposal.
+- **The study's map** lists Q `mix` as "chosen per resource (or per write) | the draft, v4's per-write ladder" ([SPACE.md](SPACE.md)). API.md's first draft dropped per-write choice because Raft has "one commit point per resource" and 23a cut `sent`. Its Q-A9 said to reopen the question "with PERF-02's and PERF-05's default-config rows" (computed: `git show edc5079:docs/v5-space/API.md`).
 
 **The final reason** (cited).
 - AMENDMENTS footnote 13: "`maj-m` and `none` per resource, never per write, because G `pslot` cuts groups by durability". G `pslot` puts the slots of many resources in one Raft group. A group has one commit point, so it cannot commit some writes in memory and others on disk.
 - The referee's RR-14 adds a second ground, for the shard rows: a per-write rung there "would be a change of the row (a second rung inside one group, v4's ladder), not a rule they hold" ([rerulings.cells.json](judging/closure/rerulings.cells.json)).
-- VERDICT's P-15 row and §5.3, and API.md's Q-A9 and its `@ts-expect-error` line, repeat this for COMP2 ([VERDICT.md](VERDICT.md), [COMP2's API.md §9](https://github.com/pemrouz/fero/blob/b48ccc4576facef304c59a12de5a8e90b6f2e506/docs/v5-space/API.md#9-open-api-questions)).
+- VERDICT's P-15 row and §5.3, and API.md's Q-A9 and its `@ts-expect-error` line, repeat this for COMP2 ([VERDICT.md](VERDICT.md), [COMP2's API.md §9](https://github.com/pemrouz/fero/blob/8a7abd924146108c9616ed6611cb1d4a7b2e1252/docs/v5-space/API.md#9-open-api-questions)).
 
 **Does that reason hold on TiKV's shape?**
 - **For a commit level per write: not by the footnote** (cited unless marked).

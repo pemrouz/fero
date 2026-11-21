@@ -1,5 +1,5 @@
 # The scratch kernel of DESIGN-LEAVE §10.10 (2026-10-10, after its fourth review): the rule for a vote above my view, with its release.
-# Built on a copy of w5c/release (v4 at 145a70b plus the harness commits fc77fc1, d8ebc5d, d374759 and the fourth review's), outside
+# Built on a copy of w5c/release (v4 at 87e8d6b plus the harness commits fc77fc1, d8ebc5d, d374759 and the fourth review's), outside
 # any git tree; measured, never committed. FERO_SCRATCH_VARIANT names the REJECTED variants, kept only for their teeth (§10.10.8):
 # timeout (a clock on the hold), forget (a two-tick memory of a held member's ask: the second review's blocker), counted (a stayer
 # counts a held member), nojoint (the commit ignores the joint sets), nolead (a held member leads nothing: the second review's
@@ -13,7 +13,7 @@
 # #lastAsk to HELLO_WORD, a word no key equals, so the next change's ask goes on EVERY member link — not only the one that carried
 # the HELLO (askAfterHello); (2) the two onAdmit lines have their pins (lostRelease, askAtAdmit); (3) freshLinkSim counts only the
 # far side's writable split and is "not the shape" unless n01 evicts both; (4) `v` is signed INSIDE proofMsg's JSON array as
-# [[e, p, h], …] under the label fero-door/2 (below). This diff was built on v4 at 145a70b and no longer applies to the tree after
+# [[e, p, h], …] under the label fero-door/2 (below). This diff was built on v4 at 87e8d6b and no longer applies to the tree after
 # V4-39 (the knock window moved kernel/membership.ts under it); the build applied its rule by hand, commit by commit, and it stays
 # here as the measured record §10.10.8 cites.
 --- a/kernel/codec.ts

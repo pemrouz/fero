@@ -45,7 +45,7 @@ The monitors were checked once against two planted kernel bugs (not kept as a ch
 - **Timing** ([results/test01.jsonl](results/test01.jsonl), [results/replay-native.jsonl](results/replay-native.jsonl)): 3 timing runs under `$SP/bin/timing`, each one hold with the load average recorded at its start. Within a run each measure repeats 5 times after a warm-up (chaos: 5 runs of 200 seeds; fresh node: 5 × 2,000 scenarios); the tables give the median of the 3 run medians and their range.
 - **A chaos seed's size.** At 130 ticks a K seed makes about 864 kernel events and a Raft seed about 1,420 (raft-rs and etcd raft send a heartbeat every tick). E-22's prototype seeds made 1,372; the tables give ns per event so any size can be read off.
 - **The fresh-node scenario** (TEST-01's second bar): a new solo node, 25 ticks (it elects itself), three client writes (`set`, `incr`, `set`), every applied entry folded by data, a read of the folded row, and the node destroyed. With WASM it runs in a shared instance (`reset`), or in a new instance per scenario.
-- Box: 4 vCPU Firecracker VM, 15 GB RAM, Ubuntu 24.04; Node 22.22.0 (V8 12.4); Rust 1.97.0 with the `wasm32-unknown-unknown` target; raft-rs 0.7.0; data 63fea66; E-10's port as in this repo (fero 68a5b8e).
+- Box: 4 vCPU Firecracker VM, 15 GB RAM, Ubuntu 24.04; Node 22.22.0 (V8 12.4); Rust 1.97.0 with the `wasm32-unknown-unknown` target; raft-rs 0.7.0; data 63fea66; E-10's port as in this repo (fero 5f382bc).
 - `./run.sh build`, `./run.sh guard`, `./run.sh timing`, then `python3 -I summarize.py` writes [results/tables.md](results/tables.md). [fetch.sh](fetch.sh) adds the Rust target and fetches the crates.
 
 ## Results

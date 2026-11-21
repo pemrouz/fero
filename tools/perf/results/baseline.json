@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "kind": "fero-v3-absolute-baseline",
-  "rev": "9449003",
+  "rev": "30a952c",
   "when": "2026-07-28T07:48:59.357Z",
   "dirty": true,
   "reason": "initial advisory baseline — WSL2 dev box, ms tier informational; the pinned quiet runner is unprovisioned (IDEAS P1)",
   "supersedes": {
-    "rev": "9449003",
+    "rev": "30a952c",
     "when": "2026-07-28T07:46:11.248Z"
   },
   "runner": {

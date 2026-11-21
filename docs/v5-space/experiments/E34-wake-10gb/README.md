@@ -14,7 +14,7 @@ A third reading, 10 GB of *small* rows (about 8e7 rows, 26 GB of heap), cannot r
 
 ## Method
 
-Everything goes through fero v4's real seam: [tree.sh](tree.sh) copies `api/substrate.ts`, `kernel/env.ts` and `kernel/codec.ts` from fero (68a5b8e) into a scratch tree and links `data` (63fea66) beside them. Nothing in fero or data is changed. The code is in [bench/](bench).
+Everything goes through fero v4's real seam: [tree.sh](tree.sh) copies `api/substrate.ts`, `kernel/env.ts` and `kernel/codec.ts` from fero (5f382bc) into a scratch tree and links `data` (63fea66) beside them. Nothing in fero or data is changed. The code is in [bench/](bench).
 
 - **Snapshots** ([bench/gen.mjs](bench/gen.mjs), [gen.sh](gen.sh)). Insert records in fero v4's codec, 256 to a frame, each frame with its crc32c, back to back in one file: 5e6 small rows (128 B a row, 0.64 GB, written in 33 s) and 5e6 rows of about 2 KB (2,039 B a row, 10.2 GB, written in 117 s). They live in a scratch folder, not the repo.
 - **Wake on the main thread** ([bench/wake.mjs](bench/wake.mjs)), form (a). One process: read the snapshot in 64 MiB chunks, check every frame's crc, decode it with fero's codec, fold it into a `data` source through the seam's lane (one batch per frame). Then the **first committed write**: a new row's record is encoded, appended to a journal file and `fdatasync`'d, then folded with `substrate.applyRec`. "Committed" is local here: there is no replication round trip (E-01's C = 0.73 ms would add to it). Time is counted from the process start (`performance.now()`, whose zero is the process's start). A second way to fill, `adopt`, puts every row in one plain object and lets data adopt it (`$(obj)`): data then builds its key map only at the first new-key write.

@@ -29,7 +29,7 @@ This experiment gives the evidence. [ANYPATH.md](../../ANYPATH.md) weighs it and
 - **Road 1, road 2**: two ways to send a commit to a client. Road 1 sends the log records as written. Road 2 sends E-55's `c.recs()`, `data`'s merged change per row.
 - **A picture**: what a client that joins now gets: here, the server's row through JSON.
 
-**Marks.** *(measured)*: timed, three runs, each process alone on the box under the timing lock; the range over the runs. *(checked)*: a seeded run, a probe, or a read of the source; the run's line is in `results/`. *(reasoned)*: an argument, nothing ran it. *(a guess)*: nobody measured it. **The mix of writes is made up**: the shares depend on it; the zeros, the holes and the planted-bug failures do not. `API.md:NNN` names a line of API.md at commit 17adf71, before it was rewritten for V5-13 to V5-15 (`git show 17adf71:docs/v5-space/API.md`); `CONNECT.md:NNN` and `TRANSFORMS.md:NNN` name lines of those pages as they stand.
+**Marks.** *(measured)*: timed, three runs, each process alone on the box under the timing lock; the range over the runs. *(checked)*: a seeded run, a probe, or a read of the source; the run's line is in `results/`. *(reasoned)*: an argument, nothing ran it. *(a guess)*: nobody measured it. **The mix of writes is made up**: the shares depend on it; the zeros, the holes and the planted-bug failures do not. `API.md:NNN` names a line of API.md at commit ca36cf8, before it was rewritten for V5-13 to V5-15 (`git show ca36cf8:docs/v5-space/API.md`); `CONNECT.md:NNN` and `TRANSFORMS.md:NNN` name lines of those pages as they stand.
 
 ## What was built
 

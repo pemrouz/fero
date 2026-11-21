@@ -118,7 +118,7 @@ test('role rule 4/4: two CLIENT links with one uuid keep today\'s duplicate-link
 // ── Commit 2 — the contract and the methods-only hint (§2, §4, §8) ──────────────────────────────────
 
 //! the byte-identity guard (§8): a node that sets nothing sends the v4.0 HELLO — these exact bytes,
-// recorded from the tree at e9c1a77 (not a round trip: a round trip would follow a changed encoder).
+// recorded from the tree at 1904b62 (not a round trip: a round trip would follow a changed encoder).
 const V40_HELLO_AA = 'f3000120000000fea631430803818000750782800061618180006905028180006c0786800073696d3a6161'
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
 const sends = (effects: unknown[][]) => effects.filter((e) => e[0] === 'send').map((e) => e[2] as Uint8Array)
@@ -131,7 +131,7 @@ test('byte identity: a node with nothing set encodes its HELLO to the literal v4
   assert.equal(node.methodsOnly, false)
 })
 
-test('journal golden: the no-secret two-node HELLO sequence is the rows of e9c1a77, both sides, two frames each', () => {
+test('journal golden: the no-secret two-node HELLO sequence is the rows of 1904b62, both sides, two frames each', () => {
   const mk = (uuid: string) => {
     const sent: Uint8Array[] = []
     const sink = { connect() {}, send: (_l: number, b: Uint8Array) => { sent.push(b) }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {}, invoke() {}, result() {}, subRecs() {} } as unknown as EffectSink

@@ -38,7 +38,7 @@ This file has two rounds. The **second round** checks the revised protocol (the 
 
 ### What the model now has
 
-Everything from the first round carries over: the abstract Raft groups, the client and dedup, and the message set (`git show 28ad0a2:docs/v5-spec/slot_move.md` has the full write-up). Added:
+Everything from the first round carries over: the abstract Raft groups, the client and dedup, and the message set (`git show 6b50150:docs/v5-spec/slot_move.md` has the full write-up). Added:
 
 - **The move's owner (C2).** A's leader appends `exporting(s, to B)`. The move's name is that entry's position in A's log. Every message of the move carries the name. Before its fence, A may cancel on its own (`cancel`), and B then drops its copy. After the fence, only B gives up (`abort`, only while its log has no `open`). B writes `s → A` back, then reports the abort, and A reopens s with `unfenced` at N.
 - **The ready report (S1).** B commits its bulk copy, then reports ready with the position its copy reached. A fences on that report. After the fence commits, only the delta since the ready position crosses, then `END(N)` and the carried state.
@@ -221,7 +221,7 @@ Each mutant removes or changes one rule of the fixed protocol. It runs on `move`
 
 ## First round: the protocol before the revision
 
-The first round checked §4.2 as it stood at commit fc81eb7: no `exporting`, no ready report, no slot table, no recovery. The model, its traces and its full write-up are in commit 28ad0a2 (`git show 28ad0a2:docs/v5-spec/slot_move.md`). In short:
+The first round checked §4.2 as it stood at commit ad6496d: no `exporting`, no ready report, no slot table, no recovery. The model, its traces and its full write-up are in commit 6b50150 (`git show 6b50150:docs/v5-spec/slot_move.md`). In short:
 
 **The model.** Two shards A and B as abstract Raft groups (a committed log, a leader's tail lost on deposition, a lost tail that may come back until the next commit). One slot moved from A to B; slot t stayed at A. One issuer with rising call ids, resends, the window and the floor. A message set with duplication, delay and loss. Two bounds:
 - `deep`: two writes to s, two depositions per shard;

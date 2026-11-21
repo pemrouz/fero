@@ -1,4 +1,4 @@
-# hold default-: 10, start 2026-11-07T02:03:30, load 1.92 3.42 4.97 1/340 1461, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "b74e40e"}
+# hold default-: 10, start 2026-11-07T02:03:30, load 1.92 3.42 4.97 1/340 1461, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "ccdb747"}
 2026-11-07T02:03:51 default-set-p1 run 1: 146757 ops/s p50 1.255 p99 2.751 p99.9 4.607 max 10.495 (load 1.92 3.42 4.97 1/345 1476)
 2026-11-07T02:04:13 default-set-p16 run 1: 620157 ops/s p50 5.055 p99 9.343 p99.9 18.047 max 30.719 (load 2.00 3.32 4.89 1/342 1571)
 2026-11-07T02:04:35 default-get-p1 run 1: 144680 ops/s p50 1.271 p99 2.831 p99.9 4.703 max 33.791 (load 1.78 3.19 4.81 2/345 1688)
@@ -30,7 +30,7 @@
 2026-11-07T02:13:53 default-set-p1-rb run 3: 140513 ops/s p50 1.239 p99 2.655 p99.9 3.863 max 32.991 (load 2.02 2.40 3.71 1/166 5441)
 2026-11-07T02:14:12 default-set-p16-rb run 3: 629723 ops/s p50 4.975 p99 8.447 p99.9 13.743 max 28.143 (load 2.80 2.56 3.73 1/165 5537)
 # hold default-: end 2026-11-07T02:14:13
-# hold aof-set aof-get aof-incr aof-mix: 14, start 2026-11-07T02:45:20, load 4.00 4.16 4.52 9/524 31360, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "b74e40e"}
+# hold aof-set aof-get aof-incr aof-mix: 14, start 2026-11-07T02:45:20, load 4.00 4.16 4.52 9/524 31360, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "ccdb747"}
 2026-11-07T02:45:42 aof-set-p1 run 1: 75555 ops/s p50 2.367 p99 5.599 p99.9 25.599 max 68.095 (load 4.00 4.16 4.52 2/242 31420)
 2026-11-07T02:46:03 aof-set-p16 run 1: 316863 ops/s p50 9.599 p99 30.335 p99.9 55.551 max 82.943 (load 3.27 3.99 4.45 1/181 31487)
 2026-11-07T02:46:14 aof-set-p1-rb run 1: 83998 ops/s p50 1.983 p99 4.935 p99.9 11.087 max 39.775 (load 2.88 3.86 4.39 1/181 31631)
@@ -74,7 +74,7 @@
 2026-11-07T02:58:22 aof-mix-p1 run 3: 101221 ops/s p50 1.791 p99 4.063 p99.9 6.431 max 35.327 (load 2.62 2.33 3.17 1/187 1509)
 2026-11-07T02:58:44 aof-mix-p16 run 3: 511676 ops/s p50 6.303 p99 10.303 p99.9 15.807 max 42.751 (load 2.16 2.24 3.13 1/183 1572)
 # hold aof-set aof-get aof-incr aof-mix: end 2026-11-07T02:58:44
-# hold default-get default-incr: 8, start 2026-11-07T03:13:32, load 1.23 1.61 2.33 1/164 3274, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "b74e40e"}
+# hold default-get default-incr: 8, start 2026-11-07T03:13:32, load 1.23 1.61 2.33 1/164 3274, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "ccdb747"}
 2026-11-07T03:13:54 default-get-p1-rb run 1: 140964 ops/s p50 1.239 p99 2.743 p99.9 4.343 max 21.151 (load 1.23 1.61 2.33 1/169 3288)
 2026-11-07T03:14:18 default-get-p16-rb run 1: 664658 ops/s p50 4.639 p99 8.335 p99.9 13.551 max 22.383 (load 2.26 1.83 2.39 1/174 3365)
 2026-11-07T03:14:39 default-incr-p1-rb run 1: 147980 ops/s p50 1.175 p99 2.639 p99.9 4.039 max 10.103 (load 2.22 1.84 2.38 1/173 3420)
@@ -88,7 +88,7 @@
 2026-11-07T03:17:29 default-incr-p1-rb run 3: 151622 ops/s p50 1.151 p99 2.551 p99.9 3.767 max 7.647 (load 2.57 2.26 2.46 1/171 3899)
 2026-11-07T03:17:48 default-incr-p16-rb run 3: 842602 ops/s p50 3.607 p99 6.455 p99.9 9.239 max 19.295 (load 2.43 2.25 2.45 1/175 3988)
 # hold default-get default-incr: end 2026-11-07T03:17:48
-# hold aof-r3-: 10, start 2026-11-07T05:00:24, load 2.71 2.84 1.69 1/161 11764, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "1a68e55"}
+# hold aof-r3-: 10, start 2026-11-07T05:00:24, load 2.71 2.84 1.69 1/161 11764, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "3348509"}
 2026-11-07T05:00:52 aof-r3-set-p1 run 1: 90122 ops/s p50 1.951 p99 5.151 p99.9 33.791 max 73.727 (load 2.49 2.79 1.68 1/178 11910)
 2026-11-07T05:01:20 aof-r3-set-p16 run 1: 323028 ops/s p50 9.087 p99 37.375 p99.9 53.247 max 75.263 (load 2.43 2.76 1.71 1/184 12151)
 2026-11-07T05:01:47 aof-r3-incr-p1 run 1: 116101 ops/s p50 1.519 p99 3.807 p99.9 9.535 max 64.767 (load 3.08 2.90 1.78 1/184 12375)
@@ -120,7 +120,7 @@
 2026-11-07T05:11:05 aof-r3-incr-p1-rb run 3: 116376 ops/s p50 1.423 p99 3.215 p99.9 9.735 max 74.879 (load 2.94 2.91 2.29 3/195 17158)
 2026-11-07T05:11:17 aof-r3-incr-p16-rb run 3: 497843 ops/s p50 5.679 p99 18.943 p99.9 63.871 max 78.975 (load 2.71 2.87 2.28 3/204 17318)
 # hold aof-r3-: end 2026-11-07T05:11:18
-# hold b2-: 16, start 2026-11-07T05:47:30, load 2.51 2.80 2.30 2/159 15085, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "68a5b8e"}
+# hold b2-: 16, start 2026-11-07T05:47:30, load 2.51 2.80 2.30 2/159 15085, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "5f382bc"}
 2026-11-07T05:47:52 b2-aof-set-p1 run 1: 91609 ops/s p50 1.991 p99 4.895 p99.9 18.303 max 51.455 (load 2.55 2.80 2.30 2/164 15100)
 2026-11-07T05:48:15 b2-aof-set-p16 run 1: 378560 ops/s p50 7.967 p99 26.751 p99.9 39.679 max 233.471 (load 2.49 2.78 2.31 1/148 15184)
 2026-11-07T05:48:37 b2-aof-incr-p1 run 1: 107751 ops/s p50 1.663 p99 4.223 p99.9 9.407 max 43.263 (load 2.04 2.65 2.28 1/147 15312)
@@ -170,11 +170,11 @@
 2026-11-07T06:05:07 b2-aof-r3-mix-p1 run 3: 97563 ops/s p50 1.943 p99 4.447 p99.9 7.135 max 61.439 (load 2.52 2.48 2.44 1/189 12957)
 2026-11-07T06:05:34 b2-aof-r3-mix-p16 run 3: 464668 ops/s p50 6.591 p99 13.631 p99.9 43.775 max 71.167 (load 2.35 2.46 2.44 1/188 13160)
 # hold b2-: end 2026-11-07T06:05:35
-# hold proto-: 10, start 2026-11-07T06:28:27, load 2.69 3.31 3.26 1/160 20852, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "68a5b8e"}
+# hold proto-: 10, start 2026-11-07T06:28:27, load 2.69 3.31 3.26 1/160 20852, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "5f382bc"}
 2026-11-07T06:28:49 proto-set-p1 run 1: 6632 ops/s p50 26.879 p99 83.455 p99.9 491.519 max 528.383 (load 2.69 3.31 3.26 1/167 20865)
 2026-11-07T06:29:10 proto-set-p16 run 1: 11721 ops/s p50 249.855 p99 1044.479 p99.9 1482.751 max 1662.975 (load 2.29 3.18 3.22 1/163 20985)
 2026-11-07T06:29:38 proto-get-p1 run 1: 23543 ops/s p50 6.783 p99 23.167 p99.9 158.719 max 423.935 (load 2.07 3.05 3.17 1/168 21137)
-# hold proto8g-: 10, start 2026-11-07T07:20:46, load 6.00 10.23 10.46 2/146 10313, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "68a5b8e"}
+# hold proto8g-: 10, start 2026-11-07T07:20:46, load 6.00 10.23 10.46 2/146 10313, {"memtier": "memtier_benchmark v=2.5.2 sha=00000000:0 bits=64 libevent=2.1.12-stable openssl=OpenSSL 3.0.2 15 Mar 2022 prometheus=yes", "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92", "node": "v22.22.0", "data": "63fea66", "fero": "5f382bc"}
 2026-11-07T07:21:07 proto8g-set-p1 run 1: 6775 ops/s p50 26.495 p99 70.143 p99.9 495.615 max 522.239 (load 6.00 10.23 10.46 1/156 10333)
 2026-11-07T07:21:29 proto8g-set-p16 run 1: 11421 ops/s p50 274.431 p99 790.527 p99.9 1777.663 max 2080.767 (load 4.97 9.72 10.29 1/160 10424)
 2026-11-07T07:21:58 proto8g-get-p1 run 1: 24397 ops/s p50 6.879 p99 20.095 p99.9 100.863 max 395.263 (load 4.64 9.17 10.09 1/156 10545)

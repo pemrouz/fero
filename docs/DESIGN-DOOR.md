@@ -6,7 +6,7 @@ took every default of §14 on 2026-10-09. Three proposals and three
 skeptic critiques went into it (a kernel angle, a shell angle, an operator
 angle). Where a skeptic disagreed with a proposal, this record sides with the
 evidence and says so. Every file:line below was read on the tree at
-`364e5ee`. The DECISIONS number is assigned at landing.*
+`8fa013f`. The DECISIONS number is assigned at landing.*
 
 *Built, stage 1 of 3 (2026-10-09): commits 1 and 2 of §13 — the role rule, then
 the contract and the methods-only hint. No secret, no nonce, no DOOR verb yet.

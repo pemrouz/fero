@@ -257,7 +257,7 @@ done by hand against the tree. Re-run the panel on the implementation.)
 ## §10 The implementation panel (after landing)
 
 Five lenses (kernel, directory mechanics, composer, tests, ops) × a skeptic
-per finding, against commits 26213b2/e28e48a/b8a4f73: 25 confirmed, 0
+per finding, against commits 260759b/2c136f2/9591784: 25 confirmed, 0
 refuted, 8 major. Every major was reproduced with a scratch script. Fixed:
 
 - **The squat strand** (composer + kernel, above): the string-compare guard

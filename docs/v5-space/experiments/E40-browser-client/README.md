@@ -10,7 +10,7 @@
 
 ## Method
 
-Code: [client/fero-client.ts](client/fero-client.ts) (the prototype client), [server.mjs](server.mjs) (its server), [bundle.mjs](bundle.mjs), [cold.mjs](cold.mjs) with [static-src/](static-src) and [cold-node.mjs](cold-node.mjs), and E-08's relay and subscribers for the fan-out part. `data` at 63fea66 and fero's frame codec (`kernel/codec.ts`, fero a08ac53) are used as they are.
+Code: [client/fero-client.ts](client/fero-client.ts) (the prototype client), [server.mjs](server.mjs) (its server), [bundle.mjs](bundle.mjs), [cold.mjs](cold.mjs) with [static-src/](static-src) and [cold-node.mjs](cold-node.mjs), and E-08's relay and subscribers for the fan-out part. `data` at 63fea66 and fero's frame codec (`kernel/codec.ts`, fero 1e9d7a7) are used as they are.
 
 - **The prototype client.** About 100 lines: a WebSocket with binary frames; the door (the server sends a 32-byte nonce with the upgrade; the client proves it holds the project secret with HMAC-SHA-256 through `crypto.subtle`); follow (a cursor; the server answers with a snapshot frame, then each commit); a write that resolves when it commits (V4-7). State lives in `data` (a keyed source, folded through data's hot lane, as a replica folds); records travel in fero v4's frame codec, which already runs in browsers (the site ships it). It uses no Node API. The proof, the follow and the first write leave together, without waiting for the welcome, so after TCP, TLS and the WebSocket upgrade the first write costs one more round trip.
 - **(a) Bundle.** esbuild 0.25.12, minified ESM for browsers, tree-shaking on; gzip -9 and brotli 11. Four bundles: all of `data`; only what the client imports from `data` (`$`, `lane`); the codec alone; the whole client.

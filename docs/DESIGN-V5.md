@@ -1,6 +1,6 @@
 # fero v5: one log per shard, Raft for each
 
-A design, a plan and a backtest for the next fero, against `main` at d7c9efe (v4, 1,216 tests) and data at 63fea66. Nothing here is built.
+A design, a plan and a backtest for the next fero, against `main` at 3e3fa79 (v4, 1,216 tests) and data at 63fea66. Nothing here is built.
 
 **What this draft changes.**
 - The last draft put the log first: log nodes, loglets, chains and a metadata Raft group, with servers on top. That was three protocols, about twice the code ([V5-LOG-FIRST-REVIEW.md](V5-LOG-FIRST-REVIEW.md)).
@@ -971,7 +971,7 @@ Each answer is also a case in V5-BACKTEST part 2 (R-59 to R-79). The fixed-slots
 - Failover went from about 0.6 s (draft 2) to 2.2 s, the GC-safe timeout, still half of v4's. This draft keeps 2.2 s (`election.ms`).
 - The rest were its 23 open cases.
 
-Its 23 open cases were answered in that draft (git history, commit 0ad07a8), and re-judged against this one above.
+Its 23 open cases were answered in that draft (git history, commit 21fa2c4), and re-judged against this one above.
 
 The per-case files in [v5-backtest/](v5-backtest) carry each case's latest verdict: the fixed-slots one for the 290 cases that touch slots, positions or moves, else the Raft-per-shard one for the cases that touch L0 or L1.
 
@@ -1036,7 +1036,7 @@ Each row is a target, how it is reached, and the bar to beat, measured with the 
 
 ## 9. Measured today
 
-Measured on `main` (d7c9efe) in a container on a cloud VM (Node 22). These locate costs; they are not a baseline.
+Measured on `main` (3e3fa79) in a container on a cloud VM (Node 22). These locate costs; they are not a baseline.
 - GitHub's data `v4` branch is at 63fea66, which is SCHEDULE_VERSION 4. fero's `main` needs 5, so two rows marked *data 63fea66* may differ on the newer data.
 - The full battery could not run faithfully here: 50 failures in its first 196 tests, so it was stopped.
 
