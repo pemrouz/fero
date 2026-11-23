@@ -209,7 +209,8 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 - **A member pauses**, say in a long GC. Its shares go to others, and its late `commit()` is refused `fenced`: 40 of 40 such commits were refused in [E-22] (checked).
 - **The leader changes, or a slot moves.** A cursor keeps its meaning across both ([E-31]; checked).
 - **A record comes twice.** With `commit()`, your code sees it twice. With `run()`, the second write is skipped at its mark, and answers `skipped`.
-- **The log was cut.** A reader whose cursor is older than what the source keeps (its `history`) gets `expired` and stops. It never skips ahead. A reader that writes marks first reads its marks again, and goes on from them if they are past what is kept (E-61's pick, taken with V5-20).
+- **A marked write you did not await is refused.** Nobody sees the refusal as an error: fero logs it once, and the loop goes on (E-61's pick, taken with V5-20). A refusal on the row still raises the mark (step 6 above).
+- **The log was cut.** A reader whose cursor is older than what the source keeps (its `history`) gets `expired` and stops. It never skips ahead. Before it stops, a reader that writes marks reads them again, and goes on from them if they are past what is kept (E-61's pick, taken with V5-20).
 
 **Cost.**
 - A reader: one trip to open; then each kept record crosses the wire once. A cursor is 22 to 79 B for 1 to 10 partitions ([E-19]; measured).
