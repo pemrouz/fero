@@ -1,0 +1,9 @@
+{"loadavg":"3.75 5.54 6.01","run":1}
+{"part":"sample-bench","run":1,"node":"v22.22.0","filter":{"nsPerRecord":1.85,"kept":596686},"held62500":{"foldNsPerWrite":320,"readUs":638.2,"heapMB":12,"sink":false},"held625000":{"foldNsPerWrite":1531,"readUs":837.6,"heapMB":72,"sink":false}}
+{"part":"cm-bench","run":1,"node":"v22.22.0","top10":[{"G":16,"nsPerFrame":706,"sink":true},{"G":256,"nsPerFrame":7328,"sink":true}]}
+{"loadavg":"3.53 5.46 5.98","run":2}
+{"part":"sample-bench","run":2,"node":"v22.22.0","filter":{"nsPerRecord":1.53,"kept":596686},"held62500":{"foldNsPerWrite":278,"readUs":610.7,"heapMB":14,"sink":false},"held625000":{"foldNsPerWrite":1331,"readUs":820.5,"heapMB":78,"sink":false}}
+{"part":"cm-bench","run":2,"node":"v22.22.0","top10":[{"G":16,"nsPerFrame":664,"sink":true},{"G":256,"nsPerFrame":6962,"sink":true}]}
+{"loadavg":"3.53 5.46 5.98","run":3}
+{"part":"sample-bench","run":3,"node":"v22.22.0","filter":{"nsPerRecord":1.71,"kept":596686},"held62500":{"foldNsPerWrite":341,"readUs":608.2,"heapMB":13,"sink":false},"held625000":{"foldNsPerWrite":1218,"readUs":714.9,"heapMB":76,"sink":false}}
+{"part":"cm-bench","run":3,"node":"v22.22.0","top10":[{"G":16,"nsPerFrame":668,"sink":true},{"G":256,"nsPerFrame":7172,"sink":true}]}

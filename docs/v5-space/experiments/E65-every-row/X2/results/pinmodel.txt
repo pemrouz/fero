@@ -1,0 +1,13 @@
+{"n":625000,"w":5000,"T":12,"peakDropped":14648,"MBdropped":1.6,"peakAll":57210,"MBall":6.4,"groupsTimes":16}
+{"n":625000,"w":5000,"T":10,"peakDropped":12255,"MBdropped":1.4,"peakAll":48052,"MBall":5.4,"groupsTimes":16}
+{"n":625000,"w":5000,"T":60,"peakDropped":66901,"MBdropped":7.5,"peakAll":238260,"MBall":26.6,"groupsTimes":16}
+{"n":625000,"w":5000,"T":600,"peakDropped":333900,"MBdropped":37.3,"peakAll":619856,"MBall":69.2,"groupsTimes":16}
+{"n":625000,"w":20000,"T":12,"peakDropped":54710,"MBdropped":6.1,"peakAll":199293,"MBall":22.2,"groupsTimes":16}
+{"n":625000,"w":20000,"T":10,"peakDropped":46275,"MBdropped":5.2,"peakAll":171157,"MBall":19.1,"groupsTimes":16}
+{"n":625000,"w":20000,"T":60,"peakDropped":201023,"MBdropped":22.4,"peakAll":533371,"MBall":59.5,"groupsTimes":16}
+{"n":625000,"w":20000,"T":600,"peakDropped":501440,"MBdropped":56,"peakAll":625000,"MBall":69.7,"groupsTimes":16}
+{"n":625000,"w":50000,"T":12,"peakDropped":120597,"MBdropped":13.5,"peakAll":385692,"MBall":43,"groupsTimes":16}
+{"n":625000,"w":50000,"T":10,"peakDropped":103929,"MBdropped":11.6,"peakAll":344169,"MBall":38.4,"groupsTimes":16}
+{"n":625000,"w":50000,"T":60,"peakDropped":333900,"MBdropped":37.3,"peakAll":619856,"MBall":69.2,"groupsTimes":16}
+{"n":625000,"w":50000,"T":600,"peakDropped":562644,"MBdropped":62.8,"peakAll":625000,"MBall":69.7,"groupsTimes":16}
+{"cap":"one image a row at most","capMB":69.7,"perGroupRows":625000}

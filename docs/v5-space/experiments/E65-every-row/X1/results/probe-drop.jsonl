@@ -1,0 +1,2 @@
+{"loadavg":"8.03 8.03 6.37","cmd":"node --experimental-strip-types --no-warnings --expose-gc --max-old-space-size=3500 src/probe-drop.mjs"}
+{"exp":"E-65","opt":"X1","bench":"probe-drop","rows_per_round":100000,"node":"v22.22.0","drop":{"start_mb":8.8,"after_each_round_mb":[27.1,45.3,63.5],"kept_mb_per_round":18.2},"dispose":{"start_mb":63.5,"after_each_round_mb":[87,110.5,131.8],"kept_mb_per_round":22.8},"clear":{"start_mb":131.8,"after_each_round_mb":[144.9,131.9,131.9],"kept_mb_per_round":0}}

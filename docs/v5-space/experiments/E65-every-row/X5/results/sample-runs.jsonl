@@ -1,0 +1,11 @@
+{"part":"sample","bug":"none","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":0,"coverRate":{"count":0.945,"sum":0.934,"mean":0.929,"paid":0.944,"median":0.948,"p90":0.925}}
+{"part":"sample","bug":"none","tail":"moderate","k":256,"parts":2000,"seeds":100,"failed":1,"coverRate":{"count":0.921,"sum":0.912,"mean":0.916,"paid":0.937,"median":0.937,"p90":0.921}}
+{"part":"sample","bug":"none","tail":"heavy","k":256,"parts":30000,"seeds":100,"failed":6,"coverRate":{"count":0.929,"sum":0.858,"mean":0.865,"paid":0.927,"median":0.936,"p90":0.88}}
+{"part":"sample","bug":"none","tail":"heavy","k":1024,"parts":30000,"seeds":50,"failed":1,"coverRate":{"count":0.943,"sum":0.902,"mean":0.895,"paid":0.94,"median":0.953,"p90":0.903}}
+{"part":"sample","bug":"none","tail":"moderate","k":64,"parts":30000,"seeds":50,"failed":0,"coverRate":{"count":0.926,"sum":0.921,"mean":0.931,"paid":0.934,"median":0.934,"p90":0.923}}
+{"part":"sample","bug":"noscale","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":100,"coverRate":{"count":0,"sum":0,"mean":0.929,"paid":0.944,"median":0.948,"p90":0.925}}
+{"part":"sample","bug":"rowvar","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":100,"coverRate":{"count":0.53,"sum":0.552,"mean":0.57,"paid":0.717,"median":0.611,"p90":0.636}}
+{"part":"sample","bug":"hotpick","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":100,"coverRate":{"count":0,"sum":0,"mean":0.95,"paid":0.98,"median":0.96,"p90":0.96}}
+{"part":"sample","bug":"window","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":100,"coverRate":{"count":0.945,"sum":0.934,"mean":0.163,"paid":0.94,"median":0.186,"p90":0.438}}
+{"part":"sample","bug":"lostdelete","tail":"moderate","k":256,"parts":30000,"seeds":100,"failed":100,"coverRate":{"count":0.873,"sum":0.89,"mean":0.937,"paid":0.945,"median":0.941,"p90":0.938}}
+{"part":"sample","bug":"skipempty","tail":"moderate","k":256,"parts":2000,"seeds":100,"failed":100,"coverRate":{"count":0,"sum":0.005,"mean":0.917,"paid":0.938,"median":0.937,"p90":0.921}}

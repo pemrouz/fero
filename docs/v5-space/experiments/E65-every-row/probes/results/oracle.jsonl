@@ -1,0 +1,3 @@
+{"probe":"sortedcol-oracle","bug":"none","seeds":300,"steps":6000,"failed":0,"checks":7198913,"first":null}
+{"probe":"sortedcol-oracle","bug":"nextchunk","seeds":300,"steps":6000,"failed":300,"checks":206470,"first":{"seed":1,"bad":"remove of a present value returned false: -3"}}
+{"probe":"sortedcol-oracle","bug":"nointerp","seeds":300,"steps":6000,"failed":292,"checks":198677,"first":{"seed":1,"bad":"q0.25 -Infinity vs NaN"}}
