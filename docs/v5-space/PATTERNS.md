@@ -5,6 +5,7 @@ This page walks through six jobs that most apps need, and shows how fero v5 does
 - **Nothing here is built.** The code type-checks against the declarations in [API.md](API.md) (its section 6); section 11 of this page shows how. [E-22] ran all of API.md's patterns on a prototype, with older names for the calls, and with leader changes forced in.
 - **The names and calls are API.md's** as of 2026-11-21 (decisions V5-1 to V5-17 in [DECISIONS.md][dec]). Where API.md is silent and this page picks, it says *this page's reading*.
 - **Amended 2026-11-21 for V5-17**, the owner's answers to API.md's open questions. A service's answer that throws now sends the request back to be taken again (section 4). The readings this page took for locks, sagas and consumers are now decisions, and say V5-17.
+- **Amended 2026-11-23 for V5-20 and V5-21.** A marked write that is skipped answers `skipped`, a refused one leaves a mark or not by why it was refused, `derive()` and `run()` await your function, and marks cover only the slots a deriver joined (items 16 to 19, from [E-61]). Live work over every row is a served view merged across groups, or a fold (items 1 and 5); one-time work over every row, `migrate` among it, is `scan()` (item 4).
 - **How each claim is marked.** (measured): timed. (checked): a model checker, a simulation with fixed random seeds, or the TypeScript compiler ran it. (reasoned): an argument, or sums on measured parts. (a guess): nobody measured it. (from memory): an outside fact not checked here.
 - **Where the numbers come from.** E-nn is an experiment under [experiments/](experiments). PATHS 3.7, LAYERS 8.8, MEMORY 9.3 and TRANSFORMS 3.4 are sections of [PATHS.md](PATHS.md), [LAYERS.md](LAYERS.md), [MEMORY.md](MEMORY.md) and [TRANSFORMS.md](TRANSFORMS.md).
 - **L1 to L5 are the layers** of [LAYERS.md](LAYERS.md), named under each "What happens". L1 keeps the log and its copies (Raft). L2 judges writes and turns records into rows: conditions, ops, marks, writer time. L3 is the reads that stay: live links, `changes()` and cursors. L4 is the surface: `fero()`, the lens and its verbs. L5 is the libraries, built only from L4's calls.
@@ -41,7 +42,9 @@ Each word is explained once, here.
 | fencing token | A number that rises with each new holder of a lock. A write carries it, and the leader refuses a token older than one it has seen. |
 | mark | A note that says "source record `e` is done". The write option `{ from: e }` puts it in the same log entry as the output it made. So a restart skips what is done. |
 | share | A part of a source's partitions that one consumer owns at a time. |
-| served view | A view the server names in its `methods:`. It is kept on one copy, for every client that asks. |
+| served view | A view the server names in its `methods:`. It is kept once for every client that asks, on one server that holds its rows, preferring one that leads no group of the resource (V5-20 item 13). Over several groups each group keeps its own piece, and a **merger** adds the pieces up (item 1). |
+| fold | Live code over every row that the server names: what each row adds, and one of fero's combines (`sum`, `count`, `min`, `max`, `top(k)`, `distinct`) to add the pieces up. Each group keeps one piece (V5-20 item 5). |
+| `scan()` | Every row once, in pages, from one copy of each group, at one cut by default. It keeps nothing, and has no row limit (V5-20 item 4). |
 | `#` names | fero's own system resources: `#locks`, `#groups` (where consumers keep their places), `#sagas`, `#calls`, `#sessions`. |
 | at least once | Nothing is lost, but after a crash some work may happen twice. |
 | exactly once | Each item has its effect once, through crashes and resends. In fero, only for writes into fero, never for an email your code sends. |
@@ -189,23 +192,24 @@ invoicing.run((e) => invoices.data[e.partition].set({ cents: 1 }, { from: e }).r
 3. The source's partitions are split into **shares**. Each share has one owner at a time. A lease row in `#locks` holds it, and that row's version is the share's token. (16 shares by default, fixed for the group's life, as [E-22]'s library had it: a partition stays in its share for good. V5-17.)
 4. A new owner reads the share's cursor from `#groups`. It writes that cursor back once, under its own token, before it reads the log. After that, an older owner's late write of the cursor is refused `fenced`.
 5. It reads its shares' log from that cursor. `commit()` writes the cursor of each share the batch read, under that share's token: one commit per share (V5-17).
-6. `run(fn)` writes no cursor per batch. Each output carries `{ from: e }`, so its mark lands in the same log entry as the output, at the target's leader. That leader keeps the highest mark it has applied, per reader name and source slot. It skips a write at or below that mark, and answers it as done.
-7. `run(fn)` still keeps each share's cursor, so a restart knows where to read from. It writes the cursor now and then, and moves it only once the marked writes up to it are answered. So a restart may read some records again; their writes are skipped at their marks (API.md P-08, LAYERS 6.3, PATHS 4.14; the restart from the share's cursor is V5-17's).
+6. `run(fn)` writes no cursor per batch. Each output carries `{ from: e }`, so its mark lands in the same log entry as the output, at the target's leader. That leader keeps the highest mark it has handled, per reader name and source slot. It skips a write at or below that mark, and answers it `skipped` ("handled before"), never `applied` (V5-20 item 17). A marked write refused on the row (a condition about the row fails) raises the mark too, and the refusal is final: a copy sent again is skipped. A write refused `fenced` or `forbidden` leaves no mark (item 16).
+7. `run(fn)` awaits `fn` before it gives the next record, so `fn` may be async (V5-20 item 18). It still keeps each share's cursor, so a restart knows where to read from. It writes the cursor now and then; the cursor passes a record only once `fn` has returned for it, moves only once the marked writes up to it are answered, keeps its fence, and only moves up. So a restart may read some records again; their writes are skipped at their marks (API.md P-08, LAYERS 6.3, PATHS 4.14; the restart from the share's cursor is V5-17's).
 8. fero paces `run`: a marked write is never refused `backpressure`. Instead the reader stops giving records until the line of waiting writes is short again (V5-12).
 
 **What it promises, and what it does not.**
 - Every committed record reaches one owner, in order within its partition. There is no order across partitions.
 - `commit()` is at least once: after a crash, the records since the last commit come again, and your code runs again.
 - `run()` with `{ from: e }` is exactly once for the writes into fero, even after a long stop, while the source keeps its log back to the share's cursor ([E-30]; checked). It is not exactly once for an email or a payment your function makes.
-- Two runs are not done yet. E-30's model wrote the mark itself, so a model run with the mark written by your code, as here, is still to do. So is a test of the pacing in a real client (API.md 3.11).
+- [E-61] ran E-30's model with the marks written by your code, as here: writes not awaited, bare marks, the pacing, refused writes, lost log tails, restarts and share moves. Each record changes the target exactly once on all 42 bounds and in 4,000 seeded runs, once a skip answers `skipped`, a refusal's mark follows its reason, and the loop awaits `fn` (V5-20 items 16 to 18; checked). A test of the pacing in a real client is still to do (API.md 3.11).
+- **Your `fn` keeps two rules** ([E-61]'s two app-code rules, taken with V5-20; the types cannot check them). For one record it makes the same writes in the same order every time it runs. And it makes every write before its promise settles (item 18): without that, an async `fn` lost records in 327 to 485 of 1,000 seeded runs. A dev check that runs `fn` twice on one record and compares the writes comes later.
 - `e.value` is set only when a record wrote a whole row. Write orders whole, or use `derive` with rows (section 9).
 
 **When something breaks.**
 - **A member crashes.** Its lease lapses, and other members take its shares, within one lease plus one commit (API.md P-08; reasoned, not measured).
 - **A member pauses**, say in a long GC. Its shares go to others, and its late `commit()` is refused `fenced`: 40 of 40 such commits were refused in [E-22] (checked).
 - **The leader changes, or a slot moves.** A cursor keeps its meaning across both ([E-31]; checked).
-- **A record comes twice.** With `commit()`, your code sees it twice. With `run()`, the second write is skipped at its mark.
-- **The log was cut.** A reader whose cursor is older than what the source keeps (its `history`) gets `expired` and stops. It never skips ahead.
+- **A record comes twice.** With `commit()`, your code sees it twice. With `run()`, the second write is skipped at its mark, and answers `skipped`.
+- **The log was cut.** A reader whose cursor is older than what the source keeps (its `history`) gets `expired` and stops. It never skips ahead. A reader that writes marks first reads its marks again, and goes on from them if they are past what is kept (E-61's pick, taken with V5-20).
 
 **Cost.**
 - A reader: one trip to open; then each kept record crosses the wire once. A cursor is 22 to 79 B for 1 to 10 partitions ([E-19]; measured).
@@ -400,16 +404,17 @@ await derive(orders, paid, (e, { row }) => row)
 5. Follow `orders`: one fenced write per changed bucket per commit.
 
 **What happens: the record form.**
-1. Read `paid.marks(name)`, where `name` is the deriver's name: `derive`'s `name` option; with none, the target's own name, as V5-17 rules for marks. For each source slot, it gives the lowest mark over `paid`'s slots. That is the cursor.
+1. Read `paid.marks(name)`, where `name` is the deriver's name: `derive`'s `name` option; with none, the target's own name, as V5-17 rules for marks. For each source slot, it gives the lowest mark over the slots of `paid` this name has joined. That is the cursor. A deriver **joins** an output slot in `#groups` before its first write there: one commit, once per name, source slot and output slot (V5-20 item 19).
 2. Read `orders`' log from there, for the shares this deriver owns. With `{ rows: true }` it also keeps its share of `orders`' rows in memory, so `fn` gets the row after the record and the row before it.
-3. Run `fn` per record. Each output is a marked write, not awaited. A record with no output gets a bare mark, so idle slots keep up.
-4. At `paid`'s leader, a write at or below the stored mark is skipped and answered as done. Any other is applied, and its mark raised, in one log entry.
+3. Run `fn` per record, and await it before the next record (V5-20 item 18). Each output is a marked write, not awaited. A joined slot that got no output from the last records gets a bare mark, so idle slots keep up; bare marks go only to joined slots (item 19).
+4. At `paid`'s leader, a write at or below the stored mark is skipped and answers `skipped`, never `applied` (V5-20 item 17). Any other is applied, and its mark raised, in one log entry. A write refused on the row raises the mark too; one refused `fenced` or `forbidden` does not (item 16).
 
 **What it promises, and what it does not.**
 - **The view form.** `totals` equals the view once it catches up. It never steps back, and never goes back to older code. The first design failed 514 of 1,000 seeds; with the bump, the barrier and the code version, 0 of 1,000 failed ([E-57] B3; checked). It reads rows, not the log, so it needs no `history`.
 - The view form still has one gap. A stale write from an older deriver can land at a target group before the bump reaches it. The next difference repairs it: 1,389 did, all repaired ([E-57] B3; checked).
 - In the view form, only the deriver writes the target. Any other write is refused `derived` (TRANSFORMS 3.4, LAYERS 6.3; reasoned, not run).
-- **The record form.** [E-30] checked it without rows. Each source record changes the target exactly once, through crashes, restarts and moves, while the source keeps its log back to the marks (checked). E-30's model wrote the marks itself; a run with the marks written by your code is not done yet, as in section 5.
+- **The record form.** [E-30] checked it without rows. Each source record changes the target exactly once, through crashes, restarts and moves, while the source keeps its log back to the marks (checked). [E-61] then checked it with the marks written by your code, as in section 5 (V5-20 items 16 to 19; checked). Your `fn` keeps section 5's two rules.
+- **The view form over several groups** follows the merged view, and holds the buckets, never the source rows. Its buckets have a stated limit: about 1.6e5 at 16 groups. Past it, use the record form; shards by output key come next (V5-20 item 10).
 - **The record form with rows, as `paid` uses it.** The same promise is meant to hold. But on a restart it also opens `orders`' past at the mark, and works the rows forward from there. That part is reasoned, not built, and its model is not run yet (LAYERS 6.3, 6.4).
 - The target trails the source by about one commit. There is no transaction across the two.
 - The view form's own log is a log of states. To count events, use the record form.
@@ -417,8 +422,8 @@ await derive(orders, paid, (e, { row }) => row)
 **When something breaks.**
 - **The deriver crashes.** Another server of the target takes over: the lock, for the view form; the shares, for the record form. Several servers of `paid` split the work, so it is done once.
 - **Old code comes back**, after a rollback. It does not take over from newer code until an admin resets the lock row's version.
-- **A record comes twice.** Its write is skipped at its mark.
-- **The source's log was cut** past the marks. The record form stops with `expired` and says so; it never skips a record (reasoned; not modelled: E-30's model kept the whole log, LAYERS 8.8). The view form does not care: 7,475 starts after the log was cut, 0 wrong ([E-57] B3; checked).
+- **A record comes twice.** Its write is skipped at its mark, and answers `skipped`.
+- **The source's log was cut** past the marks. The record form reads its marks again first; if they are still below what the source keeps, it stops with `expired` and says so. It never skips a record ([E-61]; checked: a reader that skipped ahead lost records in 206 to 258 of 1,000 seeded runs). The view form does not care: 7,475 starts after the log was cut, 0 wrong ([E-57] B3; checked).
 - **The source loses its majority.** The target stops getting changes, and keeps serving what it has (LAYERS 8.8; reasoned, not modelled).
 
 **Cost.**
@@ -426,7 +431,7 @@ await derive(orders, paid, (e, { row }) => row)
 - The record form: one marked write per output; writes sent together go in the same commits. The target keeps each mark in 29 B, one per reader, source slot and target slot ([E-30]; measured).
 - With rows: applying each record to its row costs 0.63 to 1.5 µs. The deriver keeps its share of the rows, at about 330 B a row ([E-57] A1, [E-05]; measured). The form with rows is not built yet (V5-15).
 
-**Use something else when.** You need the answer on a screen, not stored: a served view, or operators right of `connect()`, which run in this process (API.md 3.10). A join on a screen: `lookup`, right of `connect()`. A side effect outside fero: a consumer with `commit()` (section 5).
+**Use something else when.** You need the answer on a screen, not stored: a served view or a fold, or operators right of `connect()`, which run in this process (API.md 3.10). A join on a screen: `lookup`, right of `connect()`. A side effect outside fero: a consumer with `commit()` (section 5).
 
 ## 10. Every pattern of API.md, and which of the six it builds on
 
@@ -448,7 +453,7 @@ The six lean on each other too:
 | P-09 Work queue | a work queue |
 | P-10 Locks and leader election | a lock |
 | P-11 Counters and rate limits | none: ops at the leader (`limiter` is its own small library) |
-| P-12 Leaderboards, live aggregates | none: served views; to keep one for good, a derived resource |
+| P-12 Leaderboards, live aggregates | none: served views, merged across groups (V5-20 item 1), or a fold for live code over every row (item 5); to keep one for good, a derived resource |
 | P-13 Presence | none: rows that die with their session |
 | P-14 Invariants | answering a request: a method on a row |
 | P-15 Transactions across partitions | a saga |
@@ -456,7 +461,7 @@ The six lean on each other too:
 | P-17 Derived resources | a derived resource |
 | P-18 Tapes, forks, replays | none |
 | P-19 Clients everywhere | none |
-| P-20 Change the shape of rows | none (`migrate` is a paced loop of its own) |
+| P-20 Change the shape of rows | none: `migrate` reads every row once with `scan()` (V5-20 item 4), in a paced loop of its own |
 | P-21 Request and reply | answering a request: `service()`, or a method |
 | P-22 Delayed jobs, waiting takes, priorities | a work queue |
 
@@ -534,3 +539,4 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 [E-44]: experiments/E44-outside-log/README.md
 [E-55]: experiments/E55-lens-prototype/README.md
 [E-57]: experiments/E57-transforms/README.md
+[E-61]: experiments/E61-marks-from-code/README.md
