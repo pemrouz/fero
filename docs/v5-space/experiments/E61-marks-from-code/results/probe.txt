@@ -1,0 +1,34 @@
+# 1. move-small: {"mode": "derive", "src": {"a1": 2}, "owners": ["d"], "slots": {"R": 1}, "move": ["R", 1, 0], "line": 2, "faults": 1, "restarts": 1}
+design: 986 states, 0.0s: all hold
+    DONE: 986 judged states, 0 cannot reach the goal
+design without fence.oseq: 1,407 states, 0.1s: all hold
+    DONE: 1,407 judged states, 0 cannot reach the goal
+1-minimal set: 986 states, 0.0s: all hold
+    DONE: 986 judged states, 0 cannot reach the goal
+1-minimal set without fence.oseq: 1,445 states, 0.1s: all hold
+    DONE: 1,445 judged states, 0 cannot reach the goal
+
+# 2. share-cut-tail4: {"mode": "derive", "src": {"a1": 4}, "owners": ["d", "d"], "share": true, "slots": {"P": 0}, "line": 2, "faults": 2, "restarts": 0, "takes": 1, "cuts": 2, "crashes": 1}
+design: 861,498 states, 96.3s: all hold
+    DONE: 861,498 judged states, 0 cannot reach the goal
+K14-resync-tail: 41,845 states, 3.2s: LOST (19 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 19 steps
+     1. start (('i', 0),)
+     2. takeover 1
+     3. start (('i', 1),)
+     4. read (('i', 0), ('s', 'a1'))
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     8. read (('i', 0), ('s', 'a1'))
+     9. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    10. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+    11. cut a1 1
+    12. read (('i', 0), ('s', 'a1'))
+    13. apply (('g', 0), ('m', ('c', (0, 0), 'P', 3, ('o', 2, 0), 'd', 0)))
+    14. apply (('g', 0), ('m', ('c', (0, 0), 'P', 4, ('o', 3, 0), 'd', 0)))
+    15. resync (('i', 1), ('s', 'a1'))
+    16. crash b0 tail keeps 0
+    17. read (('i', 1), ('s', 'a1'))
+    18. apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 3, 0), 'd', 1)))
+    19. commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 3, 0), 3, 1)

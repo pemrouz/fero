@@ -1,0 +1,374 @@
+## design --bound d-share --drop expire.stale
+design d-share: 235 states, 0.0s: NOSTOP (11 steps) (STOPPED AT THE STATE LIMIT)
+  NOSTOP: shortest trace, 11 steps
+     1. start (('i', 0),)
+     2. takeover 1
+     3. start (('i', 1),)
+     4. read (('i', 0), ('s', 'a1'))
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     8. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+     9. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+    10. cut a1 1
+    11. expire (('i', 1), ('s', 'a1'))
+
+## design --bound r-share --drop resync.jump
+design r-share: 2,001 states, 0.1s: DONE (9 steps)
+  DONE: shortest trace, 9 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     4. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     5. cursor (('i', 0), ('p', 1), ('s', 'a1'))
+     6. takeover 1
+     7. start (('i', 1),)
+     8. commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))
+     9. cut a1 1
+
+## design --bound r-share --drop cursor.ahead
+design r-share: 2,314 states, 0.1s: NOSTOP (18 steps) (STOPPED AT THE STATE LIMIT)
+  NOSTOP: shortest trace, 18 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     4. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     5. cursor (('i', 0), ('p', 1), ('s', 'a1'))
+     6. commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))
+     7. cut a1 1
+     8. read (('i', 0), ('s', 'a1'))
+     9. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    10. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+    11. cursor (('i', 0), ('p', 2), ('s', 'a1'))
+    12. takeover 1
+    13. start (('i', 1),)
+    14. commit gc ('cur', 'd', 'a1', 2, 0, (0, 0))
+    15. cut a1 2
+    16. cursor (('i', 1), ('p', 1), ('s', 'a1'))
+    17. commit gc ('cur', 'd', 'a1', 1, 1, (1, 0))
+    18. expire (('i', 1), ('s', 'a1'))
+
+## design --bound d-refuse --drop refuse.mark
+design d-refuse: 473 states, 0.0s: STAND (16 steps) (STOPPED AT THE STATE LIMIT)
+  STAND: shortest trace, 16 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. crash (('i', 0),)
+     5. start (('i', 0),)
+     6. read (('i', 0), ('s', 'a1'))
+     7. read (('i', 0), ('s', 'a1'))
+     8. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+     9. commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+    10. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    11. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+    12. refuse (('g', 0), ('m', ('c', (0, 1), 'P', 2, ('o', 1, 0), 'd', 0)))
+    13. commit b0 ('r', (0, 1), 'P', 2, None, 1, None)
+    14. flip True
+    15. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    16. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+
+## design --bound d-refuse-then --drop refuse.mark
+design d-refuse-then: 175 states, 0.0s: STAND (10 steps) (STOPPED AT THE STATE LIMIT)
+  STAND: shortest trace, 10 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. crash (('i', 0),)
+     4. start (('i', 0),)
+     5. read (('i', 0), ('s', 'a1'))
+     6. refuse (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. commit b0 ('r', (0, 1), 'P', 1, None, 0, None)
+     8. flip True
+     9. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    10. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+
+## design --bound d-refuse2 --drop refuse.above
+design d-refuse2: 82 states, 0.0s: STAND (10 steps) (STOPPED AT THE STATE LIMIT)
+  STAND: shortest trace, 10 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. crash (('i', 0),)
+     4. start (('i', 0),)
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     8. flip False
+     9. refuse (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    10. commit b0 ('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)
+
+## design --bound d-refuse --drop skip.say
+design d-refuse: 346 states, 0.0s: ANSWER (12 steps) (STOPPED AT THE STATE LIMIT)
+  ANSWER: shortest trace, 12 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. crash (('i', 0),)
+     5. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     6. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     7. refuse (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+     8. commit b0 ('r', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, None)
+     9. start (('i', 0),)
+    10. read (('i', 0), ('s', 'a1'))
+    11. skip (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))
+    12. commit b0 ('k', (0, 1), 'P', 1, None, 1, 'ok')
+
+## design --bound d-async --drop read.fnret
+design d-async: 44 states, 0.0s: LOST (5 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 5 steps
+     1. start (('i', 0),)
+     2. read (('hold', True), ('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))
+     5. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)
+
+## design --bound r-async --drop cursor.fnret
+design r-async: 20 states, 0.0s: LOST (4 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 4 steps
+     1. start (('i', 0),)
+     2. read (('hold', True), ('i', 0), ('s', 'a1'))
+     3. cursor (('i', 0), ('p', 1), ('s', 'a1'))
+     4. commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))
+
+## design --bound d-bare-drop --drop bare.idle --drop bmark.inorder
+design d-bare-drop: 1,078 states, 0.0s: LOST (11 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 11 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. drop ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)
+     4. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     5. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     6. read (('i', 0), ('s', 'a1'))
+     7. bare (('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))
+     8. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))
+     9. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 2, 0)
+    10. bmark (('g', 1), ('m', ('c', (0, 0), 'R', 2, ('m', 'a1', 1), 'd', 0)))
+    11. commit b1 ('m', (0, 0), 'R', 2, ('d', 'a1', 1, 255), None, None)
+
+## design --bound d-bare --drop bare.read
+design d-bare: 301 states, 0.0s: HANDLED (8 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 8 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. bare (('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))
+     4. bmark (('g', 0), ('m', ('c', (0, 0), 'R', 1, ('m', 'a1', 1), 'd', 0)))
+     5. commit b0 ('m', (0, 0), 'R', 1, ('d', 'a1', 1, 255), None, None)
+     6. read (('i', 0), ('s', 'a1'))
+     7. skip (('g', 0), ('m', ('c', (0, 0), 'R', 2, ('o', 1, 0), 'd', 0)))
+     8. commit b0 ('k', (0, 0), 'R', 2, None, 1, 'skip')
+
+## design --bound d-refuse-drop --drop refuse.inorder
+design d-refuse-drop: 280 states, 0.0s: HANDLED (10 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 10 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. drop ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)
+     4. crash (('i', 0),)
+     5. start (('i', 0),)
+     6. read (('i', 0), ('s', 'a1'))
+     7. refuse (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))
+     8. commit b0 ('r', (0, 0), 'P', 2, ('d', 'a1', 0, 1), 1, None)
+     9. skip (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+    10. commit b0 ('k', (0, 1), 'P', 1, None, 0, 'skip')
+
+## design --bound r-short --drop cursor.answered
+design r-short: 13 states, 0.0s: LOST (4 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 4 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. cursor (('i', 0), ('p', 1), ('s', 'a1'))
+     4. commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))
+
+## design --bound r-lock --drop cursor.fence
+design r-lock: 1,025 states, 0.1s: LOST (14 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 14 steps
+     1. start (('i', 0),)
+     2. takeover 1
+     3. start (('i', 1),)
+     4. read (('i', 0), ('s', 'a1'))
+     5. read (('i', 0), ('s', 'a1'))
+     6. read (('i', 1), ('s', 'a1'))
+     7. apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))
+     8. commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)
+     9. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    10. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+    11. fenced (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    12. commit b0 ('f', (0, 0), 'P', 2, None, 1, None)
+    13. cursor (('i', 0), ('p', 2), ('s', 'a1'))
+    14. commit gc ('cur', 'd', 'a1', 2, 1, (0, 0))
+
+## design --bound d-tail --drop apply.inorder
+design d-tail: 65 states, 0.0s: LOST (7 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 7 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     5. crash b0 tail keeps 0
+     6. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+
+## fenced-mark --bound d-lock
+fenced-mark d-lock: 336 states, 0.0s: HANDLED (15 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 15 steps
+     1. start (('i', 0),)
+     2. takeover 1
+     3. start (('i', 1),)
+     4. read (('i', 0), ('s', 'a1'))
+     5. read (('i', 0), ('s', 'a1'))
+     6. read (('i', 1), ('s', 'a1'))
+     7. read (('i', 1), ('s', 'a1'))
+     8. apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))
+     9. commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)
+    10. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    11. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+    12. fenced (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    13. commit b0 ('f', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, None)
+    14. skip (('g', 0), ('m', ('c', (1, 0), 'P', 2, ('o', 1, 0), 'd', 1)))
+    15. commit b0 ('k', (1, 0), 'P', 2, None, 1, 'skip')
+
+## fenced-mark --bound r-lock
+fenced-mark r-lock: 870 states, 0.1s: HANDLED (15 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 15 steps
+     1. start (('i', 0),)
+     2. takeover 1
+     3. start (('i', 1),)
+     4. read (('i', 0), ('s', 'a1'))
+     5. read (('i', 0), ('s', 'a1'))
+     6. read (('i', 1), ('s', 'a1'))
+     7. read (('i', 1), ('s', 'a1'))
+     8. apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))
+     9. commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)
+    10. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    11. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+    12. fenced (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+    13. commit b0 ('f', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, None)
+    14. skip (('g', 0), ('m', ('c', (1, 0), 'P', 2, ('o', 1, 0), 'd', 1)))
+    15. commit b0 ('k', (1, 0), 'P', 2, None, 1, 'skip')
+
+## unpaced --bound d-pace
+unpaced d-pace: 53 states, 0.0s: LOST (8 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 8 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     5. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     6. read (('i', 0), ('s', 'a1'))
+     7. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))
+     8. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 2, 0), 2, 0)
+
+## mark-apart --bound d-tail
+mark-apart d-tail: 575 states, 0.0s: ONCE (10 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 10 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. crash (('i', 0),)
+     4. start (('i', 0),)
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)
+     8. crash b0 tail keeps 0
+     9. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+    10. commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)
+
+## mark-first --bound d-tail
+mark-first d-tail: 241 states, 0.0s: HANDLED (8 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 8 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     4. commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)
+     5. crash b0 tail keeps 0
+     6. resend (('i', 0), ('j', 0))
+     7. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     8. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+
+## marks-tail --bound d-tail
+marks-tail d-tail: 477 states, 0.0s: LOST (11 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 11 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. crash (('i', 0),)
+     5. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     6. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+     7. start (('i', 0),)
+     8. crash b0 tail keeps 0
+     9. read (('i', 0), ('s', 'a1'))
+    10. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))
+    11. commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 1, 0), 1, 0)
+
+## marks-marked --bound d-short
+marks-marked d-short: 848 states, 0.1s: LOST (13 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 13 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     4. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     5. read (('i', 0), ('s', 'a1'))
+     6. crash (('i', 0),)
+     7. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))
+     8. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 2, 0)
+     9. start (('i', 0),)
+    10. read (('i', 0), ('s', 'a1'))
+    11. bare (('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))
+    12. bmark (('g', 1), ('m', ('c', (0, 1), 'R', 1, ('m', 'a1', 1), 'd', 0)))
+    13. commit b1 ('m', (0, 1), 'R', 1, ('d', 'a1', 1, 255), None, None)
+
+## judge-com --bound d-short
+judge-com d-short: 146 states, 0.0s: ONCE (9 steps) (STOPPED AT THE STATE LIMIT)
+  ONCE: shortest trace, 9 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. crash (('i', 0),)
+     4. start (('i', 0),)
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))
+     7. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     8. commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     9. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+
+## skip-ahead --bound d-cut
+skip-ahead d-cut: 60 states, 0.0s: LOST (6 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 6 steps
+     1. cut a1 1
+     2. start (('i', 0),)
+     3. resync (('i', 0), ('s', 'a1'))
+     4. read (('i', 0), ('s', 'a1'))
+     5. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))
+     6. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)
+
+## nondet --bound d-two
+nondet d-two: 140 states, 0.0s: HANDLED (9 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 9 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. crash (('i', 0),)
+     4. start (('i', 0),)
+     5. read (('i', 0), ('s', 'a1'))
+     6. apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 1, 0)
+     8. skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     9. commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')
+
+## key-name --bound d-slots
+key-name d-slots: 107 states, 0.0s: LOST (7 steps) (STOPPED AT THE STATE LIMIT)
+  LOST: shortest trace, 7 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. read (('i', 0), ('s', 'a1'))
+     4. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     5. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     6. apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))
+     7. commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)
+
+## no-wnum --bound r-two
+no-wnum r-two: 24 states, 0.0s: HANDLED (6 steps) (STOPPED AT THE STATE LIMIT)
+  HANDLED: shortest trace, 6 steps
+     1. start (('i', 0),)
+     2. read (('i', 0), ('s', 'a1'))
+     3. apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))
+     4. commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)
+     5. skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))
+     6. commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')
+

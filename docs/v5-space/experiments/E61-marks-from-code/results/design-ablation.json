@@ -1,0 +1,4702 @@
+{
+ "option": "design",
+ "bounds": [
+  "d-refuse2",
+  "r-two",
+  "d-pace",
+  "d-share-two",
+  "d-refuse-then",
+  "d-names",
+  "d-lock",
+  "d-share",
+  "r-refuse-then",
+  "d-refuse",
+  "d-refuse-drop",
+  "d-cut",
+  "d-flip2",
+  "d-async",
+  "r-async",
+  "d-drop",
+  "r-lock",
+  "d-share-cut",
+  "d-two",
+  "r-refuse",
+  "r-short",
+  "r-share",
+  "r-cut",
+  "d-tail",
+  "d-cut-tail",
+  "d-short",
+  "d-slots",
+  "r-share-cut",
+  "r-tail",
+  "r-cut-tail",
+  "d-share-tail",
+  "d-twice",
+  "d-bare-drop",
+  "d-share-restart",
+  "r-share-tail",
+  "d-bare",
+  "d-move",
+  "r-twice",
+  "d-share-cut-tail3",
+  "r-share-restart"
+ ],
+ "verify": [
+  "d-share-move",
+  "d-twice-tail"
+ ],
+ "pinned": [
+  "apply.append",
+  "apply.eat",
+  "apply.holds",
+  "apply.out",
+  "apply.unfenced",
+  "bmark.append",
+  "bmark.bare",
+  "bmark.eat",
+  "crash.crash",
+  "cursor.write",
+  "dup.eat",
+  "dup.seen",
+  "emit.send",
+  "fail.end",
+  "fence.append",
+  "fenced.append",
+  "fenced.eat",
+  "fenced.out",
+  "fenced.stale",
+  "gap.ahead",
+  "gap.eat",
+  "gap.end",
+  "notice.stop",
+  "open.append",
+  "read.run",
+  "refuse.append",
+  "refuse.eat",
+  "refuse.fails",
+  "refuse.out",
+  "resend.send",
+  "skip.append",
+  "skip.eat",
+  "start.read"
+ ],
+ "base": {
+  "d-refuse2": {
+   "states": 72,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    72,
+    115,
+    7769757908294966977
+   ],
+   "judged": {
+    "DONE": [
+     72,
+     0
+    ]
+   }
+  },
+  "r-two": {
+   "states": 150,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    150,
+    231,
+    8736692131763138321
+   ],
+   "judged": {
+    "DONE": [
+     150,
+     0
+    ]
+   }
+  },
+  "d-pace": {
+   "states": 160,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    160,
+    201,
+    918902931451693953
+   ],
+   "judged": {
+    "DONE": [
+     160,
+     0
+    ]
+   }
+  },
+  "d-share-two": {
+   "states": 190,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    190,
+    387,
+    10489796098723734693
+   ],
+   "judged": {
+    "DONE": [
+     190,
+     0
+    ]
+   }
+  },
+  "d-refuse-then": {
+   "states": 288,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    288,
+    538,
+    3978898175916224261
+   ],
+   "judged": {
+    "DONE": [
+     288,
+     0
+    ]
+   }
+  },
+  "d-names": {
+   "states": 291,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    291,
+    544,
+    12706001157491503774
+   ],
+   "judged": {
+    "DONE": [
+     291,
+     0
+    ]
+   }
+  },
+  "d-lock": {
+   "states": 345,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    345,
+    787,
+    17347914417837974644
+   ],
+   "judged": {
+    "DONE": [
+     345,
+     0
+    ]
+   }
+  },
+  "d-share": {
+   "states": 435,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    435,
+    995,
+    12901066818880262365
+   ],
+   "judged": {
+    "DONE": [
+     435,
+     0
+    ]
+   }
+  },
+  "r-refuse-then": {
+   "states": 441,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    441,
+    829,
+    296461949755975782
+   ],
+   "judged": {
+    "DONE": [
+     441,
+     0
+    ]
+   }
+  },
+  "d-refuse": {
+   "states": 462,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    462,
+    905,
+    10248745424708418031
+   ],
+   "judged": {
+    "DONE": [
+     462,
+     0
+    ]
+   }
+  },
+  "d-refuse-drop": {
+   "states": 618,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    618,
+    1046,
+    8488195210065813732
+   ],
+   "judged": {
+    "DONE": [
+     618,
+     0
+    ]
+   }
+  },
+  "d-cut": {
+   "states": 616,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    616,
+    1325,
+    13462801862174994401
+   ],
+   "judged": {
+    "DONE": [
+     616,
+     0
+    ]
+   }
+  },
+  "d-flip2": {
+   "states": 746,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    746,
+    1622,
+    10772873910552789550
+   ],
+   "judged": {
+    "DONE": [
+     746,
+     0
+    ]
+   }
+  },
+  "d-async": {
+   "states": 792,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    792,
+    1647,
+    962320364844663933
+   ],
+   "judged": {
+    "DONE": [
+     792,
+     0
+    ]
+   }
+  },
+  "r-async": {
+   "states": 803,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    803,
+    1629,
+    3860099766869144390
+   ],
+   "judged": {
+    "DONE": [
+     803,
+     0
+    ]
+   }
+  },
+  "d-drop": {
+   "states": 1020,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1020,
+    1841,
+    449645200516333127
+   ],
+   "judged": {
+    "DONE": [
+     1020,
+     0
+    ]
+   }
+  },
+  "r-lock": {
+   "states": 1286,
+   "secs": 0.07,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1286,
+    3054,
+    5634988060811887712
+   ],
+   "judged": {
+    "DONE": [
+     1286,
+     0
+    ]
+   }
+  },
+  "d-share-cut": {
+   "states": 1320,
+   "secs": 0.07,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1320,
+    3497,
+    1522759595068122408
+   ],
+   "judged": {
+    "DONE": [
+     1320,
+     0
+    ]
+   }
+  },
+  "d-two": {
+   "states": 1607,
+   "secs": 0.08,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1607,
+    2800,
+    773601367996674139
+   ],
+   "judged": {
+    "DONE": [
+     1607,
+     0
+    ]
+   }
+  },
+  "r-refuse": {
+   "states": 1817,
+   "secs": 0.07,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1817,
+    3790,
+    4769398844472348080
+   ],
+   "judged": {
+    "DONE": [
+     1817,
+     0
+    ]
+   }
+  },
+  "r-short": {
+   "states": 1907,
+   "secs": 0.1,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1907,
+    4222,
+    8730347643467101398
+   ],
+   "judged": {
+    "DONE": [
+     1907,
+     0
+    ]
+   }
+  },
+  "r-share": {
+   "states": 2088,
+   "secs": 0.14,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2088,
+    5189,
+    3878006988100456456
+   ],
+   "judged": {
+    "DONE": [
+     2088,
+     0
+    ]
+   }
+  },
+  "r-cut": {
+   "states": 2174,
+   "secs": 0.1,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2174,
+    5022,
+    4849521822508684087
+   ],
+   "judged": {
+    "DONE": [
+     2174,
+     0
+    ]
+   }
+  },
+  "d-tail": {
+   "states": 2338,
+   "secs": 0.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2338,
+    4360,
+    13788196856167769856
+   ],
+   "judged": {
+    "DONE": [
+     2338,
+     0
+    ]
+   }
+  },
+  "d-cut-tail": {
+   "states": 2663,
+   "secs": 0.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2663,
+    4989,
+    3181634985800680876
+   ],
+   "judged": {
+    "DONE": [
+     2663,
+     0
+    ]
+   }
+  },
+  "d-short": {
+   "states": 3668,
+   "secs": 0.29,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3668,
+    9352,
+    5173322968550020476
+   ],
+   "judged": {
+    "DONE": [
+     3668,
+     0
+    ]
+   }
+  },
+  "d-slots": {
+   "states": 4142,
+   "secs": 0.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4142,
+    7267,
+    13012937650880810499
+   ],
+   "judged": {
+    "DONE": [
+     4142,
+     0
+    ]
+   }
+  },
+  "r-share-cut": {
+   "states": 4677,
+   "secs": 0.27,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    4677,
+    13131,
+    7793521761574015269
+   ],
+   "judged": {
+    "DONE": [
+     4677,
+     0
+    ]
+   }
+  },
+  "r-tail": {
+   "states": 7213,
+   "secs": 0.35,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    7213,
+    13818,
+    1744540708235451899
+   ],
+   "judged": {
+    "DONE": [
+     7213,
+     0
+    ]
+   }
+  },
+  "r-cut-tail": {
+   "states": 10495,
+   "secs": 0.49,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    10495,
+    21313,
+    4101753437492229797
+   ],
+   "judged": {
+    "DONE": [
+     10495,
+     0
+    ]
+   }
+  },
+  "d-share-tail": {
+   "states": 11568,
+   "secs": 0.88,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    11568,
+    31722,
+    4715142095694216244
+   ],
+   "judged": {
+    "DONE": [
+     11568,
+     0
+    ]
+   }
+  },
+  "d-twice": {
+   "states": 12832,
+   "secs": 0.9,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    12832,
+    28544,
+    8651331098351297946
+   ],
+   "judged": {
+    "DONE": [
+     12832,
+     0
+    ]
+   }
+  },
+  "d-bare-drop": {
+   "states": 73056,
+   "secs": 7.64,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    73056,
+    200430,
+    11077190963952050581
+   ],
+   "judged": {
+    "DONE": [
+     73056,
+     0
+    ]
+   }
+  },
+  "d-share-restart": {
+   "states": 24135,
+   "secs": 1.71,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    24135,
+    62351,
+    6255170304421688682
+   ],
+   "judged": {
+    "DONE": [
+     24135,
+     0
+    ]
+   }
+  },
+  "r-share-tail": {
+   "states": 35065,
+   "secs": 2.34,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    35065,
+    98291,
+    8512847144884664285
+   ],
+   "judged": {
+    "DONE": [
+     35065,
+     0
+    ]
+   }
+  },
+  "d-bare": {
+   "states": 35679,
+   "secs": 2.28,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    35679,
+    59745,
+    10911403092123435761
+   ],
+   "judged": {
+    "DONE": [
+     35679,
+     0
+    ]
+   }
+  },
+  "d-move": {
+   "states": 92171,
+   "secs": 7.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    92171,
+    165378,
+    18158777812766326750
+   ],
+   "judged": {
+    "DONE": [
+     92171,
+     0
+    ]
+   }
+  },
+  "r-twice": {
+   "states": 103546,
+   "secs": 9.46,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    103546,
+    261312,
+    17244055208894269838
+   ],
+   "judged": {
+    "DONE": [
+     103546,
+     0
+    ]
+   }
+  },
+  "d-share-cut-tail3": {
+   "states": 108591,
+   "secs": 13.68,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    108591,
+    320675,
+    14003087288945112070
+   ],
+   "judged": {
+    "DONE": [
+     108591,
+     0
+    ]
+   }
+  },
+  "r-share-restart": {
+   "states": 150636,
+   "secs": 16.48,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    150636,
+    428384,
+    8600868036976016549
+   ],
+   "judged": {
+    "DONE": [
+     150636,
+     0
+    ]
+   }
+  }
+ },
+ "verify_undecided": [
+  "d-share-move",
+  "LIMIT",
+  1300001,
+  [
+   "LIMIT"
+  ]
+ ],
+ "greedy": [
+  [
+   "read.paced",
+   "dropped"
+  ],
+  [
+   "resync.kept",
+   "dropped"
+  ],
+  [
+   "bare.idle",
+   "dropped"
+  ],
+  [
+   "skip.inorder",
+   "dropped"
+  ],
+  [
+   "fenced.inorder",
+   "dropped"
+  ],
+  [
+   "fenced.above",
+   "dropped"
+  ],
+  [
+   "bmark.inorder",
+   "kept: with the others dropped it breaks HANDLED on d-bare-drop in 10 steps"
+  ],
+  [
+   "bmark.above",
+   "kept: with the others dropped it breaks LIMIT on d-bare-drop in 1300003 steps"
+  ]
+ ],
+ "removed": [
+  "read.paced",
+  "resync.kept",
+  "bare.idle",
+  "skip.inorder",
+  "fenced.inorder",
+  "fenced.above"
+ ],
+ "put_back": [],
+ "minimal": {
+  "d-refuse2": {
+   "states": 72,
+   "secs": 0.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    72,
+    115,
+    7769757908294966977
+   ],
+   "judged": {
+    "DONE": [
+     72,
+     0
+    ]
+   }
+  },
+  "r-two": {
+   "states": 150,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    150,
+    231,
+    8736692131763138321
+   ],
+   "judged": {
+    "DONE": [
+     150,
+     0
+    ]
+   }
+  },
+  "d-pace": {
+   "states": 1057,
+   "secs": 0.1,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1057,
+    2008,
+    12098437241770711155
+   ],
+   "judged": {
+    "DONE": [
+     1057,
+     0
+    ]
+   }
+  },
+  "d-share-two": {
+   "states": 190,
+   "secs": 0.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    190,
+    387,
+    10489796098723734693
+   ],
+   "judged": {
+    "DONE": [
+     190,
+     0
+    ]
+   }
+  },
+  "d-refuse-then": {
+   "states": 288,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    288,
+    538,
+    3978898175916224261
+   ],
+   "judged": {
+    "DONE": [
+     288,
+     0
+    ]
+   }
+  },
+  "d-names": {
+   "states": 291,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    291,
+    544,
+    12706001157491503774
+   ],
+   "judged": {
+    "DONE": [
+     291,
+     0
+    ]
+   }
+  },
+  "d-lock": {
+   "states": 497,
+   "secs": 0.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    497,
+    1129,
+    13256662899409239751
+   ],
+   "judged": {
+    "DONE": [
+     497,
+     0
+    ]
+   }
+  },
+  "d-share": {
+   "states": 435,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    435,
+    995,
+    12901066818880262365
+   ],
+   "judged": {
+    "DONE": [
+     435,
+     0
+    ]
+   }
+  },
+  "r-refuse-then": {
+   "states": 441,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    441,
+    829,
+    296461949755975782
+   ],
+   "judged": {
+    "DONE": [
+     441,
+     0
+    ]
+   }
+  },
+  "d-refuse": {
+   "states": 462,
+   "secs": 0.02,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    462,
+    905,
+    10248745424708418031
+   ],
+   "judged": {
+    "DONE": [
+     462,
+     0
+    ]
+   }
+  },
+  "d-refuse-drop": {
+   "states": 661,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    661,
+    1117,
+    12167336632058279800
+   ],
+   "judged": {
+    "DONE": [
+     661,
+     0
+    ]
+   }
+  },
+  "d-cut": {
+   "states": 718,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    718,
+    1525,
+    2598619063506843147
+   ],
+   "judged": {
+    "DONE": [
+     718,
+     0
+    ]
+   }
+  },
+  "d-flip2": {
+   "states": 746,
+   "secs": 0.03,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    746,
+    1622,
+    10772873910552789550
+   ],
+   "judged": {
+    "DONE": [
+     746,
+     0
+    ]
+   }
+  },
+  "d-async": {
+   "states": 1454,
+   "secs": 0.11,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1454,
+    3362,
+    7531920131693660313
+   ],
+   "judged": {
+    "DONE": [
+     1454,
+     0
+    ]
+   }
+  },
+  "r-async": {
+   "states": 803,
+   "secs": 0.05,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    803,
+    1629,
+    3860099766869144390
+   ],
+   "judged": {
+    "DONE": [
+     803,
+     0
+    ]
+   }
+  },
+  "d-drop": {
+   "states": 1079,
+   "secs": 0.08,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1079,
+    1940,
+    12659059208601770132
+   ],
+   "judged": {
+    "DONE": [
+     1079,
+     0
+    ]
+   }
+  },
+  "r-lock": {
+   "states": 1948,
+   "secs": 0.18,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1948,
+    4766,
+    4475704888335949244
+   ],
+   "judged": {
+    "DONE": [
+     1948,
+     0
+    ]
+   }
+  },
+  "d-share-cut": {
+   "states": 1767,
+   "secs": 0.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1767,
+    4640,
+    7071984631176501414
+   ],
+   "judged": {
+    "DONE": [
+     1767,
+     0
+    ]
+   }
+  },
+  "d-two": {
+   "states": 1793,
+   "secs": 0.1,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1793,
+    3146,
+    1654903220198385019
+   ],
+   "judged": {
+    "DONE": [
+     1793,
+     0
+    ]
+   }
+  },
+  "r-refuse": {
+   "states": 1817,
+   "secs": 0.09,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1817,
+    3790,
+    4769398844472348080
+   ],
+   "judged": {
+    "DONE": [
+     1817,
+     0
+    ]
+   }
+  },
+  "r-short": {
+   "states": 3049,
+   "secs": 0.22,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    3049,
+    7754,
+    14419267983892814855
+   ],
+   "judged": {
+    "DONE": [
+     3049,
+     0
+    ]
+   }
+  },
+  "r-share": {
+   "states": 2088,
+   "secs": 0.13,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2088,
+    5189,
+    3878006988100456456
+   ],
+   "judged": {
+    "DONE": [
+     2088,
+     0
+    ]
+   }
+  },
+  "r-cut": {
+   "states": 2441,
+   "secs": 0.17,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2441,
+    5578,
+    8498538105926175827
+   ],
+   "judged": {
+    "DONE": [
+     2441,
+     0
+    ]
+   }
+  },
+  "d-tail": {
+   "states": 2556,
+   "secs": 0.15,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2556,
+    4775,
+    14207912970126738188
+   ],
+   "judged": {
+    "DONE": [
+     2556,
+     0
+    ]
+   }
+  },
+  "d-cut-tail": {
+   "states": 2949,
+   "secs": 0.22,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    2949,
+    5575,
+    5949898362654833989
+   ],
+   "judged": {
+    "DONE": [
+     2949,
+     0
+    ]
+   }
+  },
+  "d-short": {
+   "states": 11828,
+   "secs": 1.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    11828,
+    36890,
+    8775593364408943794
+   ],
+   "judged": {
+    "DONE": [
+     11828,
+     0
+    ]
+   }
+  },
+  "d-slots": {
+   "states": 8150,
+   "secs": 0.61,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    8150,
+    15835,
+    14834321451314990093
+   ],
+   "judged": {
+    "DONE": [
+     8150,
+     0
+    ]
+   }
+  },
+  "r-share-cut": {
+   "states": 5804,
+   "secs": 0.36,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    5804,
+    16151,
+    1218041486829527665
+   ],
+   "judged": {
+    "DONE": [
+     5804,
+     0
+    ]
+   }
+  },
+  "r-tail": {
+   "states": 7995,
+   "secs": 0.41,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    7995,
+    15454,
+    16660644153222064035
+   ],
+   "judged": {
+    "DONE": [
+     7995,
+     0
+    ]
+   }
+  },
+  "r-cut-tail": {
+   "states": 11753,
+   "secs": 0.53,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    11753,
+    24186,
+    2387640720293825848
+   ],
+   "judged": {
+    "DONE": [
+     11753,
+     0
+    ]
+   }
+  },
+  "d-share-tail": {
+   "states": 13460,
+   "secs": 0.94,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    13460,
+    36763,
+    9708542463683169616
+   ],
+   "judged": {
+    "DONE": [
+     13460,
+     0
+    ]
+   }
+  },
+  "d-twice": {
+   "states": 12832,
+   "secs": 0.92,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    12832,
+    28544,
+    8651331098351297946
+   ],
+   "judged": {
+    "DONE": [
+     12832,
+     0
+    ]
+   }
+  },
+  "d-bare-drop": {
+   "states": 1243000,
+   "secs": 134.26,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    1243000,
+    4135821,
+    17285637028242033885
+   ],
+   "judged": {
+    "DONE": [
+     1243000,
+     0
+    ]
+   }
+  },
+  "d-share-restart": {
+   "states": 24135,
+   "secs": 1.7,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    24135,
+    62351,
+    6255170304421688682
+   ],
+   "judged": {
+    "DONE": [
+     24135,
+     0
+    ]
+   }
+  },
+  "r-share-tail": {
+   "states": 40768,
+   "secs": 2.79,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    40768,
+    114919,
+    9821047437236533837
+   ],
+   "judged": {
+    "DONE": [
+     40768,
+     0
+    ]
+   }
+  },
+  "d-bare": {
+   "states": 143846,
+   "secs": 11.01,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    143846,
+    278379,
+    12437733711844625903
+   ],
+   "judged": {
+    "DONE": [
+     143846,
+     0
+    ]
+   }
+  },
+  "d-move": {
+   "states": 369522,
+   "secs": 31.7,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    369522,
+    753369,
+    6263448190826245051
+   ],
+   "judged": {
+    "DONE": [
+     369522,
+     0
+    ]
+   }
+  },
+  "r-twice": {
+   "states": 103546,
+   "secs": 7.68,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    103546,
+    261312,
+    17244055208894269838
+   ],
+   "judged": {
+    "DONE": [
+     103546,
+     0
+    ]
+   }
+  },
+  "d-share-cut-tail3": {
+   "states": 847007,
+   "secs": 87.31,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    847007,
+    2826586,
+    15606319879836832502
+   ],
+   "judged": {
+    "DONE": [
+     847007,
+     0
+    ]
+   }
+  },
+  "r-share-restart": {
+   "states": 150636,
+   "secs": 10.74,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    150636,
+    428384,
+    8600868036976016549
+   ],
+   "judged": {
+    "DONE": [
+     150636,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "d-share-move": {
+   "states": 1300001,
+   "secs": 138.55,
+   "complete": false,
+   "fail": {},
+   "digest": [
+    1300001,
+    3546371,
+    7081687173318033167
+   ],
+   "judged": {}
+  },
+  "d-twice-tail": {
+   "states": 1300001,
+   "secs": 107.95,
+   "complete": false,
+   "fail": {},
+   "digest": [
+    1300001,
+    3279656,
+    5582814903694252997
+   ],
+   "judged": {}
+  }
+ },
+ "rules": [
+  {
+   "id": "start.read",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "read.paced",
+   "kind": "guard",
+   "role": "pace",
+   "note": "the reader yields a record only while this client holds fewer than LINE waiting writes",
+   "cmp": "<",
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "read.fnret",
+   "kind": "guard",
+   "role": "async",
+   "note": "the loop takes the next record only once fn has returned (it awaits fn's promise)",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-async",
+    "LOST",
+    5,
+    [
+     "LOST"
+    ]
+   ],
+   "final": [
+    "d-async",
+    "LOST",
+    5,
+    [
+     "LOST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('hold', True), ('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "read.number",
+   "kind": "update",
+   "role": "wnum",
+   "note": "each write carries its number within its record, per output slot",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-two",
+    "HANDLED",
+    6,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final": [
+    "r-two",
+    "HANDLED",
+    6,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 2, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "id": "read.run",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "resync.kept",
+   "kind": "guard",
+   "role": "expired",
+   "note": "below the floor: jump to the marks (or cursor) only if they are at or past the floor",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "resync.jump",
+   "kind": "update",
+   "role": "expired",
+   "note": "an `expired` reader reads its marks (or cursor) again and resumes there",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-share",
+    "DONE",
+    9,
+    [
+     "DONE"
+    ]
+   ],
+   "final": [
+    "r-share",
+    "DONE",
+    9,
+    [
+     "DONE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "expire.stale",
+   "kind": "guard",
+   "role": "expired",
+   "note": "stop only when the marks (or cursor) too are below the floor",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-share",
+    "NOSTOP",
+    11,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "final": [
+    "d-share",
+    "NOSTOP",
+    11,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ],
+    [
+     "expire",
+     "(('i', 1), ('s', 'a1'))"
+    ]
+   ]
+  },
+  {
+   "id": "expire.stop",
+   "kind": "update",
+   "role": "expired",
+   "note": "stop with `expired`; never skip a record",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-cut",
+    "DONE",
+    1,
+    [
+     "DONE"
+    ]
+   ],
+   "final": [
+    "d-cut",
+    "DONE",
+    1,
+    [
+     "DONE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "cut",
+     "a1",
+     "1"
+    ]
+   ]
+  },
+  {
+   "id": "resend.send",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "bare.read",
+   "kind": "guard",
+   "role": "bare",
+   "note": "a bare mark only for a record already run (its writes were issued before it)",
+   "cmp": "<",
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-bare",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final": [
+    "d-bare",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bare",
+     "(('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bmark",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('m', 'a1', 1), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('m', (0, 0), 'R', 1, ('d', 'a1', 1, 255), None, None)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'R', 2, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "id": "bare.idle",
+   "kind": "guard",
+   "role": "bare",
+   "note": "a bare mark waits until no write to its slot waits",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "bare.send",
+   "kind": "update",
+   "role": "bare",
+   "note": "derive() sends a bare mark to an idle output slot",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "final": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "emit.send",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "cursor.answered",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "the cursor moves past a record only once its marked writes are answered",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-two",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "final": [
+    "r-two",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "id": "cursor.fnret",
+   "kind": "guard",
+   "role": "async",
+   "note": "the cursor moves past a record only once fn has returned for it",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-async",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "final": [
+    "r-async",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('hold', True), ('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "id": "cursor.fence",
+   "kind": "guard",
+   "role": "fence",
+   "note": "a cursor write carries the share token; an older owner's is refused `fenced`",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-lock",
+    "LOST",
+    14,
+    [
+     "LOST"
+    ]
+   ],
+   "final": [
+    "r-lock",
+    "LOST",
+    14,
+    [
+     "LOST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 1), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ],
+    [
+     "fenced",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('f', (0, 0), 'P', 2, None, 1, None)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 2), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 2, 1, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "id": "cursor.ahead",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "the cursor row never moves back: gc applies a write only above its value",
+   "cmp": ">",
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "r-share",
+    "NOSTOP",
+    18,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "final": [
+    "r-share",
+    "NOSTOP",
+    18,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 2), ('s', 'a1'))"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 2, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "2"
+    ],
+    [
+     "cursor",
+     "(('i', 1), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 1, (1, 0))"
+    ],
+    [
+     "expire",
+     "(('i', 1), ('s', 'a1'))"
+    ]
+   ]
+  },
+  {
+   "id": "cursor.write",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "crash.crash",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "notice.stop",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fail.end",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "dup.seen",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "dup.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "gap.ahead",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "gap.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "gap.end",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "apply.out",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "apply.inorder",
+   "kind": "guard",
+   "role": "order",
+   "note": "issue order: a writer's write n to a slot only after n-1",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-drop",
+    "LOST",
+    6,
+    [
+     "LOST"
+    ]
+   ],
+   "final": [
+    "d-drop",
+    "LOST",
+    6,
+    [
+     "LOST"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.above",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "apply only above the stored mark",
+   "cmp": ">",
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.holds",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "apply.unfenced",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "apply.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "apply.mark",
+   "kind": "update",
+   "role": "dedup",
+   "note": "the mark goes in the output's own entry",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, None, 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, None, 0, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "apply.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "skip.inorder",
+   "kind": "guard",
+   "role": "order",
+   "note": "issue order",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "skip.below",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "skip a write at or below the stored mark",
+   "cmp": "<=",
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse2",
+    "HANDLED",
+    4,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final": [
+    "d-refuse2",
+    "HANDLED",
+    4,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ]
+   ]
+  },
+  {
+   "id": "skip.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "skip.say",
+   "kind": "update",
+   "role": "answer",
+   "note": "a skip answers `skipped` (handled before), never `applied`",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse2",
+    "ANSWER",
+    10,
+    [
+     "ANSWER"
+    ]
+   ],
+   "final": [
+    "d-refuse2",
+    "ANSWER",
+    10,
+    [
+     "ANSWER"
+    ]
+   ],
+   "final_trace": [
+    [
+     "flip",
+     "False"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 1), 'P', 1, None, 0, 'ok')"
+    ]
+   ]
+  },
+  {
+   "id": "skip.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "refuse.out",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "refuse.inorder",
+   "kind": "guard",
+   "role": "order",
+   "note": "issue order",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse-drop",
+    "HANDLED",
+    10,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final": [
+    "d-refuse-drop",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))"
+    ],
+    [
+     "resend",
+     "(('i', 0), ('j', 0))"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 2, ('d', 'a1', 0, 1), 1, None)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ]
+   ]
+  },
+  {
+   "id": "refuse.above",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "only a write above the mark is judged",
+   "cmp": ">",
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse2",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "final": [
+    "d-refuse2",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "flip",
+     "False"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)"
+    ]
+   ]
+  },
+  {
+   "id": "refuse.fails",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "refuse.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "refuse.mark",
+   "kind": "update",
+   "role": "refusal",
+   "note": "a marked write refused on its row still raises the mark: the refusal is final",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-refuse-then",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "final": [
+    "d-refuse-then",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 1), 'P', 1, None, 0, None)"
+    ],
+    [
+     "flip",
+     "True"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "refuse.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fenced.out",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fenced.inorder",
+   "kind": "guard",
+   "role": "order",
+   "note": "issue order",
+   "cmp": null,
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "fenced.above",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "only a write above the mark is judged",
+   "cmp": ">",
+   "pinned": false,
+   "kept": false,
+   "alone": null
+  },
+  {
+   "id": "fenced.stale",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fenced.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fenced.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "bmark.bare",
+   "kind": "guard",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "bmark.inorder",
+   "kind": "guard",
+   "role": "order",
+   "note": "issue order",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "final": [
+    "d-bare-drop",
+    "HANDLED",
+    10,
+    [
+     "HANDLED"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bare",
+     "(('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))"
+    ],
+    [
+     "bmark",
+     "(('g', 1), ('m', ('c', (0, 0), 'R', 2, ('m', 'a1', 1), 'd', 0)))"
+    ],
+    [
+     "resend",
+     "(('i', 0), ('j', 1))"
+    ],
+    [
+     "skip",
+     "(('g', 1), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('m', (0, 0), 'R', 2, ('d', 'a1', 1, 255), None, None)"
+    ],
+    [
+     "commit",
+     "b1",
+     "('k', (0, 0), 'R', 1, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "id": "bmark.above",
+   "kind": "guard",
+   "role": "dedup",
+   "note": "a bare mark only raises the mark",
+   "cmp": ">",
+   "pinned": false,
+   "kept": true,
+   "alone": null,
+   "final": [
+    "d-bare-drop",
+    "LIMIT",
+    1300003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "bmark.eat",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "bmark.mark",
+   "kind": "update",
+   "role": "bare",
+   "note": "the bare mark's entry holds the mark",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "final": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "final_trace": []
+  },
+  {
+   "id": "bmark.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "fence.carry",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries the slot's marks",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "final": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (0, 1), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('w', (0, 1), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "b1",
+     "('fence', 'R', (frozenset(), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 'R', (frozenset(), frozenset({((0, 1), 1)})))),)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('open', 'R', (frozenset(), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "fence.oseq",
+   "kind": "update",
+   "role": "carry",
+   "note": "the fence carries the slot's issue-order numbers",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-move",
+    "LIMIT",
+    1300001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final": [
+    "d-move",
+    "LIMIT",
+    1300001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null
+  },
+  {
+   "id": "fence.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  },
+  {
+   "id": "open.carry",
+   "kind": "update",
+   "role": "carry",
+   "note": "the open takes the carried state",
+   "cmp": null,
+   "pinned": false,
+   "kept": true,
+   "alone": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "final": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "final_trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (0, 1), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('w', (0, 1), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "b1",
+     "('fence', 'R', (frozenset({(('d', 'a1'), (0, 0))}), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 'R', (frozenset({(('d', 'a1'), (0, 0))}), frozenset({((0, 1), 1)})))),)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('open', 'R', (frozenset(), frozenset()))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "id": "open.append",
+   "kind": "update",
+   "role": "world",
+   "note": "",
+   "cmp": null,
+   "pinned": true,
+   "kept": true,
+   "alone": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "read.fnret",
+   "caught": [
+    "d-async",
+    "LOST",
+    5,
+    [
+     "LOST"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('hold', True), ('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "read.number",
+   "caught": [
+    "r-two",
+    "HANDLED",
+    6,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 2, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resync.jump",
+   "caught": [
+    "r-share",
+    "DONE",
+    9,
+    [
+     "DONE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.stale",
+   "caught": [
+    "d-share",
+    "NOSTOP",
+    11,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ],
+    [
+     "expire",
+     "(('i', 1), ('s', 'a1'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "expire.stop",
+   "caught": [
+    "d-cut",
+    "DONE",
+    1,
+    [
+     "DONE"
+    ]
+   ],
+   "trace": [
+    [
+     "cut",
+     "a1",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "bare.read",
+   "caught": [
+    "d-bare",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bare",
+     "(('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bmark",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('m', 'a1', 1), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('m', (0, 0), 'R', 1, ('d', 'a1', 1, 255), None, None)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'R', 2, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "bare.send",
+   "caught": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "cursor.answered",
+   "caught": [
+    "r-two",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "cursor.fnret",
+   "caught": [
+    "r-async",
+    "LOST",
+    4,
+    [
+     "LOST"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('hold', True), ('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "cursor.fence",
+   "caught": [
+    "r-lock",
+    "LOST",
+    14,
+    [
+     "LOST"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 1), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ],
+    [
+     "fenced",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('f', (0, 0), 'P', 2, None, 1, None)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 2), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 2, 1, (0, 0))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "cursor.ahead",
+   "caught": [
+    "r-share",
+    "NOSTOP",
+    18,
+    [
+     "NOSTOP"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "1"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ],
+    [
+     "cursor",
+     "(('i', 0), ('p', 2), ('s', 'a1'))"
+    ],
+    [
+     "takeover",
+     "1"
+    ],
+    [
+     "start",
+     "(('i', 1),)"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 2, 0, (0, 0))"
+    ],
+    [
+     "cut",
+     "a1",
+     "2"
+    ],
+    [
+     "cursor",
+     "(('i', 1), ('p', 1), ('s', 'a1'))"
+    ],
+    [
+     "commit",
+     "gc",
+     "('cur', 'd', 'a1', 1, 1, (1, 0))"
+    ],
+    [
+     "expire",
+     "(('i', 1), ('s', 'a1'))"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.inorder",
+   "caught": [
+    "d-drop",
+    "LOST",
+    6,
+    [
+     "LOST"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.above",
+   "caught": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "apply.mark",
+   "caught": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, None, 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, None, 0, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "skip.below",
+   "caught": [
+    "d-refuse2",
+    "HANDLED",
+    4,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "skip.say",
+   "caught": [
+    "d-refuse2",
+    "ANSWER",
+    10,
+    [
+     "ANSWER"
+    ]
+   ],
+   "trace": [
+    [
+     "flip",
+     "False"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 1), 'P', 1, None, 0, 'ok')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.inorder",
+   "caught": [
+    "d-refuse-drop",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))"
+    ],
+    [
+     "resend",
+     "(('i', 0), ('j', 0))"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 2, ('d', 'a1', 0, 1), 1, None)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'P', 1, None, 0, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.above",
+   "caught": [
+    "d-refuse2",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "flip",
+     "False"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "refuse.mark",
+   "caught": [
+    "d-refuse-then",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 1), 'P', 1, None, 0, None)"
+    ],
+    [
+     "flip",
+     "True"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "bmark.inorder",
+   "caught": [
+    "d-bare-drop",
+    "HANDLED",
+    10,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "drop",
+     "('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bare",
+     "(('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))"
+    ],
+    [
+     "bmark",
+     "(('g', 1), ('m', ('c', (0, 0), 'R', 2, ('m', 'a1', 1), 'd', 0)))"
+    ],
+    [
+     "resend",
+     "(('i', 0), ('j', 1))"
+    ],
+    [
+     "skip",
+     "(('g', 1), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('m', (0, 0), 'R', 2, ('d', 'a1', 1, 255), None, None)"
+    ],
+    [
+     "commit",
+     "b1",
+     "('k', (0, 0), 'R', 1, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "bmark.above",
+   "caught": null,
+   "undecided": [
+    "d-bare-drop",
+    "LIMIT",
+    1300003,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "bmark.mark",
+   "caught": [
+    "d-short",
+    "DONE",
+    0,
+    [
+     "DONE"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "fence.carry",
+   "caught": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (0, 1), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('w', (0, 1), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "b1",
+     "('fence', 'R', (frozenset(), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 'R', (frozenset(), frozenset({((0, 1), 1)})))),)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('open', 'R', (frozenset(), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "fence.oseq",
+   "caught": null,
+   "undecided": [
+    "d-move",
+    "LIMIT",
+    1300001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "open.carry",
+   "caught": [
+    "d-move",
+    "ONCE",
+    13,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 1), ('m', ('c', (0, 1), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b1",
+     "('w', (0, 1), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ],
+    [
+     "fence",
+     "()"
+    ],
+    [
+     "commit",
+     "b1",
+     "('fence', 'R', (frozenset({(('d', 'a1'), (0, 0))}), frozenset({((0, 1), 1)})))"
+    ],
+    [
+     "open",
+     "(('f', ('fence', 'R', (frozenset({(('d', 'a1'), (0, 0))}), frozenset({((0, 1), 1)})))),)"
+    ],
+    [
+     "commit",
+     "b0",
+     "('open', 'R', (frozenset(), frozenset()))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "bare.read",
+   "caught": [
+    "d-bare",
+    "HANDLED",
+    8,
+    [
+     "HANDLED"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bare",
+     "(('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "bmark",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 1, ('m', 'a1', 1), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('m', (0, 0), 'R', 1, ('d', 'a1', 1, 255), None, None)"
+    ],
+    [
+     "skip",
+     "(('g', 0), ('m', ('c', (0, 0), 'R', 2, ('o', 1, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('k', (0, 0), 'R', 2, None, 1, 'skip')"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "cursor.ahead",
+   "caught": null,
+   "undecided": [
+    "d-share-move",
+    "LIMIT",
+    1300001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "apply.above",
+   "caught": [
+    "d-refuse2",
+    "ONCE",
+    9,
+    [
+     "ONCE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "skip.below",
+   "caught": [
+    "r-two",
+    "DONE",
+    4,
+    [
+     "DONE"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "refuse.above",
+   "caught": [
+    "d-refuse2",
+    "STAND",
+    10,
+    [
+     "STAND"
+    ]
+   ],
+   "trace": [
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "crash",
+     "(('i', 0),)"
+    ],
+    [
+     "start",
+     "(('i', 0),)"
+    ],
+    [
+     "read",
+     "(('i', 0), ('s', 'a1'))"
+    ],
+    [
+     "apply",
+     "(('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"
+    ],
+    [
+     "flip",
+     "False"
+    ],
+    [
+     "refuse",
+     "(('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))"
+    ],
+    [
+     "commit",
+     "b0",
+     "('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "bmark.above",
+   "caught": null,
+   "undecided": [
+    "d-bare-drop",
+    "LIMIT",
+    1300003,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "fence: carry <-> oseq",
+   "caught": null,
+   "undecided": [
+    "d-share-move",
+    "LIMIT",
+    1300001,
+    [
+     "LIMIT"
+    ]
+   ]
+  }
+ ],
+ "secs": 1068
+}

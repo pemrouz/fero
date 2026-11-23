@@ -1,0 +1,4 @@
+# DEV-10 on the design, all 42 bounds (the final run; it ran in four slices of at most 25 minutes each, the
+# cache keeping the work between them; earlier runs, before the last two bounds were added, are dropped)
+  pass 1: 23 of 31 rules necessary alone
+design: 25 rules needed of 31; mutants 32, caught 27, equivalent 0; put back []; 1068 s

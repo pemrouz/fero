@@ -1,0 +1,810 @@
+{"option": "mark-apart", "drop": [], "bound": "d-refuse2", "states": 88, "complete": true, "secs": 0.0}
+{"option": "mark-apart", "drop": [], "bound": "r-two", "states": 223, "complete": true, "secs": 0.02}
+{"option": "mark-apart", "drop": [], "bound": "d-pace", "states": 306, "complete": true, "secs": 0.03}
+{"option": "mark-apart", "drop": [], "bound": "d-share-two", "states": 275, "complete": true, "secs": 0.03}
+{"option": "mark-apart", "drop": [], "bound": "d-refuse-then", "states": 368, "complete": true, "secs": 0.03}
+{"option": "mark-apart", "drop": [], "bound": "d-names", "states": 419, "complete": true, "secs": 0.03}
+{"option": "mark-apart", "drop": [], "bound": "d-lock", "states": 489, "complete": true, "secs": 0.04}
+{"option": "mark-apart", "drop": [], "bound": "d-share", "states": 583, "complete": true, "secs": 0.05}
+{"option": "mark-apart", "drop": [], "bound": "r-refuse-then", "states": 608, "complete": true, "secs": 0.04}
+{"option": "mark-apart", "drop": [], "bound": "d-refuse", "states": 614, "complete": true, "secs": 0.04}
+{"option": "mark-apart", "drop": [], "bound": "d-cut", "states": 879, "complete": true, "secs": 0.08}
+{"option": "mark-apart", "drop": [], "bound": "d-flip2", "states": 1000, "complete": true, "secs": 0.1}
+{"option": "mark-apart", "drop": [], "bound": "d-async", "states": 1193, "complete": true, "secs": 0.11}
+{"option": "mark-apart", "drop": [], "bound": "r-async", "states": 1271, "complete": true, "secs": 0.12}
+{"option": "mark-apart", "drop": [], "bound": "d-drop", "states": 1460, "complete": true, "secs": 0.15}
+{"option": "mark-apart", "drop": [], "bound": "r-lock", "states": 2025, "complete": true, "secs": 0.12}
+{"option": "mark-apart", "drop": [], "bound": "d-share-cut", "states": 1879, "complete": true, "secs": 0.11}
+{"option": "mark-apart", "drop": [], "bound": "d-two", "states": 419, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "r-refuse", "states": 2440, "complete": true, "secs": 0.11}
+{"option": "mark-apart", "drop": [], "bound": "r-short", "states": 4275, "complete": true, "secs": 0.29}
+{"option": "mark-apart", "drop": [], "bound": "r-share", "states": 3343, "complete": true, "secs": 0.21}
+{"option": "mark-apart", "drop": [], "bound": "r-cut", "states": 3432, "complete": true, "secs": 0.38}
+{"option": "mark-apart", "drop": [], "bound": "d-tail", "states": 575, "complete": false, "secs": 0.03, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "d-cut-tail", "states": 577, "complete": false, "secs": 0.03, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "d-short", "states": 6949, "complete": true, "secs": 0.65}
+{"option": "mark-apart", "drop": [], "bound": "d-slots", "states": 6437, "complete": true, "secs": 0.47}
+{"option": "mark-apart", "drop": [], "bound": "r-share-cut", "states": 7404, "complete": true, "secs": 0.65}
+{"option": "mark-apart", "drop": [], "bound": "r-tail", "states": 767, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "r-cut-tail", "states": 785, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, None, 0, 0)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "d-share-tail", "states": 895, "complete": false, "secs": 0.04, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, None, 0, 1)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "d-twice", "states": 15948, "complete": true, "secs": 1.35}
+{"option": "mark-apart", "drop": [], "bound": "d-share-restart", "states": 30147, "complete": true, "secs": 2.93}
+{"option": "mark-apart", "drop": [], "bound": "r-share-tail", "states": 1200, "complete": false, "secs": 0.04, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, None, 0, 1)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "d-bare", "states": 44440, "complete": true, "secs": 3.84}
+{"option": "mark-apart", "drop": [], "bound": "d-move", "states": 121267, "complete": true, "secs": 12.1}
+{"option": "mark-apart", "drop": [], "bound": "r-twice", "states": 139692, "complete": true, "secs": 13.12}
+{"option": "mark-apart", "drop": [], "bound": "d-share-cut-tail3", "states": 1036, "complete": false, "secs": 0.04, "broke": "ONCE", "steps": 10, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, None, 0, 1)", "crash b0 tail keeps 0", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, None, 0, 0)"]}
+{"option": "mark-apart", "drop": [], "bound": "r-share-restart", "states": 207822, "complete": true, "secs": 19.3}
+{"option": "mark-first", "drop": [], "bound": "d-refuse2", "states": 88, "complete": true, "secs": 0.01}
+{"option": "mark-first", "drop": [], "bound": "r-two", "states": 194, "complete": true, "secs": 0.02}
+{"option": "mark-first", "drop": [], "bound": "d-pace", "states": 211, "complete": true, "secs": 0.02}
+{"option": "mark-first", "drop": [], "bound": "d-share-two", "states": 275, "complete": true, "secs": 0.03}
+{"option": "mark-first", "drop": [], "bound": "d-refuse-then", "states": 368, "complete": true, "secs": 0.03}
+{"option": "mark-first", "drop": [], "bound": "d-names", "states": 419, "complete": true, "secs": 0.04}
+{"option": "mark-first", "drop": [], "bound": "d-lock", "states": 495, "complete": true, "secs": 0.05}
+{"option": "mark-first", "drop": [], "bound": "d-share", "states": 651, "complete": true, "secs": 0.06}
+{"option": "mark-first", "drop": [], "bound": "r-refuse-then", "states": 521, "complete": true, "secs": 0.03}
+{"option": "mark-first", "drop": [], "bound": "d-refuse", "states": 617, "complete": true, "secs": 0.06}
+{"option": "mark-first", "drop": [], "bound": "d-cut", "states": 882, "complete": true, "secs": 0.07}
+{"option": "mark-first", "drop": [], "bound": "d-flip2", "states": 1006, "complete": true, "secs": 0.07}
+{"option": "mark-first", "drop": [], "bound": "d-async", "states": 1131, "complete": true, "secs": 0.09}
+{"option": "mark-first", "drop": [], "bound": "r-async", "states": 984, "complete": true, "secs": 0.07}
+{"option": "mark-first", "drop": [], "bound": "d-drop", "states": 1475, "complete": true, "secs": 0.08}
+{"option": "mark-first", "drop": [], "bound": "r-lock", "states": 1560, "complete": true, "secs": 0.09}
+{"option": "mark-first", "drop": [], "bound": "d-share-cut", "states": 1884, "complete": true, "secs": 0.14}
+{"option": "mark-first", "drop": [], "bound": "d-two", "states": 222, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "r-refuse", "states": 2039, "complete": true, "secs": 0.18}
+{"option": "mark-first", "drop": [], "bound": "r-short", "states": 2662, "complete": true, "secs": 0.23}
+{"option": "mark-first", "drop": [], "bound": "r-share", "states": 2460, "complete": true, "secs": 0.19}
+{"option": "mark-first", "drop": [], "bound": "r-cut", "states": 2657, "complete": true, "secs": 0.18}
+{"option": "mark-first", "drop": [], "bound": "d-tail", "states": 241, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "d-cut-tail", "states": 241, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "d-short", "states": 5438, "complete": true, "secs": 0.6}
+{"option": "mark-first", "drop": [], "bound": "d-slots", "states": 5881, "complete": true, "secs": 0.52}
+{"option": "mark-first", "drop": [], "bound": "r-share-cut", "states": 5700, "complete": true, "secs": 0.4}
+{"option": "mark-first", "drop": [], "bound": "r-tail", "states": 254, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "r-cut-tail", "states": 255, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "d-share-tail", "states": 393, "complete": false, "secs": 0.02, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "d-twice", "states": 18062, "complete": true, "secs": 1.53}
+{"option": "mark-first", "drop": [], "bound": "d-share-restart", "states": 33818, "complete": true, "secs": 3.0}
+{"option": "mark-first", "drop": [], "bound": "r-share-tail", "states": 413, "complete": false, "secs": 0.02, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "d-bare", "states": 41995, "complete": true, "secs": 3.45}
+{"option": "mark-first", "drop": [], "bound": "d-move", "states": 112404, "complete": true, "secs": 9.5}
+{"option": "mark-first", "drop": [], "bound": "r-twice", "states": 115588, "complete": true, "secs": 8.27}
+{"option": "mark-first", "drop": [], "bound": "d-share-cut-tail3", "states": 397, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('M', None, 'P', None, ('d', 'a1', 0, 0), None, None)", "crash b0 tail keeps 0", "resend (('i', 0), ('j', 0))", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "mark-first", "drop": [], "bound": "r-share-restart", "states": 170349, "complete": true, "secs": 12.11}
+{"option": "key-slot", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "key-slot", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "key-slot", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "key-slot", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "d-names", "states": 148, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 8, "trace": ["start (('i', 0),)", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 1, 0), 'e', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('e', 'a1', 0, 0), 1, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "key-slot", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "key-slot", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "key-slot", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "key-slot", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "key-slot", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "key-slot", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "key-slot", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "key-slot", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "key-slot", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "key-slot", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "key-slot", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "key-slot", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "key-slot", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "key-slot", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "key-slot", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "key-slot", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.27}
+{"option": "key-slot", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.23}
+{"option": "key-slot", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.26}
+{"option": "key-slot", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.34}
+{"option": "key-slot", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.49}
+{"option": "key-slot", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.8}
+{"option": "key-slot", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.84}
+{"option": "key-slot", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.66}
+{"option": "key-slot", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.56}
+{"option": "key-slot", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.48}
+{"option": "key-slot", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.89}
+{"option": "key-slot", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.46}
+{"option": "key-slot", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 11.22}
+{"option": "key-slot", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 11.76}
+{"option": "key-name", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "key-name", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "key-name", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "key-name", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "key-name", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "key-name", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "key-name", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "key-name", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "key-name", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "key-name", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "key-name", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "key-name", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "key-name", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "key-name", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "key-name", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "key-name", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "key-name", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "key-name", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "key-name", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.07}
+{"option": "key-name", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "key-name", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "key-name", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "key-name", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "key-name", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "key-name", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.27}
+{"option": "key-name", "drop": [], "bound": "d-slots", "states": 107, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 7, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "key-name", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.24}
+{"option": "key-name", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.35}
+{"option": "key-name", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.49}
+{"option": "key-name", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.8}
+{"option": "key-name", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.84}
+{"option": "key-name", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.6}
+{"option": "key-name", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.19}
+{"option": "key-name", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.3}
+{"option": "key-name", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 7.03}
+{"option": "key-name", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.13}
+{"option": "key-name", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.57}
+{"option": "key-name", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.1}
+{"option": "no-wnum", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "no-wnum", "drop": [], "bound": "r-two", "states": 24, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "no-wnum", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "no-wnum", "drop": [], "bound": "d-share-two", "states": 40, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "no-wnum", "drop": [], "bound": "d-refuse-then", "states": 50, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "no-wnum", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "no-wnum", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "no-wnum", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "no-wnum", "drop": [], "bound": "r-refuse-then", "states": 50, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, None)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "no-wnum", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "no-wnum", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "no-wnum", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "no-wnum", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "no-wnum", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "no-wnum", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "no-wnum", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.08}
+{"option": "no-wnum", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.08}
+{"option": "no-wnum", "drop": [], "bound": "d-two", "states": 35, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "no-wnum", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.09}
+{"option": "no-wnum", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.15}
+{"option": "no-wnum", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.15}
+{"option": "no-wnum", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.12}
+{"option": "no-wnum", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.16}
+{"option": "no-wnum", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.19}
+{"option": "no-wnum", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.35}
+{"option": "no-wnum", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.29}
+{"option": "no-wnum", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.33}
+{"option": "no-wnum", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.46}
+{"option": "no-wnum", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.48}
+{"option": "no-wnum", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.81}
+{"option": "no-wnum", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.83}
+{"option": "no-wnum", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 2.04}
+{"option": "no-wnum", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 3.02}
+{"option": "no-wnum", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.78}
+{"option": "no-wnum", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 8.4}
+{"option": "no-wnum", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.99}
+{"option": "no-wnum", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.84}
+{"option": "no-wnum", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.39}
+{"option": "nondet", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "nondet", "drop": [], "bound": "r-two", "states": 55, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 1, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "nondet", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "nondet", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "nondet", "drop": [], "bound": "d-refuse-then", "states": 118, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 1, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "nondet", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "nondet", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "nondet", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "nondet", "drop": [], "bound": "r-refuse-then", "states": 125, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 1, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "nondet", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "nondet", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "nondet", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.04}
+{"option": "nondet", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.05}
+{"option": "nondet", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "nondet", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.06}
+{"option": "nondet", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.08}
+{"option": "nondet", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.1}
+{"option": "nondet", "drop": [], "bound": "d-two", "states": 140, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 1, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')"]}
+{"option": "nondet", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "nondet", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "nondet", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.1}
+{"option": "nondet", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "nondet", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.11}
+{"option": "nondet", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "nondet", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.28}
+{"option": "nondet", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.27}
+{"option": "nondet", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.28}
+{"option": "nondet", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.41}
+{"option": "nondet", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.53}
+{"option": "nondet", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 1.01}
+{"option": "nondet", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.96}
+{"option": "nondet", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.7}
+{"option": "nondet", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.45}
+{"option": "nondet", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.44}
+{"option": "nondet", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 7.47}
+{"option": "nondet", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.13}
+{"option": "nondet", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 8.99}
+{"option": "nondet", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.96}
+{"option": "unpaced", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "unpaced", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "unpaced", "drop": [], "bound": "d-pace", "states": 53, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 8, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 2, 0), 2, 0)"]}
+{"option": "unpaced", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "unpaced", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "unpaced", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "unpaced", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "unpaced", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.03}
+{"option": "unpaced", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "unpaced", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "unpaced", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "unpaced", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "unpaced", "drop": [], "bound": "d-async", "states": 1052, "complete": true, "secs": 0.07, "broke": "DONE", "steps": 4, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "unpaced", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "unpaced", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "unpaced", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "unpaced", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.08}
+{"option": "unpaced", "drop": [], "bound": "d-two", "states": 85, "complete": true, "secs": 0.0, "broke": "DONE", "steps": 0, "trace": []}
+{"option": "unpaced", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.09}
+{"option": "unpaced", "drop": [], "bound": "r-short", "states": 152, "complete": false, "secs": 0.01, "broke": "LOST", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 1), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))", "commit b1 ('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "cursor (('i', 0), ('p', 2), ('s', 'a1'))", "commit gc ('cur', 'd', 'a1', 2, 0, (0, 0))"]}
+{"option": "unpaced", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.12}
+{"option": "unpaced", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.1}
+{"option": "unpaced", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.13}
+{"option": "unpaced", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.14}
+{"option": "unpaced", "drop": [], "bound": "d-short", "states": 5974, "complete": true, "secs": 0.52, "broke": "DONE", "steps": 3, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "unpaced", "drop": [], "bound": "d-slots", "states": 5612, "complete": true, "secs": 0.42, "broke": "DONE", "steps": 4, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a2'))"]}
+{"option": "unpaced", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.28}
+{"option": "unpaced", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.34}
+{"option": "unpaced", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.53}
+{"option": "unpaced", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.82}
+{"option": "unpaced", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.86}
+{"option": "unpaced", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.65}
+{"option": "unpaced", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.38}
+{"option": "unpaced", "drop": [], "bound": "d-bare", "states": 48009, "complete": true, "secs": 3.02, "broke": "DONE", "steps": 4, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "bare (('P', 'R'), ('i', 0), ('q', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "unpaced", "drop": [], "bound": "d-move", "states": 135991, "complete": true, "secs": 9.82, "broke": "DONE", "steps": 3, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "unpaced", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.19}
+{"option": "unpaced", "drop": [], "bound": "d-share-cut-tail3", "states": 160734, "complete": true, "secs": 14.11, "broke": "DONE", "steps": 4, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "unpaced", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.69}
+{"option": "marks-tail", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "marks-tail", "drop": [], "bound": "r-two", "states": 137, "complete": true, "secs": 0.01}
+{"option": "marks-tail", "drop": [], "bound": "d-pace", "states": 166, "complete": true, "secs": 0.01}
+{"option": "marks-tail", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "marks-tail", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "marks-tail", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "marks-tail", "drop": [], "bound": "d-lock", "states": 357, "complete": true, "secs": 0.02}
+{"option": "marks-tail", "drop": [], "bound": "d-share", "states": 447, "complete": true, "secs": 0.02}
+{"option": "marks-tail", "drop": [], "bound": "r-refuse-then", "states": 402, "complete": true, "secs": 0.02}
+{"option": "marks-tail", "drop": [], "bound": "d-refuse", "states": 480, "complete": true, "secs": 0.02}
+{"option": "marks-tail", "drop": [], "bound": "d-cut", "states": 636, "complete": true, "secs": 0.03}
+{"option": "marks-tail", "drop": [], "bound": "d-flip2", "states": 776, "complete": true, "secs": 0.03}
+{"option": "marks-tail", "drop": [], "bound": "d-async", "states": 841, "complete": true, "secs": 0.05}
+{"option": "marks-tail", "drop": [], "bound": "r-async", "states": 599, "complete": true, "secs": 0.03}
+{"option": "marks-tail", "drop": [], "bound": "d-drop", "states": 1050, "complete": true, "secs": 0.05}
+{"option": "marks-tail", "drop": [], "bound": "r-lock", "states": 986, "complete": true, "secs": 0.07}
+{"option": "marks-tail", "drop": [], "bound": "d-share-cut", "states": 1382, "complete": true, "secs": 0.07}
+{"option": "marks-tail", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "marks-tail", "drop": [], "bound": "r-refuse", "states": 1391, "complete": true, "secs": 0.06}
+{"option": "marks-tail", "drop": [], "bound": "r-short", "states": 1573, "complete": true, "secs": 0.08}
+{"option": "marks-tail", "drop": [], "bound": "r-share", "states": 1518, "complete": true, "secs": 0.08}
+{"option": "marks-tail", "drop": [], "bound": "r-cut", "states": 1636, "complete": true, "secs": 0.06}
+{"option": "marks-tail", "drop": [], "bound": "d-tail", "states": 477, "complete": false, "secs": 0.02, "broke": "LOST", "steps": 11, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "start (('i', 0),)", "crash b0 tail keeps 0", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "marks-tail", "drop": [], "bound": "d-cut-tail", "states": 484, "complete": false, "secs": 0.02, "broke": "LOST", "steps": 11, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "start (('i', 0),)", "crash b0 tail keeps 0", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "marks-tail", "drop": [], "bound": "d-short", "states": 3710, "complete": true, "secs": 0.27}
+{"option": "marks-tail", "drop": [], "bound": "d-slots", "states": 4238, "complete": true, "secs": 0.25}
+{"option": "marks-tail", "drop": [], "bound": "r-share-cut", "states": 3691, "complete": true, "secs": 0.19}
+{"option": "marks-tail", "drop": [], "bound": "r-tail", "states": 5435, "complete": true, "secs": 0.25}
+{"option": "marks-tail", "drop": [], "bound": "r-cut-tail", "states": 7329, "complete": true, "secs": 0.36}
+{"option": "marks-tail", "drop": [], "bound": "d-share-tail", "states": 1055, "complete": false, "secs": 0.05, "broke": "LOST", "steps": 11, "trace": ["start (('i', 0),)", "takeover 1", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "start (('i', 1),)", "crash b0 tail keeps 0", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 1, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 1)"]}
+{"option": "marks-tail", "drop": [], "bound": "d-twice", "states": 13776, "complete": true, "secs": 0.92}
+{"option": "marks-tail", "drop": [], "bound": "d-share-restart", "states": 25065, "complete": true, "secs": 1.7}
+{"option": "marks-tail", "drop": [], "bound": "r-share-tail", "states": 26601, "complete": true, "secs": 1.71}
+{"option": "marks-tail", "drop": [], "bound": "d-bare", "states": 36281, "complete": true, "secs": 2.23}
+{"option": "marks-tail", "drop": [], "bound": "d-move", "states": 92652, "complete": true, "secs": 7.17}
+{"option": "marks-tail", "drop": [], "bound": "r-twice", "states": 84792, "complete": true, "secs": 5.71}
+{"option": "marks-tail", "drop": [], "bound": "d-share-cut-tail3", "states": 1269, "complete": false, "secs": 0.07, "broke": "LOST", "steps": 11, "trace": ["start (('i', 0),)", "takeover 1", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "start (('i', 1),)", "crash b0 tail keeps 0", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 1, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 1)"]}
+{"option": "marks-tail", "drop": [], "bound": "r-share-restart", "states": 84140, "complete": true, "secs": 5.74}
+{"option": "marks-marked", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "marks-marked", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "marks-marked", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "marks-marked", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "marks-marked", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "marks-marked", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "marks-marked", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "marks-marked", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "marks-marked", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "marks-marked", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "marks-marked", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "marks-marked", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "marks-marked", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "marks-marked", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "marks-marked", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "marks-marked", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "marks-marked", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "marks-marked", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "marks-marked", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "marks-marked", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "marks-marked", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "marks-marked", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "marks-marked", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "marks-marked", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.14}
+{"option": "marks-marked", "drop": [], "bound": "d-short", "states": 848, "complete": false, "secs": 0.05, "broke": "LOST", "steps": 13, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 2, 0)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "bare (('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))", "bmark (('g', 1), ('m', ('c', (0, 1), 'R', 1, ('m', 'a1', 1), 'd', 0)))", "commit b1 ('m', (0, 1), 'R', 1, ('d', 'a1', 1, 255), None, None)"]}
+{"option": "marks-marked", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "marks-marked", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.25}
+{"option": "marks-marked", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.34}
+{"option": "marks-marked", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.52}
+{"option": "marks-marked", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.82}
+{"option": "marks-marked", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 1.0}
+{"option": "marks-marked", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.76}
+{"option": "marks-marked", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.6}
+{"option": "marks-marked", "drop": [], "bound": "d-bare", "states": 856, "complete": false, "secs": 0.04, "broke": "LOST", "steps": 11, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 0), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'R', 1, ('d', 'a1', 1, 0), 1, 0)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "bare (('P', 'P'), ('i', 0), ('q', 1), ('s', 'a1'))", "bmark (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('m', 'a1', 1), 'd', 0)))", "commit b0 ('m', (0, 1), 'P', 1, ('d', 'a1', 1, 255), None, None)"]}
+{"option": "marks-marked", "drop": [], "bound": "d-move", "states": 2375, "complete": false, "secs": 0.14, "broke": "LOST", "steps": 13, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 1), ('m', ('c', (0, 0), 'R', 1, ('o', 1, 0), 'd', 0)))", "commit b1 ('w', (0, 0), 'R', 1, ('d', 'a1', 0, 0), 1, 0)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 1), ('m', ('c', (0, 0), 'R', 2, ('o', 2, 0), 'd', 0)))", "commit b1 ('w', (0, 0), 'R', 2, ('d', 'a1', 1, 0), 2, 0)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "bare (('P', 'P'), ('i', 0), ('q', 1), ('s', 'a1'))", "bmark (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('m', 'a1', 1), 'd', 0)))", "commit b0 ('m', (0, 1), 'P', 1, ('d', 'a1', 1, 255), None, None)"]}
+{"option": "marks-marked", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 8.18}
+{"option": "marks-marked", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.62}
+{"option": "marks-marked", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.78}
+{"option": "judge-com", "drop": [], "bound": "d-refuse2", "states": 75, "complete": false, "secs": 0.0, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-two", "states": 60, "complete": false, "secs": 0.0, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-pace", "states": 45, "complete": false, "secs": 0.0, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share-two", "states": 99, "complete": false, "secs": 0.0, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-refuse-then", "states": 180, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 10, "trace": ["flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-names", "states": 213, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-lock", "states": 152, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share", "states": 152, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-refuse-then", "states": 192, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 10, "trace": ["flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-refuse", "states": 173, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-cut", "states": 234, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-flip2", "states": 229, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-async", "states": 149, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-async", "states": 162, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-drop", "states": 229, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-lock", "states": 192, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share-cut", "states": 396, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-two", "states": 152, "complete": false, "secs": 0.0, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-refuse", "states": 225, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-short", "states": 138, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-share", "states": 195, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-cut", "states": 293, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-tail", "states": 210, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-cut-tail", "states": 212, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-short", "states": 146, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-slots", "states": 380, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-share-cut", "states": 462, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-tail", "states": 253, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-cut-tail", "states": 256, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share-tail", "states": 309, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-twice", "states": 365, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 8, "trace": ["start (('i', 0),)", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share-restart", "states": 528, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-share-tail", "states": 375, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-bare", "states": 379, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-move", "states": 318, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-twice", "states": 410, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 8, "trace": ["start (('i', 0),)", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "d-share-cut-tail3", "states": 330, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "judge-com", "drop": [], "bound": "r-share-restart", "states": 612, "complete": false, "secs": 0.03, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "skip-ahead", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "skip-ahead", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "skip-ahead", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "skip-ahead", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.02}
+{"option": "skip-ahead", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.02}
+{"option": "skip-ahead", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "skip-ahead", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.03}
+{"option": "skip-ahead", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "skip-ahead", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.03}
+{"option": "skip-ahead", "drop": [], "bound": "d-cut", "states": 60, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 6, "trace": ["cut a1 1", "start (('i', 0),)", "resync (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "skip-ahead", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.05}
+{"option": "skip-ahead", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "skip-ahead", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "skip-ahead", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.1}
+{"option": "skip-ahead", "drop": [], "bound": "d-share-cut", "states": 96, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 6, "trace": ["cut a1 1", "start (('i', 0),)", "resync (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.11}
+{"option": "skip-ahead", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.1}
+{"option": "skip-ahead", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.11}
+{"option": "skip-ahead", "drop": [], "bound": "r-share", "states": 2116, "complete": true, "secs": 0.15}
+{"option": "skip-ahead", "drop": [], "bound": "r-cut", "states": 40, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 5, "trace": ["cut a1 1", "start (('i', 0),)", "resync (('i', 0), ('s', 'a1'))", "cursor (('i', 0), ('p', 1), ('s', 'a1'))", "commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.15}
+{"option": "skip-ahead", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.16}
+{"option": "skip-ahead", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.31}
+{"option": "skip-ahead", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.25}
+{"option": "skip-ahead", "drop": [], "bound": "r-share-cut", "states": 61, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 5, "trace": ["cut a1 1", "start (('i', 0),)", "resync (('i', 0), ('s', 'a1'))", "cursor (('i', 0), ('p', 1), ('s', 'a1'))", "commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))"]}
+{"option": "skip-ahead", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.45}
+{"option": "skip-ahead", "drop": [], "bound": "r-cut-tail", "states": 10549, "complete": true, "secs": 0.52}
+{"option": "skip-ahead", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.83}
+{"option": "skip-ahead", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.85}
+{"option": "skip-ahead", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.65}
+{"option": "skip-ahead", "drop": [], "bound": "r-share-tail", "states": 35290, "complete": true, "secs": 2.29}
+{"option": "skip-ahead", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.3}
+{"option": "skip-ahead", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 7.19}
+{"option": "skip-ahead", "drop": [], "bound": "r-twice", "states": 104322, "complete": true, "secs": 7.26}
+{"option": "skip-ahead", "drop": [], "bound": "d-share-cut-tail3", "states": 108513, "complete": true, "secs": 9.72}
+{"option": "skip-ahead", "drop": [], "bound": "r-share-restart", "states": 153066, "complete": true, "secs": 10.77}
+{"option": "no-bare", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "no-bare", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "no-bare", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "no-bare", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "no-bare", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "no-bare", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "no-bare", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "no-bare", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "no-bare", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "no-bare", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "no-bare", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "no-bare", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "no-bare", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "no-bare", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "no-bare", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "no-bare", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "no-bare", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "no-bare", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.07}
+{"option": "no-bare", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "no-bare", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "no-bare", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "no-bare", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "no-bare", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.11}
+{"option": "no-bare", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "no-bare", "drop": [], "bound": "d-short", "states": 876, "complete": true, "secs": 0.05, "broke": "DONE", "steps": 0, "trace": []}
+{"option": "no-bare", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "no-bare", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.25}
+{"option": "no-bare", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.36}
+{"option": "no-bare", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.59}
+{"option": "no-bare", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.92}
+{"option": "no-bare", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.83}
+{"option": "no-bare", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.54}
+{"option": "no-bare", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.32}
+{"option": "no-bare", "drop": [], "bound": "d-bare", "states": 430, "complete": true, "secs": 0.02, "broke": "DONE", "steps": 0, "trace": []}
+{"option": "no-bare", "drop": [], "bound": "d-move", "states": 10854, "complete": true, "secs": 0.68, "broke": "DONE", "steps": 0, "trace": []}
+{"option": "no-bare", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.17}
+{"option": "no-bare", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.45}
+{"option": "no-bare", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.36}
+{"option": "fenced-mark", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "fenced-mark", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "fenced-mark", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "fenced-mark", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "fenced-mark", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "fenced-mark", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "fenced-mark", "drop": [], "bound": "d-lock", "states": 336, "complete": false, "secs": 0.02, "broke": "HANDLED", "steps": 15, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')", "fenced (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('f', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, None)", "skip (('g', 0), ('m', ('c', (1, 0), 'P', 2, ('o', 1, 0), 'd', 1)))", "commit b0 ('k', (1, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "fenced-mark", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "fenced-mark", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "fenced-mark", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "fenced-mark", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "fenced-mark", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "fenced-mark", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "fenced-mark", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "fenced-mark", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "fenced-mark", "drop": [], "bound": "r-lock", "states": 870, "complete": false, "secs": 0.04, "broke": "HANDLED", "steps": 15, "trace": ["start (('i', 0),)", "takeover 1", "start (('i', 1),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "read (('i', 1), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (1, 0), 'P', 1, ('o', 0, 0), 'd', 1)))", "commit b0 ('w', (1, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 1)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 1, None, 0, 'skip')", "fenced (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('f', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 1, None)", "skip (('g', 0), ('m', ('c', (1, 0), 'P', 2, ('o', 1, 0), 'd', 1)))", "commit b0 ('k', (1, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "fenced-mark", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "fenced-mark", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.07}
+{"option": "fenced-mark", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.07}
+{"option": "fenced-mark", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "fenced-mark", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "fenced-mark", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "fenced-mark", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.11}
+{"option": "fenced-mark", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "fenced-mark", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.27}
+{"option": "fenced-mark", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "fenced-mark", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.24}
+{"option": "fenced-mark", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.34}
+{"option": "fenced-mark", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.49}
+{"option": "fenced-mark", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.81}
+{"option": "fenced-mark", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.84}
+{"option": "fenced-mark", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.63}
+{"option": "fenced-mark", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.28}
+{"option": "fenced-mark", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.28}
+{"option": "fenced-mark", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.76}
+{"option": "fenced-mark", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 6.89}
+{"option": "fenced-mark", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.24}
+{"option": "fenced-mark", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.3}
+{"option": "mark-apart", "drop": [], "bound": "d-bare-drop", "states": 120932, "complete": true, "secs": 13.23}
+{"option": "mark-first", "drop": [], "bound": "d-bare-drop", "states": 104177, "complete": true, "secs": 11.51}
+{"option": "key-slot", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 7.29}
+{"option": "key-name", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 7.91}
+{"option": "no-wnum", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 7.27}
+{"option": "nondet", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 6.87}
+{"option": "unpaced", "drop": [], "bound": "d-bare-drop", "states": 116953, "complete": true, "secs": 9.85, "broke": "DONE", "steps": 3, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))"]}
+{"option": "marks-tail", "drop": [], "bound": "d-bare-drop", "states": 74218, "complete": true, "secs": 6.34}
+{"option": "marks-marked", "drop": [], "bound": "d-bare-drop", "states": 3102, "complete": false, "secs": 0.17, "broke": "LOST", "steps": 13, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 2, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 2, ('d', 'a1', 1, 0), 2, 0)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "bare (('P', 'R'), ('i', 0), ('q', 1), ('s', 'a1'))", "bmark (('g', 1), ('m', ('c', (0, 1), 'R', 1, ('m', 'a1', 1), 'd', 0)))", "commit b1 ('m', (0, 1), 'R', 1, ('d', 'a1', 1, 255), None, None)"]}
+{"option": "judge-com", "drop": [], "bound": "d-bare-drop", "states": 440, "complete": false, "secs": 0.02, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 6.08}
+{"option": "no-bare", "drop": [], "bound": "d-bare-drop", "states": 6593, "complete": true, "secs": 0.44, "broke": "DONE", "steps": 0, "trace": []}
+{"option": "fenced-mark", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 5.92}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-async", "states": 44, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 5, "trace": ["start (('i', 0),)", "read (('hold', True), ('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-async", "states": 25, "complete": false, "secs": 0.0, "broke": "LOST", "steps": 4, "trace": ["start (('i', 0),)", "read (('hold', True), ('i', 0), ('s', 'a1'))", "cursor (('i', 0), ('p', 1), ('s', 'a1'))", "commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))"]}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.07}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.12}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.11}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.26}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.23}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.24}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.33}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.49}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.81}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.84}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 6.07}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.69}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.34}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.2}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.86}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-twice", "states": 103546, "complete": true, "secs": 7.65}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 8.77}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.39}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-refuse2", "states": 279, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-refuse-then", "states": 202, "complete": false, "secs": 0.01, "broke": "STAND", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 1, None, 0, None)", "flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-refuse-then", "states": 205, "complete": false, "secs": 0.01, "broke": "STAND", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 1, None, 0, None)", "flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-refuse", "states": 630, "complete": false, "secs": 0.02, "broke": "STAND", "steps": 15, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 2, None, 1, None)", "flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "skip (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 1), 'P', 1, None, 0, 'skip')", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-flip2", "states": 958, "complete": false, "secs": 0.04, "broke": "STAND", "steps": 15, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 2, None, 1, None)", "flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "read (('i', 0), ('s', 'a1'))", "skip (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('k', (0, 1), 'P', 1, None, 0, 'skip')", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 2, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.1}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-refuse", "states": 1249, "complete": false, "secs": 0.07, "broke": "STAND", "steps": 14, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "cursor (('i', 0), ('p', 1), ('s', 'a1'))", "commit gc ('cur', 'd', 'a1', 1, 0, (0, 0))", "read (('i', 0), ('s', 'a1'))", "refuse (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 0), 'd', 0)))", "commit b0 ('r', (0, 0), 'P', 2, None, 1, None)", "flip True", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 1, 0), 1, 0)"]}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.12}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.11}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.11}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.13}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.26}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.25}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.34}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.5}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.83}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.89}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 6.17}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.66}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.36}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.28}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.61}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-twice", "states": 103546, "complete": true, "secs": 6.88}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 9.01}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.87}
+{"option": "stop-refuse", "drop": [], "bound": "d-refuse2", "states": 116, "complete": true, "secs": 0.0}
+{"option": "stop-refuse", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": [], "bound": "d-refuse-then", "states": 2356, "complete": true, "secs": 0.12}
+{"option": "stop-refuse", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "stop-refuse", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "stop-refuse", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.02}
+{"option": "stop-refuse", "drop": [], "bound": "r-refuse-then", "states": 3481, "complete": true, "secs": 0.16}
+{"option": "stop-refuse", "drop": [], "bound": "d-refuse", "states": 686, "complete": true, "secs": 0.03}
+{"option": "stop-refuse", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "stop-refuse", "drop": [], "bound": "d-flip2", "states": 1082, "complete": true, "secs": 0.05}
+{"option": "stop-refuse", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.05}
+{"option": "stop-refuse", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "stop-refuse", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "stop-refuse", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "stop-refuse", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "stop-refuse", "drop": [], "bound": "r-refuse", "states": 7047, "complete": true, "secs": 0.33}
+{"option": "stop-refuse", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "stop-refuse", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.12}
+{"option": "stop-refuse", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "stop-refuse", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "stop-refuse", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.15}
+{"option": "stop-refuse", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.28}
+{"option": "stop-refuse", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "stop-refuse", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.26}
+{"option": "stop-refuse", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.52}
+{"option": "stop-refuse", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.51}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.84}
+{"option": "stop-refuse", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.85}
+{"option": "stop-refuse", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 5.97}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.7}
+{"option": "stop-refuse", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.3}
+{"option": "stop-refuse", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.48}
+{"option": "stop-refuse", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.81}
+{"option": "stop-refuse", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 6.71}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 8.76}
+{"option": "stop-refuse", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.18}
+{"option": "stop-refuse", "drop": [], "bound": "d-share-move", "states": 874075, "complete": true, "secs": 81.82}
+{"option": "stop-refuse", "drop": [], "bound": "d-twice-tail", "states": 1092334, "complete": true, "secs": 97.7}
+{"option": "start-fresh", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "start-fresh", "drop": [], "bound": "r-two", "states": 136, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": [], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": [], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": [], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": [], "bound": "d-share", "states": 435, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": [], "bound": "r-refuse-then", "states": 399, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": [], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": [], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": [], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": [], "bound": "d-async", "states": 792, "complete": true, "secs": 0.04}
+{"option": "start-fresh", "drop": [], "bound": "r-async", "states": 569, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": [], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "start-fresh", "drop": [], "bound": "r-lock", "states": 934, "complete": true, "secs": 0.05}
+{"option": "start-fresh", "drop": [], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "start-fresh", "drop": [], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "start-fresh", "drop": [], "bound": "r-refuse", "states": 1317, "complete": true, "secs": 0.07}
+{"option": "start-fresh", "drop": [], "bound": "r-short", "states": 1547, "complete": true, "secs": 0.12}
+{"option": "start-fresh", "drop": [], "bound": "r-share", "states": 1463, "complete": true, "secs": 0.1}
+{"option": "start-fresh", "drop": [], "bound": "r-cut", "states": 1554, "complete": true, "secs": 0.07}
+{"option": "start-fresh", "drop": [], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "start-fresh", "drop": [], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.14}
+{"option": "start-fresh", "drop": [], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.29}
+{"option": "start-fresh", "drop": [], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.24}
+{"option": "start-fresh", "drop": [], "bound": "r-share-cut", "states": 3403, "complete": true, "secs": 0.18}
+{"option": "start-fresh", "drop": [], "bound": "r-tail", "states": 5163, "complete": true, "secs": 0.25}
+{"option": "start-fresh", "drop": [], "bound": "r-cut-tail", "states": 7001, "complete": true, "secs": 0.32}
+{"option": "start-fresh", "drop": [], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.78}
+{"option": "start-fresh", "drop": [], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.83}
+{"option": "start-fresh", "drop": [], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 7.22}
+{"option": "start-fresh", "drop": [], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 2.34}
+{"option": "start-fresh", "drop": [], "bound": "r-share-tail", "states": 25867, "complete": true, "secs": 2.31}
+{"option": "start-fresh", "drop": [], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.63}
+{"option": "start-fresh", "drop": [], "bound": "d-move", "states": 92171, "complete": true, "secs": 7.95}
+{"option": "start-fresh", "drop": [], "bound": "r-twice", "states": 79384, "complete": true, "secs": 6.27}
+{"option": "start-fresh", "drop": [], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 10.15}
+{"option": "start-fresh", "drop": [], "bound": "r-share-restart", "states": 80920, "complete": true, "secs": 5.67}
+{"option": "start-fresh", "drop": [], "bound": "d-share-move", "states": 874075, "complete": true, "secs": 79.78}
+{"option": "start-fresh", "drop": [], "bound": "d-twice-tail", "states": 1092334, "complete": true, "secs": 96.89}
+{"option": "resend-any", "drop": [], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "resend-any", "drop": [], "bound": "r-two", "states": 455, "complete": true, "secs": 0.02}
+{"option": "resend-any", "drop": [], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "resend-any", "drop": [], "bound": "d-share-two", "states": 918, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "d-refuse-then", "states": 954, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "resend-any", "drop": [], "bound": "d-lock", "states": 1141, "complete": true, "secs": 0.08}
+{"option": "resend-any", "drop": [], "bound": "d-share", "states": 1408, "complete": true, "secs": 0.09}
+{"option": "resend-any", "drop": [], "bound": "r-refuse-then", "states": 1341, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "d-refuse", "states": 963, "complete": true, "secs": 0.04}
+{"option": "resend-any", "drop": [], "bound": "d-cut", "states": 1201, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "d-flip2", "states": 1553, "complete": true, "secs": 0.07}
+{"option": "resend-any", "drop": [], "bound": "d-async", "states": 2759, "complete": true, "secs": 0.14}
+{"option": "resend-any", "drop": [], "bound": "r-async", "states": 1240, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "d-drop", "states": 1164, "complete": true, "secs": 0.05}
+{"option": "resend-any", "drop": [], "bound": "r-lock", "states": 2954, "complete": true, "secs": 0.16}
+{"option": "resend-any", "drop": [], "bound": "d-share-cut", "states": 3904, "complete": true, "secs": 0.25}
+{"option": "resend-any", "drop": [], "bound": "d-two", "states": 2238, "complete": true, "secs": 0.13}
+{"option": "resend-any", "drop": [], "bound": "r-refuse", "states": 3008, "complete": true, "secs": 0.12}
+{"option": "resend-any", "drop": [], "bound": "r-short", "states": 2692, "complete": true, "secs": 0.13}
+{"option": "resend-any", "drop": [], "bound": "r-share", "states": 4438, "complete": true, "secs": 0.24}
+{"option": "resend-any", "drop": [], "bound": "r-cut", "states": 3485, "complete": true, "secs": 0.14}
+{"option": "resend-any", "drop": [], "bound": "d-tail", "states": 2490, "complete": true, "secs": 0.12}
+{"option": "resend-any", "drop": [], "bound": "d-cut-tail", "states": 2802, "complete": true, "secs": 0.13}
+{"option": "resend-any", "drop": [], "bound": "d-short", "states": 9575, "complete": true, "secs": 0.68}
+{"option": "resend-any", "drop": [], "bound": "d-slots", "states": 18680, "complete": true, "secs": 1.11}
+{"option": "resend-any", "drop": [], "bound": "r-share-cut", "states": 9967, "complete": true, "secs": 0.54}
+{"option": "resend-any", "drop": [], "bound": "r-tail", "states": 7358, "complete": true, "secs": 0.32}
+{"option": "resend-any", "drop": [], "bound": "r-cut-tail", "states": 10445, "complete": true, "secs": 0.46}
+{"option": "resend-any", "drop": [], "bound": "d-share-tail", "states": 15517, "complete": true, "secs": 1.11}
+{"option": "resend-any", "drop": [], "bound": "d-twice", "states": 54117, "complete": true, "secs": 3.52}
+{"option": "resend-any", "drop": [], "bound": "d-bare-drop", "states": 50723, "complete": true, "secs": 3.74}
+{"option": "resend-any", "drop": [], "bound": "d-share-restart", "states": 77318, "complete": true, "secs": 5.67}
+{"option": "resend-any", "drop": [], "bound": "r-share-tail", "states": 41650, "complete": true, "secs": 2.62}
+{"option": "resend-any", "drop": [], "bound": "d-bare", "states": 65509, "complete": true, "secs": 3.99}
+{"option": "resend-any", "drop": [], "bound": "d-move", "states": 204597, "complete": true, "secs": 15.27}
+{"option": "resend-any", "drop": [], "bound": "r-twice", "states": 289435, "complete": true, "secs": 19.13}
+{"option": "resend-any", "drop": [], "bound": "d-share-cut-tail3", "states": 252937, "complete": true, "secs": 21.59}
+{"option": "resend-any", "drop": [], "bound": "r-share-restart", "states": 348706, "complete": true, "secs": 25.07}
+{"option": "resend-any", "drop": [], "bound": "d-share-move", "states": 1500001, "complete": false, "secs": 136.3}
+{"option": "resend-any", "drop": [], "bound": "d-twice-tail", "states": 1145777, "complete": true, "secs": 94.34}
+{"option": "marks-joined", "drop": [], "bound": "d-refuse2", "states": 84, "complete": true, "secs": 0.0}
+{"option": "marks-joined", "drop": [], "bound": "r-two", "states": 150, "complete": true, "secs": 0.01}
+{"option": "marks-joined", "drop": [], "bound": "d-pace", "states": 166, "complete": true, "secs": 0.01}
+{"option": "marks-joined", "drop": [], "bound": "d-share-two", "states": 200, "complete": true, "secs": 0.01}
+{"option": "marks-joined", "drop": [], "bound": "d-refuse-then", "states": 300, "complete": true, "secs": 0.01}
+{"option": "marks-joined", "drop": [], "bound": "d-names", "states": 702, "complete": true, "secs": 0.04}
+{"option": "marks-joined", "drop": [], "bound": "d-lock", "states": 355, "complete": true, "secs": 0.02}
+{"option": "marks-joined", "drop": [], "bound": "d-share", "states": 445, "complete": true, "secs": 0.03}
+{"option": "marks-joined", "drop": [], "bound": "r-refuse-then", "states": 441, "complete": true, "secs": 0.02}
+{"option": "marks-joined", "drop": [], "bound": "d-refuse", "states": 474, "complete": true, "secs": 0.02}
+{"option": "marks-joined", "drop": [], "bound": "d-cut", "states": 642, "complete": true, "secs": 0.03}
+{"option": "marks-joined", "drop": [], "bound": "d-flip2", "states": 764, "complete": true, "secs": 0.04}
+{"option": "marks-joined", "drop": [], "bound": "d-async", "states": 798, "complete": true, "secs": 0.05}
+{"option": "marks-joined", "drop": [], "bound": "r-async", "states": 803, "complete": true, "secs": 0.04}
+{"option": "marks-joined", "drop": [], "bound": "d-drop", "states": 1026, "complete": true, "secs": 0.05}
+{"option": "marks-joined", "drop": [], "bound": "r-lock", "states": 1286, "complete": true, "secs": 0.07}
+{"option": "marks-joined", "drop": [], "bound": "d-share-cut", "states": 1374, "complete": true, "secs": 0.08}
+{"option": "marks-joined", "drop": [], "bound": "d-two", "states": 1613, "complete": true, "secs": 0.08}
+{"option": "marks-joined", "drop": [], "bound": "r-refuse", "states": 1817, "complete": true, "secs": 0.08}
+{"option": "marks-joined", "drop": [], "bound": "r-short", "states": 1907, "complete": true, "secs": 0.1}
+{"option": "marks-joined", "drop": [], "bound": "r-share", "states": 2088, "complete": true, "secs": 0.12}
+{"option": "marks-joined", "drop": [], "bound": "r-cut", "states": 2174, "complete": true, "secs": 0.09}
+{"option": "marks-joined", "drop": [], "bound": "d-tail", "states": 2344, "complete": true, "secs": 0.12}
+{"option": "marks-joined", "drop": [], "bound": "d-cut-tail", "states": 2669, "complete": true, "secs": 0.15}
+{"option": "marks-joined", "drop": [], "bound": "d-short", "states": 7362, "complete": true, "secs": 0.59}
+{"option": "marks-joined", "drop": [], "bound": "d-slots", "states": 8704, "complete": true, "secs": 0.56}
+{"option": "marks-joined", "drop": [], "bound": "r-share-cut", "states": 4677, "complete": true, "secs": 0.26}
+{"option": "marks-joined", "drop": [], "bound": "r-tail", "states": 7213, "complete": true, "secs": 0.35}
+{"option": "marks-joined", "drop": [], "bound": "r-cut-tail", "states": 10495, "complete": true, "secs": 0.51}
+{"option": "marks-joined", "drop": [], "bound": "d-share-tail", "states": 11578, "complete": true, "secs": 0.86}
+{"option": "marks-joined", "drop": [], "bound": "d-twice", "states": 12854, "complete": true, "secs": 0.97}
+{"option": "marks-joined", "drop": [], "bound": "d-bare-drop", "states": 146138, "complete": true, "secs": 12.57}
+{"option": "marks-joined", "drop": [], "bound": "d-share-restart", "states": 24165, "complete": true, "secs": 1.72}
+{"option": "marks-joined", "drop": [], "bound": "r-share-tail", "states": 35065, "complete": true, "secs": 2.22}
+{"option": "marks-joined", "drop": [], "bound": "d-bare", "states": 36379, "complete": true, "secs": 2.33}
+{"option": "marks-joined", "drop": [], "bound": "d-move", "states": 184472, "complete": true, "secs": 14.06}
+{"option": "marks-joined", "drop": [], "bound": "r-twice", "states": 103546, "complete": true, "secs": 6.84}
+{"option": "marks-joined", "drop": [], "bound": "d-share-cut-tail3", "states": 108601, "complete": true, "secs": 9.27}
+{"option": "marks-joined", "drop": [], "bound": "r-share-restart", "states": 150636, "complete": true, "secs": 10.24}
+{"option": "marks-joined", "drop": [], "bound": "d-share-move", "states": 924569, "complete": true, "secs": 89.7}
+{"option": "marks-joined", "drop": [], "bound": "d-twice-tail", "states": 1092356, "complete": true, "secs": 101.51}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-refuse2", "states": 72, "complete": true, "secs": 0.0}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-two", "states": 138, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-pace", "states": 160, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-two", "states": 190, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-refuse-then", "states": 288, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-names", "states": 291, "complete": true, "secs": 0.01}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-lock", "states": 345, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share", "states": 435, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-refuse-then", "states": 405, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-refuse", "states": 462, "complete": true, "secs": 0.02}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-cut", "states": 616, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-flip2", "states": 746, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-async", "states": 792, "complete": true, "secs": 0.06}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-async", "states": 632, "complete": true, "secs": 0.03}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-drop", "states": 1020, "complete": true, "secs": 0.05}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-lock", "states": 1044, "complete": true, "secs": 0.05}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-cut", "states": 1320, "complete": true, "secs": 0.07}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-two", "states": 1607, "complete": true, "secs": 0.08}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-refuse", "states": 1474, "complete": true, "secs": 0.06}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-short", "states": 1602, "complete": true, "secs": 0.09}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-share", "states": 1702, "complete": true, "secs": 0.09}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-cut", "states": 1727, "complete": true, "secs": 0.07}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-tail", "states": 2338, "complete": true, "secs": 0.12}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-cut-tail", "states": 2663, "complete": true, "secs": 0.14}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-short", "states": 3668, "complete": true, "secs": 0.27}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-slots", "states": 4142, "complete": true, "secs": 0.25}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-share-cut", "states": 3763, "complete": true, "secs": 0.23}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-tail", "states": 5570, "complete": true, "secs": 0.27}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-cut-tail", "states": 7861, "complete": true, "secs": 0.36}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-tail", "states": 11568, "complete": true, "secs": 0.9}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-twice", "states": 12832, "complete": true, "secs": 0.85}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-bare-drop", "states": 73056, "complete": true, "secs": 5.9}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-restart", "states": 24135, "complete": true, "secs": 1.58}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-share-tail", "states": 27904, "complete": true, "secs": 1.74}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-bare", "states": 35679, "complete": true, "secs": 2.12}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-move", "states": 92171, "complete": true, "secs": 6.75}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-twice", "states": 273434, "complete": true, "secs": 16.73}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-cut-tail3", "states": 108591, "complete": true, "secs": 8.95}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "r-share-restart", "states": 99549, "complete": true, "secs": 6.36}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-share-move", "states": 874075, "complete": true, "secs": 79.32}
+{"option": "start-fresh", "drop": ["cursor.ahead"], "bound": "d-twice-tail", "states": 1092334, "complete": true, "secs": 95.61}
+{"option": "mark-apart", "drop": [], "bound": "d-refuse-drop", "states": 784, "complete": true, "secs": 0.07}
+{"option": "mark-first", "drop": [], "bound": "d-refuse-drop", "states": 784, "complete": true, "secs": 0.09}
+{"option": "key-slot", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.04}
+{"option": "key-name", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "no-wnum", "drop": [], "bound": "d-refuse-drop", "states": 58, "complete": false, "secs": 0.0, "broke": "HANDLED", "steps": 6, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "skip (('g', 0), ('m', ('c', (0, 0), 'P', 2, ('o', 1, 1), 'd', 0)))", "commit b0 ('k', (0, 0), 'P', 2, None, 1, 'skip')"]}
+{"option": "nondet", "drop": [], "bound": "d-refuse-drop", "states": 193, "complete": false, "secs": 0.01, "broke": "HANDLED", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "skip (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 1, 0), 'd', 0)))", "commit b0 ('k', (0, 1), 'P', 1, None, 1, 'skip')"]}
+{"option": "unpaced", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "marks-tail", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "marks-marked", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "judge-com", "drop": [], "bound": "d-refuse-drop", "states": 204, "complete": false, "secs": 0.01, "broke": "ONCE", "steps": 9, "trace": ["start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "crash (('i', 0),)", "start (('i', 0),)", "read (('i', 0), ('s', 'a1'))", "apply (('g', 0), ('m', ('c', (0, 1), 'P', 1, ('o', 0, 0), 'd', 0)))", "apply (('g', 0), ('m', ('c', (0, 0), 'P', 1, ('o', 0, 0), 'd', 0)))", "commit b0 ('w', (0, 1), 'P', 1, ('d', 'a1', 0, 0), 0, 0)", "commit b0 ('w', (0, 0), 'P', 1, ('d', 'a1', 0, 0), 0, 0)"]}
+{"option": "skip-ahead", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "no-bare", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "fenced-mark", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.04}
+{"option": "design", "drop": ["read.fnret", "cursor.fnret"], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.06}
+{"option": "stop-refuse", "drop": ["refuse.mark"], "bound": "d-refuse-drop", "states": 21801, "complete": true, "secs": 1.57}
+{"option": "stop-refuse", "drop": [], "bound": "d-refuse-drop", "states": 2377, "complete": true, "secs": 0.15}
+{"option": "start-fresh", "drop": [], "bound": "d-refuse-drop", "states": 618, "complete": true, "secs": 0.03}
+{"option": "resend-any", "drop": [], "bound": "d-refuse-drop", "states": 1012, "complete": true, "secs": 0.05}
+{"option": "marks-joined", "drop": [], "bound": "d-refuse-drop", "states": 624, "complete": true, "secs": 0.04}

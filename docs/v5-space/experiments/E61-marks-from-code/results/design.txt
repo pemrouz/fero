@@ -1,0 +1,85 @@
+# E-61 design runs: every bound, every property listed, 2026-11-22T23:27:54Z, Python 3.13.17, 4 vCPU, load 6.34 6.49 6.38
+design d-refuse2: 72 states, 0.0s: all hold
+    DONE: 72 judged states, 0 cannot reach the goal
+design r-two: 150 states, 0.0s: all hold
+    DONE: 150 judged states, 0 cannot reach the goal
+design d-pace: 160 states, 0.0s: all hold
+    DONE: 160 judged states, 0 cannot reach the goal
+design d-share-two: 190 states, 0.0s: all hold
+    DONE: 190 judged states, 0 cannot reach the goal
+design d-refuse-then: 288 states, 0.0s: all hold
+    DONE: 288 judged states, 0 cannot reach the goal
+design d-names: 291 states, 0.0s: all hold
+    DONE: 291 judged states, 0 cannot reach the goal
+design d-lock: 345 states, 0.0s: all hold
+    DONE: 345 judged states, 0 cannot reach the goal
+design d-share: 435 states, 0.1s: all hold
+    DONE: 435 judged states, 0 cannot reach the goal
+design r-refuse-then: 441 states, 0.0s: all hold
+    DONE: 441 judged states, 0 cannot reach the goal
+design d-refuse: 462 states, 0.1s: all hold
+    DONE: 462 judged states, 0 cannot reach the goal
+design d-refuse-drop: 618 states, 0.1s: all hold
+    DONE: 618 judged states, 0 cannot reach the goal
+design d-cut: 616 states, 0.1s: all hold
+    DONE: 616 judged states, 0 cannot reach the goal
+design d-flip2: 746 states, 0.1s: all hold
+    DONE: 746 judged states, 0 cannot reach the goal
+design d-async: 792 states, 0.1s: all hold
+    DONE: 792 judged states, 0 cannot reach the goal
+design r-async: 803 states, 0.1s: all hold
+    DONE: 803 judged states, 0 cannot reach the goal
+design d-drop: 1,020 states, 0.1s: all hold
+    DONE: 1,020 judged states, 0 cannot reach the goal
+design r-lock: 1,286 states, 0.2s: all hold
+    DONE: 1,286 judged states, 0 cannot reach the goal
+design d-share-cut: 1,320 states, 0.2s: all hold
+    DONE: 1,320 judged states, 0 cannot reach the goal
+design d-two: 1,607 states, 0.2s: all hold
+    DONE: 1,607 judged states, 0 cannot reach the goal
+design r-refuse: 1,817 states, 0.2s: all hold
+    DONE: 1,817 judged states, 0 cannot reach the goal
+design r-short: 1,907 states, 0.3s: all hold
+    DONE: 1,907 judged states, 0 cannot reach the goal
+design r-share: 2,088 states, 0.3s: all hold
+    DONE: 2,088 judged states, 0 cannot reach the goal
+design r-cut: 2,174 states, 0.3s: all hold
+    DONE: 2,174 judged states, 0 cannot reach the goal
+design d-tail: 2,338 states, 0.3s: all hold
+    DONE: 2,338 judged states, 0 cannot reach the goal
+design d-cut-tail: 2,663 states, 0.4s: all hold
+    DONE: 2,663 judged states, 0 cannot reach the goal
+design d-short: 3,668 states, 0.7s: all hold
+    DONE: 3,668 judged states, 0 cannot reach the goal
+design d-slots: 4,142 states, 0.6s: all hold
+    DONE: 4,142 judged states, 0 cannot reach the goal
+design r-share-cut: 4,677 states, 0.6s: all hold
+    DONE: 4,677 judged states, 0 cannot reach the goal
+design r-tail: 7,213 states, 0.7s: all hold
+    DONE: 7,213 judged states, 0 cannot reach the goal
+design r-cut-tail: 10,495 states, 1.1s: all hold
+    DONE: 10,495 judged states, 0 cannot reach the goal
+design d-share-tail: 11,568 states, 1.9s: all hold
+    DONE: 11,568 judged states, 0 cannot reach the goal
+design d-twice: 12,832 states, 2.0s: all hold
+    DONE: 12,832 judged states, 0 cannot reach the goal
+design d-bare-drop: 73,056 states, 13.3s: all hold
+    DONE: 73,056 judged states, 0 cannot reach the goal
+design d-share-restart: 24,135 states, 3.5s: all hold
+    DONE: 24,135 judged states, 0 cannot reach the goal
+design r-share-tail: 35,065 states, 4.4s: all hold
+    DONE: 35,065 judged states, 0 cannot reach the goal
+design d-bare: 35,679 states, 5.5s: all hold
+    DONE: 35,679 judged states, 0 cannot reach the goal
+design d-move: 92,171 states, 14.0s: all hold
+    DONE: 92,171 judged states, 0 cannot reach the goal
+design r-twice: 103,546 states, 14.3s: all hold
+    DONE: 103,546 judged states, 0 cannot reach the goal
+design d-share-cut-tail3: 108,591 states, 18.6s: all hold
+    DONE: 108,591 judged states, 0 cannot reach the goal
+design r-share-restart: 150,636 states, 21.0s: all hold
+    DONE: 150,636 judged states, 0 cannot reach the goal
+design d-share-move: 874,075 states, 140.3s: all hold
+    DONE: 874,075 judged states, 0 cannot reach the goal
+design d-twice-tail: 1,092,334 states, 110.1s: all hold
+    DONE: 1,092,334 judged states, 0 cannot reach the goal
