@@ -63,7 +63,7 @@ Everything is plain JavaScript on Node 22, in one process: no network, no Raft, 
 - Health (a, b, c): each group the merger names held must be held by exactly the down groups the oracle finds. The oracle finds them from the world's own move table, not from the intake's lists.
 - At the end, every outage ends and every move finishes. Every buffer must then drain ("stuck" if it cannot).
 
-**Planted bugs**, 20 of them, each on the same 1,000 seeds in g4 and stress (section 3, table 3).
+**Planted bugs**, 20 of them, each on the same 1,000 seeds in g4 and stress (table 3; section 3 says what each shows).
 
 **The bench** ([bench/bench.mjs](bench/bench.mjs)): a picture takeover at the new host; the merger's install with G groups held; the partial on every copy and a resend from the ring; a move part. Rows are like the sim's, at 1e4 to 1e6 rows. Three runs, each alone under the timing lock.
 
@@ -103,7 +103,7 @@ Seeds with rule 4's case: ‹case_line› of 1,000 (fix a: g4, g16, elastic, str
 ## 3. Why each piece is needed
 
 - **The closure** (`noclosure`). A fence at A needs B's open, and B's open may sit behind a fence of B's own, whose open sits at C. Each half met on the way brings its own partner. O1's `takeFrom` followed one pair to the queue that must move first; with real moves a chain forms. Without it, ‹ncl_a_g4› (g4) and ‹ncl_a_st› (stress) seeds failed, ‹ncl_a_nc› of them with no picture past any half. So the closure is rule 2's, not rule 4's (S2).
-- **Keys kept apart** (`keyowner`). O1 kept one entry per key for the window and the filter, and ignored a drop from a group that did not own the key. A join applies several groups' frames and pictures at one cut, in some order: A's write puts key k over B's entry, then A's fence drops k, and k is gone though B holds it. Without it, ‹ko_a_g4› and ‹ko_a_st› seeds failed (‹ko_a_nc› with no picture past any half). No order fixes it: two pictures can each hold what the other's frames drop.
+- **Keys kept apart** (`keyowner`). O1 kept one entry per key for the window and the filter, and ignored a drop from a group that did not own the key. A join applies several groups' frames and pictures at one cut, in some order: A's write puts key k over B's entry, then A's fence drops k, and k is gone though B holds it. Without it, ‹ko_a_g4› and ‹ko_a_st› seeds failed (‹ko_a_nc› with no picture past any half). The first run's review found that applying frames before pictures does not save the one-entry form: two pictures can each hold what the other's frames drop (not rerun here).
 - **The picture carries its halves** (fix none, `rebuildnol`). Without it the rows of a passed fence vanish, or a passed open counts its rows twice. At a rebuild too: `rebuildnol` failed ‹rnl_g4› and ‹rnl_st›.
 - **The join** (`nojoin`). A picture can pass several halves (‹multi› pictures with two or more, fix a, all worlds). Each needs its partner at the same cut.
 - **The resume rule** (`ringgap`, ring of 16): a ring that does not reach back to the merger's place must not resume; ‹rg_g4› and ‹rg_st› failed.

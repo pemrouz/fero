@@ -195,6 +195,7 @@ function runSeed(SEED) {
     const visible = (y, c) => { const s = S(y), gr = groups.get(y); if (s.pic) return c <= s.pic.pos ? CARRIES && c > s.pos : c <= gr.hp; return c <= gr.hp }
     const partner = (e) => {
       const m = moves.get(e.mv)
+      if (!m) return // a move already closed at the cut: only met when a planted bug sends the cut back ('back')
       if (FIX === 'c') { if (e.kind === 'open') want(m.A, m.fpos); return }
       if (e.kind === 'open') want(m.A, m.fpos)
       else if (e.kind === 'fence') {
