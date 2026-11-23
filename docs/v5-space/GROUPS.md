@@ -10,14 +10,16 @@
 - The plan's first step needed more servers in its tests, two more pieces, and an honest note on SC-03. The rule sums were redone item by item.
 - This page also found that [E-11] and [E-13] did spread leaders over three processes, at the Raft level only (R3, R4).
 
-**How each claim is marked.** **checked**: a named source says so, or a named model checked it at small bounds. **measured**: a named experiment's number. **reasoned**: an argument; nothing ran it. **a guess**: a number nobody measured or worked out. A line number such as `API.md:260` points at that page as it stands today. [DECISIONS](../DECISIONS.md) holds V5-1 to V5-16; [DESIGN-V5](../DESIGN-V5.md) is the older draft. Other page names ([AMENDMENTS.md](AMENDMENTS.md), [REQUIREMENTS.md](REQUIREMENTS.md), [SIMPLICITY.md](SIMPLICITY.md), [VERDICT.md](VERDICT.md)) are files in this folder.
+**Amended 2026-11-23 for V5-18, V5-20 and V5-22** ([DECISIONS](../DECISIONS.md)). Every question in section 5.5 now has an answer, given there with its decision. V5-18 took the first slice with several groups and most of the readings. V5-20 answered what V5-18 left for MERGE.md: there is no fixed row ceiling and the merger ships in the first build (G5, G6), served views live on any server that holds their rows, preferring one that leads no group (V1, question 6), and a live merged view keeps serving while a group is down, which changes V5-18 pick 5 (P5). V5-22 states the gap through a merger rebuild. The items below keep their findings as written, with a **Decided** line where a decision answers them. The line numbers were moved to the pages as they stood on 2026-11-23.
+
+**How each claim is marked.** **checked**: a named source says so, or a named model checked it at small bounds. **measured**: a named experiment's number. **reasoned**: an argument; nothing ran it. **a guess**: a number nobody measured or worked out. A line number such as `API.md:260` points at that page as it stood on 2026-11-23, after the V5-20 rewrite; the cites were first written against the pages of 2026-11-21 and moved then. [DECISIONS](../DECISIONS.md) holds V5-1 to V5-22; [DESIGN-V5](../DESIGN-V5.md) is the older draft. Other page names ([AMENDMENTS.md](AMENDMENTS.md), [REQUIREMENTS.md](REQUIREMENTS.md), [SIMPLICITY.md](SIMPLICITY.md), [VERDICT.md](VERDICT.md)) are files in this folder.
 
 ## 0. The answer
 
 1. **84 places** in the design lean on one group per resource, or on one server holding a whole resource (merged from 324 finds; section 2).
 2. With many groups, **21 break**, 24 hold but cost more, 30 need a model or a measure, and 9 hold as written.
-3. **Worst:** all work over every row needs one process that holds and folds the whole resource. Past about 1e6 to 5e6 rows it cannot run, past about 5 leaders' writes it falls behind, and API.md's list of limits says neither (G5, G6).
-4. **Worst:** served views "never on a leader" fight leaders spread over servers (V1, H7).
+3. **Worst:** all work over every row needs one process that holds and folds the whole resource. Past about 1e6 to 5e6 rows it cannot run, past about 5 leaders' writes it falls behind, and API.md's list of limits says neither (G5, G6). *Answered by V5-20 items 1 to 5: the merger, `scan()` and folds, with no fixed row ceiling.*
+4. **Worst:** served views "never on a leader" fight leaders spread over servers (V1, H7). *Answered by V5-20 item 13.*
 5. **Worst:** the home group is the only map and the only mover. While it is down, new clients cannot find live groups, and a slot caught mid-move takes no writes until it returns (H1, H4).
 6. **Worst:** growth is not ready. A new group starts with one voter and gets slots at once, nothing adds a group by size, and the move misses its 10 ms bar (H6, H9, H11).
 7. **Worst:** by default every write is folded on 5 servers. So groups spread nothing on 5 servers or fewer, and writes scale to about 0.58 × n, under SC-03's 0.7 × n (G10).
@@ -25,7 +27,7 @@
 9. Bring the slot move in last, in the same slice, once its model passes and its window is timed with a real carried set.
 10. **Cost:** about +6 to +26 builder rules on 446 to 503 (1 to 6 %), +1 in `data`, +2 to +4 user rules (reasoned); 6 to 11 weeks of models, 3 to 5 if run side by side (a guess).
 11. One group first saves none of those rules: they come later, plus a rebuild of the read surface and a second `data` major version (reasoned).
-12. Twelve questions for the owner end section 5, most important first.
+12. Twelve questions for the owner end section 5, most important first. V5-18 and V5-20 have answered them all (5.5).
 
 ## 1. Words
 
@@ -69,6 +71,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* API.md:142, :262, :968, :977, :1633 (`Mode 'server'`), :1730-1733 (`RootOps`), :2959 (question 28); LAYERS 10 item 46; DECISIONS V5-12 picks 3 and 13, V5-16 pick 3.
 - *With many groups:* a partial server first downloads each group it lacks (R0). API.md already says this for a spare: "the line works on every server, and only its cost depends on the deployment" (checked: API.md:262). So no promise breaks. The same line costs differently on each server, and past one process it cannot run at all (G5) (reasoned).
 - *Needs:* confirm that the spare reading covers partial servers, and say the download on the line. 0 rules. Its cost is G4's measure.
+- *Decided* (V5-20 items 1 and 3 to 5, which close API.md question 28 and this page's question 12): one-time work over every row reads by `scan()`, with no download; live work that merges or folds is served per group; only a sync read of every row, and live code that is not a fold, take what the server lacks, under its `memory`.
 
 **G3. COST, with a wording fix owed anyway. `f.data.connect()` on a server "sends no subscription of its own".**
 - *Where:* DECISIONS V5-16 pick 2 and its REJECTED line; API.md:256, :2529 (P-01), :2727 (P-12).
@@ -79,6 +82,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* TRANSFORMS:32, :124, :280, :315 ("In the first build R0 is free"), 10 item 10; LAYERS:532, :1040, 9.4; PATHS:869 (PA-19), :1226; API.md:173, :188.
 - *With many groups:* each process with whole-resource work takes a picture of every group it lacks, then decodes and folds every write of every group for as long as it lives. It holds the whole resource: about 330 B a small row (measured, [E-05]), so about 330 MB at 1e6 rows (arithmetic), downloaded again after each restart. A read over every row wakes every dormant group: 20 groups in 10 to 16 ms (measured, [E-26]). How a subscribed group's import reaches the store is not written (+0 to +1 rule).
 - *Measure:* E-57 B1's cost run on real links, with a server missing 1 of 4 and 15 of 16 groups, at 1e5 and 1e6 rows: bytes, time under the byte-rate cap, memory, fold CPU, R2 bytes per move. **M**. V5-16 already owes this measure for a spare.
+- *Decided* (V5-20 items 1, 3 to 5): R0's download now serves only a sync read of every row and live code that is not a fold, and it is bounded by the process's `memory`, counted as RSS (about 1.4 M small rows a GB), not by a row count. The measure is still owed.
 
 **G5. BREAKS. A resource bigger than one process loses every whole-resource feature, and API.md's limits do not say so.**
 - *Assumes:* some process can always hold every row.
@@ -89,6 +93,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
   - TRANSFORMS names E-23's merger "the design" only for this uncovered case, so it does not clash with V5-14's REJECTED line (checked).
   - API.md's promise that "the line works on every server" fails past the edge (reasoned).
 - *Needs:* list the ceiling in API.md 7 and SC-10 ("whole-resource work needs the resource to fit one process: N rows, M GB"). Check it when a view is declared and as data grows, and warn at 80 %. An owner rule for what a live served view does when its resource grows past it. Keep E-23's merger (four rules) as the later design for SC-06. +1 builder rule, +1 user rule.
+- *Decided otherwise* (V5-20; [EVERYROW.md](EVERYROW.md) and [MERGE.md](MERGE.md)). No feature has a fixed row ceiling (item 3; a fixed ceiling is rejected). The merger ships in the first build for every whole-resource view that merges (item 1; its rule 4 passed, V5-22 item 1). One-time work over every row is `scan()` (item 4), live code a fold per group (item 5), and a live median a sorted column at the merger (item 6). A sync read of every row is bounded by the process's `memory`: health warns at 80 %, a hold that will not fit is refused at open, and a live hold past the line ends `not-held` (item 3). `data`'s 16,777,216 rows a source is lifted in `data` 5 (V5-21 item 2).
 
 **G6. BREAKS. A reader of every row caps the resource's write rate at one process.**
 - *Assumes:* a split resource scales its writes: "about 135 leaders' worth" (API.md:2317).
@@ -98,6 +103,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
   - With one leaderboard at 5,000 rows, each change costs 12.2 to 15.7 µs more (measured, [E-57]): about one leader's worth.
   - So "about 135 leaders' worth" holds only for a resource with no such reader, and that ceiling is not listed (reasoned).
 - *Needs:* list it beside G5's; point big sources to `derive`'s record form with shares. 0 builder rules; the user rule is G5's.
+- *Decided, in part* (V5-20 items 1, 5 and 10): a served view or a fold is merged, so no process folds every write for it; each group's copy works on its own rows. A `hold: 'all'` holder and live code that is not a fold still fold every write on one main thread. `derive`'s view form follows the merged view, with a stated bucket limit (about 1.6e5 at 16 groups); past it, the record form.
 
 **G7. BREAKS. `data` 5 has no way to work on one slot's rows.**
 - *Assumes:* a server holds one group, so its store is that group's rows.
@@ -187,6 +193,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* API.md:174, :579-584 ("sync reads never guess"), :620-621, section 8 (no code says that part is down); P-01, P-12, P-17; TRANSFORMS N-3 (:101), :168-169, :288, :370; LAYERS 4.2; PATTERNS:417; DECISIONS V5-13 pick 1, V5-14.
 - *With many groups:* `hold: 'all'` opens, `connect().ready`, `f.data.get()`, served-view pictures, `SYNC`, page reads, a view's failover to a host that lacked the group, and `derive`'s takeover all wait for that group. Partition reads and writes elsewhere go on. The more groups, the likelier one is down, so whole-resource features get less available as the resource grows. No rule says wait, refuse, or answer for the live slots with a mark; an answer behind `seen` would break "never back in time". With one group, the same outage stopped everything (reasoned).
 - *Settle by:* an owner decision (wait, with a health row naming the group; or a partial answer naming the missing slots), then E-57's B1 and group A with one group held down, and P4's model. A decision, then **M**.
+- *Decided* (V5-18 pick 5): while one group is down, reads over every row wait, health names the group, and a sync read never guesses. **Changed for live merged views by V5-20 item 2**: the view keeps serving with that group's part frozen at its last place, health names the group, and a one-time fresh read waits. A group whose next slot-move half needs a half from the down group waits too, frozen at the same exact cut, and health names it; such a pair is never given up (V5-22 item 3). **The gap** (V5-22 item 4): the frozen part lives in the merger's memory, so a merger rebuilt while the group is down serves nothing new until the group is back. The view stays at the old merger's last frame and health says why. So "keeps serving" holds while the merger that holds the frozen part lives. A standby merger is studied later. Owed: the runs this item names, with the merger.
 
 **P6. UNKNOWN. `-N`, a field's `-N`, a `Date` and a version, read back across a move.**
 - *Where:* LAYERS:274, :731, :769-770; CONNECT:88, :217, :225-227; ANYPATH:31, :198; API.md:676-688, :958; DECISIONS V5-13 pick 4, V5-15 pick 2.
@@ -221,6 +228,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* DECISIONS V5-14 pick 3 (and REJECTED: standbys first); TRANSFORMS:32, :272, :309, :371, :543, :557; API.md:126, :615, :707, :713, :779, :784, :811, :953-954, :1153, P-12, question 32; LAYERS:76, :190, :450, :614, :691, :709-711, :743, :751, :771, :1117, 8.11, 10 item 40.
 - *With many groups:* no copy of one group holds every row, so the host needs R0, and "the leader" has no single meaning. If leaders spread, as SC-03 needs (H7), most servers lead some group. Then "never on a leader" leaves no host, or puts view builds of 0.49 to 1.9 s at 1e6 rows (measured, XA-1 in [E-57]) on a process that judges writes, which pick 3 was chosen to stop (reasoned). This already happens across resources, since a copy of one resource leads groups of others on the same main thread (reasoned). Every placement number (XA-1, XA-2, the hand-off counts) ran with one group (checked: E-57 README:200).
 - *Needs:* restate pick 3: a hash over the servers that hold, or can hold, R0 for the resource, preferring those that lead no group of it. Say that stalls can reach writers until `data` builds in slices (N9, D9). +1 rule. Rerun XA-1, XA-2 and A3 at G = 4 and 16 (R1). Touches V5-14 pick 3, API.md question 32.
+- *Decided* (V5-20 item 13, which changes V5-14 pick 3; question 6): a served view lives on any server that holds its rows, preferring one that leads no group of its resource; until `data` builds views in slices, a build can stall a leader's writes. Serving only on servers that lead nothing is rejected. Over several groups the view is merged: each group's partial lives on a copy of that group by the same rule, and the merger on one server (V5-20 item 1; MERGE 5.2). The reruns are still owed.
 
 **V2. UNKNOWN. The cap of 64 per copy, the headroom `views.max / k`, hand-offs and refusals.**
 - *Where:* DECISIONS V5-14 pick 2; TRANSFORMS:272, :302-304, :384, :463, :557; API.md:780-782, :1152, :2389, :2482-2483.
@@ -231,6 +239,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* DECISIONS V5-14 pick 4 and its owed "paging across a failover"; API.md:788, :955, :1998-2002.
 - *With many groups:* the index is R0 on one host; "exact within one cut" means a cut across groups; a page walk can meet a move or a down group (reasoned).
 - *Settle by:* add "across a move, and with one group down" to the owed paging run. **M**.
+- *Decided, in part* (V5-20 item 11): over several groups each group keeps its own index, and a page read asks every group in one round; a two-round form comes once a pinned read exists. The paging run is still owed.
 
 **V4. COST. Served views get more, smaller frames, and the row guards bite more often.**
 - *Where:* TRANSFORMS:283, :289; CONNECT:176; API.md:783, :2413.
@@ -240,6 +249,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *Where:* DECISIONS V5-14 pick 5; TRANSFORMS:198-205, :372, 10 item 9; PATTERNS:392-393, :409, :417, :420; API.md:818, :820, :843-849, :962, P-17; LAYERS 8.8.
 - *With many groups:* the deriver holds and folds the whole source (R0). Its read barrier is a cut read from every source group, so a source group that is down blocks every takeover, and the target trails the slowest source group rather than "about one commit". One target group down blocks the bump, and then the whole target stops following (reasoned). B3's source had one group, and B1 had no deriver (checked: TRANSFORMS 10 item 9).
 - *Settle by:* B3 on B1's store at G = 4, with source moves, a source group down and a target group down. **M** to **L**.
+- *Decided, in part* (V5-20 item 10): over several groups the deriver follows the merged view, holding the buckets, never the source rows (MERGE 5.2), so it no longer holds R0. Its buckets have a stated limit, about 1.6e5 at 16 groups; past it, the record form, and O4 (shards by output key) comes next. A source group that is down freezes its part of the merged view (P5). The run is still owed.
 
 **V6. BREAKS (reasoned from the written rules). "A bump at every target group" misses a group made during a takeover.**
 - *Where:* DECISIONS V5-14 pick 5; TRANSFORMS:200; PATTERNS:392; LAYERS:1058, :1114 (the wire: "one per target group"), :1366, :1446, 10 item 41; API.md:845, :2373.
@@ -251,6 +261,7 @@ Each item says what it assumes, where, what changes with many groups, its class,
 - *With many groups:* `marks(name)` reads every target group (G reads). With one target group down it cannot be worked out safely, so a restart waits. A bare mark must raise every output slot's mark: a write to each such group, per idle record or per period, which is not written (reasoned). Correctness held in [E-30] with two output groups and an output move (checked).
 - *A side cost, not from groups:* the mark table per (source slot, output slot) can reach 4,096 × 4,096 × 29 B, about 490 MB per reader, when outputs are keyed apart from inputs (arithmetic). It comes from the slot shape, exists with one group too, and is unpriced.
 - *Settle by:* E-61 (in progress), a restart rule with a target group down, a bare-mark rule, and a priced mark table. **S** to **M**.
+- *Decided, in part* (V5-20 items 16 to 19, from [E-61]): a deriver joins each output slot in `#groups` before its first write there; `marks()` reads only the joined slots, and bare marks go only to them, so a deriver that writes one slot sends no bare marks to the other 4,095 (item 19). E-61 checked the marks written by app code on 42 bounds and 4,000 seeded runs. Still owed: the restart with a target group down, and a priced mark table.
 
 **V8. UNKNOWN. A `data` upgrade switches at a different place in each group.**
 - *Where:* TRANSFORMS:376, :389, 10 item 18; LAYERS:529, :549, :1598; DECISIONS V5-14's owed "a data upgrade under live views"; AMENDMENTS (a fold-version entry in each group's log).
@@ -474,7 +485,7 @@ The pattern: the experiments that checked correctness across groups ran in one p
 
 **R1. UNKNOWN. The served-view evidence ran with one group.**
 - *Where:* [E-57] README:200 ("Group A has one group"); TRANSFORMS 7 (A1 to A8, XA-1 to XA-13), 10 items 2, 3, 9, 10; DECISIONS V5-14's consequences; E-60 (in progress, one slot).
-- *With many groups:* in those runs positions were log indexes, no slot moved, every copy held every row, and "every copy but the leader" was a clear set. XA-14 (the view selector in E-31's model) has not run (checked).
+- *With many groups:* in those runs positions were log indexes, no slot moved, every copy held every row, and "every copy but the leader" was a clear set. XA-14 (the view selector in E-31's model) had not run (checked). [E-60] has since run it, on one slot with a move to a second group: every property holds but the old wording of END `view-too-big`, which V5-20 item 20 restates.
 - *Settle by:* group A again at G = 4, 16 and changing, with hand-backs, a move and one group down; and E-60 widened to a view over two slots in two groups. **L**.
 
 **R2. UNKNOWN. E-22's 22 patterns ran with two groups that every process folded, and with `#meta`.**
@@ -507,7 +518,7 @@ The pattern: the experiments that checked correctness across groups ran in one p
 | Item | What breaks | Proposed change | Decision it touches | Builder rules |
 |---|---|---|---|---|
 | G1 | "a server holds every row" | a copy is one group's replica; "held on purpose" per group; the partial server named | V5-12's review rule; V5-16 pick 2's words | +0 (user +1) |
-| G5 | whole-resource work past one process | list the one-process ceiling in API.md 7 and SC-10; check it, warn at 80 %; owner rule for a live view past it; merger later | V5-14's frame; SC-10; SC-06 | +1 (user +1) |
+| G5 | whole-resource work past one process | list the one-process ceiling in API.md 7 and SC-10; check it, warn at 80 %; owner rule for a live view past it; merger later. *Decided otherwise by V5-20: no fixed ceiling, the merger in the first build, `scan()`, folds, holds bounded by `memory`* | V5-14's frame; SC-10; SC-06 | +1 (user +1) |
 | G6 | "about 135 leaders' worth" with a reader of every row | list the fold-rate ceiling (about 5 leaders, 1 with a leaderboard); point big sources to shares | V5-14's frame; SC-10 | 0 |
 | G7 | no work by slot in `data` 5 | `data` 5.0.0 lists, snapshots and drops one slot's rows; one store per resource per process (or a fero-side index) | V5-14 pick 6 | +1 in `data` |
 | G10 | 5 holders fold every write; groups spread nothing on 5 servers or fewer | `standbys` 0 once a resource has more than one group (owner pick); tests on 6 or more servers | V5-6; API.md's `standbys` default; SC-03; SC-06 | 0 |
@@ -515,7 +526,7 @@ The pattern: the experiments that checked correctness across groups ran in one p
 | O3 | writer time never going back | carry the slot's last stamp; B never stamps lower; state the early-lapse bound | V5-4; A-17 | +1 |
 | O8 | the `memory` rung's table in a memory home group | a memory resource's home group commits on disk | V5-5 (third step) | 0 to +1, later |
 | P4 | a whole link is "one SUB" | a SUB per group; ready when every picture has come; per-slot cut for resume | V5-13 pick 1 | +1 to +2 |
-| V1 | views "on every copy but the leader" | hash over servers that hold R0, preferring those that lead no group of it; stalls named until sliced builds | V5-14 pick 3 | +1 |
+| V1 | views "on every copy but the leader" | hash over servers that hold R0, preferring those that lead no group of it; stalls named until sliced builds. *Decided by V5-20 item 13, over the servers that hold the rows* | V5-14 pick 3 | +1 |
 | V6 | bump misses a group made during a takeover | read the target's groups again after the bumps; a bump addressed to a group | V5-14 pick 5 | +1 |
 | Q1 | handler writes "at this same leader" | per-partition words, or own-partition writes only (owner pick) | V5-16 pick 3 (words) | 0 |
 | H1 | layout only from the home group | every copy keeps and hands out the home records (LAYERS 10 item 22, made a rule) | V5-3 | +1 to +2 |
@@ -580,12 +591,12 @@ Each of these gains a many-group case; most are already owed in LAYERS 11.
 **Step 1, from the first day.** Every resource in the simulator, the tests and the examples is founded with a fixed pre-split: 2 to 4 groups placed on different server sets, with no live move.
 - **Test worlds must hold partial servers.** With 5 holders per group, a world of 5 servers or fewer has none (G10). So the tiers run 6 or more servers, or `standbys: 0` on 4 or more.
 - **What it brings out:** most BREAKS (G1, G5 to G7, G10, O2, P4, V1, Q1, S1, H1, H7), the costs of G2 to G4 and Q3, the extra order apps could lean on (O1), and P5's question.
-- **What it needs:** R0 to R2 (+1 to +4), home records on every copy (H1, +1 to +2), settings adopted per group (S1, +1), whole selections over groups (P4, +1 to +2), view placement (V1, +1), the ceiling check (G5, +1), a pre-split at founding (part of H9, +1), new-group placement (H7, 0 to +1), and maybe a write line per group (Q3, 0 to +1). About **+7 to +14 builder rules, +1 in `data` (G7), +2 to +3 user rules** (reasoned).
+- **What it needs:** R0 to R2 (+1 to +4), home records on every copy (H1, +1 to +2), settings adopted per group (S1, +1), whole selections over groups (P4, +1 to +2), view placement (V1, +1), the ceiling check (G5, +1; V5-20 replaced it with EVERYROW's `memory` guard, which LAYERS 0.2 counts), a pre-split at founding (part of H9, +1), new-group placement (H7, 0 to +1), and maybe a write line per group (Q3, 0 to +1). About **+7 to +14 builder rules, +1 in `data` (G7), +2 to +3 user rules** (reasoned).
 - **What it does not do:** meet SC-03. Two to four fixed writers sit far below F_w = 64, and SC-03 asks for no count chosen up front (checked: REQUIREMENTS SC-03). Step 1 is a test shape, not the scaling answer.
 
 **Step 2, last in the slice.** The slot move in a cut form, once model 6 passes and model 7 has timed the window. With it come the voter rule for new groups (H6, +1), the grow rule (the rest of H9, 0 to +1), the stamp carry (O3, +1), the full carried set (H13, 0 to +2), the give-up without the home group (H4, 0 to +1), the bump's second read (V6, +1), `slot-table`'s high rules (0 to +4), and the cut move itself (−4 to +1, a guess). About **−1 to +12 builder rules** (reasoned).
 
-**Together:** about **+6 to +26 builder rules** on the first build's 446 to 503 (1 to 6 %), **+1 in `data`**, and **+2 to +4 user rules** (reasoned). The user rules: a server may hold only some groups (G1); whole-resource work needs the resource to fit one process (G5); and maybe what a read over every row does while a group is down (P5) and where a handler may write (Q1).
+**Together:** about **+6 to +26 builder rules** on the first build's 446 to 503 (1 to 6 %), **+1 in `data`**, and **+2 to +4 user rules** (reasoned). The user rules: a server may hold only some groups (G1); whole-resource work needs the resource to fit one process (G5; V5-20 replaced it: a sync read of every row fits the process's `memory`, and other work over every row has no row ceiling); and maybe what a read over every row does while a group is down (P5) and where a handler may write (Q1).
 
 ### 5.2 Why not one group first
 
@@ -617,20 +628,22 @@ Each of these gains a many-group case; most are already owed in LAYERS 11.
 
 ### 5.5 Questions for the owner, one at a time, most important first
 
-1. **The first slice (L1, G10, H11).** Should the first slice found every resource with several groups from the first day, tested on worlds where some servers hold only part of a resource, and take the slot move last in the same slice once it is modelled and timed? Or keep one group and no move?
-2. **Past one process (G5, G6).** For a resource bigger than one process, or busier than one process can fold, should whole-resource features be refused at a stated ceiling now, with a merger across groups as a later design? Or should the merger be designed now?
-3. **A live view past the ceiling (G5).** When a resource grows past that ceiling while a served view is live, should the view keep serving with a health warning, end with a code, or should growth wait?
-4. **`standbys` with many groups (G10).** Once a resource has more than one group, should `standbys` default to 0, so a write is folded on 3 servers instead of 5 and groups spread memory?
-5. **The move's bar (H11).** Should SC-08(b) be restated as a p50 bar plus a p99 bar tied to load? Or stay 10 ms at p99, which needs a one-commit window with the carried set sent before the fence?
-6. **Where served views live (V1).** Once leaders spread over servers, should a served view live only on a server that leads no group of its resource, or on any server that holds the rows, with build stalls reaching writers until `data` builds in slices?
-7. **One group down (P5).** While one group is down, should reads over every row wait, with a health row naming the group, or answer for the live slots with a mark that names the missing ones?
-8. **The home group down (H1, H4).** Should a client that has never seen the resource still reach its live groups while the home group is down, by taking a maybe-stale table from any copy? And may a move's target give up without the home group?
-9. **Growth (H6, H9, H10).** Must a new group have all its voters before any slot moves in? Should a resource grow by size as well as by load, and start split when it is founded, imported or restored with a size hint? What is the target time to grow from one group to sixteen under load?
-10. **Settings (S1).** Should a settings change, the read-only gate included, count as in force only once every group has adopted it, with `fero.alter` waiting for that?
-11. **Handlers that touch other rows (Q1).** May a row handler write rows in other partitions, with the extra trips and no order across groups said on the page, or only its own partition?
-12. **Servers that hold some groups (G2, G3).** Does API.md's reading for a spare (download what is missing first, and say the cost on the line) also cover a server that holds some groups but not all?
+**All answered.** V5-18 answered questions 1, 2 (in part), 4, 5 and 7 to 11 on 2026-11-21, and left 3, 6 and 12 for MERGE.md. V5-20 answered those on 2026-11-23, and changed V5-18 pick 5 for live merged views. Each question below ends with its answer.
 
-**Later, with the `memory` rung only:** must a memory resource's home group still commit on disk (O8)?
+1. **The first slice (L1, G10, H11).** Should the first slice found every resource with several groups from the first day, tested on worlds where some servers hold only part of a resource, and take the slot move last in the same slice once it is modelled and timed? Or keep one group and no move? *Answered: several groups from the first slice, tested on 6 or more servers, the move last in the same slice (V5-18 pick 1).*
+2. **Past one process (G5, G6).** For a resource bigger than one process, or busier than one process can fold, should whole-resource features be refused at a stated ceiling now, with a merger across groups as a later design? Or should the merger be designed now? *Answered: designed now (V5-18 pick 2), and then no fixed ceiling and the merger in the first build, with `scan()`, folds and a sorted column (V5-20 items 1 to 6).*
+3. **A live view past the ceiling (G5).** When a resource grows past that ceiling while a served view is live, should the view keep serving with a health warning, end with a code, or should growth wait? *Answered: there is no ceiling to grow past (V5-20 item 3). A merged view keeps serving at any size; a live hold that passes its process's `memory` line ends `not-held`, and keeping it with only a warning is rejected.*
+4. **`standbys` with many groups (G10).** Once a resource has more than one group, should `standbys` default to 0, so a write is folded on 3 servers instead of 5 and groups spread memory? *Answered: yes (V5-18 pick 3).*
+5. **The move's bar (H11).** Should SC-08(b) be restated as a p50 bar plus a p99 bar tied to load? Or stay 10 ms at p99, which needs a one-commit window with the carried set sent before the fence? *Answered: it stays 10 ms at p99, with the move cut to one commit, modelled and timed before it ships (V5-18 pick 4).*
+6. **Where served views live (V1).** Once leaders spread over servers, should a served view live only on a server that leads no group of its resource, or on any server that holds the rows, with build stalls reaching writers until `data` builds in slices? *Answered: on any server that holds the rows, preferring one that leads no group of its resource; build stalls can reach a leader's writes until `data` builds in slices (V5-20 item 13).*
+7. **One group down (P5).** While one group is down, should reads over every row wait, with a health row naming the group, or answer for the live slots with a mark that names the missing ones? *Answered: they wait, and health names the group (V5-18 pick 5). For live merged views V5-20 item 2 changes it: the view keeps serving with the down group's part frozen, and a one-time fresh read waits. Through a merger rebuild the view serves nothing new until the group is back (V5-22 item 4).*
+8. **The home group down (H1, H4).** Should a client that has never seen the resource still reach its live groups while the home group is down, by taking a maybe-stale table from any copy? And may a move's target give up without the home group? *Answered: every copy keeps and hands out the home group's records, so a new client reaches live groups (a stale entry answers `moved`); a move's target that never wrote the slot may give up without the home group (V5-18 pick 6).*
+9. **Growth (H6, H9, H10).** Must a new group have all its voters before any slot moves in? Should a resource grow by size as well as by load, and start split when it is founded, imported or restored with a size hint? What is the target time to grow from one group to sixteen under load? *Answered: all voters first; growth by size and by load; split at founding, import and restore from a size hint; the target is set after a timed growth from 1 to 16 groups (V5-18 pick 7).*
+10. **Settings (S1).** Should a settings change, the read-only gate included, count as in force only once every group has adopted it, with `fero.alter` waiting for that? *Answered: yes (V5-18 pick 8).*
+11. **Handlers that touch other rows (Q1).** May a row handler write rows in other partitions, with the extra trips and no order across groups said on the page, or only its own partition? *Answered: it may write other partitions, with the trips and the lack of order across groups stated (V5-18 pick 9).*
+12. **Servers that hold some groups (G2, G3).** Does API.md's reading for a spare (download what is missing first, and say the cost on the line) also cover a server that holds some groups but not all? *Answered by V5-20 items 1 and 3 to 5: one-time work reads by `scan()`, with no download; live work that merges or folds is served; only a sync read of every row takes what the server lacks, under its `memory`.*
+
+**Later, with the `memory` rung only:** must a memory resource's home group still commit on disk (O8)? *Not yet asked.*
 
 **Small and safe, taken without a question:** O2's wording for P-16, O3's stamp carry, H13's full carried set, G3's wording, G6's ceiling line, and the PATHS default.
 
@@ -641,7 +654,7 @@ Each of these gains a many-group case; most are already owed in LAYERS 11.
 - **HOLDS items** were not checked again one by one beyond their named evidence.
 - **Rule counts** are reasoned per item. Nobody counted them by SIMPLICITY's method (DEV-10). The cut move's count rests on a probe and a guess.
 - **Times and sizes** of models are guesses from the size of the model each one extends.
-- **E-59 to E-62 are in progress.** They were read as drafts, if at all, and are not linked here.
+- **E-59 to E-62 were in progress** when this page was written. They were read as drafts, if at all. They have since reported: [E-59], [E-60] and [E-61] fed V5-20, and [E-62] measured the read costs.
 - **Not studied:** regions (SC-14) with many groups; the browser client ([E-40]) with a SUB per group; hosted cost per group ([E-41], DEP-21); fero deploy and the CLI's `move` and `place`; v4's code and its examples; `data`'s code (only its planned list).
 - **Not priced:** a fero-side key-to-slot index (G7's other option) against the memory budget; G10's write-scaling figure with the followers' Raft and fsync work added.
 
@@ -697,3 +710,7 @@ Each of these gains a many-group case; most are already owed in LAYERS 11.
 [E-56]: experiments/E56-one-connect/README.md
 [E-57]: experiments/E57-transforms/README.md
 [E-58]: experiments/E58-any-path/README.md
+[E-59]: experiments/E59-growth-and-stop/README.md
+[E-60]: experiments/E60-view-selector/README.md
+[E-61]: experiments/E61-marks-from-code/README.md
+[E-62]: experiments/E62-read-costs/README.md
