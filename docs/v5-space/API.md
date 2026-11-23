@@ -1,12 +1,12 @@
 # fero v5: the public API
 
-Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][dec]; [VERDICT 11.7](VERDICT.md)). Rewritten again 2026-11-18 around the connect lens ([V5-12][dec]; [LENS.md](LENS.md)). **Rewritten a third time 2026-11-20 for V5-13 to V5-15** ([dec]): how code reads data ([CONNECT.md](CONNECT.md), [READS.md](READS.md)), where transformations run ([TRANSFORMS.md](TRANSFORMS.md)), and reads and writes at any path ([ANYPATH.md](ANYPATH.md)). **Amended the same day for V5-16**: a sync read is `.value`, and only where it is sure; `f.rows`, `ctx.rows` and the cluster's `snapshot()` go. Section 5.6 lists every change from the 2026-11-18 page, with its decision. **Amended 2026-11-21 for V5-17**, the owner's answers to section 11.1's questions. Most kept this page's pick. Four went the other way and change the API: a service's answer that throws sends the request back to be taken again; `past` comes in the first build; two refusals get codes of their own; and the open-links list is `f.cluster.value.links`. Section 5.7 lists those four.
+Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][dec]; [VERDICT 11.7](VERDICT.md)). Rewritten again 2026-11-18 around the connect lens ([V5-12][dec]; [LENS.md](LENS.md)). **Rewritten a third time 2026-11-20 for V5-13 to V5-15** ([dec]): how code reads data ([CONNECT.md](CONNECT.md), [READS.md](READS.md)), where transformations run ([TRANSFORMS.md](TRANSFORMS.md)), and reads and writes at any path ([ANYPATH.md](ANYPATH.md)). **Amended the same day for V5-16**: a sync read is `.value`, and only where it is sure; `f.rows`, `ctx.rows` and the cluster's `snapshot()` go. Section 5.6 lists every change from the 2026-11-18 page, with its decision. **Amended 2026-11-21 for V5-17**, the owner's answers to section 11.1's questions. Most kept this page's pick. Four went the other way and change the API: a service's answer that throws sends the request back to be taken again; `past` comes in the first build; two refusals get codes of their own; and the open-links list is `f.cluster.value.links`. Section 5.7 lists those four. **Amended 2026-11-23 for V5-20 to V5-22** ([dec]): work over every row past one process ([MERGE.md](MERGE.md), [EVERYROW.md](EVERYROW.md)), the questions E-59 to E-63 left, the merger's rule 4 ([E-67]) and compact rows ([COMPACT.md](COMPACT.md), V5-21). A fifth read verb, `scan()`, reads every row once; a `{ fold }` method keeps live code over every row, one piece per group; a served view over several groups is merged at one cut; a sync read of every row is bounded by this process's `memory`; and marks, skips and END `view-too-big` say what E-60 and E-61 found. Section 5.8 lists the changes.
 
 **This page replaces COMP2's API** of 2026-11-11. Git history keeps that one, and the earlier forms of this page (`git log -- docs/v5-space/API.md`). COMP2 was the study's earlier pick: Raft groups owned by the project, a `#meta` group and one central loop. The owner set it aside (V5-2, V5-6).
 
 - **What this page is.** What an app developer writes against fero v5, what each call promises, and what each call costs.
 - **The design in one line.** A resource's truth is a log (V5-1). Each resource is its own small cluster, with its own Raft groups and its own settings in its own log (V5-2). Every write commits on disk at a majority before anyone can see it (V5-5). `data` folds the rows on every copy and on clients.
-- **The shape in one line.** `shop.data.widgets.stock` is a **lens**: an address that does no work. The same address then reads once (`get()`), keeps the newest state live here (`connect()`), reads the log from a place (`changes()`), reads one partition as it was (`past()`), writes (`set()`) and calls a method (`sell(1)`). Four read verbs, one job each, named by what you get (V5-13).
+- **The shape in one line.** `shop.data.widgets.stock` is a **lens**: an address that does no work. The same address then reads once (`get()`), keeps the newest state live here (`connect()`), reads the log from a place (`changes()`), reads one partition as it was (`past()`), writes (`set()`) and calls a method (`sell(1)`). At the root, `scan()` reads every row once, in pages. Five read verbs, one job each, named by what you get (V5-13; `scan()` is V5-20 item 4).
 - **The aim.** The owner asked for an API that is as easy to guess as it can be, and that costs nothing in speed: no hidden copies, trips, decodes or whole-resource work. [API-TOUR.md](API-TOUR.md) walks through the choices, for review.
 - **For the layers under the surface:** [LAYERS.md](LAYERS.md). **For what each path costs:** [PATHS.md](PATHS.md). **For the evidence behind the read surface, transformations and paths:** [CONNECT.md](CONNECT.md) with [E-56], [TRANSFORMS.md](TRANSFORMS.md) with [E-57], [ANYPATH.md](ANYPATH.md) with [E-58]; for the lens itself, [LENS.md](LENS.md) with [E-55].
 
@@ -17,17 +17,17 @@ Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][d
 - **(measured)**: timed. **(checked)**: a seeded run, a model, a probe or tsc ran it. **(reasoned)**: an argument; nothing ran it. **(a guess)**: a number nobody measured. **(from memory)**: an outside fact not checked here. **(proposed)**: new on this page. *This page's reading*: where the records leave room and this page picks.
 
 **What comes when** (V5-5, V5-12, V5-14).
-- **Built first, in TypeScript:** everything here except the lines below, `past` included (V5-17). Every write commits on disk at a majority.
+- **Built first, in TypeScript:** everything here except the lines below, `past` included (V5-17). Every write commits on disk at a majority. Also in the first build (V5-20): the merger, for every served view over several groups that merges (item 1; its rule 4 passed its seeded runs, V5-22 item 1); `scan()` (item 4); folds with fero's own combines (item 5); and an exact live median over every row (item 6).
 - **Built second:** the early answer stages, `received` and `replicated` (section 3.5). The write handle is there from the first build; until the stages are built, both resolve at the commit.
 - **Built third, and only for a timed need the stages cannot meet:** a `memory` commit level per resource. It is not on this page. Nor is the no-disk kind of pub/sub (`durability: 'none'`). Both would be one resource key, and no call changes.
 - **Waiting for data 5's ordered index** (D8c; V5-14 pick 1): an ordered served view over more than 5,000 rows and `{ pages }` over more than 2,000 are refused when built until then (section 3.10). data 5.0.0 is one large major version, in TypeScript (V5-14 pick 6).
-- **Built later, each when what it waits for exists:** work pushed below a partition (class B, section 3.10; V5-12 pick 2), the partition function (section 3.2; pick 4), and a browser build in which a server role throws (section 3.8; pick 12). A folded resume on a live link, `connect({ resume })`, is modelled first (V5-13 pick 7).
+- **Built later, each when what it waits for exists:** work pushed below a partition (class B, section 3.10; V5-12 pick 2), the partition function (section 3.2; pick 4), and a browser build in which a server role throws (section 3.8; pick 12). A folded resume on a live link, `connect({ resume })`: [E-60] modelled it, and it comes when restarted screens matter (V5-20 item 21). Folds with combines the author writes (V5-20 item 5), histograms per group for quantiles (item 6), O4's shards by output key (item 10), a standby merger (studied first, V5-22 item 4), and a compact row store, inside `data` (V5-21 items 1 and 3).
 
 **How sure each part is.**
-- **Type-checked here.** Every `ts` block whose first line is `// file: …` compiles with TypeScript 6.0.2 against data's shipped types. That includes all 22 patterns and the lines that must not compile; each of those fails at its own line, for the reason its comment gives. Section 12 has the command and the result.
-- **Built small.** [E-55] built the lens on data 63fea66. [E-56] built `connect` on it: callbacks, handles and loops, `disconnect`, `signal`, `until`, and the `ended` guard, through E-55's seeded lifetime checks (CONNECT 0). [E-57] built served views, pages, `derive`'s view form, `lookup` and the store fed by slot, each against a seeded oracle with planted bugs: 0 wrong answers on the final code (TRANSFORMS 7). [E-58] checked writes at every level and readers at every level on data's real engine: 0 wrong states (ANYPATH 0). None of the four built fero's log reader (E-58 checked an "on the path" reader on its stand-in, part 1), the positions, or `past` as a value.
+- **Type-checked here.** Every `ts` block whose first line is `// file: …` compiles with TypeScript 6.0.2 against data's shipped types. That includes all 22 patterns and the lines that must not compile; each of those fails at its own line, for the reason its comment gives. Section 12 has the command and the result; the 2026-11-23 run used a stand-in for the one type the declarations take from `data`.
+- **Built small.** [E-55] built the lens on data 63fea66. [E-56] built `connect` on it: callbacks, handles and loops, `disconnect`, `signal`, `until`, and the `ended` guard, through E-55's seeded lifetime checks (CONNECT 0). [E-57] built served views, pages, `derive`'s view form, `lookup` and the store fed by slot, each against a seeded oracle with planted bugs: 0 wrong answers on the final code (TRANSFORMS 7). [E-58] checked writes at every level and readers at every level on data's real engine: 0 wrong states (ANYPATH 0). None of the four built fero's log reader (E-58 checked an "on the path" reader on its stand-in, part 1), the positions, or `past` as a value. [E-65] built `scan()`, folds per group and a sorted column for a median over every row, each against a seeded oracle with planted bugs (EVERYROW 3); [E-67] ran the merger's slot moves, takeovers and rebuilds on 4,000 seeds.
 - **Run on a prototype, under an earlier spelling.** [E-22] ran all 22 patterns on five kernel operations, with a leader change and a slot move forced into each. This page respells them; the respelled lines did not run.
-- **Model-checked.** The rules under the surface: subscribe ([E-31]), retries ([E-20]), sagas ([E-24]), derived outputs ([E-30]; with two outputs of one record in one slot, E-57 B5), answer stages ([E-48]), founding and finding a resource ([E-51]), healing ([E-52]). Not yet: the `view` selector (V5-14's owed list), marks written by app code (section 11.2).
+- **Model-checked.** The rules under the surface: subscribe ([E-31]), retries ([E-20]), sagas ([E-24]), derived outputs ([E-30]; with two outputs of one record in one slot, E-57 B5), answer stages ([E-48]), founding and finding a resource ([E-51]), healing ([E-52]). Since 2026-11-23 also: the `view` selector ([E-60]: every property holds but the old wording of END `view-too-big`, which V5-20 item 20 restates), marks written by app code ([E-61]; V5-20 items 16 to 19), and growth from one voter and a clean stop ([E-59]; V5-20 items 22 and 23).
 - **Measured.** The costs are [PATHS.md](PATHS.md)'s and the experiments'. No v5 server was timed end to end (PATHS 8).
 - **Read by a skeptic.** The 2026-11-16 page had 31 findings; LENS.md, E-54 and E-55 had 24; the 2026-11-18 rewrite had two skeptics (20 and 21 findings); CONNECT.md had 21, TRANSFORMS.md 30 and ANYPATH.md 19. Each that held was applied there. **This rewrite had two reviews the same day**: one against the decisions and their sources (27 findings), one of the mechanics: types against prose, line cites, links (16). Each that held is applied here, with one part left for other files: line cites in CONNECT.md and two E-56 READMEs, and the v5-space index (docs/v5-space/README.md), are a follow-up. **V5-16's study had a skeptic too** (12 findings), and the amendment had two reviews: one for consistency across the three pages (14 findings), one of the mechanics (9). The ones that held are applied here. Left for other files: CONNECT.md, LENS.md and READS.md still offer `f.rows` as a current read, from before V5-16, and the V5-16 record in DECISIONS.md must carry what this page cites it for.
 - **Nothing here is built.**
@@ -49,7 +49,7 @@ Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][d
 | Word | What it is |
 |---|---|
 | server, client | a **server** holds a copy of the resource and can lead part of it. A **client** only uses it. The role is per resource and comes from what the open declares (section 3.1) |
-| copy | a server's full replica: the log on disk and every row in memory |
+| copy | a server's full replica of one group: its log on disk and its rows in memory. A resource has several groups (V5-18 pick 1), so a server may hold a copy of each, or of some |
 | leader | the one server that puts a partition's writes in order and judges them |
 | commit | a write is on disk on most of the copies (a majority). Only then can anyone see it (V5-5). What a reader calls one commit is one leader's batch, cut down to the rows the reader reads |
 | stage | how far your own write has got when you hear back: `received`, `replicated`, then committed. A stage changes nothing the servers do (V5-11) |
@@ -60,7 +60,7 @@ Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][d
 | picture | the rows a link selects, at the moment it starts. A link gets the picture first, then each commit |
 | live state, the log | **live state** is the newest rows, folded: a slow reader skips to the newest, one change per row. **The log** is every record, in order: it waits for a slow reader. They differ on purpose, and by verb: `connect()` and `changes()` |
 | record | one change on the log: a key path and a value. To **fold** is to apply records to rows |
-| view | a live answer computed from rows: `room.gt('stars', 0)`. A **served view** is one the server names in `methods:` and keeps on one copy for every client that asks |
+| view | a live answer computed from rows: `room.gt('stars', 0)`. A **served view** is one the server names in `methods:` and keeps for every client that asks: on one copy, or, over several groups, as one piece per group added up by the merger (section 3.10) |
 | version | a record's place in its partition's log, as short text that keeps log order under `<` (`38S9`). One version per row: its last write's. A commit's id, inside one partition, is the version of its last record there (V5-13 pick 4) |
 | cursor | a reader's place, one position per slot it reads. Text you save and give back. Across partitions a place is a cursor; there is no single commit id |
 | `-N` | "N commits back", a start for `changes()` and `past()`, on a lens inside one partition (section 3.10) |
@@ -69,7 +69,7 @@ Rewritten 2026-11-16 for the design the owner chose ([DECISIONS V5-1 to V5-11][d
 | trip | one message there and its answer back (a round trip). On one box about 40 µs at the median ([E-01]) |
 | the collector | JavaScript's garbage collector. It never ends a link; in development it only makes fero print a warning (section 3.10) |
 
-**Words inside fero.** An app never names these. They show in `f.cluster`, in the debugger and in [LAYERS.md](LAYERS.md): **slot** (one of a resource's 4,096 fixed hash buckets; a partition hashes to one), **group** (one Raft log with one leader, holding some slots), **attempt** (one write and its retries), **session** (one process's life, held by a lease it renews by itself; it is what `while: 'session'` rows die with), **fold** (`data` applying the log's records to the rows in memory), **SUB** (v5's one subscribe message: a selector, a mode and a cursor; LAYERS 4; in **state mode** it sends rows and then their changes, in **log mode** it sends records), **GET** (one read message), **frame** (one message on a link: the writes one turn of the event loop made for one leader, or one commit's records on their way to a reader), **share** (a part of a source's partitions that one consumer owns at a time), **the tier** (older log kept in the object store; not in the first build), **selection** (what one SUB brings into a process: a partition, the whole resource, or a served view; equal lenses share one), **entry** (a copy's record of one served view: its key, instance, ring of recent frames and holders; TRANSFORMS 3.8), **the linger** (a short wait before an unused selection or entry is dropped).
+**Words inside fero.** An app never names these. They show in `f.cluster`, in the debugger and in [LAYERS.md](LAYERS.md): **slot** (one of a resource's 4,096 fixed hash buckets; a partition hashes to one), **group** (one Raft log with one leader, holding some slots), **attempt** (one write and its retries), **session** (one process's life, held by a lease it renews by itself; it is what `while: 'session'` rows die with), **fold** (`data` applying the log's records to the rows in memory), **SUB** (v5's one subscribe message: a selector, a mode and a cursor; LAYERS 4; in **state mode** it sends rows and then their changes, in **log mode** it sends records), **GET** (one read message), **frame** (one message on a link: the writes one turn of the event loop made for one leader, or one commit's records on their way to a reader), **share** (a part of a source's partitions that one consumer owns at a time), **the tier** (older log kept in the object store; not in the first build), **selection** (what one SUB brings into a process: a partition, the whole resource, or a served view; equal lenses share one), **entry** (a copy's record of one served view: its key, instance, ring of recent frames and holders; TRANSFORMS 3.8), **the linger** (a short wait before an unused selection or entry is dropped), **cut** (one position per group: a read at one cut never shows part of a commit), **partial** (one group's piece of a served view, kept on a copy of that group), **merger** (one server that adds up the partials of a served view by key, at one cut; [MERGE.md](MERGE.md), V5-20 item 1).
 
 **The layers** are [LAYERS.md](LAYERS.md)'s. **L0** storage and I/O. **L1** the log: Raft per group, founding, the directory, healing. **L2** fold and ops: records to rows, conditions, ops, marks, writer time, retries, expiry, answer stages, the one shape rule. **L3** flow: SUBs and the selections they bring (`connect`), `changes`, cursors and positions, served views and pages. **L4** the surface: `fero()`, the lens and its verbs, links and their ends. **L5** libraries, built only from L4: queue, lock, consumer, derive, saga, limiter, service, migrate, tape, the gateways and the CLI.
 
@@ -102,6 +102,7 @@ const shown = stock.connect((s, c) => draw(s, c.version))  // LIVE, AND CALL ME:
 const low = client.data.low(5).connect((top) => draw(top)) // a view the server named: an address; only its changes cross
 for await (const e of client.data.widgets.changes({ from: -5, to: 'latest' })) console.log(e.version, e.rec)   // THE LOG
 const was = await client.data.widgets.past(-1)             // AS IT WAS: a value, folded here; nothing to end
+for await (const [key, item] of client.data.scan()) console.log(key, item.stock)   // EVERY ROW ONCE: pages, one cut
 row.disconnect(); shown.disconnect(); low.disconnect()     // a link ends by your code: disconnect, a signal, until, break
 
 // ── writes: on a server, or on a client of a resource with no methods (V4-5: methods are the door)
@@ -123,23 +124,24 @@ console.log(ack.version, sold.value, was.value?.stock, shop.cluster.value.writab
 | a link: `connect()`, `connect(fn)`, a loop over `connect()` | **at a copy**, from the moment of the call; then here, for every change | one SUB, shared by every equal lens in this process; the partition once, then its changes |
 | a log reader: `lens.changes()` | **at a copy**, from the call | one trip to open, then every record on the lens's path |
 | a past read: `lens.past(pos)` | **here**: a log read from the nearest snapshot, folded once | a snapshot load and 3.6 to 4.4 µs a record (E-55 claim 23); then nothing |
-| a served view: `f.data.best(10)` | **on one copy**, never the leader, kept for every equal call | the view's own work on every write to the resource, under a cap (section 3.10) |
+| a served view: `f.data.best(10)` | **on a server that holds its rows**, preferring one that leads no group of the resource; over several groups, one partial per group and the merger. Kept for every equal call | the view's own work on every write to the resource, under a cap (section 3.10) |
+| every row once: `f.data.scan()` | **at one copy of each group**, a page at a time; then your loop, here | about 0.8 M rows a second at one asker; this process's memory stays flat; no row ceiling (section 3.13) |
 
-**Seven rules a user learns** (CONNECT 8.5; V5-13; `pages` in rule 7 is V5-14 pick 4, and "first build" in rule 5 is V5-12 pick 2).
+**Seven rules a user learns** (CONNECT 8.5; V5-13; `pages` in rule 7 is V5-14 pick 4, "first build" in rule 5 is V5-12 pick 2, and `scan()` in rule 2 and `fold` in rule 7 are V5-20 items 4 and 5).
 1. **A path is an address.** Building one sends nothing. It is never a promise, and neither is a handle.
-2. **`get()` reads a value once. `connect()` keeps the newest state here, and calls you or loops. `changes()` is every record from a place, and it waits for you. `past()` is one partition as it was: a value.**
+2. **`get()` reads a value once. `connect()` keeps the newest state here, and calls you or loops. `changes()` is every record from a place, and it waits for you. `past()` is one partition as it was: a value. `scan()` reads every row once, in pages, and keeps nothing.**
 3. **A version names a record, and so the commit that holds it; a cursor, a time and `-N` name a place. `from` starts at it, `past` reads right after it, `to` stops after it.** A version and `-N` work inside one partition; save the cursor to resume.
 4. **Left of `connect()`: plain data, which may run on a server. Right of it: your code, here.**
 5. **The wire sends whole partitions** (first build).
 6. **Every live thing ends by your code:** `disconnect()`, `break`, a signal, `until`, or the count. Never the collector. A link's rows are read only while it is live; after the end, `ended`. A `past` is a value: nothing to end.
-7. **A method says where it may be called (`at:`, `view` or `pages`), never takes a fero word, and checks what it is given.**
+7. **A method says where it may be called (`at:`, `view`, `pages` or `fold`), never takes a fero word, and checks what it is given.**
 
 Transformations add ten more, for served views, `derive` and `lookup` (TRANSFORMS 8.4; V5-14), in sections 3.10 and 3.11. Reads and writes at any path follow data's rule for when a reader above or below a write hears of it (V5-15 pick 1), and one shape rule at the leader (pick 6); sections 3.4 and 3.10 say both. The types show neither. No record counts them as user rules, and this page adds no count.
 
 **Still true from the page before.**
 - **Anything that changes data, or opens a link, sends a message.** `await` does not send it; it only waits. **Awaiting a write's handle means committed**: one trip to the leader and a share of one disk sync, about 1 ms on one box (MEMORY 9.3, computed from [E-02]). The handle's `received` and `replicated` are earlier progress reports for the few who want them (section 3.5).
 - **Make writes together, a few hundred at a time.** They leave in one frame, share disk syncs and keep their order within a partition (PATHS 3.6; A-10). A client may hold 512 waiting writes; past that the next plain one is refused `backpressure` (section 3.6).
-- **Only a line you wrote walks a whole resource:** `hold: 'all'`, `f.data.connect()`, `f.data.get()`, listing a whole resource's `h.value`, `f.data.changes({ from: 'earliest' })`, a served view on its copy, and an operator over every row on a server. Nothing else decodes, copies or walks every row. On a spare server, that last line also downloads the resource first (section 3.3).
+- **Only a line you wrote walks a whole resource:** `hold: 'all'`, `f.data.connect()`, `f.data.get()`, listing a whole resource's `h.value`, `f.data.changes({ from: 'earliest' })`, `f.data.scan()` (which keeps nothing), a served view or a fold on its servers, and an operator over every row on a server. Nothing else decodes, copies or walks every row. On a server that lacks some of the resource's groups, that last line also takes what it lacks first, under this process's `memory` (section 3.3).
 - **A resource is a table, not a row.** Each one is a small cluster. Users and orders are rows of one resource, not a resource each (V5-2).
 
 **One address, and one sync read** (V5-13 pick 6; V5-16). `f.data` is the address of everything: steps, reads, links, writes, and calls on a path or at the root (`f.data.low(5)`). `.value` is the one sync read, and it is there only where it is sure: a live handle's `h.value`, a `past`'s `value`, and `f.cluster.value`, this process's own state. Everywhere else, `get()` reads once and `connect()` keeps a link. Section 5.6 lists the words that went.
@@ -164,13 +166,13 @@ console.log(a.name, b.name, c.name, d.name, e.name)
 - **A process that brings something serves.** A seed, `methods` or another code key, `listen`, `dir` or `server: true` make a **server**. A bare name is a **client**. This is v4's rule (code: api/index.ts; README "Roles").
 - **The role is per resource** (V5-2 point 4). One process can serve `totals` and be a client of `orders`. `server: false` pins the client role.
 - **A resource exists once a server opens it.** Until then a client's writes wait as `pending` rows of `f.cluster.writes`, as in v4's rung 03.
-- **Three servers of one name are a cluster of three**, as in v4's rung 13 (rung 01 is two). Each stores the log, keeps every row in memory, and can be elected leader: of every partition in the first build, which has one group per resource, and of some partitions once a resource has more groups (V5-2, V5-6).
+- **Three servers of one name are a cluster of three**, as in v4's rung 13 (rung 01 is two). Each stores the log, keeps every row in memory, and can be elected leader of some partitions (V5-2, V5-6). A resource has several groups from the first build (V5-18 pick 1); with three servers each holds a copy of every group, and with more, a server may hold only some groups (section 3.3).
 - Ctrl-C is a clean stop (V4-8). `fero.spawn` stays (V4-9).
 
 **When `await fero(…)` comes back** *(stated here; reasoned from v4's rung 03 and section 3.9's "never guesses")*.
 - **A server:** once it holds the log and has folded it.
 - **A client, by default:** once it has reached a server and learned the leaders. No rows come: a client holds nothing until a `connect()` says what (V5-12 pick 1).
-- **A client with `hold: 'all'`:** once the first picture of every row has arrived and is folded. So `f.data.connect()` on the next line shares those rows, with no SUB of its own (reasoned). At 1,000,000 rows that is seconds (the table below).
+- **A client with `hold: 'all'`:** once the first picture of every row has arrived and is folded. So `f.data.connect()` on the next line shares those rows, with no SUB of its own (reasoned). At 1,000,000 rows that is seconds (the table below). A resource that will not fit this process's `memory` is refused at the open, `not-held` (V5-20 item 3; section 3.3).
 - **No server answers:** the open waits `connect.wait` (10 s), prints who is missing, and then resolves all the same. Writes made on that handle wait as `pending`; a `get()` waits; a handle's `value` throws `not-ready` until its first picture comes; `f.cluster.value` shows `members` as `undefined`, with a health row that says no server was reached yet (V5-16). It never reads as an empty resource. (v4's rung 03 prints `{}` here; that line changes.)
 
 **A server role is real work. Give it to a server process, not to every app process.**
@@ -185,7 +187,7 @@ console.log(a.name, b.name, c.name, d.name, e.name)
 | the first server of a new name (it founds the resource) | one create-if-absent in the store and one disk sync: about 5 ms on one box, about 35 ms across machines, once per resource for ever. The other copies join in the background | [E-49]; PATHS 5.11; V5-10 fix 1 |
 | a server joining a resource that exists | it copies the log it lacks, then folds it: 1.3 to 3 µs a small row | PATHS 2.1, 5.1 |
 | a client, cold (the default holds nothing) | 2 to 3 trips and one commit when built well (7 to 9 trips and two commits as first drawn). A cold browser made its first committed write in 13 to 17 ms. Nothing more until a `connect()` or a `get()` | PATHS 3.2 (PA-21); [E-40] |
-| a client with `hold: 'all'` | also one picture of every row: its bytes on the wire, and a decode and a fold of each row here. **Then every later write to the resource is sent here too**, for as long as the handle is open | PATHS 4.5; section 3.3 |
+| a client with `hold: 'all'` | also one picture of every row: its bytes on the wire, and a decode and a fold of each row here. **Then every later write to the resource is sent here too**, for as long as the handle is open. It must fit this process's `memory`, counted as RSS: about 1.4 M small rows a GB | PATHS 4.5; section 3.3; V5-20 item 3 |
 | each resource a server holds, idle | about 8 KB of memory, about 30 KB in the first minute after a boot; no frames, no CPU that could be measured | V5-8; [E-49] |
 
 So: **open a resource once, at start-up, and keep the handle.** `fero('doc:' + id)` would found a cluster per document. Use one `docs` resource, with a row or a partition per document (section 3.2).
@@ -253,15 +255,27 @@ every.disconnect()                                         // the rows stay: hol
 ```
 
 - **A client holds nothing until a `connect()` says what** (V5-12 pick 1, in V5-13's words). It then holds on purpose exactly what its live links name, for as long as they live. Every download is a line you wrote.
-- **`hold: 'all'`** (v4's behaviour, now an option). The open sends one picture of the whole resource, **and then every later write to it, for as long as the handle is open.** A local `get()` and operators over every row then work here. Cost: the resource's size in bytes, memory and decode time, once; then a decode and a fold here for every write anyone makes. At 1,000,000 small rows the first fold alone is seconds of this process's main thread (computed from PATHS 2.1). `f.data.connect()` holds the same rows, said as a line, with a handle you can end, and operators over every row go right of it. **A sync read of every row is that handle's `value`**, on any role (V5-16): with `hold: 'all'`, `f.data.connect()` shares the open's rows and sends no SUB of its own (section 3.10, "Equal lenses share"; reasoned). There is no `f.rows`.
+- **`hold: 'all'`** (v4's behaviour, now an option). The open sends one picture of the whole resource, **and then every later write to it, for as long as the handle is open.** A local `get()` and operators over every row then work here. Cost: the resource's size in bytes, memory and decode time, once; then a decode and a fold here for every write anyone makes. At 1,000,000 small rows the first fold alone is seconds of this process's main thread (computed from PATHS 2.1). `f.data.connect()` holds the same rows, said as a line, with a handle you can end, and operators over every row go right of it. **A sync read of every row is that handle's `value`**, on any role (V5-16): with `hold: 'all'`, `f.data.connect()` shares the open's rows and sends no SUB of its own (section 3.10, "Equal lenses share"; reasoned). There is no `f.rows`. It must fit this process's `memory` (below).
 - **`hold: '200MB'`, a size, is a cache of pictures, not a subscription** (LENS 2.2; reasoned, not built). When the last link on a selection ends, the unsubscribe is sent after the linger, as always. Inside the bound, the rows stay in memory, least recently used first, with the server position they were good at. They are **not held on purpose**: no read is served from them. A new link sends that position. If the server can still resume from it (its ring of recent frames, or the log when the resource has `history`), only the changes since cross. If not, a new picture crosses. So opening it again is a resume or a download, never free, and nothing crosses while it is closed.
   - The other choice, staying subscribed while warm, would have the server send, and this process decode and fold, every change to every warm partition for nobody (LENS 2.2).
 - **A `get()` never holds** (section 3.9). It reads once. `get({ when })` holds the partition while it waits, then lets go.
-- **A server holds every row** of the resources it serves (V5-6: `data` folds on every copy), as a voter or a standby. That is true for the first `copies + standbys` servers of a resource: 5 by default. The first build has one group per resource (TRANSFORMS' "Words"), so a server holds every row or none.
-  - **A server past that number is a spare** *(this page's reading of LAYERS 8.4 and PATHS 4.4)*. It holds no copy until a leader's healing places one on it. Until then its links behave like a client's: `f.data.connect()` subscribes, and a SUB for a served view there is answered `moved`, naming a copy (TRANSFORMS N-8).
-  - **An operator over every row on a spare holds what it lacks first** *(this page's reading of TRANSFORMS 3.9's R0: a process that runs a view over every row holds any slot it lacks the way `hold: 'all'` does)*. That covers its root operators and a handler's `ctx.data`, if a root call reaches it. A `connect()` of such a line takes one picture of the whole resource and then every write, as `hold: 'all'` does, for as long as its link lives. A `get()` of it takes one picture, answers, and keeps nothing, as every `get()` does. So the line works on every server, and only its cost depends on the deployment: a download on the sixth server, none on the first five. Health shows the download. Not measured (TRANSFORMS 10 item 10).
-  - **That is why there is no sync lookup of every row, on any role** (V5-16). A sync read cannot wait for that download, so on a spare it would have to throw: the same line would work on five servers and throw on the sixth, and the deployment would decide, not the line. `get()` and `connect()` can wait. So a server, too, reads every row in sync through `f.data.connect()`'s handle.
-- At 80 % of the process's `memory`, health warns and names the fix: end links, or give `hold` a smaller size.
+- **A server holds every row of each group it is a copy of** (V5-6: `data` folds on every copy), as a voter or a standby. A resource has several groups from the first build (V5-18 pick 1). With as many servers as a group has copies, every server holds every group; with more, a server holds the groups placed on it, and may hold only some.
+  - **A server that holds no group of the resource is a spare** *(this page's reading of LAYERS 8.4 and PATHS 4.4)*. It holds no copy until a leader's healing places one on it. Until then its links behave like a client's: `f.data.connect()` subscribes, and a SUB for a served view there is answered `moved`, naming a server that holds it (TRANSFORMS N-8).
+  - **Work over every row on a server that lacks some groups** (V5-20 items 1, 3, 4 and 5; EVERYROW 7; this closes question 28's part on servers that hold some groups). It works on every server, a spare too, and only its cost depends on the deployment:
+    - **once:** root code and a handler's loops over every row read with `scan()`: groups held here in place, the rest by pages, with no download (section 3.13);
+    - **live, a view that merges:** a served view, merged across groups (section 3.10). **Live, code that is a fold:** a `{ fold }` method (section 3.10);
+    - **a sync read of every row, and live code that is not a fold** (`f.data.connect()`, an operator over every row at the root or in `ctx.data`): the line first takes what this server lacks, the way `hold: 'all'` does, bounded by this process's `memory` (below). A `connect()` of such a line keeps it while its link lives; a `get()` of it takes one picture, answers, and keeps nothing, as every `get()` does *(this page's reading of TRANSFORMS 3.9's R0, now bounded by `memory`, not a row count)*. Health shows the download. Not measured (TRANSFORMS 10 item 10).
+  - **That is why there is no sync lookup of every row, on any role** (V5-16). A sync read cannot wait for that download, so on a server that lacks some groups it would have to throw: the same line would work on five servers and throw on the sixth, and the deployment would decide, not the line. `get()` and `connect()` can wait. So a server, too, reads every row in sync through `f.data.connect()`'s handle.
+- **`memory` bounds every sync read of every row** (V5-20 item 3; EVERYROW 6). `hold: 'all'`, a whole-resource `connect()`, and an operator over every row that takes what it lacks all keep every row in this process. No feature has a fixed row ceiling: the bound is this process's `memory`, counted as RSS (the memory the box sees the process use, garbage and all): about 1.4 M small rows a GB, at 698 to 703 B of RSS a small row ([E-65] X1) *(measured)*.
+  - At 80 %, health warns and names the fix: end links, or give `hold` a smaller size.
+  - **A hold that will not fit is refused when it opens**, `not-held`: the open rejects, or the link's `ready` and `closed` do.
+  - **A live hold that passes the line ends `not-held`, and its rows are removed**: its handles' `closed` rejects with the code, and a read of their `value` throws `ended`. It is not kept running with a warning (V5-20's REJECTED).
+  - **Near the line, whole-resource holds end first; then a server refuses writes `read-only`** (section 8). One key, one meaning, one order of actions.
+  - **Why RSS, not the live heap:** the box kills a process on RSS, and RSS ran 2.3 to 2.6 times the live heap (E-65 X1) *(measured)*. Counting the live heap would let a hold be killed before the warning.
+  - **Owed:** the guard by RSS in a seeded run, with two holds and the app's own garbage in one budget, and which hold ends first when several share it (EVERYROW 8 item 2).
+- **Two more limits of a big hold, stated** (EVERYROW 6, limits 2 and 3).
+  - **Every write to the resource is folded on this process's main thread**: about 0.28 M writes a second with no live view on the hold. `data`'s live views set the speed: until `data` 5, a top 10 over 1e6 rows costs 2.5 to 2.6 ms a write and a median 0.15 to 0.19 ms (E-65) *(measured)*. `data` 5's chunked ordered views and quantiles fix that, so every operator keeps working over every row; stores per group inside this process are the measured fallback (V5-20 item 7).
+  - **A full collection of a big hold pauses its process**: about 1 s at 5e6 small rows (E-65) *(measured)*. A process that leads groups may still hold one under its `memory`; health warns once a full collection there passes 0.5 s (V5-20 item 8).
 - `hold: 'asked'` is gone: what it did, hold only what you asked for, is the default, with nothing kept after a `get()` (section 5.5).
 
 **Copies.** `copies: 3` (1, 3 or 5) is how many copies' disks decide a commit; the default is 3 once three servers exist, and 1 until then. With two servers, the second is a full copy that does not vote: two voters would stop writing when either one died *(this page's reading; LAYERS 8.2 step 9 agrees)*. `standbys: 2` adds full copies that do not vote, so more servers read every row locally. Each leader heals its own group: when a copy dies it places a new one on a quieter machine (V5-2; V5-10 fixes 6 to 8). There is no call for it.
@@ -477,8 +491,8 @@ const rows: readonly { stock: number }[] = await shop.data.low(5)
 console.log(sale.left, pong, low.value, first.rows, rows)
 ```
 
-- **A handler is `(arg, ctx) => result`**, as in v4. `ctx.at` is the lens the call was made on (for a root action, the root). `ctx.data` is this server's root lens, where operators run here, functions included (at `depth: 2` the types give the root no operators: a name there is a room, section 3.10); `ctx.set`, `ctx.remove` and `ctx.batch` are the array-form writes. **A handler reads a row once with `get()`** (V5-16; `ctx.rows` went): `await ctx.at.get()` on a path, which runs at the leader, so the read makes no trip; at the root, where `ctx.at` is every row, `await ctx.data[k].get()`. `ctx.peer` and `ctx.claims` say who called. `ctx.signal` aborts when the call ends, so a handler's links end with the call. `ctx.use(other)` gives another resource's handle bound to this call (section 7, "Methods").
-- **Where a method may be called** (V5-12 pick 13; LENS 2.4). A bare function, a `{ view }` and a `{ pages }` are called at the root only: `f.data.ping()`, `f.data.low(5)`. To be called on a path, a method says which kind: `{ at: 'row' | 'partition' | 'any', run }`. **The server refuses any other path with `bad-path`**, and the types offer the method only on lenses of that kind, by its name (`lens.sell(1)`) and through `lens.call('sell', 1)` alike.
+- **A handler is `(arg, ctx) => result`**, as in v4. `ctx.at` is the lens the call was made on (for a root action, the root). `ctx.data` is this server's root lens, where operators run here, functions included (at `depth: 2` the types give the root no operators: a name there is a room, section 3.10); `ctx.set`, `ctx.remove` and `ctx.batch` are the array-form writes. **A handler reads a row once with `get()`** (V5-16; `ctx.rows` went): `await ctx.at.get()` on a path, which runs at the leader, so the read makes no trip; at the root, where `ctx.at` is every row, `await ctx.data[k].get()`. **A handler's loop over every row is `ctx.data.scan()`** (V5-20 item 4): the groups this server holds are read in place, the rest by pages, with no download (section 3.13). `ctx.peer` and `ctx.claims` say who called. `ctx.signal` aborts when the call ends, so a handler's links end with the call. `ctx.use(other)` gives another resource's handle bound to this call (section 7, "Methods").
+- **Where a method may be called** (V5-12 pick 13; LENS 2.4). A bare function, a `{ view }`, a `{ pages }` and a `{ fold }` are called at the root only: `f.data.ping()`, `f.data.low(5)`. To be called on a path, a method says which kind: `{ at: 'row' | 'partition' | 'any', run }`. **The server refuses any other path with `bad-path`**, and the types offer the method only on lenses of that kind, by its name (`lens.sell(1)`) and through `lens.call('sell', 1)` alike.
   - Why: under V4-5 a method is the only door, and a client picks the path. On E-55's first build a method on every lens let a client change a row's shape through the door; on the changed build, 202 of 202 calls on a path the method did not declare were refused, with 0 commits (E-55 review, claim 18).
   - `at: 'partition'` at depth 1 is the row, since each row is its own partition. `at: 'any'` may be called on any lens and at the root: inside one partition it runs at that partition's leader, at the root on any server *(this page's reading of LENS 2.4)*.
 - **Root methods sit on `f.data`** (V5-13 pick 6; READS 4). One rule covers every method: it is called on the lens where it runs, and the root is a lens. A name is a key until it is called: `f.data.low(5)` calls, `f.data.low.get()` reads the row named `low`.
@@ -490,7 +504,7 @@ console.log(sale.left, pong, low.value, first.rows, rows)
 - **It is for speed, never for safety.** A method is not a transaction. Each of its writes is judged at the one leader; the code between them is not locked. So **a check-then-set must be an op, a condition or `set(fn)`** ([E-22] C5, D15). **And a method checks its argument**: a client picks it, as it picks the path (user rule 7).
 - **An action answers after every write it made has committed.** It has no early stage (V5-11 ruling 6). **A throw** answers the caller `threw` with the message; writes made before it stay. A `FeroError` from a write inside reaches the caller as itself.
 - **`{ once: name }`** makes a call run at most once; a retry, from any process, gets the first result. It costs three commits in a row (below). **`{ retry: true }`** stays from v4: "this handler is safe to run twice, so send the call again if its server is lost" (code: api/methods.ts:549-575). Without either option, a call whose server dies answers `unknown` and is not sent again.
-- **A `{ view }` is an address, never a promise** (V5-13 pick 6). `f.data.low(5)` sends nothing: you `get()` it for one picture, or `connect()` it for a live view kept on one copy (section 3.10). A view takes no call options. **A `{ pages }` is one sorted list read a page at a time**: `page(after)` is one read that holds nothing (section 3.10).
+- **A `{ view }` is an address, never a promise** (V5-13 pick 6). `f.data.low(5)` sends nothing: you `get()` it for one picture, or `connect()` it for a live view kept for every equal call (section 3.10). A view takes no call options. **A `{ pages }` is one sorted list read a page at a time**: `page(after)` is one read that holds nothing (section 3.10). **A `{ fold }` is live code over every row** (V5-20 item 5): an address too, read as a served view (section 3.10).
 
 **Typing a client: export the type, not the handle** (LENS 1.3). The server says `export type Shop = typeof shop`; the client says `import type { Shop } from './server.ts'` and `fero<Shop>('shop')`. One type argument types the rows, every method's argument and result, and where each may be called.
 
@@ -550,7 +564,7 @@ catch (e) { console.log((e as FeroError).code, (e as FeroError).hint) }
 console.log(u, again, same, sure, name, v?.version, adult)
 ```
 
-**`get()` reads once, and it is the only way to read once** (V5-13 pick 1; CONNECT 5).
+**`get()` reads once, and it is the only way to read a value once** (V5-13 pick 1; CONNECT 5). Every row once, in pages, is `scan()` (section 3.13; V5-20 item 4).
 - `await lens.get()` is one GET, or no trip where the rows are held on purpose. `{ fresh }` asks the leader. `{ version: true }` gives the value and the row's version. `{ when }` waits until a test passes: it holds the partition while it waits, with its cost on the line. `{ signal }` and `{ timeout }` end a wait.
 - **`get()` is not `connect({ once })`.** Built that way on a client it subscribed the whole partition: 65,671 B and 1,000 rows folded to read one number, against 1 B by a GET (E-56 probe 1) *(checked)*. So `once` on `connect` is refused by the types, and the message names `get()`.
 - **`get({ at })` is refused**: a read as it was loads a snapshot and folds the log, so it has its own word, `past` (section 3.12). **`get(key)` is refused**: the step by a key is `at(key)`, then `get()` (CONNECT I10). In plain JavaScript a first argument that is not an options object is refused `bad-arg` *(reasoned)*.
@@ -569,10 +583,10 @@ console.log(u, again, same, sure, name, v?.version, adult)
 - A step costs 49 to 99 ns with one key read again and again; with keys spread over 1,000,000 rows, 162 to 222 ns, most of it the `Proxy` on a big heap (E-55 claim 1). **`f.at(...keys)`** builds the same lens with no `Proxy`, and with full types: use it for computed keys and in hot loops (−79 to +33 ns over the direct read with keys spread). **A number key becomes its string**: `f.at(1, 'n')` is `f.data[1].n`. Any other key type, and a key `__proto__`, is refused `bad-key` (V5-15 pick 6).
 - **What gets worse** (LENS 2.1). `typeof lens` is `'function'`. `console.log(lens)` prints `Lens(shop.widgets.stock)`. `JSON.stringify` skips a lens, and `structuredClone(lens)` throws.
 
-**To read every row in sync, take `f.data.connect()`'s handle** (V5-16, which drops V5-13 pick 6's `f.rows`). It works on every role: on a server and with `hold: 'all'` it shares the rows already held, with no SUB of its own; on a bare client or a spare it subscribes, and if the link fails, `h.closed` says why.
+**To read every row in sync, take `f.data.connect()`'s handle** (V5-16, which drops V5-13 pick 6's `f.rows`). It works on every role: on a server that holds every group and with `hold: 'all'` it shares the rows already held, with no SUB of its own; on a bare client, a spare, or a server that holds only some groups, it subscribes to what it lacks, under this process's `memory` (V5-20 item 3), and if the link fails, `h.closed` says why.
 - With `h = f.data.connect()`, `h.value.k` is one lookup and returns the frozen row itself, or `undefined` when no such row exists. At depth 2, `h.value.room1?.m7`. A partition held by `connect()` is read the same way (`room.value.m7`).
-- A row you took never changes: it is frozen (DATA-07). A partition's or the whole resource's `h.value` is one live view, always "now" while the link lives.
-- Listing it walks every row; that cost is in plain sight. **Owed: two pins**: `h.value.k` on a row already read within twice a `Map` read; the first read of a row just written, apart.
+- A row you took never changes: it is frozen (DATA-07). **Two reads of an unchanged row give the same object (`===`)**, for `data`'s object rows, as today (V5-21 item 4). A compact source, when `data` 5 builds one (section 9), makes a row on read: there a row is a frozen value, new at each write, and code compares `version`, not identity (V5-21 items 4 and 7). A partition's or the whole resource's `h.value` is one live view, always "now" while the link lives.
+- Listing it walks every row; that cost is in plain sight. **Owed: two pins**: `h.value.k` on a row already read within twice a `Map` read, for `data`'s object rows (a compact source is not bound by it, V5-21 item 4); the first read of a row just written, apart.
 
 **No whole picture per read** (V5-13 pick 6; READS 9 question 5; section 5.6). One row is `h.value[k]`; a copy is a spread you write, `{ ...h.value }`, O(rows) on the line. It closes question 1 of section 11.1. The price: 89 lines in 52 example files read `.snapshot`, that read the old whole picture, and their printed output changes (READS 9) *(checked there)*.
 
@@ -585,7 +599,7 @@ console.log(u, again, same, sure, name, v?.version, adult)
 
 ### 3.10 Reads that stay: `connect`, the log, positions, and where a transform runs
 
-**Four read verbs, one job each** (V5-13 pick 1). `get()` is a value once (3.9). **`connect()` keeps the lens's partition live here** and gives the newest state: a handle, a callback, or a loop. **`changes()` is the log**: every record on the lens's path from a place, then live; it waits for its reader. **`past(pos)` is one partition as it was**: a value (3.12). Live state and the log differ on purpose, and here they differ **by verb**, never by an option (V5-13 pick 3). **Every lens has every read verb, a field included** (V5-15 pick 2): the root has three, since `past` reads one partition.
+**Four read verbs on every lens, one job each** (V5-13 pick 1). `get()` is a value once (3.9). **`connect()` keeps the lens's partition live here** and gives the newest state: a handle, a callback, or a loop. **`changes()` is the log**: every record on the lens's path from a place, then live; it waits for its reader. **`past(pos)` is one partition as it was**: a value (3.12). Live state and the log differ on purpose, and here they differ **by verb**, never by an option (V5-13 pick 3). **Every lens has these read verbs, a field included** (V5-15 pick 2): the root has three of them, since `past` reads one partition, and one of its own, `scan()`, which reads every row once, in pages (section 3.13; V5-20 item 4).
 
 ```ts
 // file: live.ts — connect, the line between server work and local work, and how a link ends
@@ -612,7 +626,7 @@ console.log(best.value, shown.cursor)
 | `lens.connect((value, c) => …)` | the same, plus a call on the picture and once per commit, a microtask after `connect()` returns. Not a loop | as `connect()`, then your function | as `connect()` | as `connect()` |
 | `for await (const [value, c] of lens.connect())` | the newest state each turn, with the diff merged since the last turn; `break` ends the link | as `connect()` | as `connect()` | skips to the newest: 1 to 50 rows waiting with a loop 10 times slower than the writes (E-56 probe 2) |
 | operators right of `connect()`: `room.filter(…)` | a live view on held rows; it ends with its handle | here | nothing new | sees the newest state |
-| `f.data.best(10).connect()` | a view the server named, kept on one copy | on that copy | only the view's own changes | sees the newest state |
+| `f.data.best(10).connect()` | a view the server named, kept for every equal call | on a server that holds its rows; over several groups, a partial per group and the merger | only the view's own changes | sees the newest state |
 | `lens.changes({ from })` | every record on the path, in order, from a place, then live | your loop | every record of the selection | waits; nothing is skipped |
 | `lens.past(pos, { to })` | one partition as it was: a value, walked with `for…of` | here, once | the window's log, once | nothing to fall behind |
 
@@ -689,7 +703,7 @@ console.log(best.value, shown.cursor)
 - **A time is a `Date`, never a bare number**, and it is approximate across partitions: writer time may differ by the members' clock gap, 100 ms early to 300 ms late with 250 ms of skew in [E-21]'s runs. A log entry's `time` is a number; as a position it is `new Date(e.time)`.
 - **No Merkle trees** (V5-13 pick 4). Every partition has one leader and one order, so a position already says what is missing. No Merkle way kept per write came under 0.2 µs, and "rows newer than mine plus tombstones" beat a Merkle walk in all 8 resume cases (E-56 positions) *(measured, checked)*.
 - **Replaying a field from an old place starts with a `past` read of its row** (V5-15 pick 2): the reader needs the field's value at that place before it can tell which later records changed it.
-- **What to save to resume:** a log reader saves `r.cursor`; a live link you want to replay from later saves `h.cursor` or `c.cursor`, then reads `changes({ from })` for every record since, or `past(saved, { to: 'latest' })` for the state at each step; a live link after a restart saves nothing and takes a new picture. "Replay the last 5 with state, then live" is two calls with a seam (`past(-5, { to: 'latest' })`, then `connect()`): a commit that lands between them shows inside the new picture (CONNECT 6, S18). A folded resume, `connect({ resume })`, would close the seam; it is not taken now and is modelled first in E-31's model (V5-13 pick 7).
+- **What to save to resume:** a log reader saves `r.cursor`; a live link you want to replay from later saves `h.cursor` or `c.cursor`, then reads `changes({ from })` for every record since, or `past(saved, { to: 'latest' })` for the state at each step; a live link after a restart saves nothing and takes a new picture. "Replay the last 5 with state, then live" is two calls with a seam (`past(-5, { to: 'latest' })`, then `connect()`): a commit that lands between them shows inside the new picture (CONNECT 6, S18). A folded resume, `connect({ resume })`, would close the seam. [E-60] modelled it in E-31's model: it keeps every property, and after 1 to 100 missed writes it sends 0.01 % to 10 % of a picture *(checked)*. It comes later, when restarted screens matter (V5-20 item 21, after V5-13 pick 7): it needs per-row versions, which are owed anyway, and tombstones kept for a window.
 
 ```ts
 // file: log.ts — the log on any lens, and the positions it takes
@@ -704,17 +718,17 @@ const hour = new Date(Date.now() - 3_600_000)
 for await (const e of chat.data.room1.m7.stars.changes({ from: hour, signal })) console.log(e.value)   // a field: its value, each time it changed
 ```
 
-**The line between server work and local work** (V5-14). **One line, the live verb, decides where a transform runs. Right of `connect()`, any code runs here, on rows held on purpose. Left of it stands plain data only, which a copy may run inside one partition later.** Over every row a client gets only a view the server names, or `{ pages }`. Across partitions there is no merger: a process that runs a view over every row keeps one store fed by slot. `derive` keeps a resource equal to a view (3.11); `lookup` is the one join; the log is read in the app's own loop; the past is read here (3.12).
+**The line between server work and local work** (V5-14). **One line, the live verb, decides where a transform runs. Right of `connect()`, any code runs here, on rows held on purpose. Left of it stands plain data only, which a copy may run inside one partition later.** Over every row a client gets only a view the server names (a `{ view }` or a `{ fold }`), `{ pages }`, or `scan()`. **Across groups, a served view whose operators merge is merged**: one partial per group, added up by key at one cut by the merger (V5-20 item 1; [MERGE.md](MERGE.md)). A process that keeps every row itself (`hold: 'all'`, a whole-resource `connect()`, an operator over every row on a server) keeps one store, under its `memory` (section 3.3; V5-20 item 3). `derive` keeps a resource equal to a view (3.11); `lookup` is the one join; the log is read in the app's own loop; the past is read here (3.12).
 
 | Class | Example | Where it runs | Guard |
 |---|---|---|---|
 | **A. a partition, then your code** | `chat.data.room1.connect().filter(fn)` | the partition crosses whole; the chain runs here | `rules.read`, once per subscription |
 | **B. plain data inside one partition** | `chat.data.room1.gt('stars', 0).za('stars', 10).connect()` | **first build: as A.** Later a copy may run the chain and send only the answer (V5-12 pick 2) | bounded by the partition; past `views.shapes` (a guess), served as class A with the same answer |
-| **C. a view over every row, named by the server** | `fans.data.best(10).connect()` | on one copy, never the leader | the door says which views; a cap says how many |
+| **C. a view over every row, named by the server** | `fans.data.best(10).connect()` | on a server that holds its rows, preferring one that leads no group of the resource; over several groups, a partial per group and the merger | the door says which views; a cap says how many |
 
 - **A function left of `connect()` does not compile**, and untyped code is refused `unencodable`: code cannot travel. So do `limit` and `reverse` left of it (write `za(field, n)`), `byFn`, and `lookup`. Each type error names the fix.
-- **An operator over every row, on a bare client, is refused by the types**, and at run time `not-held`; the message names a view the server named. On a server, with `hold: 'all'`, and in a handler's `ctx.data`, the root's operators run here, over this process's one store, functions included. On a spare server, which holds no copy yet, such a `get()` or `connect()` first takes every row, the way `hold: 'all'` does (a `get()` for its one read, a `connect()` while its link lives), and then runs here (section 3.3; *this page's reading of TRANSFORMS R0*).
-- **At `depth: 2` the types give the root no operators, on any role** (*this page's reading*; question 28). A name on that root is a room, so `f.data.za` is the room named `za`, and `f.data.connect()` gives a handle with no operators. Over every row at depth 2, a server declares a view, whose `ctx` is typed over rows; any process with `f.data.connect()` reads its value, rooms of rows, with its own code. A room lens keeps its plain-data operators (`chat.data.room1.za('stars', 10)`). CONNECT's and TRANSFORMS' sketches have the same gap.
+- **An operator over every row, on a bare client, is refused by the types**, and at run time `not-held`; the message names a view the server named. On a server, with `hold: 'all'`, and in a handler's `ctx.data`, the root's operators run here, over this process's one store, functions included. On a server that lacks some of the resource's groups, a spare among them, such a `get()` or `connect()` first takes what it lacks, the way `hold: 'all'` does (a `get()` for its one read, a `connect()` while its link lives), under this process's `memory`, and then runs here (section 3.3; V5-20 item 3; *this page's reading of TRANSFORMS R0*). For one pass over every row with no download, use `scan()` (section 3.13).
+- **At `depth: 2` the types give the root no operators, on any role** (*this page's reading*; question 28, whose other part V5-20 closed, leaves this one as it was). A name on that root is a room, so `f.data.za` is the room named `za`, and `f.data.connect()` gives a handle with no operators. Over every row at depth 2, a server declares a view, whose `ctx` is typed over rows; any process with `f.data.connect()` reads its value, rooms of rows, with its own code. A room lens keeps its plain-data operators (`chat.data.room1.za('stars', 10)`). CONNECT's and TRANSFORMS' sketches have the same gap.
 - **Class B is the same answer, not cheaper CPU.** It buys bytes: a shape costs the copy 1.2 to 3.2 µs a change, about what the client pays in class A (1.3 to 5.0 µs), and the wire carries 0.1 to 28 B a change against 108 to 113 B (E-57 A7) *(measured)*. It equalled the chain run here in 79,209 checks through disconnects, resumes and the fallback to class A *(checked)*. It waits for the `view` selector in E-31's model and the order channel on the wire.
 
 **The merge contract** (V5-14 pick 6; TRANSFORMS 2, 9). data 5's merge contract makes every view a function of its rows only, not of the order they came in:
@@ -742,6 +756,7 @@ const fans = await fero.of<Fan>()('fans', { views: { client: 16, max: 64, rows: 
   mine: { view: (user: string, ctx) => ctx.data.eq('name', user).length(),                   // per user: the user is the argument
           allow: (user: string, claims) => claims?.sub === user },                          // checked on every SUB, with the caller
   ranked: { pages: (_: null, ctx) => ctx.data.za('points'), size: 20 },                      // one sorted list, read in pages
+  tiers: { fold: { emit: (f) => [[f.points >= 100 ? 'gold' : 'plain', f.points]], combine: 'sum' } },   // live code: a piece per group
 } })
 export type Fans = typeof fans
 const orders = await fero.of<Order, 2>()('orders', { depth: 2, methods: {          // a user is a partition, an order a row
@@ -761,31 +776,45 @@ const fans = await fero<Fans>('fans'), orders = await fero<Orders>('orders'), pr
 const top = fans.data.best(10).connect((rows, c) => draw(rows, c.order))   // a window: an array in rank order, with rank changes
 const teams = fans.data.byTeam(null).connect()                              // buckets: a Map from team to number
 const total = await fans.data.total(null).get()                             // one value, read once
+const tiers = fans.data.tiers().connect()                                   // a fold: a Map from bucket to sum, merged from each group
 await fans.data.best(10).connect().sync()                                   // after my own write: wait until the view has it
-const p1 = await fans.data.ranked(null).page()                              // pages: one shared index on one copy
+const p1 = await fans.data.ranked(null).page()                              // pages: an index per group, all asked in one round
 const p2 = p1.next && await fans.data.ranked(null).page(p1.next)            // the next page after a cursor
 orders.data.ada.connect().lookup(products.data, 'sku').connect((rows) => {   // the one join, right of connect()
   for (const k in rows) { const j = rows[k]; if (j?.other) draw(j.row.cents, j.other.price) }   // undefined: loading; null: none
 })
-await teams.ready
-console.log(top.cursor, teams.value.get('red'), total, p2)
+await teams.ready; await tiers.ready
+console.log(top.cursor, teams.value.get('red'), tiers.value.get('gold'), total, p2)
 ```
 
 - **Declared `{ view: (arg, ctx) => … }`, an address you `get` or `connect`.** The server's author decides what work every write may carry; a client picks only the argument. A view must be:
-  - **bounded**: a window, one value, or buckets. A view of unbounded rows, of `group`, of `limit` over unordered rows, or of a page after a cursor does not compile, and each error names the fix. Buckets cannot be bounded by a type, so `views.rows` (1,000, a guess) is checked on every commit; past it the view ends `view-too-big`, which stays until the method's code changes (E-57 A5, XA-12);
+  - **bounded**: a window, one value, or buckets. A view of unbounded rows, of `group`, of `limit` over unordered rows, or of a page after a cursor does not compile, and each error names the fix. Buckets cannot be bounded by a type, so `views.rows` (1,000, a guess) is checked on every commit; past it **the served instance a client follows ends `view-too-big`**. After a reload or a failover the view may be built again, and if it fits, it is served (V5-20 item 20; [E-60] found the old wording, "stays until the method's code changes", cannot hold: a copy that reloads before it folds the too-big commit never meets it). An ended instance never serves again, so the build does not loop (E-57 A5, XA-12);
   - **blind to the caller**: one view serves every equal call, so its `ctx` has the rows only, no claims. A per-user view takes the user as its argument, and `allow(arg, claims)` checks it with the caller on every SUB (E-57 A4: 3,188 denials, 0 frames to them) *(checked)*;
   - **a function of its argument and the rows**: no clock, no random number, no module state. A view with a `Date.now()` threshold gave another answer after a failover in 822 of 1,000 seeds (E-57 XA-8) *(checked)*. The types cannot see this; it is a user rule;
   - **of one resource**: `lookup` inside a view does not compile, since its positions cover one resource. A handler may join, once.
-- **Placement** (V5-14 pick 3). **Each served view lives on one copy, chosen by a hash over every copy but the leader.** A SUB at another copy gets `moved`, naming the right one. The leader, which takes the writes, never builds a view while another copy can serve it. **A group whose only copy is the leader**, as with one server process or while a group grows from one voter (section 3.3), **has the leader serve its views until a second copy is ready, and health says so** (V5-17). Meanwhile a build stalls the write path *(reasoned; not run)*. Serving from standbys first refused a held view in 377 of 1,000 seeds with one standby; with every copy but the leader serving, 5 and 6 of 1,000 (E-57 xa2s2x, xa2sbx) *(checked)*. The price: a new leader hands its views on, 1,796 to 3,271 hand-offs per 1,000 seeds with standbys.
+- **Placement** (V5-14 pick 3, changed by V5-20 item 13). **A served view lives on a server that holds its rows, chosen by a hash, preferring one that leads no group of its resource.** Over several groups that is one partial per group, each on a copy of its group, and the merger on one server (MERGE 5.2). A SUB at another server gets `moved`, naming the right one. Once a resource has several groups its leaders spread over the servers, so a view may have to live on a server that leads a group; keeping served views only on servers that lead nothing was rejected (V5-20). **A group whose only copy is the leader**, as with one server process or while a group grows from one voter (section 3.3), **has the leader serve its views until a second copy is ready, and health says so** (V5-17). Either way, until `data` builds views in slices, a build there can stall that leader's writes *(reasoned; not run)*. Serving from standbys first refused a held view in 377 of 1,000 seeds with one standby; with every copy but the leader serving, 5 and 6 of 1,000 (E-57 xa2s2x, xa2sbx) *(checked)*. The price: a new leader hands its views on, 1,796 to 3,271 hand-offs per 1,000 seeds with standbys.
 - **The cap** (V5-14 pick 2). **At most 64 served views per copy (`views.max`), weighted by cost**: each entry counts by data 5's cost class for its call, O(1), O(log n) or O(n) a change, so the cap bounds cost, not only count (E-57 XA-9, on guessed classes) *(checked)*. Lingering entries count; a `{ pages }` index counts as an ordered view. **A client holds at most `views.client` (16) per copy.** **Headroom:** with k serving copies, k of 2 or more, `views.max / k` is kept free on each for clients that held a view on a copy that died; **with one serving copy, none**, since its failover goes to copies that hold no views. So k copies admit about (k − 1) × `views.max` fresh views. Past a cap the SUB is refused `too-many-views`. This replaces the 2026-11-18 page's 1,000 per resource.
   - **Why so few.** Every live served view sees every write to its resource. At PERF-09's 50,000 writes a second one core has 20 µs a write, about 18 µs of it left for views. A bucket or sum view costs 1.8 to 4.9 µs a change with its frame, so about 3 to 10 fit; a leaderboard costs 5.7 to 6.7 µs at 1,000 rows, 12.2 to 15.7 at 5,000, 17.4 to 20.6 at 10,000 and 134 to 155 at 100,000 (E-57 A1 and pagecost) *(measured)*. Class C is for **a few shared views per resource**, not a query per user.
   - **What headroom does not cover.** A client that held a view was still refused after failures, in 1 to 21 of 1,000 seeds by configuration (TRANSFORMS 3.8: E-57 XA-2 and its reruns; V5-14's consequences quote 5 to 21, its standby and leader-kill runs) *(checked)*. It is one of V5-14's three missed bars. A failover may refuse a held view, rarely, while copies come and go.
 - **The row guards** (V5-14 pick 1). **Until data 5's ordered index (D8c), an ordered `{ view }` over more than 5,000 rows and a `{ pages }` over more than 2,000 are refused when built** (`view-too-big`). The numbers are guesses at the edge of the budget. D8c's chunked index costs 3.0 to 4.6 µs a write at 10^5 rows and 9.5 to 15.1 at 10^6, still above its guessed 3 µs (V5-14's missed bar XB-1) *(measured)*.
-- **Builds.** A copy builds one view at a time per resource; a `get()` with no live entry builds like a SUB, counted and paced. Today a build over 10^6 rows stalls its copy for 0.49 to 1.9 s in one piece, 0.21 to 0.24 s sliced, until data builds every view in slices (V5-14's missed bar XA-1) *(measured)*. Off the leader, a stall slows that copy's fold, never the writers.
+- **Builds.** A copy builds one view at a time per resource; a `get()` with no live entry builds like a SUB, counted and paced. Today a build over 10^6 rows stalls its copy for 0.49 to 1.9 s in one piece, 0.21 to 0.24 s sliced, until data builds every view in slices (V5-14's missed bar XA-1) *(measured)*. On a server that leads no group of the resource, a stall slows that copy's fold, never the writers; on one that leads a group, it stalls that leader's writes too, until then (V5-20 item 13).
 - **What a client gets.** A window is an array in rank order, and each commit carries `c.order`; operators right of a served ordered view keep its order. A served scalar is a number. A new picture, after a failover, a ring miss or a redeploy, arrives as one commit of differences with one call (E-57 XA-4). A resume within the entry's ring of recent frames sends only the frames missed. **`sync()`** on a held view resolves once the view has passed every write this process saw resolve: read-your-writes for a served view (E-57 XA-13: 1,965 answers, 0 early) *(checked)*. A method's version (`version` beside `view`, else the deploy's build id) is part of its entries' key: a new version ends old entries `redeployed`, and a client never shows an older version than it has seen; an older typed client gets `stale-client`.
-- **On the wire.** A SUB's `view` selector carries `{ method, arg }`, with the client's `seen` and the method's version. **Owed:** the `view` selector in E-31's model (V5-14's consequences).
+- **A view over several groups** (V5-20 items 1, 2 and 12; V5-22). The client sees the view's answer at one cut: never back, and no commit shown in part. When a group's partial moves to another copy in the middle of a slot move, its new picture names every slot-move half it passed, and the merger installs it with each half's partner at one cut, so no row shows twice or goes missing ([E-67]: 0 of 1,000 seeds failed in each of four worlds, 2,066,979 checks; V5-22 item 1) *(checked)*. It costs one more hop than a view on one copy: 20 µs p50 on one box (MERGE 3.2) *(measured)*.
+  - **At a slot move** the two groups' part waits about one move window (V5-20 item 12). If that wait proves too long, keys by blocks of slots, or a part for the moving slot, are the fallbacks; the timed window chooses, and neither is in the first build (V5-22 item 5).
+  - **A group that cannot be reached:** the view keeps serving, with that group's part frozen at its last place, and health names the group; a one-time read that must see past that place waits (V5-20 item 2, which changes V5-18 pick 5 for live merged views). **A group whose next slot-move half needs a half from the down group waits too**, frozen at the same exact cut, and health names the down group and each group it holds. The wait ends when a copy of the down group hosts its partial again. Such a pair is never given up: in E-67 giving it up failed 81 to 611 of 1,000 seeds (V5-22 item 3) *(checked)*.
+  - **The gap through a merger rebuild is stated, not closed** (V5-22 item 4). The frozen part lives in the merger's memory. A merger rebuilt while a group is down has no part for that group, so it serves nothing new until the group is back: the view stays at the old merger's last frame, one exact cut for every group, and health says why. A client that subscribes during the gap gets nothing until then. So "keeps serving" holds while the merger that holds the frozen part lives. In E-67 that gap was 40 to 65 sim steps on average, against 4.8 to 35 with every group up *(counted)*. A standby merger is studied later.
+  - **A median over every row is exact** (V5-20 item 6): for `ctx.data.median(field)` the merger keeps a sorted column of that one field, one part per group, about 12.8 B a value at 1e7 values, within its server's `memory` (E-65) *(measured)*. Histograms per group, which keep no values, come later.
+- **On the wire.** A SUB's `view` selector carries `{ method, arg }`, with the client's `seen` and the method's version. [E-60] model-checked it in E-31's model: every property holds through a failover, a reload, a slot move, a slow reader and a resume by a new picture, all but the old wording of END `view-too-big`, which V5-20 item 20 restates (above) *(checked)*.
 
-**Pages** (V5-14 pick 4). **`{ pages: (arg, ctx) => ctx.data.za(field), size }` is a third kind of method**: one sorted list, read a page at a time. The copy keeps one shared index for it; `page(after)` is one read of the next `size` rows after the cursor, 10 to 16 µs and 32 B on the copy, and it holds nothing (E-57 XA-7) *(measured)*. The plan of one served view per cursor cost 0.7 to 8.3 MB a page and was refused by the 17th page. **The index is not free**: it is an ordered view of every row with no window, kept on every write while it lives: 8.3 to 9.1 µs a write at 1,000 rows, 29 to 33 at 10,000, 509 to 525 at 100,000 on today's data (E-57 pagecost) *(measured)*. Pages are exact within one cut; across fetches a row is shown once if its sort value did not change between them (E-57 XB-7). At depth 2 a cursor names (partition, row). **Owed:** paging across a failover (V5-14's consequences).
+**Pages** (V5-14 pick 4). **`{ pages: (arg, ctx) => ctx.data.za(field), size }` is a third kind of method**: one sorted list, read a page at a time. The copy keeps one shared index for it; `page(after)` is one read of the next `size` rows after the cursor, 10 to 16 µs and 32 B on the copy, and it holds nothing (E-57 XA-7) *(measured)*. The plan of one served view per cursor cost 0.7 to 8.3 MB a page and was refused by the 17th page. **The index is not free**: it is an ordered view of every row with no window, kept on every write while it lives: 8.3 to 9.1 µs a write at 1,000 rows, 29 to 33 at 10,000, 509 to 525 at 100,000 on today's data (E-57 pagecost) *(measured)*. Pages are exact within one cut; across fetches a row is shown once if its sort value did not change between them (E-57 XB-7). At depth 2 a cursor names (partition, row). **Over several groups, each group keeps its own index, on its partial's server, and a page asks every group in one round** (V5-20 item 11): each sends its next `size` entries, and the asker keeps the first `size`. At 256 groups that is about 5,000 entries and 1.2 to 2.6 ms of work a page, about 400 to 860 pages a second for one asking process (MERGE 5.4 item 5) *(measured and arithmetic)*. A two-round form comes once a pinned read exists. **Owed:** paging across a failover (V5-14's consequences).
+
+**Folds** (V5-20 item 5; [E-65] X3). **`{ fold: { emit, combine } }` is a fourth kind of method: live code over every row, kept as one piece per group.** `emit(row, key)` gives the row's (bucket, value) pairs; `combine` is one of fero's own: `'sum'`, `'count'`, `'min'`, `'max'`, `'distinct'` or `{ top: k }`. Each group's partial folds its own rows on a copy of that group, and the merger adds the pieces by bucket at one cut. A client reads it as a served view, with no argument: a `Map` from bucket to value (*this page's spelling; V5-20 names the combines, not the words*).
+- **No row ceiling.** Each copy works on its own group's rows, and the merger keeps a small piece per group and bucket. In E-65: 0 wrong in 1,375,885 checks over 3,502 seeds, through slot moves, resyncs, outages and deploys *(checked)*.
+- **`emit` is the server author's code**: it runs where it is declared and never travels. Like a view, it depends on its row only (section 7).
+- **A merger audit** now and then rebuilds the answer from fresh pieces of every group at one cut, and compares. fero's own run-time checks missed the merger's planted bugs in E-65; only the test oracle saw them (V5-20 item 5). **Owed:** the audit.
+- **Combines the author writes** (sketches, custom pieces) come later, behind a self-check at build, which named the broken law in 300 of 300 seeds for each of nine mistakes in E-65, and the audit (V5-20 item 5).
+- **Cost.** On a group's copy, 0.73 to 4.47 µs a write of its own group for `sum`, `count` and `distinct`, 5.7 to 19.6 µs for `max` and `top`; at the merger, 18,000 to 26,000 writes a second for `max` or `top` at 256 groups, one write a frame (E-65 X3) *(measured)*. It counts against `views.max` and `views.client` as a served view does *(this page's reading)*.
+- **Its buckets have a stated limit** (V5-20 item 10), as `derive`'s view form's do: about 1.6e5 buckets at 16 groups, 1e4 at 256, since the merger keeps each group's piece of every bucket, about 2.5 million (bucket, group) pairs in a GB (MERGE 5.4 item 3). Past it, write the answer with `derive`'s record form (3.11). O4, shards by output key, comes next, beside the merger.
 
 **`lookup`: the one join** (TRANSFORMS 6). `left.lookup(other.data, field)` gives, for each row of the left view, the row of `other` whose key is `row[field]`, as a frozen `{ row, other }`, kept live when either side changes. **`other` is `undefined` while that key's first picture is on its way, `null` when there is no such row, else the row.** fero opens one link per distinct key the left rows name, counted, lingered and ended with the view, so those rows are held on purpose: a new key costs one trip, from the one line the user wrote. There is **no common cut**: `other` may lag behind the left side by as much as its link lags. It runs right of `connect()` or in a handler; never left of the line, never inside a `{ view }`. 537,670 checks, 0 unequal (E-57 B4); 2.9 to 3.9 µs a left change, 161 B a left row *(measured)*. Many to many, a join on a field that is not the other's key, and a join at a common cut are not supported (TRANSFORMS 6.2).
 
@@ -808,7 +837,7 @@ There are three steps, and each costs more and lasts longer.
 | Step | Code | Where it lives | Cost |
 |---|---|---|---|
 | a view | `orders.data.ada.connect().filter(fn)`, right of `connect()` | in this process, while its handle lives | the fold: about 1 µs per change for a filter ([E-05]) |
-| a served view | a `{ view }` clients `connect` | on one copy, while a client holds it | its work on every write, once for all equal calls |
+| a served view | a `{ view }` or a `{ fold }` clients `connect` | on servers that hold its rows (over several groups, a partial per group and the merger), while a client holds it | its work on every write, once for all equal calls |
 | a derived resource | `derive(view, target)` or `derive(source, target, fn)` | in its own log and copies, for good | a share of one commit per change |
 
 ```ts
@@ -848,23 +877,30 @@ await lock('derive:spent', async () => {
   5. Follow the source: one fenced write per changed bucket per commit.
   - As first planned (a lock, fenced writes, a full difference) it failed 514 of 1,000 seeds: the target was wrong at idle in 28 and handed back to older code in 452. With the bump, the barrier and the code version: 0 of 1,000, through 11,810 deriver changes and 7,475 starts after the source's log was cut (E-57 B3, XB-8 to XB-10) *(checked)*.
   - Only the deriver writes the target; any other write is refused `derived`. Two buckets with one name at run time (`1` and `'1'`) stop the deriver with `bucket-collision`, named in health *(reasoned; not run)*.
+  - **Over several groups the deriver follows the merged view**: it holds the buckets, never the source rows (MERGE 5.2). **Its buckets have a stated limit** (V5-20 item 10): about 1.6e5 at 16 groups, 1e4 at 256, since it keeps each group's sum for every bucket, about 2.5 million (bucket, group) pairs in a GB (MERGE 5.4 item 3; the GB is a guess). Past it, use the record form with rows (below), exact for whole-number amounts; O4, shards by output key, comes next, beside the merger.
   - **Its log is a log of states**: each restart's difference is in it. A consumer that counts records there miscounts; events go through the record form.
 - **The record form, `derive(source, target, fn)`**: `fn` runs once per source record and writes with `{ from: e }`. Marks make it exact across restarts; it needs the source's `history`. **It sees the record, not the row**: `e.value` is set only for a whole-row write, so a filter on row content in `fn` is exact only for a source written by whole rows. A dev warning names the line when `fn` reads `e.value` on a field record (V5-15 pick 4). In E-58's mix a filter on the record alone left the final set wrong in 582 and 584 of 1,000 seeds (part 4) *(checked)*.
 - **The record form with rows, `derive(source, target, (e, { row, prev }) => …, { rows: true })`**, is in the first build (V5-15 pick 4, superseding V5-14 pick 8). The deriver folds its share of the source, so `fn` also gets the row after the record and the row before it: a field write counts too. It costs one fold per record (0.63 to 1.5 µs at 10^3 to 10^5 rows, E-57 A1) and about 330 B a row of its share ([E-05]) *(measured)*; on a restart it opens the source's past at its mark and folds forward. **Owed:** a build of it (V5-15's consequences).
 
-**Use `derive()` and `consumer().run()` first** (V5-12). They are libraries over public calls, and nothing in them is a primitive (LENS 2.8). They **pace the loop** (item 1 below); they **run it once**: a **share** is a part of the source's partitions that one runner owns at a time, `#groups` keeps who owns which, and the derivers that share a name split the source's shares; and **`derive()` sends bare marks** for output slots that get no output for a while. `consumer().run()` restarts from its share's own cursor and needs no bare marks (V5-17).
+**Use `derive()` and `consumer().run()` first** (V5-12). They are libraries over public calls, and nothing in them is a primitive (LENS 2.8). They **pace the loop** (item 1 below); they **run it once**: a **share** is a part of the source's partitions that one runner owns at a time, `#groups` keeps who owns which, and the derivers that share a name split the source's shares; and **`derive()` sends bare marks** for output slots that get no output for a while. **Both await `fn`** before the next record (V5-20 item 18). `consumer().run()` restarts from its share's own cursor and needs no bare marks (V5-17). That cursor passes a record only once `fn` has returned for it and its writes are answered, moves only up, and its writes carry the share's token, so a cursor write from an owner that lost the share is fenced (V5-20 item 18, and E-61's pick, taken with it).
 
-**The mark is a write option: `{ from: e }`** (V5-12 pick 7). The write and "source record `e` is applied" land in one log entry of the target. The leader skips a marked write at or below its stored mark and answers it as done. `target.marks(name)` reads the marks back as a cursor for `changes({ from })`. A mark is 29 B in the target's own log, so a restart resumes exactly, and no source record counts twice ([E-30]).
+**The mark is a write option: `{ from: e }`** (V5-12 pick 7). The write and "source record `e` is applied" land in one log entry of the target. The leader skips a marked write at or below its stored mark, never judges it again, and **answers it `skipped`**: handled before, never `applied` (V5-20 item 17). Its answer carries `skipped: true`. `target.marks(name)` reads the marks back as a cursor for `changes({ from })`. A mark is 29 B in the target's own log, so a restart resumes exactly, and no source record counts twice ([E-30]).
 - **The mark carries the write's number within its record**, and a record's outputs to one slot go out in that order. E-30's model, widened to two outputs of one record in one slot, holds on all 12 bounds; without the number, or without the order, an output is lost (E-57 B5) *(checked)*. Packed into one number the mark stays 29 B; a record whose `fn` writes more than 256 outputs to one slot is refused `too-many-outputs` (TRANSFORMS 3.4). This closes question 21's case of several outputs.
 - **Which name a mark goes under** (V5-17): marks are kept per reader name; `target.marks(name)` gives a cursor that carries the name, and `{ from: e }` marks under it, else under the target's own name.
+- **Which slots the marks cover** (V5-20 item 19). A deriver joins each output slot in `#groups` before its first write there: one commit, once per reader name, source slot and output slot. `target.marks(name)` reads only the slots joined under that name, and bare marks, `derive()`'s and `target.mark(e)`'s, go only to them. Reading only the slots that hold a mark loses records, and marks on every slot would send up to 4,095 bare marks a round for a deriver that writes one slot (E-61) *(checked)*.
+- **A refused marked write** (V5-20 item 16). **Refused on the row** (a condition about the row, a shape check), it raises the mark and is final: a copy sent again after a restart is skipped. **Refused `fenced` or `forbidden`** (about the writer, not the row), it leaves no mark, so the right writer's copy of it still lands. A refusal keeps issue order, as an apply does (E-61). A refused marked write that nobody awaits prints one line, once, and the loop goes on (E-61's pick, taken with V5-20).
 - **A marked write takes no `once` name** (V5-17). `if` and `ttl` are allowed. A mark goes on a plain write, an op or a remove; `set(fn)`, `batch` and a room write take none.
 
 **The four lines are exact only with two more things** (LENS 1.7).
 1. **fero paces the loop.** A marked write is never refused `backpressure`: it waits, and the `changes()` reader its `e` came from stops yielding while this client holds 512 waiting writes or 64 MB. Unpaced, E-55's stand-in lost outputs in 998 of 1,000 seeds; paced, 0 lost and 0 doubled (E-55 review, claim 21).
 2. **It runs in one process.** With `server: true`, every server process of the target that runs the four lines derives: the marks keep the result right, but the work is done N times. Take a lock (P-10), or use `derive()`, which splits the work.
 
+**And the app's code keeps two rules**, in any loop that writes marks (V5-20 item 18, and E-61's pick to put them in the docs). The types cannot check them; a dev check that runs `fn` twice on one record and compares the writes comes later.
+1. **For one record, make the same writes in the same order on every run.** A condition read from outside `e`, such as a version taken from the target, makes a run again a different write (E-61: HANDLED in 9 steps).
+2. **Make every write before `fn`'s promise settles.** No write left in a promise `fn` does not return. `derive()` and `run()` wait for `fn` to settle before the next record; without that wait, an async `fn` lost records in 327 to 485 of 1,000 seeded runs (E-61) *(checked)*, and a write `fn` leaves for later escapes the wait the same way *(reasoned)*.
+
 - **Not awaiting is the point.** Marked writes not awaited ran at 122,000 to 134,000 a second, against 239 to 240 awaited one by one (E-55 claim 21).
-- **The source needs `history`** for the record form, and the default keeps none (section 9), so the source's server opens it with one, as above. Past it, the deriver stops with `expired` rather than skip a record (LAYERS 8.8).
+- **The source needs `history`** for the record form, and the default keeps none (section 9), so the source's server opens it with one, as above. Past it, the deriver stops with `expired` rather than skip a record (LAYERS 8.8). Before it stops, it reads its marks again and goes on from them if they are past the log's floor, so a share move and a cut do not stop a reader that lost nothing (E-61's pick, taken with V5-20).
 - There is no transaction across the two. The target trails the source by about one commit. On the project's one timeline, a derived record is placed after its source (V5-4).
 
 **Is fero exactly once?** (LENS 1.2.) **Yes, for writes into fero, in three layers, each with a limit: a resend counts once inside one session; a `once` name counts once for a day; a mark counts once per source record while the source keeps its log and the loop is paced and runs in one process. Like Kafka, not for an email or a payment made inside your code.**
@@ -873,14 +909,14 @@ await lock('derive:spent', async () => {
 |---|---|---|---|---|
 | **sessions**, always on | a resent write | the session's life; a pause over `session.ms` answers `unknown` | 309 B a client; 13 rules, model-checked ([E-20]) | the idempotent producer |
 | **`once` names** | a write or call the app names, across processes and restarts | 1 day | about 221 B a name (section 3.4) | nothing direct |
-| **marks** (`{ from: e }`) | read from a source, write an output | while the source keeps its log back to the mark | 29 B a mark; 5 rules, model-checked ([E-30]); 1 more for pacing | transactions with `sendOffsetsToTransaction` |
+| **marks** (`{ from: e }`) | read from a source, write an output | while the source keeps its log back to the mark | 29 B a mark; 25 rules with marks written by app code, 23 shown needed ([E-61]; [E-30] had 5); 1 more for pacing | transactions with `sendOffsetsToTransaction` |
 
 - **Weaker than Kafka:** no atomic write across partitions that readers cannot see half of ([E-24]; V5-1 gave this up knowingly). **Simpler:** the mark needs no coordinator and no two-phase commit ([E-30]).
-- **Still owed:** E-30's model with `{ from: e }` written by app code, and the pacing rule in a real client.
+- **Model-checked since 2026-11-23:** [E-61] ran E-30's model with `{ from: e }` written by app code and not awaited, bare marks, refusals, an async `fn`, lost log tails, share and slot moves and a cut source log: each source record changed the target exactly once on 42 bounds and in 4,000 seeded runs (V5-20 items 16 to 19) *(checked)*. **Still owed:** the pacing rule in a real client.
 
 ### 3.12 Looking back: `past`
 
-`past(pos)` is one partition as it was: a value, folded here once, with nothing to end (V5-13 pick 1; section 5.6). It is in the first build, with the other three read verbs (V5-17).
+`past(pos)` is one partition as it was: a value, folded here once, with nothing to end (V5-13 pick 1; section 5.6). It is in the first build, with the other read verbs (V5-17).
 
 ```ts
 // file: past.ts — one partition as it was: a value, folded here once
@@ -908,6 +944,31 @@ console.log(old.value)
 - **Why not on the write path** (E-54, at 10^5 and 10^6 rows). A hash-tree root kept per write adds 3.3 to 5.7 µs to a 0.79 to 1.4 µs fold; a prior value in the log would add 80 to 150 % to a record's bytes. No version structure in data, and no prior value in the log (V5-12 pick 8, kept by V5-13).
 - **An undo** takes `prev` and `version` from a diff entry and writes `set(prev, { if: { version } })`, so a write that came in between is not overwritten (CONNECT 6, S11).
 - **Owed:** `past` as a value in a real build (V5-13's consequences).
+
+### 3.13 Every row once: `scan()`
+
+`f.data.scan()` reads every row of the resource once, in pages, from one copy of each group, and keeps nothing (V5-20 item 4; [E-65] X2). It is the fifth read verb, and the root's alone. **One-time work over every row is a scan**, on a client and on a server alike: a read of every row, `migrate`, `export`, and root code or a handler's loop over `ctx.data` that runs once. There is no row ceiling.
+
+```ts
+// file: scan.ts — every row once, in pages, at one cut; nothing is kept
+import { fero } from 'fero'
+type Order = { user: string; cents: number }
+const orders = await fero<Order>('orders')                               // a client: it holds nothing, and a scan keeps nothing
+let cents = 0
+for await (const [, order] of orders.data.scan()) cents += order.cents   // every row once, at one cut: no commit shown in part
+for await (const [key, order, user] of orders.data.scan({ cut: false, signal }))   // no cut: each row once; a commit may show in part
+  if (order.cents > 10_000) console.log(key, user)
+console.log(cents)
+```
+
+- **What it promises.** Every row once, **at one cut by default**: each group is pinned at one place, so no commit shows in part, at any number of rows. **`cut: false`** opts out: a row that existed for the whole scan comes exactly once, any other at most once, and a commit of several rows may show in part. In E-65, 0 failed in 14,100 seeds, and at one cut 0 of 1,119,674 commits over several slots were torn *(checked)*.
+- **Each entry** is `[key, row, partition]`: the row's key, the row, and its partition (its room at depth 2, the row's own key at depth 1).
+- **This process's memory stays flat**: at most two pages a group asked for or unread, whatever the resource's size, and a slow loop stops the asking. Through 1e7 rows the asker's heap peaked at 7 to 59 MB *(measured, E-65 X2)*.
+- **Its limit is time**: about 0.8 M whole rows a second at one asker, 16 to 20 M a second for one number field (1e7 rows over 16 groups, over TCP). On a server, the groups held there are read in place, about 9 to 10 M rows a second, and the rest by pages, with no download *(measured, E-65 X2)*.
+- **What it costs the servers.** One cut keeps a before-image of a pinned row the first time it changes, on every copy, until the scan has passed the row: 127 B each, up to about 70 MB a copy for a 625,000-row group under steady writes *(measured and counted, E-65 X2)*. Those bytes count against the server's `memory`, whose line refuses writes. So a copy keeps an image budget, and past it the scan ends `scan-lost`, never the writes. **Owed:** the budget, `scan-lost` and the scan's lease (V5-20's consequences).
+- **While a group is down**, the scan waits for it and health names the group: a read over every row never guesses (V5-18 pick 5).
+- **It is not a link, and not live.** It ends at `break`, its `signal`, or its last row; nothing lingers, and `f.cluster.value.links` lists it while it runs *(this page's reading)*. Every row kept live is `f.data.connect()`, under `memory` (3.3), or a served view or a fold (3.10).
+- **Its price in rules** (reasoned, EVERYROW 5): +9 to +19 builder rules for one cut, and +1 to +3 user rules.
 
 ## 4. What each call costs
 
@@ -950,22 +1011,24 @@ console.log(old.value)
 | a lens inside a big partition | as `connect()` | 0 | **the whole partition** (first build) | user rule 5 |
 | operators right of `connect()` | 0 | 0 | a filter about 1 µs per affected view; an ordered view with a window 1.6 to 62 µs a change, by partition size; `by().sum()` 0.66 to 1.84 µs at 10^6 rows, where `group(fn)` is 78 to 94 ms. Released when their handle ends | [E-05]; E-55 claims 16, 26; E-57 B2 |
 | `lookup(other, field)` | 1 per new key named | 0 | 2.9 to 3.9 µs a left change; a right change 1.9 to 3.3 µs when one left row names it, 39 to 48 at 100; 161 B a left row | E-57 B4 |
-| a served view, `f.data.best(10).connect()` | 1 SUB | 0 | on its copy, on **every write to the resource**: a bucket or sum view 1.8 to 4.9 µs a change with its frame; a leaderboard on today's data 5.7 to 6.7 µs at 10^3 rows, 12.2 to 15.7 at 5,000, 17.4 to 20.6 at 10^4, 134 to 155 at 10^5 (1.1 MB at 10^4, 9.1 MB at 10^5). One encode per frame for every subscriber: 288 encodes for 288,000 sends. One more subscriber 2.0 to 2.1 µs to join. Counted against the cap (64 a copy) | E-57 A1, A5, pagecost |
+| a served view, `f.data.best(10).connect()` | 1 SUB | 0 | on its copy, on **every write to the resource**: a bucket or sum view 1.8 to 4.9 µs a change with its frame; a leaderboard on today's data 5.7 to 6.7 µs at 10^3 rows, 12.2 to 15.7 at 5,000, 17.4 to 20.6 at 10^4, 134 to 155 at 10^5 (1.1 MB at 10^4, 9.1 MB at 10^5). One encode per frame for every subscriber: 288 encodes for 288,000 sends. One more subscriber 2.0 to 2.1 µs to join. Counted against the cap (64 a copy). Over several groups, the same on each group's partial, and one more hop to the merger: 20 µs p50 on one box | E-57 A1, A5, pagecost; MERGE 3.2 |
+| a fold, `f.data.tiers().connect()` | 1 SUB | 0 | on a copy of each group, on every write to that group: 0.73 to 4.47 µs for `sum`, `count` and `distinct`, 5.7 to 19.6 µs for `max` and `top`; at the merger, 18,000 to 26,000 writes a second for `max` or `top` at 256 groups, one write a frame. Buckets: about 1.6e5 at 16 groups | E-65 X3; V5-20 items 5, 10 |
 | a served view's build | 0 | 0 | on its copy, one at a time: today 0.49 to 1.9 s at 10^6 rows in one piece, 0.21 to 0.24 s sliced (a missed bar until data builds in slices) | E-57 XA-1 |
-| `{ pages }`: `page(after)` | 1 | 0 | a read: 10 to 16 µs and 32 B on the copy; holds nothing. **The shared index costs every write while it lives**: 8.3 to 9.1 µs at 10^3 rows, 29 to 33 at 10^4, 509 to 525 at 10^5 on today's data; D8c's index 3.8 to 5.1 at 10^5 | E-57 XA-7, pagecost, pageindex-cost |
+| `{ pages }`: `page(after)` | 1 to each group, in one round | 0 | a read: 10 to 16 µs and 32 B on the copy; holds nothing. Over several groups, each sends `size` entries: at 256 groups about 5,000 entries and 1.2 to 2.6 ms a page (MERGE 5.4 item 5; V5-20 item 11). **The shared index costs every write while it lives**: 8.3 to 9.1 µs at 10^3 rows, 29 to 33 at 10^4, 509 to 525 at 10^5 on today's data; D8c's index 3.8 to 5.1 at 10^5 | E-57 XA-7, pagecost, pageindex-cost |
 | class B pushed down (later) | 1 SUB | 0 | only the answer: 0.1 to 28 B a change against 108 to 113 B for the partition; the copy pays 1.2 to 3.2 µs a shape, about what the client pays here | E-57 A7 |
 | `lens.changes({ from })` | 1 to open | 0 | **every kept record on the path**; the SUB carries the cursor, 22 to 79 B for 1 to 10 partitions | PATHS 4.5; [E-19] |
 | `changes({ from: -5 })` | 1 to open | 0 | the server counts back: about 5 × P / 4,096 records of the slot when writes spread evenly, 0.6 to 2 ms at 10^6 partitions; up to all of `history` for a cold partition beside a hot one; on a field, the row's log read back. **Not priced on a real log** | CONNECT 3.4; V5-13, V5-15 consequences |
 | `changes({ from: date })` | 1 to open | 0 | a binary search over segments by their first batch's time; no time index | CONNECT 3.5 |
 | a reconnect | resumes from the server's position | 0 | only the missed records | PATHS 4.6; E-55 claim 7 |
+| `f.data.scan()`, or `scan({ cut: false })` | 1 a page a group, two pages a group in flight | 0 | **every row once, kept nowhere**: about 0.8 M whole rows a second at one asker; this process's memory flat. At one cut, every copy keeps a before-image of each pinned row that changes, until the scan passes it: 127 B each. On a server, its own groups read in place | E-65 X2; V5-20 item 4 |
 | `lens.past(pos)` | 1 log read | 0 | a snapshot load, O(rows of the partition), then 3.6 to 4.4 µs a record to fold with the version lists; 103 to 285 B a version, in this process only, until every value of the window is dropped; a step 10 to 12 ns plus one small object | [E-54]; E-55 claim 23 |
 | `derive(view, target)`, the view form | 1 SUB to the source | 0.748 target writes per source commit, fenced; one bump per target group at a takeover | the view, on the deriver; a restart 48.7 to 51.8 ms at 10^5 source rows and 10^3 buckets | E-57 B3 |
 | `derive(source, target, fn)`, the record form | 1 delivery a record | a share of 1, per output partition | a 29 B mark. With `{ rows: true }`: one fold a record, 0.63 to 1.5 µs, and about 330 B a row of the deriver's share | PATHS 4.9; [E-30]; E-57 A1; [E-05] |
 | `depth: 2` | | | a key grows 2 B. Partitions of 100 rows and more: the fold is 0.78 to 1.10 times flat with PA-17's index, and 1.2 to 805 KB **less** memory a partition. One-row partitions: 1.3 to 1.5 times, and +0.9 KB each, until data's D3 | E-55 claim 19 |
 | a partition function (later) | | | an index from partition to rows on every copy: memory per row, an update per fold | PA-17 |
 | `fero(name)`, a client, by default | 2 to 3 built well | 1 (its session) | none: it holds nothing | PATHS 3.2 |
-| `hold: 'all'`, or `f.data.connect()` | 1 SUB (none for `f.data.connect()` on a server or with `hold: 'all'`: it shares the rows held) | 0 | **the whole resource, once; then every write to the resource**, decoded and folded here | PATHS 3.2, 4.5 |
-| an operator over every row on a spare server: its root operators, or `ctx.data` | 1 SUB per such `connect()`; one picture per such `get()` | 0 | **the whole resource**: a `connect()` takes it once and then every write while its link lives; a `get()` takes it for each read and keeps nothing. None on the first `copies + standbys` servers. **Not measured** | section 3.3; TRANSFORMS R0 and 10 item 10 |
+| `hold: 'all'`, or `f.data.connect()` | 1 SUB (none for `f.data.connect()` on a server that holds every group, or with `hold: 'all'`: it shares the rows held) | 0 | **the whole resource, once; then every write to the resource**, decoded and folded here. Under this process's `memory`, counted as RSS: about 1.4 M small rows a GB; refused at open past it, ended `not-held` if it grows past it | PATHS 3.2, 4.5; V5-20 item 3 |
+| an operator over every row on a server that lacks some groups: its root operators, or `ctx.data` | 1 SUB per such `connect()`; one picture per such `get()` | 0 | **the groups it lacks**: a `connect()` takes them once and then every write while its link lives; a `get()` takes them for each read and keeps nothing; under `memory`. None on a server that holds every group. **Not measured** | section 3.3; TRANSFORMS R0 and 10 item 10; V5-20 item 3 |
 | `hold: '200MB'`: a closed selection opened again | 1 SUB | 0 | a resume (the changes since) if the server can; else the picture again. Nothing while closed; never free | reasoned (LENS 2.2) |
 | `fero(name, …)` with a server role, joining | | | the whole log copied and folded; a `dir` and its syncs; a vote or a standby | PATHS 2.1, 5.1 |
 | `fero(name, …)` founding a resource | one create-if-absent | about 5 ms; about 35 ms across machines | about 8 KB per server while idle | [E-49]; V5-8 |
@@ -979,7 +1042,7 @@ console.log(old.value)
 | a queue message | | 3 (add, take, ack) | | PATHS 4.13 |
 | a `service` ask | | 3; 2 more for each try after a throw (a release and a new claim) | | [E-22] D7; V5-17; reasoned |
 
-Nothing on the surface decodes, copies or walks a whole resource except the bold "whole" and "every" rows. Most of those say so in their shape: a call that returns everything, or a listing you wrote. **Four do not, so learn them:** `hold: 'all'` (an option, not a line of code), a lens inside a partition, which holds the whole partition (user rule 5), a served view or a `{ pages }` index, which costs its copy something on every write to the resource, and an operator over every row on a spare server, which downloads the resource first (the deployment, not the line, says whether this server is a spare).
+Nothing on the surface decodes, copies or walks a whole resource except the bold "whole" and "every" rows. Most of those say so in their shape: a call that returns everything, or a listing you wrote. **Four do not, so learn them:** `hold: 'all'` (an option, not a line of code), a lens inside a partition, which holds the whole partition (user rule 5), a served view or a `{ pages }` index, which costs its copy something on every write to the resource, and an operator over every row on a server that lacks some groups, which takes what it lacks first, under its `memory` (the deployment, not the line, says which groups this server holds).
 
 **Where the surface itself used to cost, and what this page did.**
 - A whole picture copied every row per read: a sync read is a handle's lookup, and the picture went (PA-8; V5-13 pick 6; V5-16).
@@ -1193,7 +1256,36 @@ The owner answered section 11.1's questions on 2026-11-21 ([V5-17][dec]). Most k
 | `f.cluster.value.open` | `f.cluster.value.links` | 26 |
 
 - **The answers that kept this page's pick** are listed in section 11.1, each with its question. Where the page said *this page's pick* or *this page's reading* for one of them, it now says V5-17.
-- **Question 28 stays open** until the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) reports. That audit has reported, and [V5-18][dec] now has question 28 wait for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress). Question 41 was new; [V5-19][dec] closed it the same day, with question 4.
+- **Question 28 stayed open** until the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) reported. That audit reported, and [V5-18][dec] had question 28 wait for the study of how work over every row is merged across groups, and of its alternatives ([MERGE.md](MERGE.md)). [V5-20][dec] closed it on 2026-11-23 (section 11.1). Question 41 was new; [V5-19][dec] closed it the same day, with question 4.
+
+### 5.8 From the 2026-11-21 page, for V5-20 to V5-22
+
+The owner asked whether a fixed one-process ceiling was needed at all, since a process can read each group's rows from the servers that hold them. [MERGE.md](MERGE.md) designed the merger across groups, [EVERYROW.md](EVERYROW.md) built five ways round the ceiling, and E-59 to E-63 left choices only the owner could make. [V5-20][dec] answered them on 2026-11-23, one at a time; [V5-21][dec] answered [COMPACT.md](COMPACT.md)'s study of compact rows, and [V5-22][dec] the run of the merger's rule 4 ([E-67]). Each row below is a change from the 2026-11-21 page.
+
+| The 2026-11-21 page | Now | Decision |
+|---|---|---|
+| four read verbs | five: `scan()`, at the root, reads every row once, in pages, at one cut by default; `cut: false` opts out (3.13) | V5-20 item 4 |
+| "across partitions there is no merger": a view over every row keeps one store fed by slot | a served view over several groups is merged at one cut, a partial per group and the merger; one store only where a process keeps every row itself, under its `memory` (3.10) | V5-20 item 1; V5-22 item 1 |
+| (none) | `{ fold: { emit, combine } }`: live code over every row, with fero's combines; combines the author writes come later (3.10) | V5-20 item 5 |
+| `memory`: "near it, writes are refused `read-only`"; health warns at 80 % | counted as RSS; a hold that will not fit is refused at open, and a live one past the line ends `not-held` and its rows go; near the line, whole-resource holds end first, then writes are refused `read-only` (3.3, 9) | V5-20 item 3 |
+| an operator over every row on a spare downloads the resource | one-time work reads by `scan()`, with no download; live work that merges or folds is served; only a sync read of every row takes what the server lacks, under `memory`. Question 28 closes (3.3) | V5-20 items 1, 3 to 5 |
+| a served view on one copy, by a hash over every copy but the leader | on a server that holds its rows, preferring one that leads no group of its resource; until `data` builds views in slices, a build can stall a leader's writes (3.10) | V5-20 item 13 |
+| `{ pages }`: one shared index on one copy | an index per group; a page asks every group in one round (3.10) | V5-20 item 11 |
+| a median view over every row: unstated | exact, from a sorted column at the merger; histograms later (3.10) | V5-20 item 6 |
+| (none) | a stated bucket limit for `derive`'s view form and a fold, about 1.6e5 at 16 groups; past it, the record form (3.10, 3.11) | V5-20 item 10 |
+| what a client of a merged view sees: unstated | a group out of reach: its part frozen, health names it, a fresh read waits; a pair whose partner is down waits, frozen at one cut; the gap through a merger rebuild is stated (3.10) | V5-20 item 2; V5-22 items 3, 4 |
+| END `view-too-big` "stays until the method's code changes" | it ends that served instance; after a reload or a failover the view may be built again, and if it fits, it is served (3.10) | V5-20 item 20 |
+| a marked write skipped at its mark "answered as done" | answered `skipped`, never `applied`: `skipped: true` on its answer (3.11) | V5-20 item 17 |
+| a refused marked write: unstated | refused on the row, it raises the mark and is final; refused `fenced` or `forbidden`, it leaves none; one nobody awaits is printed once, and the loop goes on (3.11) | V5-20 item 16; E-61's pick |
+| `fn` in `derive()` and `run()`: unstated | awaited before the next record; the app's two rules for `fn`; run()'s cursor keeps its fence and moves only up; a reader reads its marks again before it stops `expired` (3.11) | V5-20 item 18; E-61's picks |
+| `marks()`: the lowest mark over "the output slots" | over the slots the reader name joined in `#groups`; bare marks go only to them (3.11) | V5-20 item 19 |
+| a folded resume, "modelled first" | modelled ([E-60]); it comes when restarted screens matter (3.10) | V5-20 item 21 |
+| a clean stop with no spare: "exits at `leave.ms`", read from LAYERS | the leaver stays in the config, absent; it exits once the voters left can carry on without it; at `leave.ms` it stops as a crash would only if nothing can carry the group without it (7, 9) | V5-20 items 22, 23 |
+| a row read: "a new frozen object at each write" | the same object (`===`) for `data`'s object rows while unchanged; on a compact source, compare `version` (3.9) | V5-21 item 4 |
+| (none) | no store key yet: a compact backing is an explicit setting, named when `data` builds one (9) | V5-21 item 7 |
+
+- **What a user learns more** (reasoned; EVERYROW 5, E-61): `scan()`, +1 to +3 rules; a fold, 0 to +1; the `memory` bound in place of a fixed ceiling, net +1; and two rules for code that writes marks (3.11).
+- **What a builder writes more** (reasoned; LAYERS counts them): about +20 to +37 rules for EVERYROW's first build; the merger about +11 to +18 net, not +9 to +14 (V5-22 item 6); +7 for the `view` selector ([E-60]); and 25 rules for marks written by app code, where E-30 had 5 ([E-61]).
 
 ## 6. The declarations
 
@@ -1207,6 +1299,7 @@ What every code block on this page compiles against. They merge three type sketc
 - **V5-16, the same day.** New: `ClusterView.value` and `WritesView.value`; `connect((value) => …, { signal, until })` on both; `ClusterShape`'s `id`, `members` and `groups` typed `| undefined` until a server answers. Gone: `Handle.rows` (`f.rows`), `Ctx.rows`, `ClusterView.snapshot` and `WritesView.snapshot`. After its two reviews: every field of `ClusterShape`, `HealthRow` and `WriteRow` is read-only, as a frozen value is; `hold` is in a client's open only (`ClientOpen`), not in a server's; and a stream (`rows: false`) has `cluster` too.
 - **V5-17, 2026-11-21.** `ClusterShape.open` is now `ClusterShape.links`. `Code` gains `field-ttl` and `room-too-large`. `service()` takes `deliveries`. Comments give the defaults of `LockOpts.renew` and of `consumer()`'s options, the unit of `Runner.lag`, what a refused `saga()` gives and that its steps may span resources, and that a service's `deliveries` is a setting of its resource.
 - **V5-19, the same day.** `ClusterShape.me.links` is now `me.peers`: the members this process has a live connection to, so `links` names only the open links. The `service()` comment and the `threw` row cite V5-19 for the delivery count.
+- **V5-20 to V5-22, 2026-11-23.** New: `scan()` on the root lens (`ScanRead`, `ScanOpts`, `Scan`), a steer for it on a stream's lens, and `scan` among the root's fero words in `NoClash`; `{ fold }` methods (`FoldDef`, `Combine`, and a fold's answer, `FoldOut`); `Ack.skipped`; the code `scan-lost`; `'scan'` as a link kind. Comments now say what `memory` does, that marks cover the slots a reader name joined, and that `fn` is awaited. Five more must-fail lines: a scan on a row, a scan on a stream, a method named `scan`, a fold given an argument, and a fold with a combine the author wrote.
 
 **How the types know a role.** `Resource<Row, M, D, R>` carries the row type, the methods, the depth and what the types know of the role: `'server'`, `'client'` (a bare client, which holds what its links name) or `'all'` (a client that said `hold: 'all'`). A server marker in the open makes `'server'` (section 3.1). `fero<Shop>(name)` turns a server's type into `'client'`, or `'all'` with `{ hold: 'all' }`. A client of a resource with methods has no writes on its lenses, rooms or root (V4-5). A bare client has no operators over every row. No role has a sync lookup of every row (V5-16): `f.data.connect()` gives a handle on every role. A handle typed by its rows only (`fero<Row>(name)`) has no methods in its type, so it may write, and calls through `call()` are untyped.
 
@@ -1216,7 +1309,7 @@ What every code block on this page compiles against. They merge three type sketc
 - The role is known from the open's markers and from `fero<Shop>`. A server marker given through the config cascade, not the call, is not seen by the types.
 - `ctx.at` of a method declared `at: 'any'` is untyped: it may be any kind of lens.
 - `ClusterShape`'s `id`, `members` and `groups` are `| undefined` on every role, though a server that holds a copy has them: `ClusterView` does not carry the role, and a spare may not have them yet.
-- The types cannot tell a spare server from a copy (section 3.3): a spare's root operators compile as a copy's do, and first download the resource.
+- The types cannot tell a server that holds every group from one that holds some, or none (section 3.3): root operators compile on each, and on the last two first take what the server lacks, under its `memory` (V5-20 item 3).
 - `session.ms` is `#sessions`' own setting (section 9), not a key of an app's resource, so no type carries it: an app sets it through the cascade (`fero.opt.ts`, `FERO_SESSION_MS`).
 - At `depth: 2` the root has no operators in the types, on any role, and `f.data.connect()` gives a handle with none: a name on that root is a room (section 3.10; question 28). The text's root operators on a server, with `hold: 'all'` and in `ctx.data` hold at depth 1 only.
 - A saga `Step`'s value is not checked against its lens's type.
@@ -1228,12 +1321,13 @@ What every code block on this page compiles against. They merge three type sketc
 - The libraries keep their shape.
 
 ```ts
-// file: fero.d.ts — fero v5's public API for the chosen design (V5-1 to V5-16). Declarations only.
+// file: fero.d.ts — fero v5's public API for the chosen design (V5-1 to V5-22). Declarations only.
 //   lens.get(opts?)              read once; hold nothing. One GET, or no trip where the rows are held on purpose
 //   lens.connect(opts?)          the newest state, kept here: a handle (value, ready, cursor, closed, disconnect), and a loop
 //   lens.connect(fn, opts?)      the same, plus fn(value, c) on the picture and once per commit. Not a loop
 //   lens.changes(opts?)          the log: every record on the lens's path from a place, then live. It waits for you
 //   lens.past(pos, opts?)        one partition as it was: folded here once, then a value with step(n) and for..of
+//   f.data.scan(opts?)           every row once, in pages, at one cut by default; it keeps nothing (V5-20 item 4)
 //   { signal }, { until }        how a live thing ends, beside disconnect() and break. Never by the collector
 import type { ChangeRecordV2 } from 'data'
 /** One change record: data's own, and the wire's. `c.recs()` gives them; an Entry carries one. */
@@ -1326,6 +1420,9 @@ export interface ProcessOptions {
   secret?: string | false
   token?: string
   admin?: string
+  /** This process's memory bound, counted as RSS. Health warns at 80 %; a whole-resource hold that will not fit is
+   *  refused at open, and a live one past the line ends 'not-held'; near it, whole-resource holds end first, then
+   *  a server refuses writes 'read-only' (V5-20 item 3). */
   memory?: Size
   ping?: { ms?: number }
   evict?: { after?: number }
@@ -1405,7 +1502,8 @@ export interface Handle<Row, M, D extends Depth, R extends Role> {
   readonly data: Lens<Tree<Row, D>, Row, M, 'root', D, R>
   /** The same address as f.data.a.b, with no Proxy: keys from input, keys named like fero words, hot loops. */
   readonly at: AtFn<Row, M, 'root', D, R>
-  /** A reader name's marks, as a cursor for changes({ from }). */
+  /** A reader name's marks, as a cursor for changes({ from }): the lowest over the output slots that name joined
+   *  in #groups (V5-20 item 19). */
   marks(name: string): Promise<Cursor>
   /** This resource's members, groups, health, writes in flight, and the links this process has open: a live
    *  link the open holds for you. `f.cluster.value` is a sync read of it (V5-16). */
@@ -1426,7 +1524,8 @@ export interface RootWrites<Row, D extends Depth> {
   remove(path: RowPath<D>, opts?: PlainOpts): Write
   remove(path: FieldPath<D>, opts?: FieldOpts | FieldMarkOpts): Judged
   touch(path: RowPath<D>, opts?: TouchOpts): Judged
-  /** A bare mark: source record `e` is applied, and nothing is written. A write to this resource's marks. */
+  /** A bare mark: source record `e` is applied, and nothing is written. A write to this resource's marks, on the
+   *  output slots the reader name joined (V5-20 item 19). */
   mark(e: Entry<any>): Judged
   /** For libraries: the leader leases the first takeable rows of a partition to the caller. */
   claim(opts: ClaimOpts<Row>): Promise<Claimed<Row>[]>
@@ -1469,6 +1568,7 @@ export type LogLens<Row, K extends Kind, D extends Depth> = {
   readonly get: Steer<NoRows>
   readonly connect: Steer<NoRows>
   readonly past: Steer<NoRows>
+  readonly scan: Steer<NoRows>
 } & { readonly [key: string]: LogLens<Row, K extends 'root' ? (D extends 2 ? 'part' : 'row') : 'row', D> }
 
 // ── the lens: an address. A property read is a step; a call is a verb ───
@@ -1504,7 +1604,7 @@ export type Lens<T, Row, M, K extends Kind, D extends Depth, R extends Role> =
     : { readonly past: Steer<'past() reads one partition as it was; here it would fold every partition: read the log from a time, changes({ from: new Date(...) })'> })
   & { readonly at: AtFn<Row, M, K, D, R>; readonly call: CallFn<M, K, D> }
   & Writes<T, Row, K, D, M, R>
-  & (K extends 'root' ? RootCalls<M, StepOf<Row, M, K, D, R>, D> & RootOps<Row, D, R> & RootOf<Row, D> : K extends 'part' ? Ops<Row, 'left', 'rows', true> : {})
+  & (K extends 'root' ? RootCalls<M, StepOf<Row, M, K, D, R>, D> & RootOps<Row, D, R> & RootOf<Row, D> & ScanRead<Row> : K extends 'part' ? Ops<Row, 'left', 'rows', true> : {})
   & PathCalls<M, K, D, StepOf<Row, M, K, D, R>>
   & { readonly subscribe: Steer<'a lens is not a store: lens.connect(fn)'>
       /** `${lens}` and String(lens) give its path, 'shop.widgets.stock': a stable key for a framework. */
@@ -1559,6 +1659,23 @@ export interface PastRead<V, Row> {
   /** value is the state right after pos: after a version's commit, or at a place. for..of walks every commit
    *  changes() would give from pos to `to` (default: pos alone), each as [value, c]. */
   past<const P extends Pos<true>, const T extends Pos<true> = P>(pos: Back<P>, opts?: { to?: T } & BackOpt<T, 'to'>): Promise<Past<V, Row>>
+}
+/** The root's own read verb (V5-20 item 4): one-time work over every row, with no row ceiling. */
+export interface ScanRead<Row> {
+  /** Every row once, in pages, from one copy of each group: this process keeps at most two pages a group. At one
+   *  cut by default: each group pinned, no commit shown in part. On a server, the groups it holds are read in place. */
+  scan(opts?: ScanOpts): Scan<Row>
+}
+export interface ScanOpts {
+  /** false: no cut. A row that lived through the whole scan comes once, any other at most once; a commit may show in part. */
+  cut?: boolean
+  signal?: AbortSignal
+}
+/** One pass over every row, each as [key, row, partition]. Not a link and not live: it ends at break, its signal, or
+ *  the last row. A scan at one cut that passes a copy's image budget ends 'scan-lost' (the budget is owed). */
+export interface Scan<Row> extends AsyncIterable<[key: Key, row: Row, partition: Partition]> {
+  readonly closed: Promise<void>
+  readonly disconnect: () => void
 }
 export interface GetOpts {
   fresh?: boolean      // ask the leader: one trip plus its round with a majority; no disk
@@ -1649,7 +1766,8 @@ export interface Change<Row> {
 // ── operators: left of connect() plain data, right of it your code ───────
 /** left: left of connect() on a lens inside a partition (plain data; a copy may run it later). right: right of
  *  connect(), here, on held rows. server: where this process holds every row (a server, hold: 'all', a handler's
- *  ctx.data): it runs here; a spare server first takes every row, as hold: 'all' does (section 3.3).
+ *  ctx.data): it runs here; a server that lacks some groups first takes them, as hold: 'all' does, under its
+ *  memory (section 3.3; V5-20 item 3).
  *  view: inside { view } or { pages }: this resource only, and no caller. */
 type Mode = 'left' | 'right' | 'server' | 'view'
 /** rows: unordered, unbounded. sorted: ordered, unbounded. window: ordered, at most n. page: a window after a cursor.
@@ -1820,7 +1938,8 @@ export type JudgedOpts = WriteOpts & ({ if: Cond } | { once: string }) & { from?
 /** Any write options but a mark. */
 export type UnmarkedOpts = WriteOpts & { from?: undefined }
 /** A marked write: the write and "source record `e` is applied" land in one log entry of this resource.
- *  The leader skips it at or below its stored mark. Commit only. Never refused 'backpressure': it waits,
+ *  The leader skips it at or below its stored mark and answers `skipped: true` (V5-20 item 17). Refused on the row,
+ *  it raises the mark; refused 'fenced' or 'forbidden', it leaves none (item 16). Commit only. Never refused 'backpressure': it waits,
  *  and the reader `e` came from stops yielding until the line is short again. It takes no `once` name. */
 export type MarkOpts = Omit<WriteOpts, 'once'> & { from: Entry<any>; once?: undefined }
 type OnRow = 'a ttl and a lease belong to a row: give them on the row lens, f.data.k.set(row, { ttl })'
@@ -1876,8 +1995,8 @@ export declare const op: {
   min(x: number | string): Op
   now(plus?: Duration): Op
 }
-/** The committed answer. */
-export interface Ack { key: Path; version: Version; attempt: AttemptId; value?: any }
+/** The committed answer. `skipped`: a marked write at or below its mark, handled before and not applied now (V5-20 item 17). */
+export interface Ack { key: Path; version: Version; attempt: AttemptId; value?: any; readonly skipped?: true }
 /** A progress report: how far the write got. No version, no value (V5-11). */
 export interface Early { key: Path; attempt: AttemptId; stage: 'received' | 'replicated' }
 /** A write's handle. Awaiting it answers at the commit. A promise is made only when it is awaited. */
@@ -1903,15 +2022,31 @@ export interface ViewDef<Row = any> {
   /** Run on every SUB with the caller: may this caller hold this view? The view itself never sees the caller. */
   readonly allow?: (arg: any, claims: Claims | null) => boolean
 }
-/** One sorted list read a page at a time: one shared index on one copy; a page read holds nothing. */
+/** One sorted list read a page at a time: an index per group, and a page asks every group in one round (V5-20
+ *  item 11); a page read holds nothing. */
 export interface PagesDef<Row = any> {
   readonly pages: (arg: any, ctx: ViewCtx<Row>) => unknown
   readonly size?: number
   readonly version?: number | string
   readonly allow?: (arg: any, claims: Claims | null) => boolean
 }
+/** Live code over every row, kept as one piece per group (V5-20 item 5): `emit` gives a row's (bucket, value) pairs,
+ *  one of fero's combines adds them, and the merger adds the groups' pieces at one cut. A client reads it as a
+ *  served view, with no argument: a Map from bucket to value. Combines the author writes come later. The value:
+ *  a number for sum, min, max and top (its score); any scalar for distinct; count ignores it. */
+export interface FoldDef<Row = any, C extends Combine = Combine> {
+  readonly fold: {
+    readonly emit: (row: Row, key: Key) => readonly (readonly [bucket: Scalar, value: C extends 'distinct' | 'count' ? Scalar : number])[]
+    readonly combine: C
+  }
+  /** Part of its pieces' key: a merger takes only pieces of its own version. None: the deploy's build id. */
+  readonly version?: number | string
+}
+export type Combine = 'sum' | 'count' | 'min' | 'max' | 'distinct' | { readonly top: number }
+/** What a client sees per bucket: a number, the distinct values, or the top k rows' keys with their values. */
+type FoldOut<C> = C extends 'distinct' ? readonly Scalar[] : C extends { top: number } ? readonly { readonly key: Key; readonly value: number }[] : number
 /** A function (the root only); `{ at, run }` (the paths it may be called on, at that path's leader; the server
- *  refuses any other path with 'bad-path'); `{ view }`; or `{ pages }`. */
+ *  refuses any other path with 'bad-path'); `{ view }`; `{ pages }`; or `{ fold }`. */
 export type MethodDef<Row = any, D extends Depth = 1> =
   | Handler<Row, D, 'root'>
   | { readonly at: 'row'; readonly run: Handler<Row, D, 'row'> }
@@ -1919,6 +2054,7 @@ export type MethodDef<Row = any, D extends Depth = 1> =
   | { readonly at: 'any'; readonly run: Handler<Row, D, 'field'> }
   | ViewDef<Row>
   | PagesDef<Row>
+  | FoldDef<Row>
 export type Methods<Row = any, D extends Depth = 1> = Record<string, MethodDef<Row, D>>
 export interface Ctx<Row = any, D extends Depth = 1, K extends Kind = 'root'> {
   /** The lens the call was made on. For a bare function, the root. */
@@ -1963,8 +2099,8 @@ type Verb = 'get' | 'connect' | 'changes' | 'past' | 'at' | 'call'
 type OpName = keyof Plain<unknown, 'left', false> | keyof CodeOps<unknown, 'left', 'rows', false> | 'lookup'
 type WhereOf<H> = H extends { at: infer W } ? W : 'root'
 /** fero's own names on the lens a method would be called on; for 'any', the root's and a row's together. */
-type Taken<W, D extends Depth> = W extends 'root' ? Verb | OpName | 'set' | 'remove' | Probe
-  : W extends 'any' ? Verb | OpName | 'set' | 'remove' | 'touch' | Probe
+type Taken<W, D extends Depth> = W extends 'root' ? Verb | 'scan' | OpName | 'set' | 'remove' | Probe
+  : W extends 'any' ? Verb | 'scan' | OpName | 'set' | 'remove' | 'touch' | Probe
   : W extends 'partition' ? (D extends 2 ? Verb | OpName | 'set' | 'remove' | Probe : Verb | 'set' | 'remove' | 'touch' | Probe)
   : Verb | 'set' | 'remove' | 'touch' | Probe
 /** A method named like a fero word, where it would be called, is refused where it is declared ('bad-name'). */
@@ -1972,12 +2108,13 @@ export type NoClash<M, D extends Depth> = {
   [N in keyof M]: N extends Taken<WhereOf<M[N]>, D> ? Steer<'this name is a fero word on the lens it would be called on: rename the method'> : M[N]
 }
 type RunOf<H> = H extends { run: infer F } ? F : H extends { view: infer F } ? F : H extends { pages: infer F } ? F : H
-type ArgsOf<H> = RunOf<H> extends (arg: infer A, ctx: any) => any
+type ArgsOf<H> = H extends { fold: any } ? [] : RunOf<H> extends (arg: infer A, ctx: any) => any
   ? H extends { view: any } | { pages: any } ? (undefined extends A ? [arg?: A] : [arg: A])
   : (undefined extends A ? [arg?: A, opts?: CallOpts] : [arg: A, opts?: CallOpts]) : never
-/** An action answers once its writes commit; a view is an address you get() or connect(); pages are read a page at a time. */
+/** An action answers once its writes commit; a view or a fold is an address you get() or connect(); pages are read a page at a time. */
 type CallOf<H, D extends Depth> =
   H extends { view: (...a: any[]) => Addr<infer V, infer R, infer B, any, any> } ? Served<V, R, B>
+  : H extends { fold: { emit: (row: infer R, ...a: any[]) => any; combine: infer C } } ? Served<ReadonlyMap<Scalar, FoldOut<C>>, R, 'buckets'>
   : H extends { pages: (...a: any[]) => Addr<any, infer R, any, any, any> } ? Paged<R, D>
   : Call<Awaited<RunOf<H> extends (...a: any[]) => infer X ? X : never>>
 type CallableAt<W, K extends Kind, D extends Depth> =
@@ -2054,7 +2191,7 @@ export interface ClusterShape {
   }>> | undefined
   /** This process's open links on this resource, by path, with counts: a leak shows here (V5-17 names it `links`). */
   readonly links: readonly {
-    readonly path: string; readonly kind: 'connect' | 'changes' | 'view' | 'pages'; readonly count: number; readonly since: Time
+    readonly path: string; readonly kind: 'connect' | 'changes' | 'view' | 'pages' | 'scan'; readonly count: number; readonly since: Time
   }[]
   readonly health: readonly HealthRow[]
 }
@@ -2101,7 +2238,7 @@ export type Code =
   | 'too-large' | 'cross-partition' | 'no-rows' | 'schema' | 'invalid' | 'rule' | 'rule-threw' | 'rule-timeout'
   | 'field-ttl' | 'room-too-large'
   | 'methods-only' | 'forbidden' | 'call-diverged' | 'read-only' | 'disk-full' | 'backpressure' | 'too-many-keys'
-  | 'not-held' | 'not-ready' | 'ended' | 'expired' | 'bad-cursor' | 'bad-position' | 'schema-changed'
+  | 'not-held' | 'not-ready' | 'ended' | 'expired' | 'bad-cursor' | 'bad-position' | 'schema-changed' | 'scan-lost'
   | 'no-such-method' | 'bad-path' | 'bad-key' | 'bad-name' | 'bad-arg' | 'bad-target' | 'threw' | 'busy' | 'aborted'
   | 'too-many-views' | 'view-too-big' | 'redeployed' | 'stale-client' | 'derived' | 'bucket-collision' | 'too-many-outputs'
   | 'timeout' | 'unknown' | 'destroyed' | 'restored'
@@ -2185,7 +2322,9 @@ type Source<S> = { readonly name: string; readonly data: { changes(opts?: { from
 type Target<T> = { readonly name: string; readonly data: RootOf<T, any>; marks(name: string): Promise<Cursor> }
 export interface DeriveOpts { name?: string; from?: 'earliest' | 'latest' }
 /** The record form: once per source record, by marks; needs the source's history. `fn` writes with `{ from: e }`.
- *  It sees the record, not the row: e.value is set only for a whole-row write (a dev warning says so). */
+ *  It sees the record, not the row: e.value is set only for a whole-row write (a dev warning says so). `fn` is
+ *  awaited before the next record; it makes every write before its promise settles, and the same writes in the same
+ *  order on every run of one record (V5-20 item 18). */
 export declare function derive<S>(source: Source<S> | readonly Source<any>[], target: Target<any>, fn: (e: Entry<S>) => unknown, opts?: DeriveOpts): Promise<Runner>
 /** The record form with rows: the deriver folds its share of the source, so fn also gets the row after the record
  *  and the row before it (undefined when there is none). */
@@ -2202,7 +2341,9 @@ export declare function consumer<Row>(source: Source<Row>, name: string, opts?: 
 export interface Consumer<Row> extends AsyncIterable<ConsumerBatch<Row>> {
   readonly member: string
   readonly owned: number
-  /** Exactly once when `fn` writes with `{ from: e }`: paced, and one owner per share. */
+  /** Exactly once when `fn` writes with `{ from: e }`: paced, and one owner per share. `fn` is awaited before the next
+   *  record; the share's cursor passes a record only once `fn` has returned, moves only up, and is fenced by the
+   *  share's token (V5-20 item 18). */
   run(fn: (e: Entry<Row>) => unknown): Runner
   leave(): Promise<void>
 }
@@ -2255,16 +2396,18 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 - **A version from another partition**, given as `from` or to `past` on one partition, compiles. The server refuses most such versions `bad-position`, but one from another slot can land on this partition's own record and give a quiet wrong answer (CONNECT 3.2). Save the cursor to resume.
 - **A `Date` that is not valid** compiles and is refused `bad-position`. **A target of the right shape that never closes**, such as a Node stream made with `emitClose: false`, compiles as `until` *(from memory)*.
 - **A forgotten `.get()`** that is printed, `JSON.stringify(await shop.at(id))`, compiles and prints `undefined` (CONNECT 5.2). A lint rule catches it.
-- **A served view depends on its argument and the rows only**: no clock, no random number, no module state (TRANSFORMS 8.4 rule 3). A view with a `Date.now()` threshold gave another answer after a failover in 822 of 1,000 seeds (E-57 XA-8). **And its buckets stay under `views.rows`**, checked on every commit at run time (E-57 A5, XA-12).
+- **A served view depends on its argument and the rows only**: no clock, no random number, no module state (TRANSFORMS 8.4 rule 3). A view with a `Date.now()` threshold gave another answer after a failover in 822 of 1,000 seeds (E-57 XA-8). **And its buckets stay under `views.rows`**, checked on every commit at run time: past it, the served instance a client follows ends `view-too-big`, and after a reload or a failover a view that fits again may be served (E-57 A5, XA-12; V5-20 item 20). **A fold's `emit` depends on its row only**, for the same reason (V5-20 item 5).
+- **A sync read of every row fits this process's `memory`** (V5-20 item 3). The types cannot count rows: a hold that will not fit is refused at open, `not-held`, and one that grows past the line ends `not-held` and its rows go (section 3.3).
 - **The record form sees records, not rows**, unless it says `{ rows: true }`. A filter on `e.value` compiles and misses every field write; a dev warning names the line (V5-15 pick 4).
 - **A method checks its argument** (rule 7). A client picks the argument and the path. The server checks the path against `at:`; the argument's shape and meaning are the method's to check.
 - **A sink never changes a row it was handed.** Rows handed out are frozen, so such a change throws in strict-mode code; the types show `c.diff`'s entries as read-only, not the rows inside them.
 - **Run the four-line derive in one process** (section 3.11), or use `derive()`, which splits the work.
+- **Code that writes marks keeps two rules** (V5-20 item 18; section 3.11): for one record, the same writes in the same order on every run; and every write made before `fn`'s promise settles. The types cannot see either; a dev check comes later.
 
 **Roles.**
 - Section 3.1 has the rule. The server markers are: `server: true`, `listen`, `dir`, a `data` seed, `methods`, and the other code keys (`validation`, `schema`, `rules`, `load`, `rows.where`, `shape.up`). A `partition` function alone is not one: a client may pass it to route by itself.
 - `listen: false` is a solo node with no socket: the only voter of its groups, for tests.
-- A server holds and folds every row of each resource it serves, with `data`, while it is one of the resource's `copies + standbys`. A server past that number is a spare (section 3.3): the types cannot tell it from a copy, and its first operator over every row downloads the resource. A client holds what its live links name, or every row with `hold: 'all'` (section 3.3).
+- A server holds and folds every row of each group it is a copy of, with `data`. A resource has several groups (V5-18 pick 1), so a server may hold only some of them, or none, as a spare (section 3.3): the types cannot tell, and an operator over every row there first takes what the server lacks, under its `memory` (V5-20 item 3). A client holds what its live links name, or every row with `hold: 'all'` (section 3.3).
 - **The libraries' own resources need a server too.** `queue('thumbs', { server: true })` on a server founds and serves the queue; a worker's `queue('thumbs')` is a client of it. fero's system resources (`#sessions`, `#locks`, `#sagas`, `#calls`, `#groups`) are resources like any other; any process that serves a resource serves them too (this page's reading, with [LAYERS.md](LAYERS.md) section 10 item 5; the records do not say who founds them).
 
 **Answers.**
@@ -2351,7 +2494,10 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 **Sizes and stated ceilings.**
 - A record is at most 1 MB and a row at most 64 MB. Larger is refused `too-large` before it is appended.
 - 4,096 slots per resource (A-16). One partition is one leader's work. With the app splitting every partition above half a leader's share, a resource reaches about 135 leaders' worth of writes ([E-18]).
-- One `data` source holds at most 16,777,216 rows (A-13, [E-34]).
+- One `data` source holds at most 16,777,216 rows today (A-13, [E-34]). `data` 5 splits each source's key index into small tables, which passed that count in [E-66] (V5-21 item 2); lifting the cap is owed to `data` 5 (V5-20's consequences).
+- **No feature has a fixed row ceiling** (V5-20 item 3). A sync read of every row is bounded by this process's `memory`, counted as RSS: about 1.4 M small rows a GB (section 3.3). One-time work (`scan()`), folds, merged served views and a live median have none (V5-20 items 1, 4 to 6).
+- A scan's limit is time: about 0.8 M whole rows a second at one asker. At one cut, past a copy's image budget, it ends `scan-lost`, never the writes; the budget is owed (section 3.13).
+- `derive`'s view form and a fold keep each group's piece of every bucket: about 1.6e5 buckets at 16 groups, 1e4 at 256 (V5-20 item 10). A live median over every row keeps one number a row of its field at the merger, 12.8 B a value, within that server's `memory` (V5-20 item 6). A `{ pages }` page asks every group: at 256 groups, about 400 to 860 pages a second for one asking process (V5-20 item 11).
 - `rows.max` is kept per group as its share, rounded up.
 - A resource costs about 8 KB per server while idle, about 2.5 KB dormant (V5-8). A whole-project cold boot takes 3 to 5 s at 1,000 resources per process (V5-7). After one server restarts, leaders are even again about 31 to 32 s later, most of it `settle.ms` ([E-53]).
 - A served view's buckets are capped by `views.rows`, a copy's served views by `views.max` weighted by cost, a client's by `views.client` (section 3.10).
@@ -2361,7 +2507,10 @@ export declare function gateway(kind: 'resp' | 'nats' | 'kafka' | 'etcd', opts: 
 - **Founding.** The first server to open a name writes a candidate id to its disk, asks the store to create that id if none exists, and founds the resource only if the stored id is its own (V5-10 fix 1; [E-51]). On one box the store is a local folder; across machines it is the object store named by `object`. Every later opener adopts the stored id and joins.
 - **Finding.** A client asks the directory once for one address of the resource, then learns the members, the slot table and the leaders from the resource itself (V5-3). While the directory is down, connected clients keep working; only first lookups wait. A client asks it again once every member it learned has failed (V5-10 fix 2).
 - One process per `dir`: a second one is refused `dir-held` (V4-59).
-- `destroy()` closes one handle. The last handle of a resource in a server process also leaves, cleanly: retiring first, then a leave (LAYERS 8.9). Under `FERO_SUPERVISED` it only hands over, because a restart is coming. With no spare machine to take its place, the leave cannot finish; LAYERS reads that the process exits at `leave.ms` and stays in the group's config, absent, until healing swaps it out (its section 10 item 25; not modelled).
+- `destroy()` closes one handle. The last handle of a resource in a server process also leaves, cleanly: retiring first, then a leave (LAYERS 8.9). Under `FERO_SUPERVISED` it only hands over, because a restart is coming.
+  - **With no spare machine to take its place, the leaver stays in the group's config, absent**, until healing swaps it out; the group does not shrink (V5-20 item 22).
+  - **It exits as soon as it is safe** (V5-20 item 23): once the voters left have the new config, can commit without it, and hold every committed entry. A leader that has appended its own removal takes no new write.
+  - **At `leave.ms`**, if nothing can carry the group without it (no live machine could stand in for it, or the group has no live majority), it stops as a crash would, and the group waits for its restart; a one-machine server still stops. Otherwise it waits while a hand-over can still finish. It never just exits at `leave.ms` whatever happens: that left an only voter's group with no voter ([E-59], in 3 steps) *(checked)*. **Owed:** the exit rules under network partitions and stale messages, which E-59 did not model (V5-20's consequences).
 - **Restore** (`fero restore`, an admin step) runs per resource. A cursor from before is refused `bad-cursor`. A retry from before is answered `restored`, never re-run. Lock tokens restart above every token handed out ([E-33]).
 
 **Under test.**
@@ -2421,7 +2570,7 @@ Every failure is a `FeroError`. `code` says what, `outcome` says whether it may 
 
 | Code | Layer | When |
 |---|---|---|
-| `read-only` | L2 | the write gate is closed, or the server is near its `memory` |
+| `read-only` | L2 | the write gate is closed, or the server is near its `memory` once its whole-resource holds have ended (V5-20 item 3) |
 | `disk-full` | L0 | the disk is at its hard limit; reads go on |
 | `backpressure` | L4 | this client holds 512 waiting writes or 64 MB on top of its credit. A verb's handle rejects with it. **An assignment throws it**, since it has no handle. **A marked write never gets it**: it waits, and pauses its reader. Write in chunks of a few hundred (section 3.6) |
 | `too-many-views` | L3 | a SUB for a served view past a cap: this client holds `views.client` live served views on that copy, or the copy's served views weigh `views.max` by cost, less its headroom (section 3.10). The hint says to end a view, or to call with an argument already open: equal calls share one view |
@@ -2441,14 +2590,15 @@ Every failure is a `FeroError`. `code` says what, `outcome` says whether it may 
 
 | Code | Layer | When | Fields |
 |---|---|---|---|
-| `not-held` | L4 | an operator over every row left of `connect()` on a client without `hold: 'all'` (the types refuse it on a bare client; untyped code meets it at run time). Never a stale or partial answer, never a hidden trip. No sync read throws it since V5-16: a handle's `value` throws `not-ready` or `ended` instead. The hint names a view the server named, or `f.data.connect()` with the operator right of it | |
+| `not-held` | L4 | an operator over every row left of `connect()` on a client without `hold: 'all'` (the types refuse it on a bare client; untyped code meets it at run time). Never a stale or partial answer, never a hidden trip. No sync read throws it since V5-16: a handle's `value` throws `not-ready` or `ended` instead. The hint names a view the server named, or `f.data.connect()` with the operator right of it. **Also (V5-20 item 3):** a whole-resource hold that will not fit this process's `memory`, refused when it opens (the open, or the link's `ready` and `closed`, reject with it); and a live one that passed the line, which ends with it, its rows removed. The hint names `scan()` for one pass, a served view or a fold for a live one, or a larger `memory` | |
 | `not-ready` | L4 | **new (V5-13):** a handle's `value` read before its first picture: await `h.ready` | |
 | `ended` | L4 | **new (V5-13 pick 5):** a read of a partition's value, or of `h.value`, after its link ended. Copy what you keep while the link is live. Also `f.cluster.value` and `f.cluster.writes.value` after `destroy()` (V5-16) | |
 | `aborted` | L4 | a `get({ when })` or a link ended by its `signal` before it had what it waited for | |
-| `expired` | L3 | a reader's cursor, `-N` or `Date` is older than `history`; a past read before what is kept; a deriver whose source cut its log | `earliest` |
+| `expired` | L3 | a reader's cursor, `-N` or `Date` is older than `history`; a past read before what is kept; a deriver whose source cut its log below its marks, read again just before it stops (section 3.11) | `earliest` |
 | `bad-cursor` | L3 | text that is not a cursor, or a cursor of another resource or from before a restore | |
 | `redeployed` | L3 | **new (V5-14):** a served view whose method version or data build changed; the client takes a new picture | |
-| `view-too-big` | L3 | **new (V5-14):** a served view whose buckets pass `views.rows`; an ordered view over more than 5,000 rows, or `{ pages }` over more than 2,000, until data 5's ordered index. It refuses the SUB or ends the view, and stays until the method's code changes: a retry cannot help | |
+| `view-too-big` | L3 | **new (V5-14):** a served view whose buckets pass `views.rows`; an ordered view over more than 5,000 rows, or `{ pages }` over more than 2,000, until data 5's ordered index. It refuses the SUB, or ends the served instance the client follows: after a reload or a failover the view may be built again, and if it fits, it is served (V5-20 item 20). An ended instance never serves again | |
+| `scan-lost` | L3 | **new (V5-20):** a scan at one cut that passed a copy's image budget: the scan ends, never the writes. Scan again, or with `cut: false`. The budget is owed (section 3.13) | |
 | `schema-changed` | L4 | an old record or tape that the upcasters cannot bring to this version | |
 
 A link that ends for a reason other than your own end rejects its `closed` promise with the code (`expired`, `too-many-views`, a lost lease). `closed` is made only when first read, so a failure nobody reads prints one stderr line, never an unhandled rejection.
@@ -2473,8 +2623,9 @@ A link that ends for a reason other than your own end rejects its `closed` promi
 - A stage the write never reached rejects with the write's own error. Once a stage has resolved, the handle never ends in a refusal (section 3.5; MEMORY 9.6).
 - A function of yours that throws in a view or a `connect` callback never stops fero; it prints one line (V4-47).
 - A remove that finds nothing answers as done.
+- A marked write skipped at its mark answers `skipped: true`, never as applied (V5-20 item 17). A refused marked write that nobody awaits prints one line, once, and its loop goes on (section 3.11).
 - **The dev warnings** (not `FeroError`s; nothing throws). In development, fero prints one line naming the path of an open link whose handle was collected and that has no `signal`, no `until` and no parent (V5-13 pick 2); and one naming the line when a record-form `fn` reads `e.value` on a field record (V5-15 pick 4). The collector's timing never changes a result; the warning only points at a cost or a bug.
-- **Gone with COMP2:** `too-many-resources`, `node-config`, `needs-persisted`, `wrong-group`, health's `meta-down`. **Renamed:** `shortfall` and `holistic` to `not-held`; `unknown-log` to `bad-cursor`; `no-writer` to `no-leader`; `no-method` to `no-such-method`. **New with the lens (V5-12):** `bad-path`, `bad-key`, `too-many-views`. **New with V5-13 to V5-15:** `ended`, `not-ready`, `aborted`, `bad-name`, `bad-arg`, `bad-target`, `bad-position`, `bad-shape`, `view-too-big`, `redeployed`, `stale-client`, `derived`, `bucket-collision`, `too-many-outputs`; `moved` is now also a served view's `END` reason, which the client follows by itself. **New with V5-17:** `field-ttl` and `room-too-large`.
+- **Gone with COMP2:** `too-many-resources`, `node-config`, `needs-persisted`, `wrong-group`, health's `meta-down`. **Renamed:** `shortfall` and `holistic` to `not-held`; `unknown-log` to `bad-cursor`; `no-writer` to `no-leader`; `no-method` to `no-such-method`. **New with the lens (V5-12):** `bad-path`, `bad-key`, `too-many-views`. **New with V5-13 to V5-15:** `ended`, `not-ready`, `aborted`, `bad-name`, `bad-arg`, `bad-target`, `bad-position`, `bad-shape`, `view-too-big`, `redeployed`, `stale-client`, `derived`, `bucket-collision`, `too-many-outputs`; `moved` is now also a served view's `END` reason, which the client follows by itself. **New with V5-17:** `field-ttl` and `room-too-large`. **New with V5-20:** `scan-lost`; `not-held` also ends a hold past `memory`.
 
 ## 9. Config keys
 
@@ -2492,7 +2643,7 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 | `object` | `.fero/<project>/objects` on one box | the store where a resource's id is created once. Needed across machines ([E-51]) |
 | `project` | the `name` in the nearest `package.json` | scopes names in the directory: a project is machines plus a name lookup (V5-2 point 5) |
 | `secret`, `token`, `admin` | none | the members' secret (V4-30), a client's credential, the admin key. Never a flag |
-| `memory` | none | this process's memory bound; near it, writes are refused `read-only` |
+| `memory` | none *(a default is not set)* | this process's memory bound, **counted as RSS** (about 1.4 M small rows a GB). Health warns at 80 %; a whole-resource hold (`hold: 'all'`, a whole `connect()`) that will not fit is refused at open, `not-held`; a live one that passes the line ends `not-held` and its rows are removed. Near the line, whole-resource holds end first, then a server refuses writes `read-only` (V5-20 item 3; section 3.3) |
 | `ping.ms` | 500 | the ping between two machines when no other frame went that way: one per pair, not per group |
 | `evict.after` | as COMP2's page | how long a silent peer counts as live |
 | `settle.ms` | 30000 | how long a restarted member must be live and caught up before leadership is handed back to it (V5-7) |
@@ -2500,7 +2651,8 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 | `bulk.rate` (V5-17) | to be measured | the byte-rate cap on catch-up, installs and moves, on the link and the disk (V5-9) |
 | `connect.wait` | `10s` | how long an open looks before it says who is missing |
 | `linger.ms` (V5-17) | 1000 *(a guess, kept until measured: V5-17)* | how long a selection whose last link ended stays subscribed before the unsubscribe is sent, so that a link ended and made again at once (a re-render, a route change) does not unsubscribe and subscribe again (section 3.10) |
-| `uuid`, `redial.ms`, `redial.tries`, `leave.ms`, `journal.cap`, `diag.allow`, `shuffle` | v4's | v4's |
+| `leave.ms` | v4's | how long a clean stop may wait. A leaver exits as soon as the voters left have the new config, can commit without it and hold every committed entry; at `leave.ms`, if nothing can carry the group without it, it stops as a crash would and the group waits for its restart, and otherwise it waits while a hand-over can still finish (V5-20 item 23; section 7) |
+| `uuid`, `redial.ms`, `redial.tries`, `journal.cap`, `diag.allow`, `shuffle` | v4's | v4's |
 
 **The resource.** Stored in its own log at founding (V5-2); compared at every later open; changed with `fero.alter(name, change)`, online.
 
@@ -2519,7 +2671,7 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 | `skew.max`, `lag.max`, `catchup.max` | 250, 1000 records, as COMP2's page | were cluster keys in `#meta`. Each resource is its own cluster, so they are its own: in its settings record, changed by `alter`, since every copy must agree on them (LAYERS 5.3; reasoned). Under A-23 writer time has no window, so no member clamps it by `skew.max`; in [E-21] it is still the clock gap the time bounds allow, and part of a lock holder's margin (a round trip plus `skew.max`) |
 | `views.max` | 64 per copy, weighted by cost (V5-14 pick 2) | the cap on served views a copy keeps, each counted by data 5's cost class for its call (O(1), O(log n) or O(n) a change); lingering entries and `{ pages }` indexes count. With k ≥ 2 serving copies, `views.max / k` is kept free as headroom; with one, none. Past it, a SUB is refused `too-many-views` |
 | `views.client` (V5-17) | 16 per client per copy *(a guess, kept until measured: V5-17)* | how many served views one client may hold on a copy; a join counts |
-| `views.rows` (V5-17) | 1,000 *(a guess, kept until measured: V5-17)* | the most buckets a served view may hold, checked on every commit; past it, the view ends `view-too-big` until its code changes (TRANSFORMS 3.2) |
+| `views.rows` (V5-17) | 1,000 *(a guess, kept until measured: V5-17)* | the most buckets a served view may hold, checked on every commit; past it, the served instance ends `view-too-big`, and after a reload or a failover a view that fits again may be served (TRANSFORMS 3.2; V5-20 item 20). A fold's buckets have their own stated limit (section 3.10) |
 | `views.shapes` *(later, with class B)* | *(a guess, not set)* | how many class B shapes a copy runs; past it, a SUB is served as class A with the same answer |
 
 **`session.ms`** (10000) is not a key of an app's resource. Sessions live in the system resource `#sessions` (LAYERS section 10 item 5), so it is `#sessions`' own setting. An app sets it like any config key, in `fero.opt.ts` or `FERO_SESSION_MS`; the server that founds `#sessions` stores it, and a later change is `fero alter '#sessions'` *(proposed; LAYERS has not written who founds the system resources)*. P-13's "within `session.ms`" reads this one value.
@@ -2539,6 +2691,7 @@ The cascade is v4's and does not change (V4-10; code: api/config.ts): `--fero.<k
 - **No key for the rest.** The seven probe names, the dev warning (development only), the freeze of rows handed to sinks, the kinds of thing `until` takes, the row guards until data 5's index (5,000 and 2,000 rows), and a served entry's ring of 64 frames are fixed behaviour, not settings: each is a rule that keeps a result from depending on timing or on a library (LENS 2.1, 2.2, 2.7).
 
 - **`durability` is not a key in the first build.** Every write commits on disk at a majority (V5-5).
+- **No store key yet** (V5-21 items 1, 3 and 7). The first build has no compact row store. When `data` 5 builds its compact backing, behind its own store, a resource turns to it only by an explicit setting its author chooses, reading field types from its schema (P-20); the key is named then, as a resource key. Nothing switches by size, or by declaring a schema alone.
 - **Gone from COMP2's page:** `seeds` as "the founders", `copies.meta`, `copies.default`, `cache.memory`, and the whole `fero.alter('#meta', …)` door. **Gone from v4:** `replicas`, `heartbeat.ms`, `seams`. **Gone with the lens (V5-12):** `partition: { before }` (now `depth`) and `hold: 'asked'` (now the default). **Changed by V5-14:** `views.max` from 1,000 per resource to 64 per copy, weighted by cost; `views.client` now counts per copy.
 - **Proposed, untested** (from COMP2's page): `skew.max` 250 ms, `lag.max` 1,000 records, `session.ms` 10 s, `connect.wait` 10 s, a `once` name's life 1 day, a token's `ttl` 1 hour, a write's `timeout` 10 s (v4's).
 - Each new key gets what v4's rule asks: a row in `LEAVES`, a coercion if it needs one, a README row and a `config.test.ts` case ([CLAUDE.md](../../CLAUDE.md), "The two seams").
@@ -2697,8 +2850,8 @@ for await (const batch of await consumer(orders, 'billing')) {                  
 }
 ```
 
-**Guarantee.** Each share has one live owner at a time, with its own token, while most clocks are sound; when most are wrong, two can overlap, and the token still fences the older one's `commit()` (section 7, "Time"). A crash hands its shares on within one lease plus one commit. `commit()` gives at least once. `run()` with `{ from: e }` gives exactly once, even after a long restart: each output's own entry carries a mark of the source position it came from ([E-30]), and the library paces the loop, so a marked write is never dropped for `backpressure`. `run()` restarts from its share's cursor, which moves only once the marked writes up to it are answered; a write made again is skipped at its mark (section 3.11; the restart from the share's cursor is V5-17's). **Cost.** `run`: a share of one commit per output, with a 29 B mark; the outputs are not awaited, so they pipeline. `commit()`: one commit per share the batch read, so one for a batch from one share. Each share's lease: 3 commits a lease (V5-17; section 4). **Layer:** L5, over L3 and L2's lock check and marks.
-**Evidence.** Nothing skipped and no paused member committed (40 of 40, [E-22]; [E-30] past the dedup horizon). Pacing: 0 lost and 0 doubled in 1,000 seeds of E-55's stand-in (claim 21). E-30's model with `{ from: e }` written by app code is owed. The hand-on time is not measured.
+**Guarantee.** Each share has one live owner at a time, with its own token, while most clocks are sound; when most are wrong, two can overlap, and the token still fences the older one's `commit()` (section 7, "Time"). A crash hands its shares on within one lease plus one commit. `commit()` gives at least once. `run()` with `{ from: e }` gives exactly once, even after a long restart: each output's own entry carries a mark of the source position it came from ([E-30]), and the library paces the loop, so a marked write is never dropped for `backpressure`. `run()` awaits `fn` and restarts from its share's cursor, which moves only up, only past records whose `fn` returned and whose marked writes are answered, and is fenced by the share's token; a write made again is skipped at its mark and answers `skipped` (section 3.11; the restart from the share's cursor is V5-17's, the rest V5-20 items 17 and 18). **Cost.** `run`: a share of one commit per output, with a 29 B mark; the outputs are not awaited, so they pipeline. `commit()`: one commit per share the batch read, so one for a batch from one share. Each share's lease: 3 commits a lease (V5-17; section 4). **Layer:** L5, over L3 and L2's lock check and marks.
+**Evidence.** Nothing skipped and no paused member committed (40 of 40, [E-22]; [E-30] past the dedup horizon). Pacing: 0 lost and 0 doubled in 1,000 seeds of E-55's stand-in (claim 21). Marks written by app code, not awaited, through lost log tails, share moves with the old owner still running and an async `fn`: each record once on 42 bounds and in 4,000 seeded runs ([E-61]; V5-20 items 16 to 19). The pacing rule in a real client is owed. The hand-on time is not measured.
 
 ### P-09 Work queue
 
@@ -2772,8 +2925,8 @@ top.map((s) => s.player).connect((names) => draw(names))   // best on a server, 
 fan.data.best('ten')
 ```
 
-**Guarantee.** A view equals its query over the committed rows after each commit, as a value (data 5's merge contract). A view over every row on a client that does not hold the resource does not compile; that is why the screen calls the server's named view (class C). Equal calls share one view, on one copy chosen by a hash, never the leader. A copy keeps at most `views.max` (64) served views weighted by cost, a client `views.client` per copy; past either, `too-many-views`, and after failures a held view can still be refused, rarely (V5-14). Until data 5's ordered index, the leaderboard is refused past 5,000 rows. `map` right of `connect()` runs here and keeps the served order. **Cost.** The view is kept once, on its copy, for all equal calls, and costs that copy on every write to `scores`: 5.7 to 6.7 µs a change at 1,000 rows, 17.4 to 20.6 at 10,000 (E-57 A1); the team sums 1.8 to 4.9 µs. A screen receives only the view's changes, one encode for every subscriber. **Layer:** L4, data's operators; L3 for the served view.
-**Evidence.** E-57 A built served views small: a window, buckets, a scalar and a page, 144,843 checks with 0 unequal, through resumes, copy kills and redeploys (A1 to A8) *(checked)*. The `view` selector is not modelled (V5-14's owed list). `group` costs 2,574 µs a record at 1,000,000 rows against the 1 µs bar ([E-05]); `by(field).sum()` is 0.66 to 1.84 µs (E-57 B2).
+**Guarantee.** A view equals its query over the committed rows after each commit, as a value (data 5's merge contract). A view over every row on a client that does not hold the resource does not compile; that is why the screen calls the server's named view (class C). Equal calls share one view, on a server that holds its rows, chosen by a hash, preferring one that leads no group of `scores`; over several groups, one partial per group, merged at one cut (V5-20 items 1 and 13). A copy keeps at most `views.max` (64) served views weighted by cost, a client `views.client` per copy; past either, `too-many-views`, and after failures a held view can still be refused, rarely (V5-14). Until data 5's ordered index, the leaderboard is refused past 5,000 rows. `map` right of `connect()` runs here and keeps the served order. **Cost.** The view is kept once, on its copy, for all equal calls, and costs that copy on every write to `scores`: 5.7 to 6.7 µs a change at 1,000 rows, 17.4 to 20.6 at 10,000 (E-57 A1); the team sums 1.8 to 4.9 µs. A screen receives only the view's changes, one encode for every subscriber. **Layer:** L4, data's operators; L3 for the served view.
+**Evidence.** E-57 A built served views small: a window, buckets, a scalar and a page, 144,843 checks with 0 unequal, through resumes, copy kills and redeploys (A1 to A8) *(checked)*. The `view` selector holds every property in E-31's model, through a failover, a reload, a slot move and a slow reader ([E-60]) *(checked)*. `group` costs 2,574 µs a record at 1,000,000 rows against the 1 µs bar ([E-05]); `by(field).sum()` is 0.66 to 1.84 µs (E-57 B2).
 
 ### P-13 Presence
 
@@ -2865,8 +3018,8 @@ const counts = await fero<number>('counts', { server: true })   // the record fo
 await derive(orders, counts, (e) => { if (e.value) counts.data[e.value.user].set(op.incr(1), { from: e }) })
 ```
 
-**Guarantee.** The view form keeps `totals` equal to the sum per user over the rows of `orders`: it reads rows, not history, and after a deriver changes hands it bumps every target group, folds to a read barrier and writes the difference, so the target never steps back and never goes back to older code (V5-14 pick 5; E-57 B3: 0 of 1,000 seeds fail). In the record form, each record of `orders` changes `counts` exactly once, across crashes, restarts and moves, as long as `orders` keeps its log (its `history`, or the tier) back to the marks. A deriver that comes back after the log was cut stops with `expired` and says so; it never skips a record (LAYERS 8.8). `op.incr` is not idempotent, so this is the hard case on purpose. In the plain record form an order must be written whole, once: `e.value` is unset for a field write, so the `if` skips it; with `{ rows: true }` the function gets the row after and before, and a field write counts too (3.11). `derive()` paces the loop, so a marked write is never dropped for `backpressure`, runs it once by splitting the source's shares, and sends bare marks for idle slots (section 3.11). The four lines it is made of are exact only paced and in one process. **Cost.** The view form: the view on the deriver, 0.748 target writes per source commit, one fenced bump per target group at a takeover (E-57 B3). The record form, per source record: one delivery, one run of the function, a share of one commit, a 29 B mark. Run on three servers, the source is still read once. The writes are not awaited: 122,000 to 134,000 a second against 239 to 240 awaited (E-55 claim 21). **Layer:** L5.
-**Evidence.** The view form: 0 of 1,000 seeds fail through 11,810 deriver changes; as first planned, 514 failed (E-57 B3). The mark is model-checked: no output twice ([E-30]), and with two outputs of one record in one slot (E-57 B5). Pacing: as written, 998 of 1,000 seeds of E-55's stand-in lost outputs; paced, 0 lost and 0 doubled (E-55 review, claim 21). E-30's model with marks written by app code is owed.
+**Guarantee.** The view form keeps `totals` equal to the sum per user over the rows of `orders`: it reads rows, not history, and after a deriver changes hands it bumps every target group, folds to a read barrier and writes the difference, so the target never steps back and never goes back to older code (V5-14 pick 5; E-57 B3: 0 of 1,000 seeds fail). In the record form, each record of `orders` changes `counts` exactly once, across crashes, restarts and moves, as long as `orders` keeps its log (its `history`, or the tier) back to the marks. A deriver that comes back after the log was cut reads its marks again, and stops with `expired` and says so only if they are below what is kept; it never skips a record (LAYERS 8.8; E-61's pick, taken with V5-20). `op.incr` is not idempotent, so this is the hard case on purpose. In the plain record form an order must be written whole, once: `e.value` is unset for a field write, so the `if` skips it; with `{ rows: true }` the function gets the row after and before, and a field write counts too (3.11). `derive()` paces the loop, so a marked write is never dropped for `backpressure`, runs it once by splitting the source's shares, and sends bare marks for idle slots it joined (section 3.11). The four lines it is made of are exact only paced and in one process. **Cost.** The view form: the view on the deriver, 0.748 target writes per source commit, one fenced bump per target group at a takeover (E-57 B3). The record form, per source record: one delivery, one run of the function, a share of one commit, a 29 B mark. Run on three servers, the source is still read once. The writes are not awaited: 122,000 to 134,000 a second against 239 to 240 awaited (E-55 claim 21). **Layer:** L5.
+**Evidence.** The view form: 0 of 1,000 seeds fail through 11,810 deriver changes; as first planned, 514 failed (E-57 B3). The mark is model-checked: no output twice ([E-30]), and with two outputs of one record in one slot (E-57 B5). Pacing: as written, 998 of 1,000 seeds of E-55's stand-in lost outputs; paced, 0 lost and 0 doubled (E-55 review, claim 21). With marks written by app code: each record once on 42 bounds and in 4,000 seeded runs, with a cut source log stopping the reader `expired` and never skipping ([E-61]; V5-20 items 16 to 19).
 
 ### P-18 Tapes, forks, replays
 
@@ -2959,7 +3112,7 @@ if (m) { await sendMail(m.job.to); await m.ack() }
 
 ### 11.1 For the owner
 
-The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 closes 26 of them.** Each kept this page's pick, except four that went the other way: 22, 26, 33 and 38 (section 5.7). **Still open: question 28**, which waited for the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) and now, by [V5-18][dec], waits for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress). [V5-19][dec] closed two more the same day: question 4, settled in use but never named, and question 41, new with V5-17. The other twelve were closed before V5-17: V5-11 and V5-12 closed seven of the first fourteen, V5-13 to V5-16 closed 1, 5, 15 and 19 and the served-view half of 16, and TRANSFORMS 3.4 settled 21. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 were this page's picks where V5-13 to V5-15 leave room; 34 to 40 came from the patterns walk-through ([PATTERNS.md](PATTERNS.md)). Each says by what. [API-TOUR.md](API-TOUR.md) section 6 lists them the same way.
+The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 closes 26 of them.** Each kept this page's pick, except four that went the other way: 22, 26, 33 and 38 (section 5.7). Question 28 waited for the audit of what one group per resource assumes ([GROUPS.md](GROUPS.md)) and then, by [V5-18][dec], for the study of how work over every row is merged across groups ([MERGE.md](MERGE.md), [EVERYROW.md](EVERYROW.md)); **[V5-20][dec] closed it on 2026-11-23. None is open now.** [V5-19][dec] closed two more the same day: question 4, settled in use but never named, and question 41, new with V5-17. The other twelve were closed before V5-17: V5-11 and V5-12 closed seven of the first fourteen, V5-13 to V5-16 closed 1, 5, 15 and 19 and the served-view half of 16, and TRANSFORMS 3.4 settled 21. Questions 1 to 14 keep the first tour's numbers; 15 to 24 came with the 2026-11-18 page; 25 to 33 were this page's picks where V5-13 to V5-15 leave room; 34 to 40 came from the patterns walk-through ([PATTERNS.md](PATTERNS.md)). Each says by what. [API-TOUR.md](API-TOUR.md) section 6 lists them the same way.
 
 1. **`f.rows` for reads; what is `f.snapshot`?** **Closed by V5-13 pick 6 and V5-16**: `f.snapshot` goes (pick 6); `f.rows` goes too (V5-16, which supersedes pick 6's "`f.rows` stays"): every row is read in sync through `f.data.connect()`'s handle.
 2. **Verbs on the resource (`f.set`), or on `f.data` (`f.data.set`)?** **Closed by V5-12**: the path write is the main spelling; `f.set(path, v)` stays as the array form; `f.data.set` is the root's refused write.
@@ -2994,7 +3147,7 @@ The owner answered these one at a time on 2026-11-21 ([V5-17][dec]). **V5-17 clo
 25. **What a log entry below a row carries.** **Closed by V5-17**: `e.value` is the lens's value right after the record (`FieldEntry`).
 26. **The name of the open-links list.** **Closed by V5-17, the other way**: `f.cluster.value.links`, each with its path, kind, count and start time. This page had `open`.
 27. **Roles in the types.** **Closed by V5-17**: any server marker of section 3.1 types a server, and a handle opened with none is a client. So a handle typed by its rows only has no root operators.
-28. **Operators on a server's root.** **Still open.** The owner pointed out that moving from one group per resource to many may break what this question assumes, and asked for a study before building (V5-17). That audit, [GROUPS.md](GROUPS.md), has reported; the question now waits for the study of how work over every row is merged across groups, and of its alternatives (MERGE.md, in progress) (V5-18). The question as it stood: TRANSFORMS types a server's own root as a place where functions run (it holds every row). This page does the same for `hold: 'all'` and a handler's `ctx.data`; a partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types give the root no operators on any role**, since a name there is a room; CONNECT's and TRANSFORMS' sketches have the same gap. There a server declares a view, and code over every row reads `f.data.connect()`'s value. The other way types a depth-2 root's operators over (partition, row) keys and says how an operator name and a room name share the root. **On a spare server**, which holds no copy, this page reads TRANSFORMS R0: such a read first takes every row, as `hold: 'all'` does, so the line works on every server and only its cost depends on the deployment (section 3.3). The other way refuses it `not-held` there, as on a bare client: the line would then work on five servers and throw on the sixth.
+28. **Operators on a server's root.** **Closed by V5-20** (items 1, 3, 4 and 5; EVERYROW 7), for servers that hold only some groups. The owner pointed out that moving from one group per resource to many may break what this question assumes (V5-17); [GROUPS.md](GROUPS.md), [MERGE.md](MERGE.md) and [EVERYROW.md](EVERYROW.md) studied it (V5-18). Now: **one-time root code and a handler's loops over every row read with `scan()`**, on every server, a spare too, with no download; **live work over every row that merges is a served view, merged across groups, and live code that is a fold is a `{ fold }`**; and **only a sync read of every row and live code that is not a fold** (`f.data.connect()`, an operator over every row at a server's root, with `hold: 'all'` or in `ctx.data`) take what the server lacks first, as `hold: 'all'` does, bounded by this process's `memory`, never refused for being a spare (section 3.3). So the types keep operators at a server's root, with `hold: 'all'` and in `ctx.data`, as TRANSFORMS has them; a partition lens stays plain data left of `connect()` everywhere. **At `depth: 2` the types still give the root no operators on any role**, since a name there is a room (*this page's reading*; V5-20 does not touch it): a server declares a view or a fold, and code over every row reads `f.data.connect()`'s value or a scan. CONNECT's and TRANSFORMS' sketches have the same gap. The other way, not taken, types a depth-2 root's operators over (partition, row) keys and says how an operator name and a room name share the root.
 29. **How `moved` and `stale-client` show.** **Closed by V5-17**: fero follows `moved` itself; `stale-client` reaches the app.
 30. **A remove that finds nothing.** **Closed by V5-17**: it answers as done.
 31. **`f.cluster.tap(fn)` and `f.cluster.writes.tap(fn)`.** **Closed by V5-17**: they become `f.cluster.connect((shape) => …)` and `f.cluster.writes.connect((rows) => …)`, under a lens's link rules.
@@ -3033,15 +3186,16 @@ Each is a gap the records leave. None changes a call.
 
 **Owed, by decision.**
 - **V5-13:** the cost of `c.version` and `c.cursor` (bar 50 ns a commit); counting back for `-N` on a real log, a cold partition beside a hot one included; `past` as a value in a real build; the `ended` guard in a real build; the per-row version store that `if: { version }`, diff entries and `c.version` rest on, kept inside the row's entry and timed (CONNECT 3.6 and 9; +10.5 to +276 ns a write as a separate `Map`, *measured*, E-56 positions). Also owed from CONNECT 9: whether the dev warning fires in a browser, how often real apps leak with no net, whether React needs `useSyncExternalStore`, and a loop that takes its turn's diff when the body resumes.
-- **V5-13 pick 7:** a folded resume on a live link, `connect({ resume })`, in E-31's model with a client-held base, before it is offered.
-- **V5-14:** the `view` selector in [E-31]'s model (E-57 XA-14, not run); paging across a failover; a data upgrade under live views (Q-B11). **Three missed bars, stated:** a view build over 10^6 rows stalls its copy 0.2 to 1.9 s until data builds in slices (XA-1); a client that held a view can still be refused after failures, in 1 to 21 of 1,000 seeds by configuration (XA-2; TRANSFORMS 3.8; V5-14's consequences quote 5 to 21, its standby and leader-kill runs); the chunked ordered index costs 9.5 to 15.1 µs a write at 10^6 rows against a guessed 3 (XB-1). And the defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 and the row guards are guesses.
+- **V5-13 pick 7:** a folded resume on a live link, `connect({ resume })`, in E-31's model with a client-held base. **Done by [E-60]**: it keeps every property; V5-20 item 21 offers it later, when restarted screens matter, with the per-row versions owed above.
+- **V5-14:** the `view` selector in [E-31]'s model, **done by [E-60]**: every property holds but the old END wording, now restated (V5-20 item 20); paging across a failover; a data upgrade under live views (Q-B11). **Three missed bars, stated:** a view build over 10^6 rows stalls its copy 0.2 to 1.9 s until data builds in slices (XA-1); a client that held a view can still be refused after failures, in 1 to 21 of 1,000 seeds by configuration (XA-2; TRANSFORMS 3.8; V5-14's consequences quote 5 to 21, its standby and leader-kill runs); the chunked ordered index costs 9.5 to 15.1 µs a write at 10^6 rows against a guessed 3 (XB-1). And the defaults: `views.client`, `views.max`, `views.rows`, the ring of 64 and the row guards are guesses.
 - **V5-15:** the cost of an `equals` guard at the leader, and its size on the wire; a size rule for room writes; a build of the record form with rows; the "on the path" reader for the log below a row, with its run-time rule; a field's `-N`, read from the row's log back, unpriced.
 - **V5-16:** how often `lag` makes a new cluster shape (at every commit, a screen would redraw per commit); what replaces v4's `peers` (`me.peers`, [V5-19][dec], lists only members; v4's also counted clients), `me.uuid`, `me.hosts` and `me.origin`, which 23 of the 46 example lines that read the cluster use (section 5.1); the `ended` guard on `f.cluster.value` in a real build; the promise's cost on a real `get()`, measured here only on a stand-in; what an operator over every row costs on a spare server, which first downloads the resource (section 3.3; TRANSFORMS 10 item 10).
-- **V5-17:** the times of the lock, consumer and service rows of section 4; a service's delivery count (question 41) in E-22's checks; the merger study (MERGE.md) before question 28 is answered (V5-18); and `past` built in the first build, with claim 23 run on it (V5-13's list above).
-- **From V5-12, still owed:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27; E-57 A built one on its own harness); E-30's model with marks written by app code, including the reader name a mark goes under and `run()`'s restart from its share's cursor (questions 20 and 24, now V5-17's rules); the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
-- **data's changes** (V5-14 pick 6): data 5.0.0, D1 and D2 first (D1 needs a pin: claim 8 sits at its bar), then the merge contract C1 to C10 with its SCHEDULE clause and version bump, N1 to N9, D3, D4, D6 to D9, F1 to F3 (TRANSFORMS 9.1).
+- **V5-17:** the times of the lock, consumer and service rows of section 4; a service's delivery count (question 41) in E-22's checks; the merger study before question 28 is answered (V5-18), **done**: MERGE.md and EVERYROW.md, and V5-20 closed question 28; and `past` built in the first build, with claim 23 run on it (V5-13's list above).
+- **From V5-12, still owed:** the 22 patterns end to end on the new spelling (E-55 claim 25); a served view with its cap on the prototype (claim 27; E-57 A built one on its own harness); E-30's model with marks written by app code, including the reader name a mark goes under and `run()`'s restart from its share's cursor (questions 20 and 24, now V5-17's rules), **done by [E-61]** (V5-20 items 16 to 19); the pacing rule in a real client; a GET that carries the highest position seen, against copies that lag.
+- **V5-20 to V5-22:** the scan's image budget, its lease and `scan-lost`; the merger audit for folds; the guard by RSS in a seeded run, and which hold ends first when several share it; the merger on real sockets, with `data`'s views as the partials; the move window timed, which chooses between waiting and the two fallbacks (V5-22 item 5); a partial whose max and distinct keep an index; the standby merger study, which would close the gap through a rebuild; the exit rules of a clean stop under partitions and stale messages; a dev check for the two rules of code that writes marks; and a `memory` default.
+- **data's changes** (V5-14 pick 6): data 5.0.0, D1 and D2 first (D1 needs a pin: claim 8 sits at its bar), then the merge contract C1 to C10 with its SCHEDULE clause and version bump, N1 to N9, D3, D4, D6 to D9, F1 to F3 (TRANSFORMS 9.1). V5-20 adds chunked ordered views and quantiles, freeing a dropped source, and lifting the cap of 16,777,216 rows a source; V5-21 adds the key index split into small tables, operators that keep keys and the values they project, not whole rows, and later a compact backing that covers holds and servers' own rows (V5-21 items 2, 5 and 6).
 
-**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-16 on the same day, and for V5-17 on 2026-11-21; its table "What V5-12 to V5-17 changed" says where each change lands there. It carries V5-17's answers to questions 25 to 33 in its section 10 item 46, and counts `past` in the first build (its 0.2). Questions 34 to 41 are about the libraries' meanings and are not in it. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
+**Where this page and [LAYERS.md](LAYERS.md) stand.** LAYERS.md was updated for V5-13 to V5-16 on the same day, and for V5-17 on 2026-11-21; its table "What V5-12 to V5-17 changed" says where each change lands there. It carries V5-17's answers to questions 25 to 33 in its section 10 item 46, and counts `past` in the first build (its 0.2). Questions 34 to 41 are about the libraries' meanings and are not in it. V5-20 to V5-22 change it in the same rewrite as this page: their consequences name its sections. Its section 10 item 23 asks for one of the two meanings of `busy` to be renamed: this page uses it for "every server tried has a stalled main thread"; DESIGN-V5 4.2 uses it for a member already loading two snapshots.
 
 ### 11.3 Carried from COMP2's page
 
@@ -3087,7 +3241,7 @@ declare const UserV3: import('fero').Schema<{ id: string; name: { first: string;
 ```ts
 // file: types.ts — what must and must not type-check
 import { fero, op, saga, lock, derive, type Cond, type Early, type Entry, type FieldEntry, type Judged, type Write,
-  type Version, type Cursor, type Rows, type Live, type Link, type Commit, type Turn, type Past, type Changes } from 'fero'
+  type Version, type Cursor, type Rows, type Live, type Link, type Commit, type Turn, type Past, type Changes, type Scalar } from 'fero'
 import type { Fans, Fan, Orders, Products } from './servers.ts'
 
 // ── writes and their handle (V5-5, V5-11)
@@ -3396,7 +3550,14 @@ await fero.of<Part>()('names', { methods: {
   connect: { at: 'row', run: (k: number, ctx) => ctx.at.stock.set(k) },
   // @ts-expect-error nor an operator's name at the root ('bad-name' when the server opens)
   za: { view: (k: number, ctx) => ctx.data.za('stock', k) },
+  // @ts-expect-error nor scan, the root's own read verb (V5-20 item 4)
+  scan: { view: (k: number, ctx) => ctx.data.za('stock', k) },
   best: { view: (k: number, ctx) => ctx.data.za('stock', k) },
+} })
+await fero.of<Part>()('sums', { methods: {
+  sold: { fold: { emit: (p) => [['all', p.stock]], combine: 'sum' } },   // a fold with fero's sum
+  // @ts-expect-error a fold's combine is one of fero's own (V5-20 item 5): combines the author writes come later
+  own: { fold: { emit: (p) => [['all', p.stock]], combine: (a: number, b: number) => a + b } },
 } })
 await fero.of<{ cents: number }>()('wallet', { methods: {
   pay: { at: 'row', run: async (n: number, ctx) => ((await ctx.at.get())?.cents ?? 0) >= n },   // local at the leader
@@ -3426,6 +3587,12 @@ const fans = await fero<Fans>('fans'), orders = await fero<Orders>('orders'), pr
 const top = fans.data.best(10).connect()
 const t13: Eq<typeof top.value, readonly Fan[]> = true                                              // a window: rank order
 const t14: Eq<Awaited<ReturnType<ReturnType<typeof fans.data.byTeam>['get']>>, ReadonlyMap<string, number>> = true   // buckets: a Map
+const t15: Eq<Awaited<ReturnType<ReturnType<typeof fans.data.tiers>['get']>>, ReadonlyMap<Scalar, number>> = true   // a fold: a Map per bucket
+const t16: Eq<ItemOf<ReturnType<typeof f.data.scan>>, [key: string, row: N, partition: string]> = true   // a scan: every row once
+// @ts-expect-error a fold takes no argument: one answer for every caller (V5-20 item 5)
+fans.data.tiers(5)
+// @ts-expect-error scan() reads every row of the resource, at the root: read one row once with get()
+f.data.k.scan()
 // @ts-expect-error a served view takes no operators left of the line
 fans.data.best(10).za('points', 3)
 // @ts-expect-error a served view is an address, not a promise: get() it
@@ -3484,8 +3651,10 @@ await fero('x', { server: true, copies: 2 })
 await fero('x', { server: true, history: '7 days' })
 // @ts-expect-error a stream keeps no rows (rows: false): there is no state to connect to; read its log
 await fero<Msg>('news', { server: true, rows: false }).then((s) => s.data.x.connect())
+// @ts-expect-error nor rows to scan
+await fero<Msg>('news', { server: true, rows: false }).then((s) => s.data.scan())
 console.log(cond, acks, held, n1, n2, all2, viaResolve, row1, best, mine, last5, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12,
-  n, who, rich, richRows, n3, t13, t14, wrongRows, w1, inFlight)
+  n, who, rich, richRows, n3, t13, t14, t15, t16, wrongRows, w1, inFlight)
 ```
 
 The checker writes every `// file:` block to a fresh folder and runs `tsc` against data's `types/public.d.ts`. Then, in a copy where each `@ts-expect-error` is a plain comment, each line it marks must fail at its own line, and nothing else may (the strip proof, as on CONNECT.md, TRANSFORMS.md and ANYPATH.md):
@@ -3539,7 +3708,9 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 ```
 
 **Result, run here on 2026-11-21, after the V5-19 amendment** (Node v22.22.0, TypeScript 6.0.2, data at 63fea66): `ok: 42 blocks type-check (tsc Version 6.0.2)`, then `148 marked lines, 148 fail at their own line, 0 errors elsewhere`. V5-17 added the line for the cluster's `open`, now `links`; V5-19 added the one for `me.links`, now `me.peers`.
-- **Where the 147 are:** 139 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
+
+**Result, run here on 2026-11-23, after the V5-20 to V5-22 amendment** (Node v22.23.5, TypeScript 6.0.2), **against a stand-in for `data`'s types**: `data` was not reachable for this run. `fero.d.ts` takes one type from it, `ChangeRecordV2`, and uses it only as an opaque record, so a one-type stand-in ran in its place; with it, the 2026-11-21 page gave its own result again (42 blocks; 148 of 148). This page: `ok: 43 blocks type-check (tsc Version 6.0.2)`, then `153 marked lines, 153 fail at their own line, 0 errors elsewhere`. V5-20 added the block `scan.ts` and five lines. **Owed:** the run against `data` itself.
+- **Where the 153 are:** 145 in `types.ts`, six in `client.ts`, one in `p12.ts` and one in `p14.ts`. Each fails for the reason its comment gives:
 
 | `types.ts` group | The wrong uses | tsc |
 |---|---|---|
@@ -3554,6 +3725,7 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 | the line | `filter`, `limit`, `lookup` left of `connect()`; `by(fn)`; `sum('text')`; `eq` on an object; `gt` on a string; an operator over every row on a bare client | TS2349 with the fix in the type's text; TS2345 against `ScalarF` and `NumF` |
 | methods | a wrong or missing argument; `connect()` on an action's answer; a view given `{ once }`; `f.methods`; the door client's `set`, `remove`, `touch`, `batch`, `at().set`, `mark`, `claim`; a row method at the root or on a field; a root method on a path; `call()` with a name not allowed there, or unknown; the depth-2 `at:` cases; a method named `connect` or `za`; `fero<Row>(name, { methods })` | TS2345; TS2554; TS2339; TS2349; TS2345 on `call()`'s names; TS2322 on the method, with the `NoClash` text; TS2769 |
 | served views and pages (V5-14) | an operator after a served view; `await` a served view; `c.order` on a scalar; a lookup's `other` used unchecked; a lookup on a missing field; a 2-part cursor at depth 2; `derive` of `group`, into the wrong target, by a boolean; a `{ view }` unbounded, of `limit`, of `group`, of a page after a cursor; `{ pages }` over buckets; a view that reads `claims`; `lookup` inside a view | TS2339; TS2740; TS2339; TS18049; TS2345; TS2345; TS2345 against the view form; TS2322 on the method, with `CheckViews`' text; TS2339: no `claims` on `ViewCtx`; TS2349 |
+| every row (V5-20) | `scan()` on a row; a method named `scan`; a fold given an argument; a fold whose combine the author wrote; `scan()` on a stream | TS2339: a row lens has no `scan`; TS2322 on the method, with the `NoClash` text; TS2554; TS2322: not a `Combine`; TS2349: a stream's `scan` is a `Steer` |
 | options | `depth` and `data` in `fero.alter`; `depth: 3`; `{ before }`; `hold: 'asked'`; `copies: 2`; a history in words; `connect()` on a stream | TS2353; TS2769; TS2349: a stream's lens has no state |
 
 - **Several must-fail lines fail for a reason the types cannot say in words.** A step named like a verb (`shop.data.sell(1)` at the root, `f.data.set(…)`, a row method on a depth-2 partition) fails with "This expression is not callable": on those lenses the name is a step to a row or field of that name, and a lens is not callable. Where a `Steer` is involved, its text in the message names the fix.
@@ -3598,3 +3770,9 @@ node --input-type=module -e "$(awk '/^```js check$/{f=1;next} /^```$/{f=0} f' do
 [E-56]: experiments/E56-one-connect/README.md
 [E-57]: experiments/E57-transforms/README.md
 [E-58]: experiments/E58-any-path/README.md
+[E-59]: experiments/E59-growth-and-stop/README.md
+[E-60]: experiments/E60-view-selector/README.md
+[E-61]: experiments/E61-marks-from-code/README.md
+[E-65]: experiments/E65-every-row/README.md
+[E-66]: experiments/E66-compact-rows/README.md
+[E-67]: experiments/E67-merge-rule4/README.md
