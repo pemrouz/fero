@@ -142,6 +142,8 @@ First failures of (b0) by the last picture event before them:
 | 100,000 | 1 | 20.6 to 23.6 | 7.78 to 8.33 |
 | 100,000 | 4 | 84.3 to 89.2 | 8.39 to 11.4 |
 | 100,000 | 16 | 254 to 286 | 8.58 to 14.0 |
+| 1,000,000 | 1 | 464 to 631 | 174 to 252 |
+| 1,000,000 | 4 | 1487 to 1598 | 215 to 397 |
 
 **The ring** (fix b): the partial on a copy, per record; encoded as JSON for a ring of bytes; and a resend of R frames taken by the merger.
 

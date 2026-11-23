@@ -37,7 +37,9 @@ run_par() { # stdin's command lines, PAR at a time, under one hold of the heavy 
   $HEAVY sh -c 'xargs -P "$PAR" -I{} sh -c "{} >> \"$OUT/sim.jsonl\""'
 }
 bench_once() {
-  for p in picture install ring movepart; do $NODE --expose-gc bench/bench.mjs --part=$p; done
+  $NODE --expose-gc bench/bench.mjs --part=picture
+  $NODE --expose-gc bench/bench.mjs --part=install --n=10000,100000,1000000
+  for p in ring movepart; do $NODE --expose-gc bench/bench.mjs --part=$p; done
 }
 
 case "$part" in

@@ -76,3 +76,15 @@
 {"run":3,"part":"movepart","n":1000000,"slots":1,"rows":244,"partMs":0.783953,"rowsBytes":12123}
 {"run":3,"part":"movepart","n":1000000,"slots":8,"rows":1953,"partMs":3.518398,"rowsBytes":100455}
 {"run":3,"part":"movepart","n":1000000,"slots":64,"rows":15625,"partMs":29.12863,"rowsBytes":830468}
+{"run":1,"part":"install","n":1000000,"G":1,"keys":"one","installMs":630.726615}
+{"run":1,"part":"install","n":1000000,"G":1,"keys":"group","installMs":252.374602}
+{"run":1,"part":"install","n":1000000,"G":4,"keys":"one","installMs":1598.180755}
+{"run":1,"part":"install","n":1000000,"G":4,"keys":"group","installMs":397.429938}
+{"run":2,"part":"install","n":1000000,"G":1,"keys":"one","installMs":486.89653}
+{"run":2,"part":"install","n":1000000,"G":1,"keys":"group","installMs":174.244435}
+{"run":2,"part":"install","n":1000000,"G":4,"keys":"one","installMs":1486.561498}
+{"run":2,"part":"install","n":1000000,"G":4,"keys":"group","installMs":215.325759}
+{"run":3,"part":"install","n":1000000,"G":1,"keys":"one","installMs":464.29266}
+{"run":3,"part":"install","n":1000000,"G":1,"keys":"group","installMs":246.391615}
+{"run":3,"part":"install","n":1000000,"G":4,"keys":"one","installMs":1549.515998}
+{"run":3,"part":"install","n":1000000,"G":4,"keys":"group","installMs":356.303946}
