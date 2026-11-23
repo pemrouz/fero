@@ -1,0 +1,599 @@
+# view: the design, then the strict reading of END and each planted bug, on the sweep and verify bounds, 2026-11-23T01:43:55Z, Python 3.13.17, 4 vCPU, load 5.54 3.83 3.56
+view fo: 129,355 states, 8.6s: all hold
+    P5: 129,355 judged states, 0 cannot reach the goal
+view mv: 313,416 states, 20.7s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+view big: 70,483 states, 4.5s: all hold
+    P5: 70,483 judged states, 0 cannot reach the goal
+view ring2: 85,666 states, 5.5s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+view fifo: 156,832 states, 12.2s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+view bfo: 136,072 states, 7.9s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+view fo2: 898,392 states, 64.6s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+view mvf: 463,751 states, 29.7s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+strict fo: 129,355 states, 8.1s: all hold
+    P5: 129,355 judged states, 0 cannot reach the goal
+strict mv: 313,416 states, 19.9s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+strict big: 26,818 states, 1.4s: E4 (15 steps) (STOPPED AT THE STATE LIMIT)
+  E4: shortest trace, 15 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. connect (('x', 1),)
+     8. build (('x', 1),)
+     9. pic (('x', 1),)
+    10. reload FA1
+    11. loaded FA1
+    12. build (('x', 1),)
+    13. gotpic (('x', 1),)
+    14. pic (('x', 1),)
+    15. gotpic (('x', 1),)
+strict ring2: 85,666 states, 5.4s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+strict fifo: 156,832 states, 11.8s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+strict bfo: 136,072 states, 8.0s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+strict fo2: 898,392 states, 64.4s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+strict mvf: 463,751 states, 30.3s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+copyinst fo: 17,849 states, 0.8s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+copyinst mv: 36,122 states, 2.0s: V1 (13 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 13 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. fence 1
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 4),)
+    10. bopen ()
+    11. build (('x', 4),)
+    12. res (('x', 4),)
+    13. gotres (('x', 4),)
+copyinst big: 12,950 states, 0.7s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+copyinst ring2: 12,397 states, 0.6s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+copyinst fifo: 15,818 states, 0.9s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+copyinst bfo: 19,387 states, 0.9s: V1 (13 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 13 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. fence 1
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 4),)
+    10. bopen ()
+    11. build (('x', 4),)
+    12. res (('x', 4),)
+    13. gotres (('x', 4),)
+copyinst fo2: 42,346 states, 2.1s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+copyinst mvf: 34,814 states, 1.5s: P6 (12 steps), V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  P6: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. apply FA1
+     4. connect (('x', 1),)
+     5. build (('x', 1),)
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. crash FA1
+     9. connect (('x', 2),)
+    10. build (('x', 2),)
+    11. res (('x', 2),)
+    12. gotres (('x', 2),)
+incinst fo: 18,229 states, 0.9s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+incinst mv: 313,416 states, 19.4s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+incinst big: 13,006 states, 0.5s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+incinst ring2: 12,413 states, 0.5s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+incinst fifo: 15,849 states, 0.7s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+incinst bfo: 28,205 states, 1.3s: V1 (14 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 14 steps
+     1. fence 0
+     2. connect (('x', 4),)
+     3. bopen ()
+     4. propose 1
+     5. commit 1
+     6. build (('x', 4),)
+     7. pic (('x', 4),)
+     8. gotpic (('x', 4),)
+     9. crash FB
+    10. restart FB
+    11. connect (('x', 4),)
+    12. build (('x', 4),)
+    13. res (('x', 4),)
+    14. gotres (('x', 4),)
+incinst fo2: 42,901 states, 2.0s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+incinst mvf: 36,749 states, 1.8s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. pic (('x', 1),)
+     6. gotpic (('x', 1),)
+     7. crash FA1
+     8. restart FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. res (('x', 1),)
+    12. gotres (('x', 1),)
+framepos fo: 129,371 states, 7.8s: all hold
+    P5: 129,371 judged states, 0 cannot reach the goal
+framepos mv: 313,472 states, 20.2s: all hold
+    P5: 313,472 judged states, 0 cannot reach the goal
+framepos big: 70,483 states, 4.0s: all hold
+    P5: 70,483 judged states, 0 cannot reach the goal
+framepos ring2: 11,831 states, 0.6s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. connect (('x', 1),)
+     6. build (('x', 1),)
+     7. pic (('x', 1),)
+     8. apply FA1
+     9. apply FA1
+    10. gotpic (('x', 1),)
+    11. frm (('x', 1),)
+    12. gotfrm (('x', 1),)
+framepos fifo: 14,941 states, 0.8s: V1 (12 steps) (STOPPED AT THE STATE LIMIT)
+  V1: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. connect (('x', 1),)
+     6. build (('x', 1),)
+     7. pic (('x', 1),)
+     8. apply FA1
+     9. apply FA1
+    10. frm (('x', 1),)
+    11. gotpic (('x', 1),)
+    12. gotfrm (('x', 1),)
+framepos bfo: 136,072 states, 8.5s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+framepos fo2: 898,392 states, 65.5s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+framepos mvf: 463,751 states, 29.7s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+ownseq fo: 12,461 states, 0.6s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq mv: 15,845 states, 0.7s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq big: 8,919 states, 0.4s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq ring2: 8,554 states, 0.3s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq fifo: 10,434 states, 0.4s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. resub C
+     8. gotpic (('x', 1),)
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq bfo: 8,550 states, 0.3s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq fo2: 26,303 states, 1.3s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+ownseq mvf: 23,622 states, 1.0s: D1 (11 steps) (STOPPED AT THE STATE LIMIT)
+  D1: shortest trace, 11 steps
+     1. propose 1
+     2. commit 1
+     3. connect (('x', 1),)
+     4. build (('x', 1),)
+     5. apply FA1
+     6. pic (('x', 1),)
+     7. gotpic (('x', 1),)
+     8. drop C
+     9. connect (('x', 1),)
+    10. res (('x', 1),)
+    11. gotres (('x', 1),)
+leadserve fo: 204 states, 0.0s: PL1 (4 steps) (STOPPED AT THE STATE LIMIT)
+  PL1: shortest trace, 4 steps
+     1. crash LA
+     2. connect (('x', 1),)
+     3. build (('x', 1),)
+     4. pic (('x', 1),)
+leadserve mv: 163 states, 0.0s: PL1 (4 steps) (STOPPED AT THE STATE LIMIT)
+  PL1: shortest trace, 4 steps
+     1. crash LA
+     2. connect (('x', 1),)
+     3. build (('x', 1),)
+     4. pic (('x', 1),)
+leadserve big: 70,483 states, 4.2s: all hold
+    P5: 70,483 judged states, 0 cannot reach the goal
+leadserve ring2: 85,666 states, 5.5s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+leadserve fifo: 156,832 states, 11.5s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+leadserve bfo: 136,072 states, 8.7s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+leadserve fo2: 898,392 states, 62.7s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+leadserve mvf: 463,751 states, 30.3s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+noinst fo: 129,355 states, 8.8s: all hold
+    P5: 129,355 judged states, 0 cannot reach the goal
+noinst mv: 313,416 states, 20.9s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+noinst big: 70,483 states, 4.5s: all hold
+    P5: 70,483 judged states, 0 cannot reach the goal
+noinst ring2: 85,666 states, 5.6s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+noinst fifo: 156,832 states, 12.2s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+noinst bfo: 136,072 states, 8.3s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+noinst fo2: 898,392 states, 65.5s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+noinst mvf: 463,751 states, 29.4s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+endatfold fo: 129,355 states, 8.4s: all hold
+    P5: 129,355 judged states, 0 cannot reach the goal
+endatfold mv: 313,416 states, 19.3s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+endatfold big: 9,545 states, 0.4s: E3 (12 steps) (STOPPED AT THE STATE LIMIT)
+  E3: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. apply FA1
+     8. apply FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. apply FA1
+    12. pic (('x', 1),)
+endatfold ring2: 85,666 states, 5.6s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+endatfold fifo: 156,832 states, 11.2s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+endatfold bfo: 136,072 states, 7.7s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+endatfold fo2: 898,392 states, 61.2s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+endatfold mvf: 463,751 states, 29.0s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+picfits fo: 129,355 states, 8.5s: all hold
+    P5: 129,355 judged states, 0 cannot reach the goal
+picfits mv: 313,416 states, 20.2s: all hold
+    P5: 313,416 judged states, 0 cannot reach the goal
+picfits big: 9,546 states, 0.4s: E3 (12 steps) (STOPPED AT THE STATE LIMIT)
+  E3: shortest trace, 12 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. apply FA1
+     8. apply FA1
+     9. connect (('x', 1),)
+    10. build (('x', 1),)
+    11. apply FA1
+    12. pic (('x', 1),)
+picfits ring2: 85,666 states, 5.6s: all hold
+    P5: 85,666 judged states, 0 cannot reach the goal
+picfits fifo: 156,832 states, 11.6s: all hold
+    P5: 156,832 judged states, 0 cannot reach the goal
+picfits bfo: 136,072 states, 8.1s: all hold
+    P5: 136,072 judged states, 0 cannot reach the goal
+picfits fo2: 898,392 states, 63.5s: all hold
+    P5: 898,392 judged states, 0 cannot reach the goal
+picfits mvf: 463,751 states, 30.0s: all hold
+    P5: 463,751 judged states, 0 cannot reach the goal
+strict mvbig: 129,368 states, 6.9s: E4 (15 steps) (STOPPED AT THE STATE LIMIT)
+  E4: shortest trace, 15 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. connect (('x', 1),)
+     8. build (('x', 1),)
+     9. pic (('x', 1),)
+    10. reload FA1
+    11. loaded FA1
+    12. build (('x', 1),)
+    13. gotpic (('x', 1),)
+    14. pic (('x', 1),)
+    15. gotpic (('x', 1),)

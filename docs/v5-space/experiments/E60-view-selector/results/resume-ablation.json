@@ -1,0 +1,3389 @@
+{
+ "bounds": [
+  "fo",
+  "mv",
+  "tw"
+ ],
+ "verify": [
+  "fo2"
+ ],
+ "pinned": [
+  "bopen.phase",
+  "diff.held",
+  "load.rows",
+  "gc.drop"
+ ],
+ "base": {
+  "fo": {
+   "states": 96837,
+   "secs": 21.8,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    96837,
+    455535,
+    2412485846419957105
+   ],
+   "judged": {
+    "P5": [
+     96837,
+     0
+    ]
+   }
+  },
+  "mv": {
+   "states": 327908,
+   "secs": 93.91,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    327908,
+    1762752,
+    14100202605756595509
+   ],
+   "judged": {
+    "P5": [
+     327908,
+     0
+    ]
+   }
+  },
+  "tw": {
+   "states": 349571,
+   "secs": 72.94,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    349571,
+    1837488,
+    10338323416338319079
+   ],
+   "judged": {
+    "P5": [
+     349571,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "snap.req",
+   "dropped"
+  ],
+  [
+   "snap.holds",
+   "dropped"
+  ],
+  [
+   "diff.req",
+   "dropped"
+  ],
+  [
+   "diff.loaded",
+   "dropped"
+  ],
+  [
+   "diff.holds",
+   "dropped"
+  ],
+  [
+   "diff.behind",
+   "dropped"
+  ],
+  [
+   "diff.send",
+   "dropped"
+  ],
+  [
+   "fres.req",
+   "dropped"
+  ],
+  [
+   "fres.holds",
+   "dropped"
+  ],
+  [
+   "fres.send",
+   "dropped"
+  ],
+  [
+   "notready.unready",
+   "dropped"
+  ],
+  [
+   "gotdiff.add",
+   "dropped"
+  ],
+  [
+   "gotdiff.del",
+   "dropped"
+  ],
+  [
+   "gotdiff.cursor",
+   "dropped"
+  ],
+  [
+   "gotdiff.credit",
+   "dropped"
+  ],
+  [
+   "gotretry.is",
+   "dropped"
+  ],
+  [
+   "connect.alive",
+   "dropped"
+  ],
+  [
+   "fres.loaded",
+   "dropped in the final pass"
+  ],
+  [
+   "fres.cursor",
+   "dropped in the final pass"
+  ],
+  [
+   "fres.window",
+   "dropped in the final pass"
+  ],
+  [
+   "gotsnap.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotdiff.is",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfres.add",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfres.del",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfres.cursor",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfres.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "load.floor",
+   "dropped in the final pass"
+  ],
+  [
+   "gc.floor",
+   "dropped in the final pass"
+  ],
+  [
+   "bopen.floor",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfres.is",
+   "dropped in the final pass"
+  ]
+ ],
+ "removed": [
+  "snap.req",
+  "snap.holds",
+  "diff.req",
+  "diff.loaded",
+  "diff.holds",
+  "diff.behind",
+  "diff.send",
+  "fres.req",
+  "fres.holds",
+  "fres.send",
+  "notready.unready",
+  "gotdiff.add",
+  "gotdiff.del",
+  "gotdiff.cursor",
+  "gotdiff.credit",
+  "gotretry.is",
+  "connect.alive",
+  "fres.loaded",
+  "fres.cursor",
+  "fres.window",
+  "gotsnap.credit",
+  "gotdiff.is",
+  "gotfres.add",
+  "gotfres.del",
+  "gotfres.cursor",
+  "gotfres.credit",
+  "load.floor",
+  "gc.floor",
+  "bopen.floor",
+  "gotfres.is"
+ ],
+ "put_back": [],
+ "limited": [],
+ "minimal": {
+  "fo": {
+   "states": 24894,
+   "secs": 1.36,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    24894,
+    111845,
+    3604190426437567486
+   ],
+   "judged": {
+    "P5": [
+     24894,
+     0
+    ]
+   }
+  },
+  "mv": {
+   "states": 64152,
+   "secs": 3.91,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    64152,
+    327524,
+    2599506019646096939
+   ],
+   "judged": {
+    "P5": [
+     64152,
+     0
+    ]
+   }
+  },
+  "tw": {
+   "states": 84737,
+   "secs": 5.38,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    84737,
+    433320,
+    9694687206817501285
+   ],
+   "judged": {
+    "P5": [
+     84737,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "fo2": {
+   "states": 65726,
+   "secs": 4.0,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    65726,
+    335292,
+    5216531100425226799
+   ],
+   "judged": {
+    "P5": [
+     65726,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "snap.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "snap.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a copy answers only once its snapshot has loaded",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P3",
+    2,
+    [
+     "P3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "snap",
+     "(('x', 2),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "snap.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "snap.cursor",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "never before its fold has reached the cursor",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "snap.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    5,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "gc",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "diff.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "diff.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "diff.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "diff.behind",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": "<",
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "diff.held",
+   "kind": "guard",
+   "role": "serve",
+   "note": "a diff from the cursor needs the records after it; else a snapshot",
+   "cmp": "<=",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "diff.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "fres.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "fres.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P3",
+    3,
+    [
+     "P3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "fres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "fres.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "fres.cursor",
+   "kind": "guard",
+   "role": "cursor",
+   "note": "the copy waits until its fold reaches the client's cursor",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "P2",
+    10,
+    [
+     "F1",
+     "P2",
+     "P6"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    10,
+    [
+     "F1",
+     "P2",
+     "P6"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "fres",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "fres.window",
+   "kind": "guard",
+   "role": "tomb",
+   "note": "its tombstones reach back to the cursor; else a new picture",
+   "cmp": "<=",
+   "alone": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ],
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 1),)"
+    ],
+    [
+     "load",
+     "(('x', 1),)"
+    ],
+    [
+     "fres",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "fres.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "rows whose version is newer than the cursor, and tombstones newer than it; never the log",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "notready.unready",
+   "kind": "guard",
+   "role": "answer",
+   "note": "an unloaded replica, A once fenced, or B before it opens: go elsewhere",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "notready.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "notready",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "notready",
+     "(('x', 2),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.clear",
+   "kind": "update",
+   "role": "replace",
+   "note": "a snapshot replaces the view",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P2",
+    16,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P2",
+    14,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.rows",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotsnap.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotdiff.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotdiff",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotdiff.add",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotdiff.del",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotdiff.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotdiff.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotfres.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "F1",
+    3,
+    [
+     "F1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "F1",
+    3,
+    [
+     "F1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfres.add",
+   "kind": "update",
+   "role": "replace",
+   "note": "a row set after the cursor replaces the row",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    6,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    6,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "fres",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfres.del",
+   "kind": "update",
+   "role": "replace",
+   "note": "tombstones remove rows",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "fres",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfres.cursor",
+   "kind": "update",
+   "role": "cursor",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    6,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    6,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "fres",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfres.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "fres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotretry.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotretry.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotretry.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "connect.alive",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "connect.link",
+   "kind": "update",
+   "role": "seq",
+   "note": "connect({ resume: cursor }): the SUB carries the base's cursor",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": []
+  },
+  {
+   "id": "save.rows",
+   "kind": "update",
+   "role": "base",
+   "note": "the saved rows ...",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ]
+  },
+  {
+   "id": "save.cur",
+   "kind": "update",
+   "role": "base",
+   "note": "... with the cursor they are at, in one record",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ]
+  },
+  {
+   "id": "load.rows",
+   "kind": "update",
+   "role": "world",
+   "note": "the snapshot loads: rows and versions at the commit offset, no tombstones",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "fo2",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "reload",
+     "FA"
+    ]
+   ]
+  },
+  {
+   "id": "load.floor",
+   "kind": "update",
+   "role": "tomb",
+   "note": "a loaded snapshot starts the copy's window at its position",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    14,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ],
+    [
+     "reload",
+     "FA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 1),)"
+    ],
+    [
+     "load",
+     "(('x', 1),)"
+    ],
+    [
+     "fres",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gc.drop",
+   "kind": "update",
+   "role": "world",
+   "note": "the window passes: tombstones at or below the fold are dropped",
+   "cmp": null,
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "gc.floor",
+   "kind": "update",
+   "role": "tomb",
+   "note": "the floor follows the tombstones dropped",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P2",
+    15,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P2",
+    15,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "gc",
+     "(('x', 0),)"
+    ],
+    [
+     "fres",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.committed",
+   "kind": "guard",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.seen",
+   "kind": "guard",
+   "role": "write",
+   "note": "a write resolves once its writer's subscription has passed it",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.res",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": []
+  },
+  {
+   "id": "bopen.phase",
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "bopen.fold",
+   "kind": "update",
+   "role": "carry",
+   "note": "B starts from A's rows and versions at N, no tombstones",
+   "cmp": null,
+   "alone": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ],
+   "alone_all": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "bopen.floor",
+   "kind": "update",
+   "role": "tomb",
+   "note": "B's tombstone window starts at N",
+   "cmp": null,
+   "alone": [
+    "mv",
+    "P2",
+    16,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "mv",
+    "P2",
+    16,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "fence",
+     "3"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "bopen",
+     "()"
+    ],
+    [
+     "fres",
+     "(('x', 2),)"
+    ],
+    [
+     "gotfres",
+     "(('x', 2),)"
+    ]
+   ]
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "snap.loaded",
+   "caught": [
+    "fo",
+    "P3",
+    2,
+    [
+     "P3"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "snap",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "snap.cursor",
+   "caught": [
+    "fo",
+    "P6",
+    10,
+    [
+     "P6"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "snap",
+     "(('x', 1),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "snap.send",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "notready.send",
+   "caught": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.is",
+   "caught": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "notready",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.clear",
+   "caught": [
+    "fo",
+    "P2",
+    16,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.rows",
+   "caught": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotsnap.cursor",
+   "caught": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.leave",
+   "caught": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.credit",
+   "caught": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "connect.link",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "save.rows",
+   "caught": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "save.cur",
+   "caught": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ],
+    [
+     "save",
+     "()"
+    ],
+    [
+     "restart",
+     "C"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.committed",
+   "caught": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.res",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "bopen.fold",
+   "caught": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "snap.cursor",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "flip",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo",
+    "P5",
+    6,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: clear <-> rows",
+   "caught": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: clear <-> cursor",
+   "caught": [
+    "fo",
+    "P2",
+    6,
+    [
+     "P2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "LA"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "snap",
+     "(('x', 0),)"
+    ],
+    [
+     "gotsnap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotsnap: rows <-> cursor",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotretry: leave <-> credit",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "save: rows <-> cur",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  }
+ ],
+ "planted": [
+  {
+   "option": "torn",
+   "caught": [
+    "fo",
+    "P2",
+    8,
+    [
+     "P2"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 1653,
+     "complete": false,
+     "fail": {
+      "P2": [
+       8,
+       [
+        "propose 1",
+        "commit 1",
+        "apply LA",
+        "connect (('x', 0),)",
+        "snap (('x', 0),)",
+        "gotsnap (('x', 0),)",
+        "save ()",
+        "restart C"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "firstver",
+   "caught": [
+    "tw",
+    "P2",
+    16,
+    [
+     "F1",
+     "P2"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 96837,
+     "complete": true,
+     "fail": {}
+    },
+    "mv": {
+     "states": 327908,
+     "complete": true,
+     "fail": {}
+    },
+    "tw": {
+     "states": 42493,
+     "complete": false,
+     "fail": {
+      "P2": [
+       16,
+       [
+        "propose 1",
+        "commit 1",
+        "propose 2",
+        "commit 2",
+        "propose 3",
+        "commit 3",
+        "propose 4",
+        "reload FA",
+        "connect (('x', 1),)",
+        "load (('x', 1),)",
+        "commit 4",
+        "snap (('x', 1),)",
+        "apply FA",
+        "gotsnap (('x', 1),)",
+        "fres (('x', 1),)",
+        "gotfres (('x', 1),)"
+       ]
+      ],
+      "F1": [
+       16,
+       [
+        "propose 1",
+        "commit 1",
+        "propose 2",
+        "commit 2",
+        "propose 3",
+        "commit 3",
+        "propose 4",
+        "reload FA",
+        "connect (('x', 1),)",
+        "load (('x', 1),)",
+        "commit 4",
+        "snap (('x', 1),)",
+        "apply FA",
+        "gotsnap (('x', 1),)",
+        "fres (('x', 1),)",
+        "gotfres (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "option": "fold",
+ "secs": 1104
+}

@@ -1,0 +1,1291 @@
+{
+ "removed": [
+  "moved.loaded",
+  "moved.holds",
+  "build.loaded",
+  "build.holds",
+  "pic.loaded",
+  "pic.holds",
+  "res.req",
+  "res.loaded",
+  "res.holds",
+  "res.ahead",
+  "res.send",
+  "res.rec",
+  "frm.on",
+  "frm.loaded",
+  "frm.holds",
+  "frm.inst",
+  "frm.send",
+  "dispose.stays",
+  "dispose.drop",
+  "gotpic.inst",
+  "skip.old",
+  "gotfrm.next",
+  "gotgap.leave",
+  "gotgap.credit",
+  "gotbig.leave",
+  "gotbig.credit",
+  "connect.alive",
+  "bopen.fold",
+  "build.ctr",
+  "res.owner",
+  "res.live",
+  "res.inst",
+  "res.ring",
+  "gotpic.seq",
+  "skip.trim",
+  "gotres.fresh",
+  "gotres.apply",
+  "gotres.seq",
+  "gotres.pos",
+  "gotres.seen",
+  "gotres.credit",
+  "gotfrm.apply",
+  "gotfrm.seq",
+  "gotfrm.pos",
+  "gotfrm.seen",
+  "gotres.is",
+  "notready.unready",
+  "moved.notowner",
+  "build.none",
+  "pic.rec",
+  "frm.rec",
+  "gotfrm.credit",
+  "gotgap.gap",
+  "gotmoved.is",
+  "gotmoved.credit",
+  "gotretry.is",
+  "gotretry.credit",
+  "notready.send",
+  "frm.owner",
+  "frm.live",
+  "endbig.send",
+  "gotpic.credit",
+  "gotfrm.is",
+  "gotgap.is",
+  "gotmoved.leave",
+  "gotbig.ended",
+  "connect.open",
+  "frm.behind",
+  "endbig.ended",
+  "gotbig.is"
+ ],
+ "steps": [
+  [
+   "notready.unready",
+   "dropped"
+  ],
+  [
+   "moved.notowner",
+   "dropped"
+  ],
+  [
+   "build.none",
+   "dropped"
+  ],
+  [
+   "build.ent",
+   "kept: P5 on fo-cap in 0 steps"
+  ],
+  [
+   "pic.rec",
+   "dropped"
+  ],
+  [
+   "frm.behind",
+   "kept: LIMIT on fo-cap in 3000001 steps"
+  ],
+  [
+   "frm.rec",
+   "dropped"
+  ],
+  [
+   "gotfrm.credit",
+   "dropped"
+  ],
+  [
+   "gotgap.gap",
+   "dropped"
+  ],
+  [
+   "gotmoved.is",
+   "dropped"
+  ],
+  [
+   "gotmoved.credit",
+   "dropped"
+  ],
+  [
+   "gotretry.is",
+   "dropped"
+  ],
+  [
+   "gotretry.credit",
+   "dropped"
+  ],
+  [
+   "notready.send",
+   "dropped"
+  ],
+  [
+   "moved.send",
+   "kept: P5 on fo-cap in 1 steps"
+  ],
+  [
+   "build.owner",
+   "kept: PL2 on fo-cap in 2 steps"
+  ],
+  [
+   "pic.owner",
+   "kept: PL1 on fo-cap in 4 steps"
+  ],
+  [
+   "pic.live",
+   "kept: E3 on big-cap in 9 steps"
+  ],
+  [
+   "pic.seen",
+   "kept: P9 on fo-cap in 8 steps"
+  ],
+  [
+   "pic.send",
+   "kept: P5 on fo-cap in 0 steps"
+  ],
+  [
+   "frm.owner",
+   "dropped"
+  ],
+  [
+   "frm.live",
+   "dropped"
+  ],
+  [
+   "endbig.ended",
+   "kept: E1 on fo-cap in 2 steps"
+  ],
+  [
+   "endbig.send",
+   "dropped"
+  ],
+  [
+   "gotpic.is",
+   "kept: ERR on fo-cap in 3 steps"
+  ],
+  [
+   "gotpic.clear",
+   "kept: V1 on fo-cap in 15 steps"
+  ],
+  [
+   "gotpic.rows",
+   "kept: V1 on fo-cap in 7 steps"
+  ],
+  [
+   "gotpic.pos",
+   "kept: V1 on fo-cap in 7 steps"
+  ],
+  [
+   "gotpic.seen",
+   "kept: P9 on fo-cap in 11 steps"
+  ],
+  [
+   "gotpic.credit",
+   "dropped"
+  ],
+  [
+   "gotfrm.is",
+   "dropped"
+  ],
+  [
+   "gotgap.is",
+   "dropped"
+  ],
+  [
+   "gotmoved.leave",
+   "dropped"
+  ],
+  [
+   "gotretry.leave",
+   "kept: P5 on fo-cap in 1 steps"
+  ],
+  [
+   "gotbig.is",
+   "kept: E1 on fo-cap in 3 steps"
+  ],
+  [
+   "gotbig.ended",
+   "dropped"
+  ],
+  [
+   "connect.open",
+   "dropped"
+  ],
+  [
+   "connect.link",
+   "kept: P5 on fo-cap in 0 steps"
+  ],
+  [
+   "ack.committed",
+   "kept: P4 on fo-cap in 6 steps"
+  ],
+  [
+   "ack.seen",
+   "kept: P9 on fo-cap in 8 steps"
+  ],
+  [
+   "ack.acked",
+   "kept: P5 on fo-cap in 0 steps"
+  ],
+  [
+   "resolve.acked",
+   "kept: P4 on fo-cap in 5 steps"
+  ],
+  [
+   "resolve.seen",
+   "kept: P4 on fo-cap in 6 steps"
+  ],
+  [
+   "resolve.res",
+   "kept: P5 on fo-cap in 0 steps"
+  ],
+  [
+   "frm.behind",
+   "dropped in the final pass"
+  ],
+  [
+   "endbig.ended",
+   "dropped in the final pass"
+  ],
+  [
+   "gotbig.is",
+   "dropped in the final pass"
+  ]
+ ],
+ "kept": [
+  "moved.send",
+  "build.owner",
+  "build.ent",
+  "pic.owner",
+  "pic.live",
+  "pic.seen",
+  "pic.send",
+  "gotpic.is",
+  "gotpic.clear",
+  "gotpic.rows",
+  "gotpic.pos",
+  "gotpic.seen",
+  "gotretry.leave",
+  "connect.link",
+  "ack.committed",
+  "ack.seen",
+  "ack.acked",
+  "resolve.acked",
+  "resolve.seen",
+  "resolve.res"
+ ],
+ "minimal": {
+  "fo-cap": 421788,
+  "mv-cap": 722238,
+  "big-cap": 112720,
+  "ring2-cap": 223252,
+  "fifo-cap": 768360,
+  "bfo-cap": 209606
+ },
+ "verify": {
+  "fo2-cap": 1171316,
+  "mvf-cap": 859376
+ },
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "moved.send",
+   "caught": [
+    "fo-cap",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "build.owner",
+   "caught": [
+    "fo-cap",
+    "PL2",
+    2,
+    [
+     "PL2"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "build",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "build.ent",
+   "caught": [
+    "fo-cap",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.owner",
+   "caught": [
+    "fo-cap",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.live",
+   "caught": [
+    "big-cap",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.seen",
+   "caught": [
+    "fo-cap",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.send",
+   "caught": [
+    "fo-cap",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.is",
+   "caught": [
+    "fo-cap",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.clear",
+   "caught": [
+    "fo-cap",
+    "V1",
+    17,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.rows",
+   "caught": [
+    "fo-cap",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.pos",
+   "caught": [
+    "fo-cap",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.seen",
+   "caught": [
+    "fo-cap",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.leave",
+   "caught": [
+    "fo-cap",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "connect.link",
+   "caught": [
+    "fo-cap",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.committed",
+   "caught": [
+    "fo-cap",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.seen",
+   "caught": [
+    "fo-cap",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.acked",
+   "caught": [
+    "fo-cap",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.acked",
+   "caught": [
+    "fo-cap",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo-cap",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.res",
+   "caught": [
+    "fo-cap",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "pic.seen",
+   "caught": [
+    "fo-cap",
+    "P5",
+    7,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "ack",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo-cap",
+    "P5",
+    6,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> rows",
+   "caught": [
+    "fo-cap",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> pos",
+   "caught": [
+    "fo-cap",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> seen",
+   "caught": [
+    "fo-cap",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: rows <-> pos",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: rows <-> seen",
+   "caught": [
+    "fo-cap",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: pos <-> seen",
+   "caught": [
+    "fo-cap",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "ack: seen <-> acked",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  }
+ ]
+}

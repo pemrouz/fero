@@ -1,0 +1,7006 @@
+{
+ "bounds": [
+  "fo",
+  "mv",
+  "big",
+  "ring2",
+  "fifo",
+  "bfo"
+ ],
+ "verify": [
+  "fo2",
+  "mvf"
+ ],
+ "pinned": [
+  "bopen.phase",
+  "frm.ring"
+ ],
+ "base": {
+  "fo": {
+   "states": 129355,
+   "secs": 19.57,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    129355,
+    446361,
+    12853606332262940454
+   ],
+   "judged": {
+    "P5": [
+     129355,
+     0
+    ]
+   }
+  },
+  "mv": {
+   "states": 313416,
+   "secs": 40.63,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    313416,
+    1154893,
+    7521128130950109998
+   ],
+   "judged": {
+    "P5": [
+     313416,
+     0
+    ]
+   }
+  },
+  "big": {
+   "states": 70483,
+   "secs": 9.99,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    70483,
+    253995,
+    9776614012407382753
+   ],
+   "judged": {
+    "P5": [
+     70483,
+     0
+    ]
+   }
+  },
+  "ring2": {
+   "states": 85666,
+   "secs": 11.45,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    85666,
+    304040,
+    10085877228918935793
+   ],
+   "judged": {
+    "P5": [
+     85666,
+     0
+    ]
+   }
+  },
+  "fifo": {
+   "states": 156832,
+   "secs": 23.91,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    156832,
+    578891,
+    2203550879202359425
+   ],
+   "judged": {
+    "P5": [
+     156832,
+     0
+    ]
+   }
+  },
+  "bfo": {
+   "states": 136072,
+   "secs": 11.12,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    136072,
+    439840,
+    3557733211595026219
+   ],
+   "judged": {
+    "P5": [
+     136072,
+     0
+    ]
+   }
+  }
+ },
+ "greedy": [
+  [
+   "moved.loaded",
+   "dropped"
+  ],
+  [
+   "moved.holds",
+   "dropped"
+  ],
+  [
+   "build.loaded",
+   "dropped"
+  ],
+  [
+   "build.holds",
+   "dropped"
+  ],
+  [
+   "pic.loaded",
+   "dropped"
+  ],
+  [
+   "pic.holds",
+   "dropped"
+  ],
+  [
+   "res.req",
+   "dropped"
+  ],
+  [
+   "res.loaded",
+   "dropped"
+  ],
+  [
+   "res.holds",
+   "dropped"
+  ],
+  [
+   "res.ahead",
+   "dropped"
+  ],
+  [
+   "res.send",
+   "dropped"
+  ],
+  [
+   "res.rec",
+   "dropped"
+  ],
+  [
+   "frm.on",
+   "dropped"
+  ],
+  [
+   "frm.loaded",
+   "dropped"
+  ],
+  [
+   "frm.holds",
+   "dropped"
+  ],
+  [
+   "frm.inst",
+   "dropped"
+  ],
+  [
+   "frm.send",
+   "dropped"
+  ],
+  [
+   "dispose.stays",
+   "dropped"
+  ],
+  [
+   "dispose.drop",
+   "dropped"
+  ],
+  [
+   "gotpic.inst",
+   "dropped"
+  ],
+  [
+   "skip.old",
+   "dropped"
+  ],
+  [
+   "gotfrm.next",
+   "dropped"
+  ],
+  [
+   "gotgap.leave",
+   "dropped"
+  ],
+  [
+   "gotgap.credit",
+   "dropped"
+  ],
+  [
+   "gotbig.leave",
+   "dropped"
+  ],
+  [
+   "gotbig.credit",
+   "dropped"
+  ],
+  [
+   "connect.alive",
+   "dropped"
+  ],
+  [
+   "bopen.fold",
+   "dropped"
+  ],
+  [
+   "build.ctr",
+   "dropped in the final pass"
+  ],
+  [
+   "res.owner",
+   "dropped in the final pass"
+  ],
+  [
+   "res.live",
+   "dropped in the final pass"
+  ],
+  [
+   "res.inst",
+   "dropped in the final pass"
+  ],
+  [
+   "res.ring",
+   "dropped in the final pass"
+  ],
+  [
+   "gotpic.seq",
+   "dropped in the final pass"
+  ],
+  [
+   "skip.trim",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.fresh",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.apply",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.seq",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.pos",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.seen",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.credit",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfrm.apply",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfrm.seq",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfrm.pos",
+   "dropped in the final pass"
+  ],
+  [
+   "gotfrm.seen",
+   "dropped in the final pass"
+  ],
+  [
+   "gotres.is",
+   "dropped in the final pass"
+  ]
+ ],
+ "removed": [
+  "moved.loaded",
+  "moved.holds",
+  "build.loaded",
+  "build.holds",
+  "pic.loaded",
+  "pic.holds",
+  "res.req",
+  "res.loaded",
+  "res.holds",
+  "res.ahead",
+  "res.send",
+  "res.rec",
+  "frm.on",
+  "frm.loaded",
+  "frm.holds",
+  "frm.inst",
+  "frm.send",
+  "dispose.stays",
+  "dispose.drop",
+  "gotpic.inst",
+  "skip.old",
+  "gotfrm.next",
+  "gotgap.leave",
+  "gotgap.credit",
+  "gotbig.leave",
+  "gotbig.credit",
+  "connect.alive",
+  "bopen.fold",
+  "build.ctr",
+  "res.owner",
+  "res.live",
+  "res.inst",
+  "res.ring",
+  "gotpic.seq",
+  "skip.trim",
+  "gotres.fresh",
+  "gotres.apply",
+  "gotres.seq",
+  "gotres.pos",
+  "gotres.seen",
+  "gotres.credit",
+  "gotfrm.apply",
+  "gotfrm.seq",
+  "gotfrm.pos",
+  "gotfrm.seen",
+  "gotres.is"
+ ],
+ "put_back": [],
+ "limited": [
+  "notready.unready",
+  "moved.notowner",
+  "build.none",
+  "build.ent",
+  "pic.rec",
+  "frm.rec",
+  "gotfrm.credit",
+  "gotgap.gap",
+  "gotmoved.is",
+  "gotmoved.credit",
+  "gotretry.is",
+  "gotretry.credit"
+ ],
+ "minimal": {
+  "fo": {
+   "states": 106900,
+   "secs": 7.18,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    106900,
+    382075,
+    3335324408907036568
+   ],
+   "judged": {
+    "P5": [
+     106900,
+     0
+    ]
+   }
+  },
+  "mv": {
+   "states": 328928,
+   "secs": 22.36,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    328928,
+    1326743,
+    5341694596895160702
+   ],
+   "judged": {
+    "P5": [
+     328928,
+     0
+    ]
+   }
+  },
+  "big": {
+   "states": 40237,
+   "secs": 2.54,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    40237,
+    147309,
+    14551796639382617055
+   ],
+   "judged": {
+    "P5": [
+     40237,
+     0
+    ]
+   }
+  },
+  "ring2": {
+   "states": 60766,
+   "secs": 4.06,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    60766,
+    225244,
+    707362806626695094
+   ],
+   "judged": {
+    "P5": [
+     60766,
+     0
+    ]
+   }
+  },
+  "fifo": {
+   "states": 103885,
+   "secs": 7.96,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    103885,
+    403252,
+    7647816045183685177
+   ],
+   "judged": {
+    "P5": [
+     103885,
+     0
+    ]
+   }
+  },
+  "bfo": {
+   "states": 112232,
+   "secs": 7.46,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    112232,
+    422622,
+    2924403927145024026
+   ],
+   "judged": {
+    "P5": [
+     112232,
+     0
+    ]
+   }
+  }
+ },
+ "verify_result": {
+  "fo2": {
+   "states": 476689,
+   "secs": 34.72,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    476689,
+    1982736,
+    12660931593687883363
+   ],
+   "judged": {
+    "P5": [
+     476689,
+     0
+    ]
+   }
+  },
+  "mvf": {
+   "states": 409554,
+   "secs": 29.04,
+   "complete": true,
+   "fail": {},
+   "digest": [
+    409554,
+    1700832,
+    17995361220634629623
+   ],
+   "judged": {
+    "P5": [
+     409554,
+     0
+    ]
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "notready.unready",
+   "kind": "guard",
+   "role": "answer",
+   "note": "a copy that is loading, or does not hold the slot, answers retry",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000003,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "notready.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "mv",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "fence",
+     "0"
+    ]
+   ],
+   "alone_all": [
+    "mv",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "moved.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "moved.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "moved.notowner",
+   "kind": "guard",
+   "role": "place",
+   "note": "a SUB at a copy that is not the view's owner gets END moved, naming it; a held link there ends the same way when the owner changes (a hand-off)",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "moved.send",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "build.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "build.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "build.owner",
+   "kind": "guard",
+   "role": "place",
+   "note": "only the view's owner builds it: one copy, off the leader",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "PL2",
+    2,
+    [
+     "PL2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "PL2",
+    2,
+    [
+     "PL2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "build",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "PL2",
+    2,
+    [
+     "PL2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "build",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "build.none",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "build.ctr",
+   "kind": "update",
+   "role": "inst",
+   "note": "instance = (copy, incarnation, counter): unique across copies",
+   "cmp": null,
+   "alone": [
+    "big",
+    "V1",
+    13,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "big",
+    "V1",
+    13,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "dispose",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "build.ent",
+   "kind": "update",
+   "role": "serve",
+   "note": "the entry starts at the copy's fold",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "pic.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "a copy answers only once its snapshot has loaded",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "pic.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "pic.owner",
+   "kind": "guard",
+   "role": "place",
+   "note": "a copy serves a view only while it is the owner",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "pic.live",
+   "kind": "guard",
+   "role": "serve",
+   "note": "only from a live entry: never a view that has ended",
+   "cmp": null,
+   "alone": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "pic.seen",
+   "kind": "guard",
+   "role": "seen",
+   "note": "a picture waits until the copy's store is at or past the seen the SUB carried",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "pic.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "the value, the instance, the frame sequence and the position",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    8,
+    [
+     "V1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "V1",
+    8,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "pic.rec",
+   "kind": "update",
+   "role": "ring",
+   "note": "the copy records the instance and sequence it sent",
+   "cmp": null,
+   "alone": [
+    "fo2",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo2",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "res.req",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "res.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "res.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "res.owner",
+   "kind": "guard",
+   "role": "place",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "PL1",
+    9,
+    [
+     "PL1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "PL1",
+    9,
+    [
+     "PL1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "moved",
+     "(('x', 1),)"
+    ],
+    [
+     "gotmoved",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "res.live",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "E3",
+    13,
+    [
+     "E3"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "big",
+    "E3",
+    13,
+    [
+     "E3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "res.inst",
+   "kind": "guard",
+   "role": "inst",
+   "note": "the SUB's resume names this entry's instance",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "res.ring",
+   "kind": "guard",
+   "role": "ring",
+   "note": "... and the ring reaches back to it",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "V1",
+    14,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    14,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "res.ahead",
+   "kind": "guard",
+   "role": "ring",
+   "note": "",
+   "cmp": "<=",
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "res.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "the ring frames after the SUB's sequence, inside the answer",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "res.rec",
+   "kind": "update",
+   "role": "ring",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.on",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.loaded",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.holds",
+   "kind": "guard",
+   "role": "ready",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.owner",
+   "kind": "guard",
+   "role": "place",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "PL1",
+    8,
+    [
+     "PL1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "PL1",
+    6,
+    [
+     "PL1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "PL1",
+    8,
+    [
+     "PL1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "frm.live",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "E3",
+    11,
+    [
+     "E3"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "E3",
+    11,
+    [
+     "E3"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "frm.inst",
+   "kind": "guard",
+   "role": "inst",
+   "note": "frames go only on a link that follows this instance",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.behind",
+   "kind": "guard",
+   "role": "serve",
+   "note": "",
+   "cmp": "<",
+   "alone": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "final_trace": null,
+   "alone_all": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "frm.ring",
+   "kind": "guard",
+   "role": "ring",
+   "note": "the next frame is still in the ring; else a picture (a slow reader)",
+   "cmp": ">=",
+   "alone": null,
+   "kept": true,
+   "pinned": true,
+   "final": null,
+   "final_trace": null
+  },
+  {
+   "id": "frm.send",
+   "kind": "update",
+   "role": "serve",
+   "note": "one frame per commit that changed the view, with its own position",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "frm.rec",
+   "kind": "update",
+   "role": "ring",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "endbig.ended",
+   "kind": "guard",
+   "role": "end",
+   "note": "views.rows is checked on every commit: past it, END view-too-big",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "E1",
+    2,
+    [
+     "E1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "E1",
+    2,
+    [
+     "E1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "endbig",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "E1",
+    2,
+    [
+     "E1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "endbig",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "endbig.send",
+   "kind": "update",
+   "role": "end",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "dispose.stays",
+   "kind": "guard",
+   "role": "end",
+   "note": "view-too-big stays until the method's code changes: no rebuild loop",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "dispose.drop",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotpic.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.clear",
+   "kind": "update",
+   "role": "replace",
+   "note": "a new picture is one commit of differences: it replaces the view",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    15,
+    [
+     "V1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "V1",
+    15,
+    [
+     "V1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "V1",
+    15,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.rows",
+   "kind": "update",
+   "role": "replace",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.pos",
+   "kind": "update",
+   "role": "pos",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.inst",
+   "kind": "update",
+   "role": "inst",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotpic.seq",
+   "kind": "update",
+   "role": "ring",
+   "note": "the resume is the server's sequence, never the client's own count",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "D1",
+    11,
+    [
+     "D1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "D1",
+    11,
+    [
+     "D1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.seen",
+   "kind": "update",
+   "role": "seen",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotpic.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "skip.old",
+   "kind": "guard",
+   "role": "ring",
+   "note": "a ring resume carries frames the client already applied",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "skip.trim",
+   "kind": "update",
+   "role": "ring",
+   "note": "the client drops a frame it already applied",
+   "cmp": null,
+   "alone": [
+    "fifo",
+    "P5",
+    11,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fifo",
+    "P5",
+    11,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "resub",
+     "C"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotres",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.fresh",
+   "kind": "guard",
+   "role": "ring",
+   "note": "only once the frames it already applied are dropped",
+   "cmp": null,
+   "alone": [
+    "fifo",
+    "D1",
+    13,
+    [
+     "D1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fifo",
+    "D1",
+    13,
+    [
+     "D1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "resub",
+     "C"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.apply",
+   "kind": "update",
+   "role": "ring",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.seq",
+   "kind": "update",
+   "role": "ring",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "ring2",
+    "D1",
+    19,
+    [
+     "D1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "ring2",
+    "D1",
+    19,
+    [
+     "D1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotgap",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.pos",
+   "kind": "update",
+   "role": "pos",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    11,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.seen",
+   "kind": "update",
+   "role": "seen",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo2",
+    "P9",
+    15,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo2",
+    "P9",
+    15,
+    [
+     "P9"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotres.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    7,
+    [
+     "P5"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P5",
+    7,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.next",
+   "kind": "guard",
+   "role": "seq",
+   "note": "a frame is taken only if it is the next of the instance followed",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotfrm.apply",
+   "kind": "update",
+   "role": "serve",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    9,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    9,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.seq",
+   "kind": "update",
+   "role": "ring",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "D1",
+    13,
+    [
+     "D1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "D1",
+    13,
+    [
+     "D1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ],
+    [
+     "drop",
+     "C"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "res",
+     "(('x', 1),)"
+    ],
+    [
+     "gotres",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.pos",
+   "kind": "update",
+   "role": "pos",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "V1",
+    9,
+    [
+     "V1"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "V1",
+    9,
+    [
+     "V1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.seen",
+   "kind": "update",
+   "role": "seen",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P9",
+    13,
+    [
+     "P9"
+    ]
+   ],
+   "kept": false,
+   "pinned": false,
+   "alone_all": [
+    "fo",
+    "P9",
+    13,
+    [
+     "P9"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotfrm.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotgap.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotgap",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotgap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotgap.gap",
+   "kind": "guard",
+   "role": "seq",
+   "note": "any other frame: drop it and subscribe again",
+   "cmp": null,
+   "alone": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "fo2",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotgap.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotgap.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotmoved.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotmoved.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "subscribe at the owner, with the resume and seen",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotmoved.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000002,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotretry.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotretry.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "reload",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "notready",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "reload",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "notready",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotretry.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ],
+   "alone_trace": null
+  },
+  {
+   "id": "gotbig.is",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "E1",
+    3,
+    [
+     "E1"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "E1",
+    3,
+    [
+     "E1"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "E1",
+    3,
+    [
+     "E1"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotbig.ended",
+   "kind": "update",
+   "role": "end",
+   "note": "END view-too-big ends the link: h.closed rejects with it",
+   "cmp": null,
+   "alone": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "gotbig.leave",
+   "kind": "update",
+   "role": "answer",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "gotbig.credit",
+   "kind": "update",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "connect.alive",
+   "kind": "guard",
+   "role": "seq",
+   "note": "",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  },
+  {
+   "id": "connect.open",
+   "kind": "guard",
+   "role": "end",
+   "note": "an ended link never subscribes again",
+   "cmp": null,
+   "alone": [
+    "big",
+    "E2",
+    11,
+    [
+     "E2"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "big",
+    "E2",
+    12,
+    [
+     "E2"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "endbig",
+     "(('x', 1),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ],
+   "alone_all": [
+    "big",
+    "E2",
+    11,
+    [
+     "E2"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "endbig",
+     "(('x', 1),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 1),)"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "id": "connect.link",
+   "kind": "update",
+   "role": "seq",
+   "note": "a SUB carries the instance, the sequence and seen",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": []
+  },
+  {
+   "id": "ack.committed",
+   "kind": "guard",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "ack.seen",
+   "kind": "update",
+   "role": "seen",
+   "note": "seen also takes the position in the write's answer",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "id": "ack.acked",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": []
+  },
+  {
+   "id": "resolve.acked",
+   "kind": "guard",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.seen",
+   "kind": "guard",
+   "role": "write",
+   "note": "sync() resolves once the view has passed the write",
+   "cmp": ">=",
+   "alone": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "final_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ],
+   "alone_all": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "alone_trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "id": "resolve.res",
+   "kind": "update",
+   "role": "write",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": false,
+   "final": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [],
+   "alone_all": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "alone_trace": []
+  },
+  {
+   "id": "bopen.phase",
+   "kind": "update",
+   "role": "move",
+   "note": "",
+   "cmp": null,
+   "alone": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "kept": true,
+   "pinned": true,
+   "final": [
+    "mv",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "final_trace": [
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "bopen.fold",
+   "kind": "update",
+   "role": "carry",
+   "note": "B's copies start from A's rows at N",
+   "cmp": null,
+   "alone": null,
+   "kept": false,
+   "pinned": false,
+   "alone_all": null,
+   "alone_trace": null
+  }
+ ],
+ "mutants": [
+  {
+   "kind": "drop",
+   "rule": "notready.unready",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "notready.send",
+   "caught": [
+    "mv",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "fence",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "moved.notowner",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "moved.send",
+   "caught": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "build.owner",
+   "caught": [
+    "fo",
+    "PL2",
+    2,
+    [
+     "PL2"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "build",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "build.none",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "build.ent",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.owner",
+   "caught": [
+    "fo",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.live",
+   "caught": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.seen",
+   "caught": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.send",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "pic.rec",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "frm.owner",
+   "caught": [
+    "fo",
+    "PL1",
+    6,
+    [
+     "PL1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "frm.live",
+   "caught": [
+    "big",
+    "E3",
+    9,
+    [
+     "E3"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "frm",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "frm.behind",
+   "caught": null,
+   "undecided": [
+    "fo",
+    "LIMIT",
+    1000001,
+    [
+     "LIMIT"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "frm.rec",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "endbig.ended",
+   "caught": [
+    "fo",
+    "E1",
+    2,
+    [
+     "E1"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "endbig",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "endbig.send",
+   "caught": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.is",
+   "caught": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.clear",
+   "caught": [
+    "fo",
+    "V1",
+    15,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "commit",
+     "3"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.rows",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.pos",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.seen",
+   "caught": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotpic.credit",
+   "caught": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotfrm.is",
+   "caught": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotfrm",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotfrm.credit",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotgap.is",
+   "caught": [
+    "fo",
+    "ERR",
+    3,
+    [
+     "ERR"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotgap",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotgap.gap",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotmoved.is",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotmoved.leave",
+   "caught": [
+    "fo",
+    "P5",
+    1,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotmoved.credit",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.is",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.leave",
+   "caught": [
+    "fo",
+    "P5",
+    3,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "reload",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "notready",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotretry.credit",
+   "caught": null,
+   "undecided": [
+    "",
+    "LIMIT",
+    0,
+    [
+     "LIMIT"
+    ]
+   ],
+   "how": "its removal alone already stopped at the state limit (pass 1); not run again"
+  },
+  {
+   "kind": "drop",
+   "rule": "gotbig.is",
+   "caught": [
+    "fo",
+    "E1",
+    3,
+    [
+     "E1"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 0),)"
+    ],
+    [
+     "moved",
+     "(('x', 0),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "gotbig.ended",
+   "caught": [
+    "big",
+    "P5",
+    2,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "connect.open",
+   "caught": [
+    "big",
+    "E2",
+    12,
+    [
+     "E2"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "endbig",
+     "(('x', 1),)"
+    ],
+    [
+     "gotbig",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 0),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "connect.link",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.committed",
+   "caught": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.seen",
+   "caught": [
+    "fo",
+    "P9",
+    8,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "ack.acked",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.acked",
+   "caught": [
+    "fo",
+    "P4",
+    5,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "resolve",
+     "()"
+    ],
+    [
+     "commit",
+     "2"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo",
+    "P4",
+    6,
+    [
+     "P4"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "ack",
+     "()"
+    ],
+    [
+     "resolve",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "drop",
+   "rule": "resolve.res",
+   "caught": [
+    "fo",
+    "P5",
+    0,
+    [
+     "P5"
+    ]
+   ],
+   "trace": []
+  },
+  {
+   "kind": "flip",
+   "rule": "pic.seen",
+   "caught": [
+    "fo",
+    "P5",
+    7,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ],
+    [
+     "ack",
+     "()"
+    ]
+   ]
+  },
+  {
+   "kind": "flip",
+   "rule": "frm.behind",
+   "caught": null,
+   "equivalent": false
+  },
+  {
+   "kind": "flip",
+   "rule": "resolve.seen",
+   "caught": [
+    "fo",
+    "P5",
+    6,
+    [
+     "P5"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "propose",
+     "2"
+    ],
+    [
+     "commit",
+     "2"
+    ],
+    [
+     "propose",
+     "3"
+    ],
+    [
+     "crash",
+     "LA"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "pic: send <-> rec",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> rows",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> pos",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> seen",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: clear <-> credit",
+   "caught": [
+    "fo",
+    "V1",
+    7,
+    [
+     "V1"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: rows <-> pos",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: rows <-> seen",
+   "caught": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: rows <-> credit",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: pos <-> seen",
+   "caught": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: pos <-> credit",
+   "caught": [
+    "fo",
+    "P9",
+    11,
+    [
+     "P9"
+    ]
+   ],
+   "trace": [
+    [
+     "propose",
+     "1"
+    ],
+    [
+     "commit",
+     "1"
+    ],
+    [
+     "apply",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 1),)"
+    ],
+    [
+     "build",
+     "(('x', 1),)"
+    ],
+    [
+     "pic",
+     "(('x', 1),)"
+    ],
+    [
+     "gotpic",
+     "(('x', 1),)"
+    ],
+    [
+     "crash",
+     "FA1"
+    ],
+    [
+     "connect",
+     "(('x', 2),)"
+    ],
+    [
+     "build",
+     "(('x', 2),)"
+    ],
+    [
+     "pic",
+     "(('x', 2),)"
+    ]
+   ]
+  },
+  {
+   "kind": "swap",
+   "rule": "gotpic: seen <-> credit",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotmoved: leave <-> credit",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "gotretry: leave <-> credit",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  },
+  {
+   "kind": "swap",
+   "rule": "ack: seen <-> acked",
+   "caught": null,
+   "equivalent": true,
+   "how": "the two orders give the same next state from every reachable state"
+  }
+ ],
+ "planted": [
+  {
+   "option": "copyinst",
+   "caught": [
+    "fo",
+    "V1",
+    12,
+    [
+     "P6",
+     "V1"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 17849,
+     "complete": false,
+     "fail": {
+      "V1": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "apply FA1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "pic (('x', 1),)",
+        "gotpic (('x', 1),)",
+        "crash FA1",
+        "connect (('x', 2),)",
+        "build (('x', 2),)",
+        "res (('x', 2),)",
+        "gotres (('x', 2),)"
+       ]
+      ],
+      "P6": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "apply FA1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "pic (('x', 1),)",
+        "gotpic (('x', 1),)",
+        "crash FA1",
+        "connect (('x', 2),)",
+        "build (('x', 2),)",
+        "res (('x', 2),)",
+        "gotres (('x', 2),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "incinst",
+   "caught": [
+    "fo",
+    "V1",
+    12,
+    [
+     "V1"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 18229,
+     "complete": false,
+     "fail": {
+      "V1": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "pic (('x', 1),)",
+        "gotpic (('x', 1),)",
+        "crash FA1",
+        "restart FA1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "res (('x', 1),)",
+        "gotres (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "framepos",
+   "caught": [
+    "ring2",
+    "V1",
+    12,
+    [
+     "V1"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 129371,
+     "complete": true,
+     "fail": {}
+    },
+    "mv": {
+     "states": 313472,
+     "complete": true,
+     "fail": {}
+    },
+    "big": {
+     "states": 70483,
+     "complete": true,
+     "fail": {}
+    },
+    "ring2": {
+     "states": 11831,
+     "complete": false,
+     "fail": {
+      "V1": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "propose 2",
+        "commit 2",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "pic (('x', 1),)",
+        "apply FA1",
+        "apply FA1",
+        "gotpic (('x', 1),)",
+        "frm (('x', 1),)",
+        "gotfrm (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "ownseq",
+   "caught": [
+    "fo",
+    "D1",
+    11,
+    [
+     "D1"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 12461,
+     "complete": false,
+     "fail": {
+      "D1": [
+       11,
+       [
+        "propose 1",
+        "commit 1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "apply FA1",
+        "pic (('x', 1),)",
+        "gotpic (('x', 1),)",
+        "drop C",
+        "connect (('x', 1),)",
+        "res (('x', 1),)",
+        "gotres (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "leadserve",
+   "caught": [
+    "fo",
+    "PL1",
+    4,
+    [
+     "PL1"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 204,
+     "complete": false,
+     "fail": {
+      "PL1": [
+       4,
+       [
+        "crash LA",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "pic (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "noinst",
+   "caught": null,
+   "runs": {
+    "fo": {
+     "states": 129355,
+     "complete": true,
+     "fail": {}
+    },
+    "mv": {
+     "states": 313416,
+     "complete": true,
+     "fail": {}
+    },
+    "big": {
+     "states": 70483,
+     "complete": true,
+     "fail": {}
+    },
+    "ring2": {
+     "states": 85666,
+     "complete": true,
+     "fail": {}
+    },
+    "fifo": {
+     "states": 156832,
+     "complete": true,
+     "fail": {}
+    },
+    "bfo": {
+     "states": 136072,
+     "complete": true,
+     "fail": {}
+    },
+    "fo2": {
+     "states": 898392,
+     "complete": true,
+     "fail": {}
+    },
+    "mvf": {
+     "states": 463751,
+     "complete": true,
+     "fail": {}
+    }
+   }
+  },
+  {
+   "option": "endatfold",
+   "caught": [
+    "big",
+    "E3",
+    12,
+    [
+     "E3"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 129355,
+     "complete": true,
+     "fail": {}
+    },
+    "mv": {
+     "states": 313416,
+     "complete": true,
+     "fail": {}
+    },
+    "big": {
+     "states": 9545,
+     "complete": false,
+     "fail": {
+      "E3": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "propose 2",
+        "commit 2",
+        "propose 3",
+        "commit 3",
+        "apply FA1",
+        "apply FA1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "apply FA1",
+        "pic (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "option": "picfits",
+   "caught": [
+    "big",
+    "E3",
+    12,
+    [
+     "E3"
+    ]
+   ],
+   "runs": {
+    "fo": {
+     "states": 129355,
+     "complete": true,
+     "fail": {}
+    },
+    "mv": {
+     "states": 313416,
+     "complete": true,
+     "fail": {}
+    },
+    "big": {
+     "states": 9546,
+     "complete": false,
+     "fail": {
+      "E3": [
+       12,
+       [
+        "propose 1",
+        "commit 1",
+        "propose 2",
+        "commit 2",
+        "propose 3",
+        "commit 3",
+        "apply FA1",
+        "apply FA1",
+        "connect (('x', 1),)",
+        "build (('x', 1),)",
+        "apply FA1",
+        "pic (('x', 1),)"
+       ]
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "option": "view",
+ "secs": 1330
+}

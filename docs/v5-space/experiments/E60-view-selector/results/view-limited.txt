@@ -1,0 +1,29 @@
+# view: the rules whose drop stopped at the state limit, decided on the capped bounds (decide.py), 2026-11-23T04:56:25Z, Python 3.13.17, 4 vCPU, load 1.28 2.92 3.66
+the design: holds on every capped bound
+the smallest model: holds on every capped bound
+the design without notready.unready: holds on every capped bound
+the design without moved.notowner: holds on every capped bound
+the design without build.none: mv-cap: 3,000,003 states: state limit
+the design without build.ent: fo-cap: 3,000,001 states: state limit
+the design without pic.rec: holds on every capped bound
+the design without frm.rec: holds on every capped bound
+the design without gotfrm.credit: holds on every capped bound
+the design without gotgap.gap: holds on every capped bound
+the design without gotmoved.is: holds on every capped bound
+the design without gotmoved.credit: holds on every capped bound
+the design without gotretry.is: holds on every capped bound
+the design without gotretry.credit: holds on every capped bound
+the smallest model without notready.unready (its drop mutant): holds on every capped bound
+the smallest model without moved.notowner (its drop mutant): holds on every capped bound
+the smallest model without build.none (its drop mutant): holds on every capped bound
+the smallest model without build.ent (its drop mutant): fo-cap: 10,355 states: P5 (0 steps)
+  P5: shortest trace, 0 steps
+the smallest model without pic.rec (its drop mutant): holds on every capped bound
+the smallest model without frm.behind (its drop mutant): fo-cap: 3,000,002 states: state limit
+the smallest model without frm.rec (its drop mutant): holds on every capped bound
+the smallest model without gotfrm.credit (its drop mutant): holds on every capped bound
+the smallest model without gotgap.gap (its drop mutant): holds on every capped bound
+the smallest model without gotmoved.is (its drop mutant): holds on every capped bound
+the smallest model without gotmoved.credit (its drop mutant): holds on every capped bound
+the smallest model without gotretry.is (its drop mutant): holds on every capped bound
+the smallest model without gotretry.credit (its drop mutant): holds on every capped bound

@@ -1,0 +1,5 @@
+# resume: the move with two faults, in full, on the folded resume and on E-31, 2026-11-23T02:46:29Z, Python 3.13.17, 4 vCPU, load 3.35 4.04 5.03
+fold mv2: 1,324,233 states, 97.9s: all hold
+    P5: 1,324,233 judged states, 0 cannot reach the goal
+e31 mv2: 104,288 states, 6.0s: all hold
+    P5: 104,288 judged states, 0 cannot reach the goal

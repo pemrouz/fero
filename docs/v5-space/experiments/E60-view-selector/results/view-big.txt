@@ -1,0 +1,11 @@
+# view: the bigger bounds, in full, on the design (limit 3,500,000 states), 2026-11-23T02:37:06Z, Python 3.13.17, 4 vCPU, load 4.13 5.29 5.89
+view fifo2: 1,846,025 states, 145.9s: all hold
+    P5: 1,846,025 judged states, 0 cannot reach the goal
+view fo2all: 2,082,127 states, 142.8s: all hold
+    P5: 2,082,127 judged states, 0 cannot reach the goal
+view big2: 2,650,788 states, 182.7s: all hold
+    P5: 2,650,788 judged states, 0 cannot reach the goal
+view mvbig: 639,598 states, 41.9s: all hold
+    P5: 639,598 judged states, 0 cannot reach the goal
+view bfo2: 687,347 states, 45.8s: all hold
+    P5: 687,347 judged states, 0 cannot reach the goal

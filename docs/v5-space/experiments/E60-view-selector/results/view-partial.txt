@@ -1,0 +1,31 @@
+# view: the bounds that do not finish, stopped at 3,000,000 states, then 20,000 random walks each, 2026-11-23T02:48:14Z, Python 3.13.17, 4 vCPU, load 4.97 4.43 5.06
+view mv2: 3,000,001 states, 181.8s: all hold (STOPPED AT THE STATE LIMIT)
+view mv2: 20,000 walks, 2,400,000 steps, 86,532 distinct states: no property broken
+view all2: 3,000,003 states, 206.2s: all hold (STOPPED AT THE STATE LIMIT)
+view all2: 20,000 walks, 1,278,091 steps, 81,207 distinct states: no property broken
+strict all2: 20,000 walks, 1,193,916 steps, 81,110 distinct states: E4 (24 steps)
+  E4: shortest trace found, 24 steps
+     1. reload FA1
+     2. reload FA2
+     3. propose 1
+     4. commit 1
+     5. connect (('x', 1),)
+     6. loaded FA2
+     7. loaded FA1
+     8. propose 2
+     9. build (('x', 1),)
+    10. commit 2
+    11. pic (('x', 1),)
+    12. ack ()
+    13. fence 2
+    14. gotpic (('x', 1),)
+    15. bopen ()
+    16. notready (('x', 1),)
+    17. gotretry (('x', 1),)
+    18. connect (('x', 4),)
+    19. propose 3
+    20. commit 3
+    21. apply FB
+    22. build (('x', 4),)
+    23. pic (('x', 4),)
+    24. gotpic (('x', 4),)

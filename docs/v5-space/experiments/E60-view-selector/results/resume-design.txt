@@ -1,0 +1,98 @@
+# resume: E-31 as designed, the folded resume, and the planted torn base and first version, 2026-11-23T02:28:56Z, Python 3.13.17, 4 vCPU, load 7.04 7.14 6.34
+e31 fo: 7,493 states, 0.3s: all hold
+    P5: 7,493 judged states, 0 cannot reach the goal
+e31 mv: 23,087 states, 1.2s: all hold
+    P5: 23,087 judged states, 0 cannot reach the goal
+e31 tw: 17,141 states, 0.8s: all hold
+    P5: 17,141 judged states, 0 cannot reach the goal
+e31 fo2: 22,109 states, 1.1s: all hold
+    P5: 22,109 judged states, 0 cannot reach the goal
+fold fo: 96,837 states, 5.4s: all hold
+    P5: 96,837 judged states, 0 cannot reach the goal
+fold mv: 327,908 states, 22.1s: all hold
+    P5: 327,908 judged states, 0 cannot reach the goal
+fold tw: 349,571 states, 22.9s: all hold
+    P5: 349,571 judged states, 0 cannot reach the goal
+fold fo2: 270,263 states, 16.8s: all hold
+    P5: 270,263 judged states, 0 cannot reach the goal
+torn fo: 1,653 states, 0.1s: P2 (8 steps) (STOPPED AT THE STATE LIMIT)
+  P2: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. connect (('x', 0),)
+     5. snap (('x', 0),)
+     6. gotsnap (('x', 0),)
+     7. save ()
+     8. restart C
+torn mv: 2,208 states, 0.1s: P2 (8 steps) (STOPPED AT THE STATE LIMIT)
+  P2: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. connect (('x', 0),)
+     5. snap (('x', 0),)
+     6. gotsnap (('x', 0),)
+     7. save ()
+     8. restart C
+torn tw: 1,293 states, 0.1s: P2 (8 steps) (STOPPED AT THE STATE LIMIT)
+  P2: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. connect (('x', 0),)
+     5. snap (('x', 0),)
+     6. gotsnap (('x', 0),)
+     7. save ()
+     8. restart C
+torn fo2: 2,588 states, 0.1s: P2 (8 steps) (STOPPED AT THE STATE LIMIT)
+  P2: shortest trace, 8 steps
+     1. propose 1
+     2. commit 1
+     3. apply LA
+     4. connect (('x', 0),)
+     5. snap (('x', 0),)
+     6. gotsnap (('x', 0),)
+     7. save ()
+     8. restart C
+firstver fo: 96,837 states, 5.6s: all hold
+    P5: 96,837 judged states, 0 cannot reach the goal
+firstver mv: 327,908 states, 22.1s: all hold
+    P5: 327,908 judged states, 0 cannot reach the goal
+firstver tw: 42,493 states, 1.9s: F1 (16 steps), P2 (16 steps) (STOPPED AT THE STATE LIMIT)
+  F1: shortest trace, 16 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. propose 4
+     8. reload FA
+     9. connect (('x', 1),)
+    10. load (('x', 1),)
+    11. commit 4
+    12. snap (('x', 1),)
+    13. apply FA
+    14. gotsnap (('x', 1),)
+    15. fres (('x', 1),)
+    16. gotfres (('x', 1),)
+  P2: shortest trace, 16 steps
+     1. propose 1
+     2. commit 1
+     3. propose 2
+     4. commit 2
+     5. propose 3
+     6. commit 3
+     7. propose 4
+     8. reload FA
+     9. connect (('x', 1),)
+    10. load (('x', 1),)
+    11. commit 4
+    12. snap (('x', 1),)
+    13. apply FA
+    14. gotsnap (('x', 1),)
+    15. fres (('x', 1),)
+    16. gotfres (('x', 1),)
+firstver fo2: 270,263 states, 18.3s: all hold
+    P5: 270,263 judged states, 0 cannot reach the goal
