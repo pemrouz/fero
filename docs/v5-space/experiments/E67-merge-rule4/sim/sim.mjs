@@ -19,6 +19,13 @@
 // takeover. A merger rebuild: a new merger with no part; every group's host sends a picture at its own place.
 // A group that is down at a rebuild stays down (its picture comes when its outage ends): the new merger cannot
 // serve until it has every group's part, and the sim counts that gap.
+// THE FLOOR AT A REBUILD (--floor). Each rebuild picture names the halves after a floor, and in (c) the copies
+// send the parts of the moves not closed at that floor. 'exact': the dead merger's own last places and its own
+// closed set (a new merger could not know them). 'acked': the rule. Each ack of the merger carries its whole
+// cut; each group's copies keep the last one acked to them (here one of the merger's last 64 served cuts,
+// drawn per group); the new merger takes the oldest of the up groups' cuts, tells every host, and every picture
+// starts from that ONE cut, which also says which moves are closed. Planted 'mixedfloor': each group starts
+// from its own kept cut (as if an ack carried only the group's own place).
 // THE MERGER takes 0 to 3 units a step from random groups (and drains any buffer past 40), each as a join.
 //
 // THE ORACLE, written apart from the intake. It keeps, per group, that group's rows at the merger's place
@@ -29,7 +36,7 @@
 // and at the end. Places never go back ('back'). Health (fix a, b, c): each group the merger names held must be
 // held, by the down groups the oracle finds from the world's own move table. At the end every outage ends,
 // every move finishes, and every buffer must drain ('stuck' if it cannot).
-//   node sim/sim.mjs --world=g4|g16|elastic|stress --fix=none|a|b|b0|c [--mutate=...] [--ring=64] --seeds=1000
+//   node sim/sim.mjs --world=g4|g16|elastic|stress --fix=none|a|b|b0|c [--floor=exact|acked] [--mutate=...] [--ring=64] --seeds=1000
 //   node sim/sim.mjs ... --seed=7 --seeds=1 --trace     one seed, its counters
 import { rng, SLOTS, slotOf, canon, num, bkey, rowCmp, cmpStr, makeRow, genPoints, genRoom, keyName, exactSum, toUnits, fromUnits } from '../src/lib.mjs'
 import { Partial, PRED, FLAG } from '../src/partial.mjs'
@@ -37,6 +44,8 @@ import { Intake } from '../src/intake.mjs'
 
 const arg = (n, d) => { const a = process.argv.find((x) => x.startsWith('--' + n + '=')); return a ? a.slice(n.length + 3) : d }
 const WORLD = arg('world', 'g4'), FIX = arg('fix', 'a'), MUTATE = arg('mutate', ''), RING = +arg('ring', '64')
+const FLOOR = MUTATE === 'mixedfloor' ? 'acked' : arg('floor', 'exact')
+if (FLOOR !== 'exact' && FLOOR !== 'acked') throw new Error('floor ' + FLOOR)
 const SEEDS = +arg('seeds', '1000'), SEED0 = +arg('seed', '1'), STEPS = +arg('steps', '600'), KEYS = +arg('keys', '300')
 const K = 10, LAG = 40, FULL_EVERY = 25, DOM = 'dirty', TAKES = +arg('takes', '2'), DLO = +arg('dlo', '0'), DHI = +arg('dhi', '3')
 const WORLDS = {
@@ -53,11 +62,16 @@ class Stop extends Error {}
 
 function runSeed(SEED) {
   const R = rng(SEED), RF = rng(SEED * 7919 + 3), RM = rng(SEED * 31 + 17)
+  // the floor at a rebuild (--floor=acked): RP draws only in that mode, so 'exact' runs as before
+  const RP = rng(SEED * 101 + 7), snaps = [], floorOf = new Map(), cutOf = new Map()
+  // and the fenced moves the merger took and the world forgot, which a copy still keeps until no cut a new
+  // merger could start from has the move open (closed at the oldest kept cut)
+  const kept = new Map()
   const ri = (a, b) => a + Math.floor(RM() * (b - a + 1))
   const st = { seed: SEED, joins: 0, checks: 0, full: 0, moves: 0, cancels: 0, fences: 0, opens: 0, giveups: 0, slotsMoved: 0, grows: 0, shrinks: 0, removed: 0,
     takeovers: 0, outages: 0, rebuilds: 0, rebuildsDown: 0, gapSum: 0, gapMax: 0, gapDownSum: 0, gapDownMax: 0, gapN: 0, gapDownN: 0,
     ringHit: 0, ringMiss: 0, pictures: 0, cases: 0, caseTake: 0, caseRebuild: 0, caseFence: 0, caseOpen: 0, caseGiveup: 0, caseMulti: 0,
-    joinPics2: 0, waitMove: 0, held: 0, picWait: 0, maxBuf: 0, healthChecks: 0, casesAny: 0, mismatches: 0, first: null, last: 'none' }
+    joinPics2: 0, waitMove: 0, held: 0, picWait: 0, maxBuf: 0, healthChecks: 0, casesAny: 0, floorPics: 0, floorHalves: 0, mismatches: 0, first: null, last: 'none' }
   const fail = (what, detail) => { st.mismatches++; if (!st.first) st.first = { step, what, after: st.last, detail: String(detail).slice(0, 240) }; throw new Stop() }
   let step = 0
   const intake = new Intake({ fix: FIX, mutate: MUTATE, K, rnd: rng(SEED * 13 + 5) })
@@ -98,6 +112,14 @@ function runSeed(SEED) {
   }
   let oldClosed = new Set() // moves closed by earlier mergers (the copies learn it and stop keeping the rows)
   const mClosed = (mv) => oldClosed.has(mv) || intake.closed.has(mv)
+  // what g's copies know is closed: 'exact', every merger's closed set; 'acked', the live merger's (from its
+  // acks) and the moves closed at the cut the last rebuild started from
+  const knownClosed = (g, m) => {
+    if (FLOOR === 'exact') return mClosed(m.mv)
+    if (intake.closed.has(m.mv)) return true
+    const c = cutOf.get(g)
+    return c !== undefined && m.closeG !== undefined && (c.get(m.closeG) ?? 0) >= m.cpos
+  }
   const mkGroup = () => {
     const g = nextGid++
     groups.set(g, { log: [], p: new Partial(g, { KP: K }), slots: new Set(), hp: 0, down: false, until: 0, retiring: false })
@@ -240,13 +262,13 @@ function runSeed(SEED) {
   // the moves group g fenced at or before p that the merger has not closed: their rows (fix c)
   const partsAt = (g, p, floor) => {
     const out = []
-    for (const m of moves.values()) {
+    for (const m of FLOOR === 'acked' ? [...moves.values(), ...kept.values()] : moves.values()) {
       if (m.A !== g || m.fpos === undefined || m.fpos > p) continue
       if (m.closeKind === 'unfence' && m.cpos <= p) continue
-      if (mClosed(m.mv)) continue
+      if (knownClosed(g, m)) continue
       if (MUTATE === 'droprows' && m.closeKind === 'open') continue // planted: copies drop the rows once B opened
       if (floor !== undefined && m.fpos <= floor) continue // planted 'rebuildnomove'
-      out.push({ mv: m.mv, rows: m.rows })
+      out.push({ mv: m.mv, rows: m.rows, B: m.B })
     }
     return out
   }
@@ -273,10 +295,12 @@ function runSeed(SEED) {
     st.pictures++
     st.last = rebuild ? 'rebuild' : 'takeover'
     noteCase(g, s.pos, p, rebuild)
+    const from = rebuild && floorOf.has(g) ? floorOf.get(g) : s.pos // the floor its halves start from
+    if (from < s.pos) { st.floorPics++; st.floorHalves += halvesIn(g, from, s.pos).length }
     const carry = CARRIES && !(rebuild && MUTATE === 'rebuildnol')
     let parts = []
     if (FIX === 'c' && MUTATE !== 'nomoverows') parts = partsAt(g, p, rebuild && MUTATE === 'rebuildnomove' ? s.pos : undefined)
-    return { pos: p, pic: pictureAt(g, p), halves: carry ? halvesIn(g, s.pos, p) : [], parts, readyAt: step + ri(1, 3) }
+    return { pos: p, pic: pictureAt(g, p), halves: carry ? halvesIn(g, from, p) : [], parts, readyAt: step + ri(1, 3) }
   }
   const takeover = (g) => {
     const gr = groups.get(g), s = intake.st.get(g), head = gr.log.length
@@ -374,7 +398,8 @@ function runSeed(SEED) {
       for (const [k, l] of tsrc) if (l.some((e) => e[0] === g)) fail('removed group still holds', k)
       groups.delete(g); cutpos.delete(g); st.removed++
     }
-    for (const [mv, m] of moves) if (m.state === 'cancelled' || (m.state === 'closed' && taken(m))) moves.delete(mv)
+    for (const [mv, m] of moves) if (m.state === 'cancelled' || (m.state === 'closed' && taken(m))) { if (FLOOR === 'acked' && m.fpos !== undefined) kept.set(mv, m); moves.delete(mv) }
+    if (FLOOR === 'acked' && snaps.length) for (const [mv, m] of kept) if ((snaps[0].get(m.closeG) ?? 0) >= m.cpos) kept.delete(mv)
   }
   const deliver = () => {
     for (const [g, gr] of groups) {
@@ -391,6 +416,7 @@ function runSeed(SEED) {
     if (r.pics > 1) st.joinPics2++
     syncCut()
     if (!intake.serving()) return
+    if (FLOOR === 'acked') { snaps.push(new Map([...intake.st].map(([g, x]) => [g, x.pos]))); if (snaps.length > 64) snaps.shift() }
     if (gapFrom >= 0) { // the new merger serves again
       const gap = step - gapFrom
       if (gapDown) { st.gapDownSum += gap; st.gapDownMax = Math.max(st.gapDownMax, gap); st.gapDownN++ } else { st.gapSum += gap; st.gapMax = Math.max(st.gapMax, gap); st.gapN++ }
@@ -426,6 +452,13 @@ function runSeed(SEED) {
     const anyDown = [...groups.values()].some((gr) => gr.down)
     if (anyDown) st.rebuildsDown++
     if (gapFrom < 0) { gapFrom = step; gapDown = anyDown } else gapDown = gapDown || anyDown
+    if (FLOOR === 'acked') { // each group's copies kept a whole cut; the new merger takes the oldest of the up groups'
+      floorOf.clear(); cutOf.clear()
+      const gs = [...groups.keys()], pick = new Map(gs.map((g) => [g, snaps.length ? Math.floor(RP() * snaps.length) : -1]))
+      const up = gs.filter((g) => !groups.get(g).down), oldest = Math.min(...(up.length ? up : gs).map((g) => pick.get(g)))
+      const cutAt = (i) => (i < 0 ? new Map() : snaps[i]) // no served cut yet: the empty cut, every place 0
+      for (const g of gs) { const c = cutAt(MUTATE === 'mixedfloor' ? pick.get(g) : oldest); cutOf.set(g, c); floorOf.set(g, Math.min(c.get(g) ?? 0, intake.st.get(g).pos)) }
+    }
     for (const mv of intake.closed) oldClosed.add(mv)
     intake.rebuild()
     for (const [g, gr] of groups) { if (gr.down) continue; const p = gr.hp; intake.takeover(g, makePic(g, p, true)); gr.hp = p }
@@ -473,10 +506,10 @@ function runSeed(SEED) {
 }
 
 const SUM = ['joins', 'checks', 'full', 'moves', 'cancels', 'fences', 'opens', 'giveups', 'slotsMoved', 'grows', 'shrinks', 'removed', 'takeovers', 'outages', 'rebuilds', 'rebuildsDown',
-  'casesAny', 'gapSum', 'gapDownSum', 'gapN', 'gapDownN', 'ringHit', 'ringMiss', 'pictures', 'cases', 'caseTake', 'caseRebuild', 'caseFence', 'caseOpen', 'caseGiveup', 'caseMulti', 'joinPics2', 'waitMove', 'held', 'picWait', 'healthChecks']
+  'casesAny', 'gapSum', 'gapDownSum', 'gapN', 'gapDownN', 'ringHit', 'ringMiss', 'pictures', 'cases', 'caseTake', 'caseRebuild', 'caseFence', 'caseOpen', 'caseGiveup', 'caseMulti', 'joinPics2', 'waitMove', 'held', 'picWait', 'healthChecks', 'floorPics', 'floorHalves']
 const tot = Object.fromEntries(SUM.map((k) => [k, 0]))
 let failed = 0, failedCase = 0, failedNoCase = 0, seedsCase = 0, seedsAny = 0, failedNoAny = 0, gapMax = 0, gapDownMax = 0, maxBuf = 0
-const kinds = {}, after = {}, firsts = []
+const kinds = {}, after = {}, firsts = [], kindsNoRow = {}, kindsNoAny = {} // first failures of seeds with no case with rows / no half at all
 const t0 = Date.now()
 for (let s = SEED0; s < SEED0 + SEEDS; s++) {
   const st = runSeed(s)
@@ -488,9 +521,11 @@ for (let s = SEED0; s < SEED0 + SEEDS; s++) {
     failed++; if (st.cases) failedCase++; else failedNoCase++; if (!st.casesAny) failedNoAny++
     after[st.first.after] = (after[st.first.after] ?? 0) + 1
     const kind = st.first.what.split(/[ (]/)[0]; kinds[kind] = (kinds[kind] ?? 0) + 1
+    if (!st.cases) kindsNoRow[kind] = (kindsNoRow[kind] ?? 0) + 1
+    if (!st.casesAny) kindsNoAny[kind] = (kindsNoAny[kind] ?? 0) + 1
     if (firsts.length < 3) firsts.push({ seed: s, ...st.first })
   }
   if (arg('trace', '') !== '' || process.argv.includes('--trace')) console.error(JSON.stringify(st))
 }
-console.log(JSON.stringify({ world: WORLD, fix: FIX, mutate: MUTATE || 'none', ring: FIX === 'b' || FIX === 'b0' ? RING : undefined, seeds: SEEDS, steps: STEPS, keys: KEYS,
-  failed, seedsWithCase: seedsCase, failedWithCase: failedCase, failedNoCase, seedsWithAnyCase: seedsAny, failedNoAnyCase: failedNoAny, kinds, after, ...tot, gapMax, gapDownMax, maxBuf, ms: Date.now() - t0, firsts }))
+console.log(JSON.stringify({ world: WORLD, fix: FIX, floor: FLOOR, mutate: MUTATE || 'none', ring: FIX === 'b' || FIX === 'b0' ? RING : undefined, seeds: SEEDS, steps: STEPS, keys: KEYS,
+  failed, seedsWithCase: seedsCase, failedWithCase: failedCase, failedNoCase, seedsWithAnyCase: seedsAny, failedNoAnyCase: failedNoAny, kinds, kindsNoRow, kindsNoAny, after, ...tot, gapMax, gapDownMax, maxBuf, ms: Date.now() - t0, firsts }))

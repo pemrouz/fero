@@ -26,7 +26,8 @@
 // nojoin (a picture's first half joined, the others left for later), giveup (after 30 steps held by a down
 // group, take the unit alone), giveupskip (after 30 steps, drop the waiting half), back (rule 1 off: a picture
 // behind the merger's place is taken), health (health names down groups only), nomovepart, noorder (c: an
-// open does not wait for its fence). Bugs of the world side (pictures, ring, rows kept) live in sim.mjs.
+// open does not wait for its fence), gonewait (a half whose partner's group was removed waits for it). Bugs of
+// the world side (pictures, ring, rows kept, the floor at a rebuild) live in sim.mjs.
 import { Merger } from './merger.mjs'
 import { Partial } from './partial.mjs'
 
@@ -100,7 +101,9 @@ export class Intake {
     }
     const include = (g, upto, own) => {
       const s = st.get(g)
-      if (!s) return stop('gone')
+      // a removed group: the merger took every half it held before it removed it, so it is past them all. Only a
+      // rebuild that starts below the old merger's place meets one (planted 'gonewait' waits for it instead)
+      if (!s) { if (m === 'gonewait') stop('gone'); return }
       if (upto <= cur(g) && (s.present || P.has(g))) return
       if (s.down) return stop('down', g)
       if (!P.has(g)) { if (s.pic) { if (!addPic(g)) return } else if (!s.present) return stop('picture') }
@@ -116,7 +119,7 @@ export class Intake {
       if (pair) {
         if (h.kind === 'fence') {
           const c = this.closeOf.get(h.mv)
-          if (!c) { if (st.get(h.B)?.down) stop('down', h.B); else stop('move'); return }
+          if (!c) { if (!st.has(h.B) && m !== 'gonewait') return; if (st.get(h.B)?.down) stop('down', h.B); else stop('move'); return }
           include(c.g, c.pos, false)
         } else if (h.kind === 'open') include(h.A, h.fpos, false)
       } else if (h.kind === 'open' && m !== 'noorder') include(h.A, h.fpos, false) // (c): an open waits for its fence
@@ -164,7 +167,8 @@ export class Intake {
       M.install(g, pic.pic)
       s.present = true; s.pos = pic.pos; s.pic = null
       if (this.carries) for (const h of pic.halves) if (h.kind !== 'fence') closes.add(h.mv)
-      if (this.fix === 'c') for (const pt of pic.parts) creates.push(pt)
+      // a part for a move into a removed group is closed: the merger took that group's every half (gonewait: not so)
+      if (this.fix === 'c') for (const pt of pic.parts) if (pt.B === undefined || this.st.has(pt.B) || this.mutate === 'gonewait') creates.push(pt)
     }
     for (const g of order) {
       const s = this.st.get(g), to = T.get(g)
