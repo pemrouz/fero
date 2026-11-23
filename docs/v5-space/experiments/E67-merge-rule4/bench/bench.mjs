@@ -66,14 +66,14 @@ if (PART === 'ring') {
   // whole partial; its max and distinct rescan the touched bucket's rows, about n / 50 here)
   for (const n of [1e5, 1e6]) {
     const rows = rowsOf(n)
-    const W0 = n >= 1e6 ? 100000 : 200000
+    const W0 = n >= 1e6 ? 50000 : 200000
     const wr = []
     for (let w = 0; w < W0; w++) { const i = Math.floor(R() * n); wr.push([i, Math.floor(R() * 10001) / 100, R() < 0.1 ? 'r' + Math.floor(R() * 50) : undefined]) }
     const cur = rows.map(([, r]) => r)
     const changes = wr.map(([i, pts, room]) => { const prev = cur[i]; const next = { ...prev, points: pts }; if (room) next.room = room; cur[i] = next; return { k: 'k' + i, prev, next } })
     for (const form of ['sums', 'top10', 'six']) {
       if (form === 'six' && n >= 1e6) continue
-      const cs = form === 'six' ? changes.slice(0, 20000) : changes
+      const cs = form === 'six' ? changes.slice(0, 5000) : changes
       const ringN = 64
       let frames
       const run = (encode) => {

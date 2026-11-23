@@ -56,7 +56,9 @@ export class Intake {
   // buffer from it is dropped. pic = { pos, pic, halves, parts, readyAt } or null (a ring re-send follows).
   takeover(g, pic) {
     const s = this.st.get(g)
-    for (const it of s.items.values()) if (this.closeOf.get(it.mv)?.g === g && this.closeOf.get(it.mv).pos === it.pos) this.closeOf.delete(it.mv)
+    // what the merger learned of g's stream past its place (from the old buffer, or from a picture still
+    // pending) goes with it: the new host sends it again
+    for (const [mv, c] of this.closeOf) if (c.g === g && c.pos > s.pos) this.closeOf.delete(mv)
     s.items.clear()
     s.pic = pic
     if (pic && this.carries) for (const h of pic.halves) if (h.kind === 'open' || h.kind === 'unfence') this.closeOf.set(h.mv, { g, pos: h.pos })
