@@ -21,20 +21,26 @@
 
 ## 0. The answer first
 
-1. **The bug is real** once moves take their three real steps *(checked)*. Under O1's three rules, 366, 114, 321 and 923 of 1,000 seeds failed (g4, g16, elastic, stress). Every failing seed had a picture that passed a half. No seed without one failed.
-2. **Fix (a), "a picture carries its moves", holds** *(checked)*: 0 of 1,000 seeds failed in each of the four worlds. That is 2,066,979 checks through 93,389 moves, 46,257 takeovers, 7,395 outages, 9,061 merger rebuilds (2,313 of them while a group was down) and 11,765 pictures with rule 4's case.
-3. **Rule 4 is two rules, and rule 2 needs two more once moves are real** *(checked)*.
-   - Rule 4 itself: the picture names the halves it passed, and the merger joins it with each half's partner at one cut. With a picture's halves joined one at a time (`nojoin`), 97 and 727 of 1,000 seeds failed (g4, stress), and only in seeds that had the case.
+1. **The bug is real** once moves take their three real steps *(checked)*. Under O1's three rules, 366, 114, 321 and 923 of 1,000 seeds failed (g4, g16, elastic, stress); 352, 90, 315 and 918 of them on answers, the rest stuck. Every failing seed had a picture that passed a half; no seed without one failed.
+   - In 40 failing seeds every passed half had no rows. 39 of them failed stuck, and one held a key twice *(checked)*. A half with no rows changes no answer, but if the picture does not carry it, its partner waits for ever and the merger wedges. So rule 4 must carry halves with no rows too.
+2. **Fix (a), "a picture carries its moves", holds** *(checked)*: 0 of 1,000 seeds failed in each of the four worlds. That is 2,066,979 checks through 93,389 moves, 46,257 takeovers, 7,395 outages, 9,061 merger rebuilds (2,313 of them while a group was down) and 11,765 pictures with rule 4's case with rows.
+3. **A new merger must start every picture from one cut of the old merger** *(checked)*. The dead merger cannot hand over its places. The rule: each ack carries the merger's whole cut, each group's copies keep the last one acked to them, and the new merger takes the oldest of the up groups' cuts and tells every host before the pictures.
+   - With it, (a), (b) and (c) failed 0 of 1,000 in each world. For (a) that is 9,061 rebuilds whose 67,661 lowered pictures named 88,184 more halves.
+   - With each group starting from its own kept place (`mixedfloor`), (a) failed 107 and 732 of 1,000 (g4, stress), all stuck: a fence names an open below its partner's floor, which nothing will ever name. (c) failed 76 and 878 on answers: a part for a move already closed counts its rows twice.
+   - The rule has two clauses. A removed group is past every half it held: without that, 42 (a) and 45 (c) of 1,000 elastic seeds wedged (`gonewait`). And in (c) the same cut says which moves are closed, so a copy keeps a fenced move's rows until the move is closed at every cut a new merger could start from.
+4. **Rule 4 is two rules, and rule 2 needs two more once moves are real** *(checked)*.
+   - Rule 4 itself: the picture names the halves it passed, and the merger joins it with each half's partner at one cut. With a picture's halves joined one at a time (`nojoin`), 97 and 727 of 1,000 seeds failed (g4, stress), 72 and 379 of them on answers. All were seeds where a picture passed a half (in 3, only halves without rows).
    - Rule 2, the pairing: a half's partner can sit behind other halves, which bring their own partners (the **closure**); and each group's window and filter rows must be kept apart. Both failed in seeds that never had rule 4's case. So they belong to rule 2, and O1 had them only in part (section 7).
-4. **Fix (b), the ring, passes only because (a) stands behind it** *(checked)*. A ring of 64 frames covered 96.3 to 100.0 % of takeovers, and 16 frames 98.6 % (stress). But a new merger always needs pictures. With the picture installed alone behind the ring (b0), 59, 16, 83 and 583 of 1,000 seeds failed.
-5. **Fix (c), "a part for the moving slot", also holds** *(checked)*: 0 of 1,000 in every world. A fence never waits for its open, so groups waited at a move 2.3 to 13.0 times less than with (a), and were held by a down group 1.6 to 2.6 times less *(counted, in these worlds' sim steps)*. It costs about 2 rules more than (a). A move part costs 0.4 to 31.2 ms and 1.1 to 830 KB per move *(measured)*. Every copy of the source group must keep a fenced move's rows until the merger closes the move.
-6. **A pair whose partner is down must wait** *(checked)*. Giving it up after 30 steps failed 221 and 611 of 1,000 seeds with (a), and 81 and 232 with (c) (g4, stress). Dropping the waiting half failed 193 and 574. While it waits, the client sees both parts frozen at one exact cut, and health names the down group and the groups it holds. The wait ends when any copy of the down group hosts its partial again: a takeover under rule 4. So MERGE's listed rule "give up a pair when its partner is down" must not be built.
-7. **A new merger cannot keep serving while a group is down** *(checked)*. 2,313 of 9,061 rebuilds (fix a) came while a group was down. The new merger has no part for that group, so it served again only once the group came back: after 60 steps on average (at most 409), against 15.9 steps when every group was up. V5-20 item 2's "keeps serving" holds for the merger that holds the frozen part, not through a rebuild (section 6).
-8. **Pick: (a).** It is the fewest rules, and (b) and (c) both need its pieces. It pays two costs at a takeover, which (b) avoids when its ring reaches back *(measured)*:
-   - the group's part stays frozen while the new host builds its partial and picture: 27.6 to 30.5 ms at 1e4 rows, 312 to 409 ms at 1e5, 5.92 to 7.84 s at 1e6;
-   - the merger's install blocks every group: 0.74 to 1.24 ms at 1e4 rows a group, 7.78 to 14.0 ms at 1e5, 174 to 397 ms at 1e6 with groups kept apart, about the same at 1, 4 and 16 groups; O1's one-entry form grows with the number of groups (at 1e5 rows a group, 20.6 to 23.6 ms with 1 group, 84.3 to 89.2 ms with 4, 254 to 286 ms with 16; at 1e6, 464 to 631 ms with 1 and 1.49 to 1.60 s with 4).
+5. **Fix (b), the ring, passes only because (a) stands behind it** *(checked)*. A ring of 64 frames covered 96.3 to 100.0 % of takeovers; 16 frames covered 84.8 % (elastic) and 98.6 % (stress), and 256 frames 100.0 % (elastic). But a new merger always needs pictures. With the picture installed alone behind the ring (b0), 59, 16, 83 and 583 of 1,000 seeds failed.
+   - Those rates are the sim's: one commit a step across all groups. At 50,000 writes a second per leader, 64 frames hold about 1.3 ms of commits, far less than a failover takes to notice. So in real time a ring would rarely reach back, and (b) would nearly always fall back to (a)'s picture *(reasoned)*.
+6. **Fix (c), "a part for the moving slot", also holds** *(checked)*: 0 of 1,000 in every world. A fence never waits for its open, so groups waited at a move 2.3 to 13.0 times less than with (a), and were held by a down group 1.6 to 2.6 times less *(counted, in these worlds' sim steps)*. It costs about 2 rules more than (a). A move part costs 0.4 to 31.2 ms and 1.1 to 830 KB per move *(measured)*. At every fence the slots' rows go to the merger, which holds a part until the move closes; every copy of the source group keeps those rows too (section 4).
+7. **A pair whose partner is down must wait** *(checked)*. Giving it up after 30 steps failed 221 and 611 of 1,000 seeds with (a) (178 and 397 on answers), and 81 and 232 with (c) (g4, stress). Dropping the waiting half failed 193 and 574 (179 and 413 on answers). While it waits, the client sees both parts frozen at one exact cut, and health names the down group and the groups it holds. The wait ends when any copy of the down group hosts its partial again: a takeover under rule 4. So MERGE's listed rule "give up a pair when its partner is down" must not be built.
+8. **A new merger cannot keep serving while a group is down.** 2,313 of 9,061 rebuilds (fix a) came while a group was down. Such a merger served again only once the group came back: after 60 steps on average (at most 409), against 15.9 steps when every group was up *(counted)*. That gap follows from the sim's own rule that a new merger serves only once it has every part; the reason it cannot serve sooner is that it has no part for the down group *(reasoned)*. V5-20 item 2's "keeps serving" holds for the merger that holds the frozen part, not through a rebuild (section 6.2).
+9. **Pick: (a).** It is the fewest rules, and (b) and (c) both need its pieces. It pays two costs at a takeover, which (b) avoids when its ring reaches back *(measured)*:
+   - the group's part stays frozen while the new host builds its partial and picture: 27.6 to 30.5 ms at 1e4 rows, 312 to 409 ms at 1e5, 5.92 to 7.84 s at 1e6. Most of this is building O1's six-view prototype partial (5.26 to 7.14 s at 1e6); at one fold's cost a row the build would take about 0.6 to 1.5 s *(reasoned)*;
+   - the merger's install blocks every group: with groups kept apart, 0.74 to 1.24 ms at 1e4 rows a group and 7.78 to 14.0 ms at 1e5, about the same at 1, 4 and 16 groups; at 1e6, 174 to 252 ms with 1 group and 215 to 397 ms with 4 (16 not timed). O1's one-entry form grows with the number of groups (at 1e5 rows a group, 20.6 to 23.6 ms with 1 group, 84.3 to 89.2 ms with 4, 254 to 286 ms with 16; at 1e6, 464 to 631 ms with 1 and 1.49 to 1.60 s with 4).
    (b) costs the partial's work on every copy (section 4), and still needs (a) at every rebuild. (c) is the fallback if the move's wait proves too long, judged on the timed move window (V5-20 item 12).
-9. **Rules** *(reasoned)*: (a) +3 to +4, (b) +4 to +5, (c) +5 to +6 net, plus health in each. MERGE's net becomes about +10 to +16, not +9 to +14 (section 7).
+10. **Rules** *(reasoned)*: (a) +4 to +6, (b) +5 to +7, (c) +6 to +8 net, plus health in each. MERGE's net becomes about +11 to +18, not +9 to +14 (section 7).
 
 ## 1. What was built
 
@@ -46,7 +52,7 @@ Everything is plain JavaScript on Node 22, in one process: no network, no Raft, 
 
 **The forms.**
 - **none** — O1's three rules. Rule 1: frames in order; a picture at or past the merger's place. Rule 2: a half is taken with its partner, with the closure. Rule 3: a picture replaces the group's whole part. A picture carries nothing, so a picture past a half goes in alone.
-- **(a) a picture carries its moves** — the picture names every half between the merger's place and its own. The merger installs it with each half's partner, at one cut. At a rebuild, each picture names the halves after the floor (section 6.1).
+- **(a) a picture carries its moves** — the picture names every half between its floor (the merger's place, at a takeover) and its own place, with rows or not. The merger installs it with each half's partner, at one cut. At a rebuild, each picture names the halves after the floor (section 6.1).
 - **(b) a ring of frames** — every copy keeps its last 64 frames. A new host whose ring reaches back to the merger's place sends those frames again, and no picture is needed. Otherwise, and at every rebuild, (a).
 - **(b0)** — the ring, with the picture installed alone behind it.
 - **(c) a part for the moving slot** — at A's fence the slot's rows go into a part of their own. B's open or A's unfence takes them out. A fence never waits. An open waits for its fence. A picture names its halves and, with their rows, every move its group fenced that the merger has not closed (at a rebuild: not closed at the floor cut). So a takeover or a new merger gets the move part back.
@@ -71,20 +77,24 @@ Everything is plain JavaScript on Node 22, in one process: no network, no Raft, 
 
 ## 2. Results
 
-1,000 seeds of 600 steps a line, 62 lines. Full tables: [results/summary.md](results/summary.md).
+1,000 seeds of 600 steps a line, 81 lines. Full tables: [results/summary.md](results/summary.md).
 
-**Table 1. The forms** (seeds failed of 1,000) *(checked)*
+**Table 1. The forms** (seeds failed of 1,000; in brackets, on answers / stuck) *(checked)*. The main lines start a rebuild's pictures from the dead merger's own places; the last three take the floor from the hosts' acks (section 6.1).
 
-| Form | g4 | g16 | elastic | stress | First failures |
+| Form | g4 | g16 | elastic | stress | First failures (stress) |
 |---|---|---|---|---|---|
-| none (O1's three rules) | 366 | 114 | 321 | 923 | window 328, twice 243, union 237, add 110 (stress) |
+| none (O1's three rules) | 366 (352 / 14) | 114 (90 / 24) | 321 (315 / 6) | 923 (918 / 5) | window 328, twice 243, union 237, add 110 |
 | (a) a picture carries its moves | 0 | 0 | 0 | 0 | — |
 | (b) the ring (64 frames), (a) behind it | 0 | 0 | 0 | 0 | — |
-| (b0) the ring, a picture alone behind it | 59 | 16 | 83 | 583 | union 185, window 185, twice 121, add 78 (stress) |
+| (b0) the ring, a picture alone behind it | 59 (56 / 3) | 16 (15 / 1) | 83 (79 / 4) | 583 (569 / 14) | union 185, window 185, twice 121, add 78 |
 | (c) a part for the moving slot | 0 | 0 | 0 | 0 | — |
-| (b) at 16 and 256 frames (stress) | | | | 0 and 0 | — |
+| (b) at 16 frames | | | 0 | 0 | — |
+| (b) at 256 frames | | | 0 | | — |
+| (a), the rebuild floor from acks | 0 | 0 | 0 | 0 | — |
+| (b), the rebuild floor from acks | 0 | 0 | 0 | 0 | — |
+| (c), the rebuild floor from acks | 0 | 0 | 0 | 0 | — |
 
-Seeds with rule 4's case: 424, 190, 395, 994 of 1,000 (fix a: g4, g16, elastic, stress). Under O1's rules, seeds failed with no picture past any half: 0, 0, 0, 0 (the four worlds) *(checked)*.
+Seeds with rule 4's case, any half / with rows (fix a): 556 / 424, 294 / 190, 431 / 395, 998 / 994 (g4, g16, elastic, stress). Under O1's rules every failing seed had a picture past some half. In 11, 21, 6 and 2 of them every passed half had no rows; all but one of those 40 failed stuck *(checked)*.
 
 **Table 2. What the worlds threw at fix (a)** (per 1,000 seeds) *(counted)*
 
@@ -97,21 +107,22 @@ Seeds with rule 4's case: 424, 190, 395, 994 of 1,000 (fix a: g4, g16, elastic, 
 
 Elastic also made 3,022 groups and removed 792 (counted when removed, after 1,030 shrinks started).
 
-**Table 3. Planted bugs** (seeds failed of 1,000) *(checked)*. The last numbers are failures in seeds with no picture past any half: a bug that fails there is not only about rule 4.
+**Table 3. Planted bugs** (seeds failed of 1,000; in brackets, on answers / stuck) *(checked)*. "No case": failing seeds where no picture passed any half; a bug that fails there is not only about rule 4. `mixedfloor` and `gonewait` take the floor from acks.
 
 | Form | Planted | What it breaks | g4 | stress | Failed with no case (g4 / stress) | First failures (stress) |
 |---|---|---|---|---|---|---|
 | a | `nopair` | O1's rule 2: halves one by one | 1,000 | 1,000 | 905 / 704 | window 544, add 241, twice 126 |
 | a | `resyncadd` | O1's rule 3: a picture added, the old part not taken out | 1,000 | 1,000 | 899 / 683 | add 1000 |
 | a | `back` | O1's rule 1: a picture behind the merger's place | 990 | 1,000 | 921 / 696 | back 1000 |
-| a | `noclosure` | rule 2's closure off | 211 | 916 | 123 / 180 | window 327, union 226, twice 206 |
+| a | `noclosure` | rule 2's closure off | 211 (208 / 3) | 916 (899 / 17) | 123 / 180 | window 327, union 226, twice 206 |
 | a | `keyowner` | O1's one entry per key | 97 | 478 | 48 / 54 | union 321, window 157 |
-| a | `nojoin` | rule 4's join: a picture's halves one at a time | 97 | 727 | 0 / 0 | stuck 348, window 136, twice 116 |
-| a | `rebuildnol` | a new merger's pictures carry no halves | 51 | 575 | 0 / 0 | window 191, union 177, twice 121 |
+| a | `nojoin` | rule 4's join: a picture's halves one at a time | 97 (72 / 25) | 727 (379 / 348) | 0 / 0 | stuck 348, window 136, twice 116 |
+| a | `rebuildnol` | a new merger's pictures carry no halves | 51 (46 / 5) | 575 (564 / 11) | 0 / 0 | window 191, union 177, twice 121 |
+| a | `mixedfloor` | a new merger: each group starts from its own kept place, not one cut | 107 (0 / 107) | 732 (0 / 732) | 14 / 0 | stuck 732 |
 | a | `health` | health names down groups only | 428 | 771 | 350 / 218 | health 771 |
-| a | `giveup` | a pair whose partner is down: taken alone after 30 steps | 221 | 611 | 110 / 37 | stuck 214, twice 138, window 115 |
-| a | `giveupskip` | a pair whose partner is down: the half dropped after 30 steps | 193 | 574 | 77 / 24 | twice 177, stuck 161, union 92 |
-| b | `ringgap` | resume from a ring (16) that does not reach back | 437 | 220 | 402 / 50 | union 107, window 68, add 20 |
+| a | `giveup` | a pair whose partner is down: taken alone after 30 steps | 221 (178 / 43) | 611 (397 / 214) | 110 / 37 | stuck 214, twice 138, window 115 |
+| a | `giveupskip` | a pair whose partner is down: the half dropped after 30 steps | 193 (179 / 14) | 574 (413 / 161) | 77 / 24 | twice 177, stuck 161, union 92 |
+| b | `ringgap` | resume from a ring (16) that does not reach back | 437 | 220 (212 / 8) | 402 / 50 | union 107, window 68, add 20 |
 | c | `nomovepart` | no move part | 995 | 1,000 | 869 / 685 | window 537, add 310, union 153 |
 | c | `noorder` | an open does not wait for its fence | 835 | 999 | 613 / 358 | twice 613, window 386 |
 | c | `noclosure` | the closure off | 25 | 302 | 14 / 16 | twice 223, window 76, union 3 |
@@ -119,10 +130,13 @@ Elastic also made 3,022 groups and removed 792 (counted when removed, after 1,03
 | c | `nomoverows` | a picture carries no move rows | 184 | 766 | 7 / 7 | union 332, window 242, add 192 |
 | c | `droprows` | copies drop the rows at B's open, not at the merger's close | 114 | 569 | 2 / 3 | union 255, window 171, add 143 |
 | c | `rebuildnomove` | a new merger loses older move parts | 12 | 122 | 7 / 7 | add 76, window 34, union 12 |
+| c | `mixedfloor` | a new merger: each group starts from its own kept place and closed moves | 76 | 878 | 32 / 18 | add 491, window 274, union 113 |
 | c | `keyowner` | O1's one entry per key | 118 | 527 | 66 / 49 | union 385, window 142 |
 | c | `giveup` | an open whose fence is down: taken alone after 30 steps | 81 | 232 | 44 / 7 | twice 174, window 54, union 3 |
+| a | `gonewait` | a removed group not past its halves (run in elastic, the one world that removes groups) | elastic: 42 (0 / 42) | | 8 (elastic) | stuck 42 (elastic) |
+| c | `gonewait` | as above, and a part for a move into a removed group installed | elastic: 45 (3 / 42) | | 16 (elastic) | stuck 42, window 2, add 1 (elastic) |
 
-Every planted bug failed in both worlds; the weakest failed 122 of 1,000 seeds in its stronger world.
+Every planted bug failed in both of its worlds; the weakest failed 122 of 1,000 seeds in its stronger world (`gonewait`, run in elastic alone, 42 and 45). The floor bugs of (a) and `gonewait` fail only as stuck: they break liveness, not answers.
 
 **Table 4. Waits** (group-steps over 1,000 seeds, while the merger serves) *(counted)*
 
@@ -164,14 +178,17 @@ Every planted bug failed in both worlds; the weakest failed 122 of 1,000 seeds i
 - **The closure** (`noclosure`). A fence at A needs B's open, and B's open may sit behind a fence of B's own, whose open sits at C. Each half met on the way brings its own partner. O1's `takeFrom` followed one pair to the queue that must move first; with real moves a chain forms. Without it, 211 (g4) and 916 (stress) seeds failed, 303 of them with no picture past any half. So the closure is rule 2's, not rule 4's (S2).
 - **Keys kept apart** (`keyowner`). O1 kept one entry per key for the window and the filter, and ignored a drop from a group that did not own the key. A join applies several groups' frames and pictures at one cut, in some order: A's write puts key k over B's entry, then A's fence drops k, and k is gone though B holds it. Without it, 97 and 478 seeds failed (102 with no picture past any half). The first run's review found that applying frames before pictures does not save the one-entry form: two pictures can each hold what the other's frames drop (not rerun here).
 - **The picture carries its halves** (fix none, `rebuildnol`). Without it the rows of a passed fence vanish, or a passed open counts its rows twice. At a rebuild too: `rebuildnol` failed 51 and 575.
-- **The join** (`nojoin`). A picture can pass several halves (2,504 pictures with two or more, fix a, all worlds). Each needs its partner at the same cut.
+- **Halves with no rows count too** (F1). A passed half whose move carried no rows changes no answer. But if the picture does not name it, its partner later waits for a half the merger will never see. Under O1's rules 40 failing seeds had only such halves, and 39 of them failed stuck *(checked)*.
+- **The join** (`nojoin`). A picture can pass several halves (2,504 pictures with two or more, fix a, all worlds). Each needs its partner at the same cut. Without it, 97 and 727 failed, 72 and 379 on answers.
+- **One floor at a rebuild** (`mixedfloor`, `gonewait`; section 6.1). Each group starting from its own kept place failed 107 and 732 with (a), all stuck, and 76 and 878 with (c), on answers. Waiting for a removed group failed 42 (a) and 45 (c) in elastic, nearly all stuck.
+- **Why so many planted bugs fail "stuck"** (F1). In `nojoin`, `giveup` and `giveupskip`, 25 to 348 of the failing seeds wedged. Once a half's partner was taken out of turn, a fence looks for its open among the frames not yet taken (`closeOf` in the intake), not among the closed moves, so it waits for ever. With rows, a seed often fails on answers first; at a rebuild the merger does not serve, so nothing is checked before the wedge *(reasoned from the code)*. So part of each count measures how this intake wedges. On answers alone each still fails clearly: `nojoin` 72 and 379, `giveup` 178 and 397, `giveupskip` 179 and 413.
 - **The resume rule** (`ringgap`, ring of 16): a ring that does not reach back to the merger's place must not resume; 437 and 220 failed.
 - **(c)'s pieces**: the move part (`nomovepart`, 995 and 1,000), the open's wait for its fence (`noorder`, 835 and 999), the picture's rows (`nomoverows`, 184 and 766), copies keeping the rows until the merger closes the move (`droprows`, 114 and 569), a new merger getting its move parts back (`rebuildnomove`, 12 and 122), its closure and join (`noclosure` 25 and 302; `nojoin` 14 and 153), and keys apart (`keyowner` 118 and 527).
 - **O1's three rules**, rerun here: `nopair` 1,000 and 1,000, `resyncadd` 1,000 and 1,000, `back` 990 and 1,000.
 
 ## 4. The pick: (a) over (b), with (c) as the fallback
 
-**(b) never removes (a).** Every rebuild needs pictures, and so does any takeover the ring cannot reach back over: a long outage outruns any ring. In the worlds here, a ring of 64 frames covered 96.3 to 100.0 % of takeovers *(checked)*. With (a) behind it, (b) is (a) plus one rule.
+**(b) never removes (a).** Every rebuild needs pictures, and so does any takeover the ring cannot reach back over: a long outage outruns any ring. In the worlds here, a ring of 64 frames covered 96.3 to 100.0 % of takeovers. In elastic, where 64 frames missed 254, 16 frames covered 84.8 % and 256 frames 100.0 % (1 missed) *(checked)*. With (a) behind it, (b) is (a) plus one rule.
 - **That coverage is the sim's rate, not a real one** (F3). The sim makes one commit a step across all groups; a 140-step outage in stress is about 17 commits a group. At 50,000 writes a second per leader, 64 frames hold about 1.3 ms of commits, if a frame is one commit *(arithmetic)*. A failover takes far longer than that to notice. So in real time a ring of 64 would rarely reach back, and (b) would nearly always fall back to (a)'s picture *(reasoned)*. A frame per commit batch would stretch the ring, but not to a failover's length unless batches are long.
 
 **What (a) pays at a takeover, and (b) avoids when its ring reaches back** *(measured)*:
@@ -195,13 +212,34 @@ Every planted bug failed in both worlds; the weakest failed 122 of 1,000 seeds i
 ## 5. A pair whose partner is down
 
 MERGE 3.2 listed "giving up a pair when its partner is down" as a missing rule. It must not exist.
-- **Giving up is wrong** *(checked)*. Take the waiting unit alone after 30 steps (`giveup`): 221 and 611 seeds failed with (a), 81 and 232 with (c). Drop the waiting half instead (`giveupskip`): 193 and 574. Either way rows vanish or count twice, or the merger can never take the other half later ("stuck").
+- **Giving up is wrong** *(checked)*. Take the waiting unit alone after 30 steps (`giveup`): 221 and 611 seeds failed with (a) (178 and 397 on answers), 81 and 232 with (c) (all on answers). Drop the waiting half instead (`giveupskip`): 193 and 574 (179 and 413 on answers). Either way rows vanish or count twice, or the merger can never take the other half later ("stuck").
 - **What the client sees** *(checked)*. Both parts frozen at their last places. That is still one exact cut: the answer checks pass at every join while groups are held. Groups were held 174,546 group-steps with (a) over the four worlds, 72,974 with (c) *(counted)*.
 - **Health** *(checked)*. It names the down group, and each group it holds, by the down groups that hold it: 354,490 checks against the oracle with (a), 0 wrong. Naming only the down group (`health`) failed 428 and 771.
 - **When the wait ends.** When any copy of the down group hosts its partial again. That is a takeover, so rule 4 covers it: the new host's picture carries the halves it passed.
 - A fresh read waits, as V5-20 item 2 says *(reasoned; reads were not run here)*.
 
-## 6. A new merger while a group is down (S1)
+## 6. A new merger
+
+### 6.1 Where its pictures start (B1)
+
+At a rebuild each picture names the halves after a floor, and the merger joins them as at a takeover. The main lines take the floor from the dead merger's own last places, and in (c) its own closed moves. A real new merger cannot know these: the merger that held them is gone.
+
+- **The rule.** Each ack of the merger carries its whole cut. Each group's copies keep the last one acked to them. The new merger takes the oldest of the up groups' cuts, tells every host, and every picture starts from that one cut. Every cut the old merger served is a cut (each move's two halves both in or both out), and so is the oldest of several *(reasoned)*. In (c) the same cut says which moves are closed: a copy sends a move part for every move its group fenced that is not closed at it, and so it keeps a fenced move's rows until the move is closed at every cut a new merger could start from.
+- **It holds** *(checked)*. With the floor from acks, (a), (b) and (c) failed 0 of 1,000 in each world:
+
+| World | Rebuilds | Lowered pictures (a) | Extra halves (a) | Seeds failed (a / b / c) |
+|---|---|---|---|---|
+| g4 | 971 | 3,823 | 1,741 | 0 / 0 / 0 |
+| g16 | 971 | 13,887 | 2,079 | 0 / 0 / 0 |
+| elastic | 970 | 1,726 | 874 | 0 / 0 / 0 |
+| stress | 6,149 | 48,225 | 83,490 | 0 / 0 / 0 |
+
+  A lowered picture is a rebuild picture whose floor lay below the dead merger's place; the extra halves are the ones it named below that place *(counted)*. Here a group's kept cut is one of the merger's last 64 served cuts, drawn per group.
+- **Each group its own place** (`mixedfloor`) *(checked)*. As if an ack carried only the group's own place. (a) failed 107 (g4) and 732 (stress), all stuck. A's picture names a fence whose open at B lies below B's floor. B's picture does not name that open, and no frame will bring it, so the fence waits for ever *(reasoned from the intake)*. (c) never waits at a fence, so it does not wedge; it failed 76 and 878 on answers instead. A's copies, at their older cut, sent a part for a move whose open B's floor had already passed, so the move's rows counted twice.
+- **A removed group** (`gonewait`) *(checked)*. An older floor can name a half whose partner's group the old merger has since removed. The merger removed it only after taking every half it held, so the half needs nothing, and in (c) a part for a move into it is closed. Waiting for it instead failed 42 (a) and 45 (c) of 1,000 elastic seeds, 84 of the 87 as stuck. The review did not name this clause; the rerun found it.
+- **What it costs.** One more field in each ack (a place per group), and a round from the new merger to every host before the pictures. A lower floor names more halves: in stress, 83,490 more over 6,149 rebuilds *(counted)*.
+
+### 6.2 While a group is down (S1)
 
 The first run's rebuild brought every down host back. This one keeps outages through a rebuild.
 - **The gap** *(counted, fix a)*. 
@@ -226,7 +264,7 @@ Counted as MERGE counts them *(reasoned)*. Each piece has a planted bug that fai
 |---|---|---|---|---|
 | Rule 2's closure | a pair's partner can sit behind other halves | +0 to +1 (O1 had a weaker form) | same | same (an open brings its fence) |
 | Keys kept apart per group | a join applies several groups at one cut | +1 | +1 | +1 |
-| A picture carries its halves | rule 4's case; at a rebuild too | +1 | +1 | +1 (with rows; every copy keeps them until the move closes) |
+| A picture carries its halves | rule 4's case; at a rebuild too | +1 | +1 | +1 (with rows; every copy keeps them until the move is closed at every kept cut) |
 | The join for a picture with several halves | | +1 | +1 | +1 |
 | A new merger starts every picture from one cut of the old merger | it cannot know the dead merger's places; per-group floors wedge (a) and count rows twice in (c) | +1 to +2 | +1 to +2 | +1 to +2 |
 | The resume rule | the ring must reach back | | +1 | |
@@ -255,11 +293,11 @@ Proposed only. Those pages are tracked and were not edited here.
 - **3.7, the ring**: it fixes rule 4's case only with (a) behind it, and never at a rebuild; its cost per copy; and in real time 64 frames hold about 1.3 ms of commits, so it would rarely reach back over a failover (section 4).
 - **3.2, Cost**: the partial's max and distinct, as built, rescan a bucket: 514 to 559 µs a record at about 2,000 rows a bucket.
 - **5.3 item 4** and **5.4 item 7**: as above. **4, combination D** and **question 7**: name (c) beside blocks of slots as the fallback for the move's wait, with its costs at every fence: the slots' rows sent to the merger, a part held there while the move is open, and the rows kept on every copy until the move is closed at every kept cut.
-- **6 item 1**: done by E-67. Owed from it: the merger on real sockets (6 item 5), `data`'s views as the partials, the move's window timed (6 item 6), and the rebuild gap (section 6).
+- **6 item 1**: done by E-67. Owed from it: the merger on real sockets (6 item 5), `data`'s views as the partials, the move's window timed (6 item 6), and the rebuild gap (section 6.2).
 
 **LAYERS.md**
 - **The row "A resource larger than one server's memory"** (section 10's list): "E-23's merger and its four rules" becomes the merger with rule 4 in form (a), checked on seeds (E-67).
-- **8.6 item 7**: a served view merged across groups sees a slot move as two halves taken at one cut; a partial's takeover carries the halves it passed.
+- **8.6 item 7**: a served view merged across groups sees a slot move as two halves taken at one cut; a partial's takeover carries the halves it passed; a new merger starts every picture from one cut of the old merger.
 - **4.6, owed**: the seeded merger on real sockets; the rebuild gap while a group is down; a partial whose max and distinct keep an index.
 - **4.3**: the merger's rules (+4 to +6, plus health) join the count where MERGE's rules are counted.
 
@@ -275,7 +313,7 @@ The first run's files were lost, so its world's exact rates are not known. This 
 | Closure off (g4, stress) | 195, 997 | 211, 916 |
 | One entry per key (stress, a) | 146 | 478 |
 | (b0) (g4, g16, elastic, stress) | 135, 165, 306, 999 | 59, 16, 83, 583 |
-| Ring covered: 64 frames; 16 frames | 97.4 to 100 %; 78.5 % | 96.3 to 100.0 %; 98.6 % (stress) |
+| Ring covered: 64 frames; 16 frames | 97.4 to 100 %; 78.5 % | 96.3 to 100.0 %; 84.8 % (elastic), 98.6 % (stress) |
 | (c): seeds failed | 0 in every world | 0 in every world |
 | (c) against (a): waits at a move; held | 3 to 7 times less; 1.8 to 2.5 times less | 2.3 to 13.0 times less; 1.6 to 2.6 times less |
 | Give up after 30 steps: (a) g4, stress; (c) g4, stress | 249, 709; 162, 524 | 221, 611; 81, 232 |
@@ -284,18 +322,18 @@ The first run's files were lost, so its world's exact rates are not known. This 
 | A move part | 0.2 to 33 ms; 3 to 943 KB | 0.4 to 31.2 ms; 1.1 to 830 KB |
 | The install, one group, 1e6 rows | 1.26 to 1.46 s | 464 to 631 ms (one entry per key), 174 to 252 ms (groups kept apart) |
 | Ring CPU, two more copies at 50,000 writes a second: sums; top 10 | 44 to 45 ms; 0.55 to 0.66 s | 20 to 84 ms; 0.72 to 2.12 s |
-| Rules: (a); (b); (c) | +3 (3 to 4); +4 (4 to 5); +5 (5 to 6) | +3 to +4; +4 to +5; +5 to +6 |
+| Rules: (a); (b); (c) | +3 (3 to 4); +4 (4 to 5); +5 (5 to 6) | +4 to +6; +5 to +7; +6 to +8 (the rebuild floor added) |
 
 Where they differ, and why *(reasoned)*:
-- **Fewer seeds fail under O1's rules here**, most in g16. Here a takeover lands on one of the groups, picked from all of them, so with 16 groups each group's partial fails less often, and fewer pictures pass a waiting half. Also about a third of moves are of one slot, and with 300 keys over 1,024 slots most of those carry no rows; a passed half with no rows changes no answer.
+- **Fewer seeds fail under O1's rules here**, most in g16. Here a takeover lands on one of the groups, picked from all of them, so with 16 groups each group's partial fails less often, and fewer pictures pass a waiting half. Also about a third of moves are of one slot, and with 300 keys over 1,024 slots most of those carry no rows; a passed half with no rows changes no answer. It still wedges the merger if the picture does not carry it: 39 of the 40 seeds that failed with only such halves failed stuck.
 - **(b0) fails less** in the three mild worlds. Here a new merger takes each picture as it comes and keeps taking the frames of the groups it has. A half that a lone picture passed is often taken alone before the last picture arrives, which repairs the cut before the merger serves. In stress it still fails in most seeds.
-- **The ring covers more at 16 frames** here: stress has 8 groups, so an outage of up to 140 steps is about 17 commits a group.
+- **The ring covers more at 16 frames** in stress here: stress has 8 groups, so an outage of up to 140 steps is about 17 commits a group. In elastic 16 frames covered 84.8 %, near the first run's 78.5 %.
 - **The takeover's picture at 1e6 rows is slower** (5.92 to 7.84 s), and the install with one group faster. The first run's exact shapes for these were not kept.
 - **The prototype top 10 costs more a record** here (7.23 to 21.2 µs), so the ring's top-10 figure is higher.
 - **One entry per key fails more here** (478 against 146 in stress). This run applies a join's groups in a seeded random order, which meets the bad order more often.
 - **(c)'s gain in waits spreads wider** (up to 13 times in g16). With 16 groups each group sends few frames, so under (c) an open seldom finds its fence still behind; under (a) a fence still waits for its open's whole carry.
 
-## 10. Limits, and what the review changed
+## 10. Limits, and what the reviews changed
 
 **Limits.**
 - **The three-commit move** (S6). V5-18 pick 4 cut the move to one commit (E-17b's fused form: A's fence is the decision, and B's one entry is the final copy, which opens the slot). This study runs the three-commit form. The merger sees the same halves in both: A's fence, then B's open, or B's give-up and A's unfence. So the safety results carry over *(reasoned)*. The waits are sim steps with a carry of 1 to 8 steps; with the fused move the fence-to-open window is a few milliseconds, so the waits (a) pays may be much smaller in real time, and (c)'s gain with them.
@@ -312,7 +350,7 @@ Where they differ, and why *(reasoned)*:
 - **The ring's coverage** is in the sim's rate of one commit a step (F3); in real time it would be far lower.
 
 **What the first review changed** (the first run's review, folded in at the rebuild):
-- **S1**: outages stay through a rebuild; the gap is reported (section 6).
+- **S1**: outages stay through a rebuild; the gap is reported (section 6.2).
 - **S2**: the closure is split: rule 2's part and rule 4's join, each with its own planted bug and its failures in seeds without the case (sections 3 and 7).
 - **S3**: the pick names (a)'s two takeover costs, and the install is timed at 1, 4 and 16 groups (section 4).
 - **S4**: the ring's top-10 figure is marked as the prototype's and scaled to a fold's cost (section 4).
@@ -322,35 +360,35 @@ Where they differ, and why *(reasoned)*:
 - **N2, N3, N4, N7**: stated above. **N5**: the queue is called the merger's inbound buffer, dropped at a takeover. **N6**: `giveupskip` added.
 
 **What the second review changed** (a review of the rebuild; every seeded line was rerun after it):
-- **B1, the floor at a rebuild.** The rebuild's pictures started from the dead merger's exact places, and in (c) the copies knew its exact closed moves. A real new merger cannot get these. The study now names the rule (one cut of the old merger, kept from its acks), runs it in every world for (a), (b) and (c), and plants its bug (`mixedfloor`). The rule needed two clauses the review did not name, both found by the rerun: a removed group is past every half it held (`gonewait`), and a copy keeps a fenced move's rows until the move is closed at every cut a new merger could start from (sections 6.1 and 7).
+- **B1, the floor at a rebuild.** The rebuild's pictures started from the dead merger's exact places, and in (c) the copies knew its exact closed moves. A real new merger cannot get these. The study now names the rule (one cut of the old merger, kept from its acks), runs it in every world for (a), (b) and (c), and plants its bug (`mixedfloor`: 107 and 732 with (a), against the review probe's 96 and 735; 76 and 878 with (c), where the probe, whose copies still knew every closed move, found none). In those lines the copies know only the closes at the chosen cut, and keep the moves the world had forgotten once taken. Running the rule found one clause the review did not name: a removed group is past every half it held (`gonewait`). The counts rise by +1 to +2 in each form (sections 6.1 and 7).
 - **F1, stuck is a wedge.** Tables 1 and 3 give failures on answers and "stuck" apart. The case has one definition (any half; "with rows" where it matters). A passed half with no rows must still be carried (sections 0 and 3).
 - **F2**: the frozen part's cost is marked as the prototype partial's and scaled to a fold's cost (section 4).
 - **F3**: the ring's coverage is the sim's rate; the real-time arithmetic is given (sections 0 and 4).
 - **F4**: (c)'s cost at every fence, the rows sent and the part the merger holds, is named (section 4).
-- **N1**: item 7's marks are now *(counted)* and *(reasoned)*. **N2**: the install at 1e6 rows names 1 and 4 groups only. **N3**: the move part's slots are "of 4,096". **N4**: the six-view resend is left out, and the 1e6 sums run is named as the noisy top of its range. **N5**: the ring's size sweep runs in elastic, where 64 frames missed. **N6**: the rule counts say what rule 4 itself costs in (c), and whether keys kept apart is new (section 7). **N7**: stated above.
+- **N1**: section 0 item 8 (item 7 before) now marks the gap *(counted)* and *(reasoned)*. **N2**: the install at 1e6 rows names 1 and 4 groups only. **N3**: the move part's slots are "of 4,096". **N4**: the six-view resend is left out, and the 1e6 sums run is named as the noisy top of its range. **N5**: the ring's size sweep runs in elastic, where 64 frames missed. **N6**: the rule counts say what rule 4 itself costs in (c), and whether keys kept apart is new (section 7). **N7**: stated above.
 
 ## 11. Questions for the owner
 
 1. **A new merger while a group is down.** V5-20 item 2 keeps a merged view serving with a down group frozen, but a merger rebuilt during that outage has no part for the group. Pick: state the gap (the view stays at its last frame until the group is back) and study a standby merger later. Other way: a standby merger fed the same frames, in the first build.
 2. **(c) as the fallback for the move's wait**, beside or before keys by blocks of slots (V5-20 item 12)? Pick: yes, judged on the timed move window.
-3. **The MERGE.md and LAYERS edits** in section 8: apply them?
+3. **The MERGE.md and LAYERS edits** in section 8, which now carry the rebuild floor (one cut of the old merger, from its acks; +1 to +2 rules, MERGE's net about +11 to +18): apply them?
 
 ## 12. How to run, and the files
 
 ```
 ./run.sh quick    # a smoke run: a few lines of 20 seeds and one bench part, nothing written
-./run.sh sim      # the 62 lines of 1,000 seeds (results/sim.jsonl)
+./run.sh sim      # the 81 lines of 1,000 seeds (results/sim.jsonl)
 ./run.sh bench    # the timings, three runs (results/bench.jsonl)
 ./run.sh S        # the tables (results/summary.md)
 ./run.sh full     # sim, bench, S
 ```
 
-`SP` names a folder holding `bin/heavy` and `bin/timing` lock wrappers, if there are any; `PAR` (default 3) lines run at once; `SEEDS` (default 1000). One seed with its counters: `node sim/sim.mjs --world=stress --fix=a --seed=7 --seeds=1 --trace`. Each process stays under 3.5 GB.
+`SP` names a folder holding `bin/heavy` and `bin/timing` lock wrappers, if there are any; `PAR` (default 3) lines run at once; `SEEDS` (default 1000). One seed with its counters: `node sim/sim.mjs --world=stress --fix=a --seed=7 --seeds=1 --trace`. The rebuild floor from acks: `--floor=acked`. Each process stays under 3.5 GB.
 
 - [src/lib.mjs](src/lib.mjs), [src/partial.mjs](src/partial.mjs): from E-64 O1 (one import path changed in lib.mjs).
 - [src/merger.mjs](src/merger.mjs): O1's merger, with groups kept apart and a whole-part drop.
 - [src/intake.mjs](src/intake.mjs): the merger's rules in each form; the planted bugs on its side.
-- [sim/sim.mjs](sim/sim.mjs): the world, the oracle, the planted bugs on the world's side.
+- [sim/sim.mjs](sim/sim.mjs): the world, the oracle, the rebuild floor, the planted bugs on the world's side.
 - [bench/bench.mjs](bench/bench.mjs), [bench/summarize.mjs](bench/summarize.mjs).
 - [results/sim.jsonl](results/sim.jsonl), [results/bench.jsonl](results/bench.jsonl), [results/summary.md](results/summary.md).
 
