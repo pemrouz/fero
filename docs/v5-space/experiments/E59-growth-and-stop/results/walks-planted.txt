@@ -1,0 +1,303 @@
+shrink-onevoter w5g: 300 seeds, 13,466 steps, depth 90; failing seeds by property: {'HF': 24}; liveness judged at the end: P5 300, HF 300, LW 276; SF judged mid-walk: SF, no machine down 269, SF, a machine down 278; reported (walks judged, stuck): SWF 276, 54, POST 110, 7; undecided searches 101
+  first failing seed 13: ['HF'], 56 steps
+     1. learn (('m', 0), ('n', 4))
+     2. standby (('m', 2), ('n', 0))
+     3. retire (('m', 3),)
+     4. learn (('m', 0), ('n', 1))
+     5. learn (('m', 4), ('n', 2))
+     6. crash 4
+     7. leave (('m', 2),)
+     8. leave.ms 2
+     9. commit (('k', 2), ('n', 0))
+    10. evict 4
+    11. crash 2
+    12. evict 2
+    13. write (('n', 0),)
+    14. learn (('m', 1), ('n', 3))
+    15. write (('n', 0),)
+    16. commit (('k', 3), ('n', 0))
+    17. recover 2
+    18. leave (('m', 0),)
+    19. recover 4
+    20. commit (('k', 4), ('n', 0))
+    21. leave.ms 0
+    22. pick (('n', 0), ('x', 0), ('y', 2))
+    23. repl (('m', 2), ('n', 0))
+    24. commit (('k', 5), ('n', 0))
+    25. standby (('m', 4), ('n', 0))
+    26. repl (('m', 4), ('n', 0))
+    27. commit (('k', 6), ('n', 0))
+    28. repl (('m', 4), ('n', 0))
+    29. standby (('m', 1), ('n', 0))
+    30. repl (('m', 4), ('n', 0))
+    31. repl (('m', 1), ('n', 0))
+    32. commit (('k', 7), ('n', 0))
+    33. opromote (('m', 4), ('n', 0))
+    34. commit (('k', 8), ('n', 0))
+    35. repl (('m', 4), ('n', 0))
+    36. repl (('m', 2), ('n', 0))
+    37. promote (('m', 2), ('n', 0))
+    38. repl (('m', 4), ('n', 0))
+    39. commit (('k', 9), ('n', 0))
+    40. repl (('m', 1), ('n', 0))
+    41. repl (('m', 4), ('n', 0))
+    42. handover (('m', 4), ('n', 0))
+    43. learn (('m', 4), ('n', 3))
+    44. learn (('m', 4), ('n', 2))
+    45. learn (('m', 2), ('n', 0))
+    46. learn (('m', 2), ('n', 1))
+    47. vote (('m', 2), ('n', 4))
+    48. vote (('m', 0), ('n', 4))
+    49. win (('n', 4),)
+    50. repl (('m', 0), ('n', 4))
+    51. repl (('m', 1), ('n', 4))
+    52. commit (('k', 10), ('n', 4))
+    53. repl (('m', 1), ('n', 4))
+    54. repl (('m', 2), ('n', 4))
+    55. exitms (('m', 0),)
+    56. evict 0
+shrink [drop write.stay] w3: 200 seeds, 6,970 steps, depth 90; failing seeds by property: {'LW': 1}; liveness judged at the end: P5 199, HF 110, LW 111; SF judged mid-walk: SF, no machine down 200, SF, a machine down 159; reported (walks judged, stuck): SWF 158, 6, POST 11, 11; undecided searches 1
+  first failing seed 163: ['LW'], 29 steps
+     1. retire (('m', 2),)
+     2. leave (('m', 1),)
+     3. crash 2
+     4. evict 2
+     5. crash 1
+     6. cq (('n', 0),)
+     7. recover 2
+     8. evict 1
+     9. stand (('n', 2),)
+    10. vote (('m', 0), ('n', 2))
+    11. win (('n', 2),)
+    12. repl (('m', 0), ('n', 2))
+    13. commit (('k', 2), ('n', 2))
+    14. repl (('m', 0), ('n', 2))
+    15. lrem (('m', 1), ('n', 2))
+    16. recover 1
+    17. leave (('m', 1),)
+    18. leave.ms 1
+    19. repl (('m', 0), ('n', 2))
+    20. learn (('m', 2), ('n', 1))
+    21. repl (('m', 1), ('n', 2))
+    22. commit (('k', 3), ('n', 2))
+    23. lrem (('m', 2), ('n', 2))
+    24. repl (('m', 0), ('n', 2))
+    25. exitms (('m', 1),)
+    26. write (('n', 2),)
+    27. write (('n', 2),)
+    28. evict 1
+    29. commit (('k', 4), ('n', 2))
+shrink [drop write.stay] w5g: 200 seeds, 9,526 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 200, LW 200; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 72, 5; undecided searches 61
+shrink [drop lrem.keep] w3: 200 seeds, 7,096 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 154, LW 154; SF judged mid-walk: SF, no machine down 200, SF, a machine down 160; reported (walks judged, stuck): SWF 159, 5, POST 50, 50; undecided searches 1
+shrink [drop lrem.keep] w5g: 200 seeds, 9,534 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 200, LW 200; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 72, 5; undecided searches 61
+shrink [drop grow.small] w3: 200 seeds, 6,995 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 108, LW 108; SF judged mid-walk: SF, no machine down 195, SF, a machine down 161; reported (walks judged, stuck): SWF 160, 1, POST 8, 8; undecided searches 0
+shrink [drop grow.small] w5g: 200 seeds, 12,496 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 194, HF 194, LW 200, RC 2, GF 6; SF judged mid-walk: SF, no machine down 181, SF, a machine down 189; reported (walks judged, stuck): SWF 188, 37, POST 70, 5; undecided searches 63
+shrink [drop promote.pair] w3: 200 seeds, 6,941 steps, depth 90; failing seeds by property: {'B2B': 9}; liveness judged at the end: P5 191, HF 103, LW 103; SF judged mid-walk: SF, no machine down 200, SF, a machine down 160; reported (walks judged, stuck): SWF 159, 5, POST 10, 10; undecided searches 1
+  first failing seed 11: ['B2B'], 30 steps
+     1. retire (('m', 1),)
+     2. leave (('m', 2),)
+     3. lrem (('m', 2), ('n', 0))
+     4. write (('n', 0),)
+     5. write (('n', 0),)
+     6. repl (('m', 1), ('n', 0))
+     7. leave.ms 2
+     8. crash 2
+     9. leave (('m', 0),)
+    10. crash 1
+    11. leave.ms 0
+    12. evict 2
+    13. recover 2
+    14. recover 1
+    15. repl (('m', 2), ('n', 0))
+    16. commit (('k', 4), ('n', 0))
+    17. lrem (('m', 0), ('n', 0))
+    18. repl (('m', 1), ('n', 0))
+    19. commit (('k', 5), ('n', 0))
+    20. stand (('n', 1),)
+    21. learn (('m', 1), ('n', 2))
+    22. learn (('m', 2), ('n', 0))
+    23. vote (('m', 0), ('n', 1))
+    24. win (('n', 1),)
+    25. repl (('m', 0), ('n', 1))
+    26. commit (('k', 6), ('n', 1))
+    27. add (('m', 2), ('n', 1))
+    28. commit (('k', 7), ('n', 1))
+    29. repl (('m', 2), ('n', 1))
+    30. promote (('m', 2), ('n', 1))
+shrink [drop promote.pair] w5g: 200 seeds, 8,944 steps, depth 90; failing seeds by property: {'B2B': 82}; liveness judged at the end: P5 118, HF 118, LW 118; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 72, 5; undecided searches 61
+  first failing seed 2: ['B2B'], 31 steps
+     1. retire (('m', 3),)
+     2. crash 1
+     3. evict 1
+     4. recover 1
+     5. grow (('n', 0), ('x', 2), ('y', 4))
+     6. leave (('m', 4),)
+     7. leave.ms 4
+     8. commit (('k', 2), ('n', 0))
+     9. learn (('m', 0), ('n', 4))
+    10. exit (('m', 4),)
+    11. learn (('m', 0), ('n', 2))
+    12. crash 1
+    13. write (('n', 0),)
+    14. evict 4
+    15. leave (('m', 2),)
+    16. write (('n', 0),)
+    17. commit (('k', 3), ('n', 0))
+    18. learn (('m', 2), ('n', 3))
+    19. commit (('k', 4), ('n', 0))
+    20. leave.ms 2
+    21. recover 1
+    22. learn (('m', 0), ('n', 1))
+    23. standby (('m', 1), ('n', 0))
+    24. exitms (('m', 2),)
+    25. repl (('m', 1), ('n', 0))
+    26. commit (('k', 5), ('n', 0))
+    27. pick (('n', 0), ('x', 4), ('y', 1))
+    28. commit (('k', 6), ('n', 0))
+    29. evict 2
+    30. repl (('m', 1), ('n', 0))
+    31. promote (('m', 1), ('n', 0))
+shrink [drop stepback.noret] w3: 200 seeds, 6,910 steps, depth 90; failing seeds by property: {'SF': 24}; liveness judged at the end: P5 200, HF 112, LW 112, SF 24; SF judged mid-walk: SF, no machine down 200, SF, a machine down 160; reported (walks judged, stuck): SWF 159, 5, POST 10, 10; undecided searches 5
+  first failing seed 2: ['SF'], 34 steps
+     1. crash 0
+     2. evict 0
+     3. crash 1
+     4. evict 1
+     5. recover 1
+     6. retire (('m', 1),)
+     7. stand (('n', 2),)
+     8. learn (('m', 2), ('n', 1))
+     9. leave (('m', 2),)
+    10. recover 0
+    11. learn (('m', 2), ('n', 0))
+    12. leave.ms 2
+    13. vote (('m', 1), ('n', 2))
+    14. exitms (('m', 2),)
+    15. leave (('m', 0),)
+    16. stand (('n', 0),)
+    17. learn (('m', 0), ('n', 1))
+    18. vote (('m', 1), ('n', 0))
+    19. evict 2
+    20. leave.ms 0
+    21. win (('n', 0),)
+    22. write (('n', 0),)
+    23. write (('n', 0),)
+    24. repl (('m', 1), ('n', 0))
+    25. commit (('k', 3), ('n', 0))
+    26. commit (('k', 4), ('n', 0))
+    27. ldead (('m', 2), ('n', 0))
+    28. repl (('m', 1), ('n', 0))
+    29. commit (('k', 5), ('n', 0))
+    30. repl (('m', 1), ('n', 0))
+    31. stepback (('m', 1), ('n', 0))
+    32. repl (('m', 1), ('n', 0))
+    33. commit (('k', 6), ('n', 0))
+    34. repl (('m', 1), ('n', 0))
+shrink [drop stepback.noret] w5g: 200 seeds, 9,984 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 200, LW 200; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 72, 5; undecided searches 64
+shrink [drop exitms.safe] w3: 200 seeds, 6,662 steps, depth 90; failing seeds by property: {'LW': 8}; liveness judged at the end: P5 142, HF 107, LW 115; SF judged mid-walk: SF, no machine down 200, SF, a machine down 160; reported (walks judged, stuck): SWF 159, 5, POST 13, 13; undecided searches 0
+  first failing seed 11: ['LW'], 29 steps
+     1. retire (('m', 1),)
+     2. leave (('m', 2),)
+     3. lrem (('m', 2), ('n', 0))
+     4. write (('n', 0),)
+     5. write (('n', 0),)
+     6. repl (('m', 1), ('n', 0))
+     7. leave.ms 2
+     8. crash 2
+     9. leave (('m', 0),)
+    10. crash 1
+    11. leave.ms 0
+    12. evict 2
+    13. recover 2
+    14. recover 1
+    15. repl (('m', 2), ('n', 0))
+    16. commit (('k', 2), ('n', 0))
+    17. commit (('k', 4), ('n', 0))
+    18. add (('m', 2), ('n', 0))
+    19. repl (('m', 2), ('n', 0))
+    20. repl (('m', 1), ('n', 0))
+    21. commit (('k', 5), ('n', 0))
+    22. repl (('m', 1), ('n', 0))
+    23. repl (('m', 2), ('n', 0))
+    24. promote (('m', 2), ('n', 0))
+    25. repl (('m', 1), ('n', 0))
+    26. repl (('m', 2), ('n', 0))
+    27. commit (('k', 6), ('n', 0))
+    28. exitms (('m', 0),)
+    29. evict 0
+shrink [drop exitms.safe] w5g: 200 seeds, 9,342 steps, depth 90; failing seeds by property: {'LW': 18}; liveness judged at the end: P5 182, HF 182, LW 200; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 73, 6; undecided searches 46
+  first failing seed 17: ['LW'], 42 steps
+     1. standby (('m', 2), ('n', 0))
+     2. leave (('m', 2),)
+     3. learn (('m', 0), ('n', 4))
+     4. learn (('m', 4), ('n', 3))
+     5. learn (('m', 0), ('n', 2))
+     6. crash 4
+     7. retire (('m', 3),)
+     8. repl (('m', 2), ('n', 0))
+     9. crash 3
+    10. recover 3
+    11. leave.ms 2
+    12. learn (('m', 2), ('n', 1))
+    13. leave (('m', 0),)
+    14. exitms (('m', 2),)
+    15. evict 4
+    16. recover 4
+    17. commit (('k', 2), ('n', 0))
+    18. ldrop (('m', 2), ('n', 0))
+    19. write (('n', 0),)
+    20. evict 2
+    21. leave.ms 0
+    22. commit (('k', 3), ('n', 0))
+    23. commit (('k', 4), ('n', 0))
+    24. pick (('n', 0), ('x', 0), ('y', 4))
+    25. commit (('k', 5), ('n', 0))
+    26. standby (('m', 4), ('n', 0))
+    27. write (('n', 0),)
+    28. repl (('m', 4), ('n', 0))
+    29. commit (('k', 6), ('n', 0))
+    30. commit (('k', 7), ('n', 0))
+    31. standby (('m', 1), ('n', 0))
+    32. repl (('m', 1), ('n', 0))
+    33. commit (('k', 8), ('n', 0))
+    34. opromote (('m', 1), ('n', 0))
+    35. commit (('k', 9), ('n', 0))
+    36. repl (('m', 1), ('n', 0))
+    37. lrem (('m', 0), ('n', 0))
+    38. repl (('m', 4), ('n', 0))
+    39. repl (('m', 1), ('n', 0))
+    40. commit (('k', 10), ('n', 0))
+    41. exitms (('m', 0),)
+    42. evict 0
+shrink [drop exitalone.alone] w3: 200 seeds, 5,249 steps, depth 90; failing seeds by property: {'LX': 86}; liveness judged at the end: P5 114, HF 114, LW 114; SF judged mid-walk: SF, no machine down 184, SF, a machine down 173; reported (walks judged, stuck): SWF 172, 6, POST 11, 11; undecided searches 0
+  first failing seed 0: ['LX'], 9 steps
+     1. retire (('m', 0),)
+     2. handover (('m', 1), ('n', 0))
+     3. crash 0
+     4. vote (('m', 2), ('n', 1))
+     5. win (('n', 1),)
+     6. write (('n', 1),)
+     7. leave (('m', 2),)
+     8. leave.ms 2
+     9. exitalone (('m', 2),)
+shrink [drop exitalone.alone] w5g: 200 seeds, 7,865 steps, depth 90; failing seeds by property: {'LX': 64}; liveness judged at the end: P5 136, HF 136, LW 136; SF judged mid-walk: SF, no machine down 164, SF, a machine down 186; reported (walks judged, stuck): SWF 182, 36, POST 82, 5; undecided searches 0
+  first failing seed 0: ['LX'], 17 steps
+     1. retire (('m', 3),)
+     2. standby (('m', 1), ('n', 0))
+     3. leave (('m', 2),)
+     4. crash 1
+     5. leave.ms 2
+     6. exitalone (('m', 2),)
+     7. crash 4
+     8. recover 4
+     9. leave (('m', 0),)
+    10. learn (('m', 0), ('n', 3))
+    11. recover 2
+    12. write (('n', 0),)
+    13. evict 1
+    14. learn (('m', 0), ('n', 4))
+    15. learn (('m', 0), ('n', 2))
+    16. leave.ms 0
+    17. exitalone (('m', 0),)
+shrink [drop handover.voter] w3: 200 seeds, 6,972 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 112, LW 112; SF judged mid-walk: SF, no machine down 200, SF, a machine down 160; reported (walks judged, stuck): SWF 159, 5, POST 10, 10; undecided searches 1
+shrink [drop handover.voter] w5g: 200 seeds, 9,526 steps, depth 90; failing seeds by property: none; liveness judged at the end: P5 200, HF 200, LW 200; SF judged mid-walk: SF, no machine down 181, SF, a machine down 186; reported (walks judged, stuck): SWF 185, 36, POST 72, 5; undecided searches 61

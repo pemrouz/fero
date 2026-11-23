@@ -1,0 +1,20 @@
+absent g1w: 748,954 states, 109.3s: all hold (peak 1443 MB)
+    DL: 30,628 judged states, 0 cannot reach the goal
+    GF: 495,424 judged states, 0 cannot reach the goal
+    HF: 305,960 judged states, 0 cannot reach the goal
+    LW: 617,080 judged states, 0 cannot reach the goal
+    P5: 305,960 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 0 judged states, 0 cannot reach the goal
+    SWAP: 231,594 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 164,016 judged states, 768 cannot reach the goal
+absent g2: 1,000,001 states, 103.1s: all hold (STOPPED AT THE STATE LIMIT) (peak 913 MB)
+absent gs: 1,000,002 states, 107.1s: all hold (STOPPED AT THE STATE LIMIT) (peak 967 MB)
+absent gl2: 1,000,001 states, 111.1s: all hold (STOPPED AT THE STATE LIMIT) (peak 901 MB)
+absent s2f: 1,000,001 states, 89.0s: all hold (STOPPED AT THE STATE LIMIT) (peak 894 MB)
+absent s1sf: 1,000,002 states, 111.5s: all hold (STOPPED AT THE STATE LIMIT) (peak 964 MB)
+shrink gl2: 1,000,002 states, 112.4s: all hold (STOPPED AT THE STATE LIMIT) (peak 901 MB)
+shrink s2f: 1,000,002 states, 80.9s: all hold (STOPPED AT THE STATE LIMIT) (peak 881 MB)
+shrink s1sf: 1,000,003 states, 114.9s: all hold (STOPPED AT THE STATE LIMIT) (peak 965 MB)

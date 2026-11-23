@@ -1,0 +1,134 @@
+absent-dur s1: 5,503 states, 1.6s: all hold (peak 22 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 5,503 judged states, 0 cannot reach the goal
+    LW: 5,503 judged states, 0 cannot reach the goal
+    P5: 5,503 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 3,120 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+absent-dur s2: 35,625 states, 9.3s: all hold (peak 79 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 24,693 judged states, 0 cannot reach the goal
+    LW: 35,625 judged states, 0 cannot reach the goal
+    P5: 24,693 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 33,160 judged states, 0 cannot reach the goal
+    SWAP: 8,166 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 2,766 judged states, 0 cannot reach the goal
+absent-dur rl: 12,594 states, 3.1s: all hold (peak 79 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 12,594 judged states, 0 cannot reach the goal
+    LW: 12,594 judged states, 0 cannot reach the goal
+    P5: 12,594 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 6,564 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+absent-dur s1f4: 22,843 states, 3.5s: DUR (13 steps) (STOPPED AT THE STATE LIMIT) (peak 79 MB)
+  DUR: shortest trace, 13 steps
+     1. crash 1
+     2. leave (('m', 2),)
+     3. leave.ms 2
+     4. ldead (('m', 1), ('n', 0))
+     5. recover 1
+     6. repl (('m', 1), ('n', 0))
+     7. commit (('k', 2), ('n', 0))
+     8. lrem (('m', 2), ('n', 0))
+     9. repl (('m', 2), ('n', 0))
+    10. commit (('k', 3), ('n', 0))
+    11. add (('m', 1), ('n', 0))
+    12. commit (('k', 4), ('n', 0))
+    13. exit (('m', 2),)
+absent-dur s1f: 22,843 states, 3.1s: DUR (13 steps) (STOPPED AT THE STATE LIMIT) (peak 79 MB)
+  DUR: shortest trace, 13 steps
+     1. crash 1
+     2. leave (('m', 2),)
+     3. leave.ms 2
+     4. ldead (('m', 1), ('n', 0))
+     5. recover 1
+     6. repl (('m', 1), ('n', 0))
+     7. commit (('k', 2), ('n', 0))
+     8. lrem (('m', 2), ('n', 0))
+     9. repl (('m', 2), ('n', 0))
+    10. commit (('k', 3), ('n', 0))
+    11. add (('m', 1), ('n', 0))
+    12. commit (('k', 4), ('n', 0))
+    13. exit (('m', 2),)
+shrink-dur s1: 10,054 states, 1.4s: DUR (10 steps) (STOPPED AT THE STATE LIMIT) (peak 21 MB)
+  DUR: shortest trace, 10 steps
+     1. leave (('m', 1),)
+     2. lrem (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. stepback (('m', 2), ('n', 0))
+     6. repl (('m', 2), ('n', 0))
+     7. commit (('k', 3), ('n', 0))
+     8. write (('n', 0),)
+     9. commit (('k', 4), ('n', 0))
+    10. exit (('m', 1),)
+shrink-dur s2: 27,453 states, 4.9s: DUR (11 steps) (STOPPED AT THE STATE LIMIT) (peak 37 MB)
+  DUR: shortest trace, 11 steps
+     1. leave (('m', 1),)
+     2. lrem (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. stepback (('m', 2), ('n', 0))
+     6. repl (('m', 2), ('n', 0))
+     7. commit (('k', 3), ('n', 0))
+     8. leave (('m', 0),)
+     9. opromote (('m', 2), ('n', 0))
+    10. exit (('m', 1),)
+    11. commit (('k', 4), ('n', 0))
+shrink-dur rl: 17,710 states, 2.7s: DUR (11 steps) (STOPPED AT THE STATE LIMIT) (peak 37 MB)
+  DUR: shortest trace, 11 steps
+     1. leave (('m', 1),)
+     2. lrem (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. stepback (('m', 2), ('n', 0))
+     6. repl (('m', 2), ('n', 0))
+     7. commit (('k', 3), ('n', 0))
+     8. retire (('m', 0),)
+     9. opromote (('m', 2), ('n', 0))
+    10. exit (('m', 1),)
+    11. commit (('k', 4), ('n', 0))
+shrink-dur s1f4: 68,264 states, 9.9s: DUR (13 steps) (STOPPED AT THE STATE LIMIT) (peak 74 MB)
+  DUR: shortest trace, 13 steps
+     1. crash 1
+     2. leave (('m', 2),)
+     3. leave.ms 2
+     4. ldead (('m', 1), ('n', 0))
+     5. recover 1
+     6. repl (('m', 1), ('n', 0))
+     7. commit (('k', 2), ('n', 0))
+     8. lrem (('m', 2), ('n', 0))
+     9. repl (('m', 2), ('n', 0))
+    10. commit (('k', 3), ('n', 0))
+    11. add (('m', 1), ('n', 0))
+    12. commit (('k', 4), ('n', 0))
+    13. exit (('m', 2),)
+shrink-dur s1f: 68,266 states, 9.6s: DUR (13 steps) (STOPPED AT THE STATE LIMIT) (peak 74 MB)
+  DUR: shortest trace, 13 steps
+     1. crash 1
+     2. leave (('m', 2),)
+     3. leave.ms 2
+     4. ldead (('m', 1), ('n', 0))
+     5. recover 1
+     6. repl (('m', 1), ('n', 0))
+     7. commit (('k', 2), ('n', 0))
+     8. lrem (('m', 2), ('n', 0))
+     9. repl (('m', 2), ('n', 0))
+    10. commit (('k', 3), ('n', 0))
+    11. add (('m', 1), ('n', 0))
+    12. commit (('k', 4), ('n', 0))
+    13. exit (('m', 2),)

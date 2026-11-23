@@ -1,0 +1,8 @@
+absent s1: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (3, 2, 0, 2, 2, 2): 804
+shrink s1: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 1, 2, 1, 1): 8552; (3, 2, 0, 2, 2, 2): 852
+absent s2: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 0, 1, 1, 1): 2188; (3, 2, 0, 2, 2, 2): 124
+shrink s2: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 0, 1, 1, 1): 38352; (1, 1, 1, 2, 1, 1): 1208; (3, 2, 0, 2, 2, 2): 136
+absent gl: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 1, 2, 1, 1): 47028; (3, 2, 0, 2, 2, 2): 8444
+shrink gl: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 1, 2, 1, 1): 100072; (3, 2, 0, 2, 2, 2): 9132
+absent o1: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 0, 1, 1, 1): 557
+shrink o1: end states of the stop (voters, voters up, learners up, machines up, machines whose crash stops writes, disks each commit waits for): (1, 1, 0, 1, 1, 1): 557

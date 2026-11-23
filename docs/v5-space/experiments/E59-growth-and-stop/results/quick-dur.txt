@@ -1,0 +1,24 @@
+absent-dur s1: 5,503 states, 0.9s: all hold (peak 22 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 5,503 judged states, 0 cannot reach the goal
+    LW: 5,503 judged states, 0 cannot reach the goal
+    P5: 5,503 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 3,120 judged states, 0 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+shrink-dur s1: 10,054 states, 0.8s: DUR (10 steps) (STOPPED AT THE STATE LIMIT) (peak 21 MB)
+  DUR: shortest trace, 10 steps
+     1. leave (('m', 1),)
+     2. lrem (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. stepback (('m', 2), ('n', 0))
+     6. repl (('m', 2), ('n', 0))
+     7. commit (('k', 3), ('n', 0))
+     8. write (('n', 0),)
+     9. commit (('k', 4), ('n', 0))
+    10. exit (('m', 1),)

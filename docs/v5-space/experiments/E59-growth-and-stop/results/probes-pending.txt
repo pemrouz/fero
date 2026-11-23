@@ -1,0 +1,8 @@
+absent r1 (three voters, no spare, a retire hint): 110 states; states where the retire-hinted machine has left the voters: 0
+
+absent r1s: with a spare, the retire completes
+     1. retire (('m', 3),)
+shrink r1 (three voters, no spare, a retire hint): 110 states; states where the retire-hinted machine has left the voters: 0
+
+shrink r1s: with a spare, the retire completes
+     1. retire (('m', 3),)

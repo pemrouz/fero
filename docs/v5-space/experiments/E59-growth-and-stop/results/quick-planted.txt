@@ -1,0 +1,219 @@
+absent [drop exitms.safe] o1: 3,710 states, 0.4s: LW (9 steps) (peak 19 MB)
+    DL: 20 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 2,121 judged states, 0 cannot reach the goal
+    LW: 3,710 judged states, 599 cannot reach the goal
+    P5: 2,121 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 2,166 judged states, 0 cannot reach the goal
+    SWAP: 613 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 976 judged states, 599 cannot reach the goal
+  LW: shortest trace, 9 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. opromote (('m', 1), ('n', 0))
+     4. repl (('m', 1), ('n', 0))
+     5. commit (('k', 2), ('n', 0))
+     6. lrem (('m', 0), ('n', 0))
+     7. repl (('m', 1), ('n', 0))
+     8. commit (('k', 3), ('n', 0))
+     9. exitms (('m', 0),)
+absent [drop exitalone.alone] o1: 16 states, 0.0s: LX (3 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  LX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitalone (('m', 0),)
+absent [drop exitalone.stop] solo: 3 states, 0.0s: SF (1 steps) (peak 12 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 1 judged states, 0 cannot reach the goal
+    LW: 1 judged states, 0 cannot reach the goal
+    P5: 3 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 2 judged states, 2 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+  SF: shortest trace, 1 steps
+     1. leave (('m', 0),)
+absent [drop exitms.held] s1: 222 states, 0.0s: DX (6 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. write (('n', 0),)
+     4. repl (('m', 1), ('n', 0))
+     5. commit (('k', 2), ('n', 0))
+     6. exitms (('m', 0),)
+absent [drop write.stay] o1: 3,522 states, 0.3s: LW (8 steps), SF (8 steps) (peak 19 MB)
+    DL: 20 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 2,303 judged states, 0 cannot reach the goal
+    LW: 3,522 judged states, 7 cannot reach the goal
+    P5: 2,303 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 2,463 judged states, 7 cannot reach the goal
+    SWAP: 681 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 538 judged states, 7 cannot reach the goal
+  LW: shortest trace, 8 steps
+     1. leave (('m', 0),)
+     2. opromote (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. lrem (('m', 0), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. write (('n', 0),)
+     8. commit (('k', 3), ('n', 0))
+  SF: shortest trace, 8 steps
+     1. leave (('m', 0),)
+     2. opromote (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. lrem (('m', 0), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. write (('n', 0),)
+     8. commit (('k', 3), ('n', 0))
+absent [drop leave.mark] o1: 53 states, 0.0s: SF (1 steps) (peak 12 MB)
+    DL: 11 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 48 judged states, 0 cannot reach the goal
+    LW: 53 judged states, 0 cannot reach the goal
+    P5: 48 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 24 judged states, 12 cannot reach the goal
+    SWAP: 5 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+  SF: shortest trace, 1 steps
+     1. leave (('m', 0),)
+absent [drop standby.notret] o1: 71 states, 0.0s: P7 (4 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  P7: shortest trace, 4 steps
+     1. leave (('m', 1),)
+     2. ldrop (('m', 1), ('n', 0))
+     3. commit (('k', 2), ('n', 0))
+     4. standby (('m', 1), ('n', 0))
+absent [drop dropl.append] o1f: 15,423 states, 1.5s: DL (2 steps), HF (2 steps) (peak 41 MB)
+    DL: 63 judged states, 24 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 8,247 judged states, 35 cannot reach the goal
+    LW: 12,662 judged states, 0 cannot reach the goal
+    P5: 8,261 judged states, 0 cannot reach the goal
+    POST: 132 judged states, 132 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 7,611 judged states, 0 cannot reach the goal
+    SWAP: 3,094 judged states, 30 cannot reach the goal
+    SWF: 532 judged states, 504 cannot reach the goal
+    WIN: 1,833 judged states, 110 cannot reach the goal
+  DL: shortest trace, 2 steps
+     1. crash 1
+     2. evict 1
+  HF: shortest trace, 2 steps
+     1. crash 1
+     2. evict 1
+absent [drop promote.pair] o1f: 294 states, 0.0s: B2B (6 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  B2B: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. pick (('n', 0), ('x', 0), ('y', 1))
+     4. repl (('m', 1), ('n', 0))
+     5. commit (('k', 2), ('n', 0))
+     6. promote (('m', 1), ('n', 0))
+absent [drop commit.own] o1f: 30,666 states, 2.8s: LW (12 steps), SF (13 steps) (peak 69 MB)
+    DL: 95 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 21,418 judged states, 0 cannot reach the goal
+    LW: 27,035 judged states, 39 cannot reach the goal
+    P5: 21,439 judged states, 0 cannot reach the goal
+    POST: 260 judged states, 260 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 13,239 judged states, 22 cannot reach the goal
+    SWAP: 3,996 judged states, 30 cannot reach the goal
+    SWF: 612 judged states, 570 cannot reach the goal
+    WIN: 2,552 judged states, 149 cannot reach the goal
+  LW: shortest trace, 12 steps
+     1. leave (('m', 0),)
+     2. opromote (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. lrem (('m', 0), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. crash 0
+     8. recover 0
+     9. stand (('n', 0),)
+    10. vote (('m', 1), ('n', 0))
+    11. win (('n', 0),)
+    12. commit (('k', 3), ('n', 0))
+  SF: shortest trace, 13 steps
+     1. leave (('m', 0),)
+     2. opromote (('m', 1), ('n', 0))
+     3. repl (('m', 1), ('n', 0))
+     4. commit (('k', 2), ('n', 0))
+     5. lrem (('m', 0), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. crash 1
+     8. cq (('n', 0),)
+     9. recover 1
+    10. stand (('n', 0),)
+    11. vote (('m', 1), ('n', 0))
+    12. win (('n', 0),)
+    13. commit (('k', 3), ('n', 0))
+absent [drop win.maj] r1: 11 states, 0.0s: DJ (3 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DJ: shortest trace, 3 steps
+     1. retire (('m', 0),)
+     2. handover (('m', 1), ('n', 0))
+     3. win (('n', 1),)
+absent [drop ldead.append] s2: 19,151 states, 2.7s: SF (2 steps) (peak 47 MB)
+    DL: 0 judged states, 0 cannot reach the goal
+    GF: 0 judged states, 0 cannot reach the goal
+    HF: 19,151 judged states, 0 cannot reach the goal
+    LW: 19,151 judged states, 0 cannot reach the goal
+    P5: 19,151 judged states, 0 cannot reach the goal
+    POST: 0 judged states, 0 cannot reach the goal
+    RC: 0 judged states, 0 cannot reach the goal
+    SF: 18,874 judged states, 18,550 cannot reach the goal
+    SWAP: 0 judged states, 0 cannot reach the goal
+    SWF: 0 judged states, 0 cannot reach the goal
+    WIN: 0 judged states, 0 cannot reach the goal
+  SF: shortest trace, 2 steps
+     1. leave (('m', 0),)
+     2. leave (('m', 1),)
+shrink [drop stepback.two] g1: 43,472 states, 4.3s: CK (16 steps), OL (16 steps) (STOPPED AT THE STATE LIMIT) (peak 52 MB)
+  CK: shortest trace, 16 steps
+     1. grow (('n', 0), ('x', 1), ('y', 2))
+     2. commit (('k', 2), ('n', 0))
+     3. add (('m', 1), ('n', 0))
+     4. commit (('k', 3), ('n', 0))
+     5. add (('m', 2), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. repl (('m', 2), ('n', 0))
+     8. commit (('k', 4), ('n', 0))
+     9. promote (('m', 1), ('n', 0))
+    10. repl (('m', 2), ('n', 0))
+    11. commit (('k', 5), ('n', 0))
+    12. promote (('m', 2), ('n', 0))
+    13. crash 2
+    14. repl (('m', 1), ('n', 0))
+    15. commit (('k', 6), ('n', 0))
+    16. stepback (('m', 1), ('n', 0))
+  OL: shortest trace, 16 steps
+     1. grow (('n', 0), ('x', 1), ('y', 2))
+     2. commit (('k', 2), ('n', 0))
+     3. add (('m', 1), ('n', 0))
+     4. commit (('k', 3), ('n', 0))
+     5. add (('m', 2), ('n', 0))
+     6. repl (('m', 1), ('n', 0))
+     7. repl (('m', 2), ('n', 0))
+     8. commit (('k', 4), ('n', 0))
+     9. promote (('m', 1), ('n', 0))
+    10. repl (('m', 2), ('n', 0))
+    11. commit (('k', 5), ('n', 0))
+    12. promote (('m', 2), ('n', 0))
+    13. crash 2
+    14. repl (('m', 1), ('n', 0))
+    15. commit (('k', 6), ('n', 0))
+    16. stepback (('m', 1), ('n', 0))

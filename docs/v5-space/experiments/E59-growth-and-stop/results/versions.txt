@@ -1,0 +1,16 @@
+python: 3.13.17
+box: 4 CPUs, 15 GB
+sha256 c6043076361bdcd6  ../E16-controller-loop/engine/engine.py
+sha256 596afa92136ea3ca  ../E16-controller-loop/engine/cli.py
+sha256 68908b496f9f61e5  ../E17-partitioning/harness/dsl.py
+sha256 9d99cae2c757a704  models/ablate.py
+sha256 6233bb1b0a27891e  models/count.py
+sha256 3d87980a619ba7fc  models/grow.py
+sha256 e9a487abf3047519  models/maxchg.py
+sha256 d00612f05dc2bb7a  models/mutants.py
+sha256 1c8321d4999ef1ce  models/pass1.py
+sha256 427e6a8418170bef  models/probe.py
+sha256 f6b0708b24718261  models/run.py
+sha256 6b252e76e9da874a  models/sentences.py
+sha256 7f567f39f05a0e73  models/walk.py
+sha256 36b28bab4f9814d2  run.sh

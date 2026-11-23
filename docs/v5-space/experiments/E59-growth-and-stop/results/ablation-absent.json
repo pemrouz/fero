@@ -1,0 +1,1734 @@
+{
+ "option": "absent",
+ "bounds": [
+  "solo",
+  "r1",
+  "o1",
+  "o1d",
+  "g0",
+  "o1f",
+  "s1",
+  "rl",
+  "r1s",
+  "g1"
+ ],
+ "verify": [
+  "gr",
+  "s1s",
+  "s2",
+  "s1f"
+ ],
+ "model_hash": "3d87980a619ba7fc",
+ "limit": 2000000,
+ "base": {
+  "solo": {
+   "states": 9,
+   "complete": true,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    9,
+    9,
+    7749001087360067454
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     5,
+     0
+    ],
+    "LW": [
+     5,
+     0
+    ],
+    "P5": [
+     7,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     2,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     0,
+     0
+    ]
+   }
+  },
+  "r1": {
+   "states": 110,
+   "complete": true,
+   "secs": 0.0,
+   "fail": {},
+   "digest": [
+    110,
+    221,
+    8798360337578164527
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     110,
+     0
+    ],
+    "LW": [
+     110,
+     0
+    ],
+    "P5": [
+     110,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     0,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     0,
+     0
+    ]
+   }
+  },
+  "o1": {
+   "states": 3111,
+   "complete": true,
+   "secs": 1.0,
+   "fail": {},
+   "digest": [
+    3111,
+    5360,
+    11279076660644100329
+   ],
+   "judged": {
+    "DL": [
+     20,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     2121,
+     0
+    ],
+    "LW": [
+     3111,
+     0
+    ],
+    "P5": [
+     2121,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     2166,
+     0
+    ],
+    "SWAP": [
+     613,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     377,
+     0
+    ]
+   }
+  },
+  "o1d": {
+   "states": 1565,
+   "complete": true,
+   "secs": 0.5,
+   "fail": {},
+   "digest": [
+    1565,
+    2472,
+    13227336243818713315
+   ],
+   "judged": {
+    "DL": [
+     27,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     878,
+     0
+    ],
+    "LW": [
+     1515,
+     0
+    ],
+    "P5": [
+     886,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     1115,
+     0
+    ],
+    "SWAP": [
+     408,
+     0
+    ],
+    "SWF": [
+     12,
+     0
+    ],
+    "WIN": [
+     255,
+     0
+    ]
+   }
+  },
+  "g0": {
+   "states": 9316,
+   "complete": true,
+   "secs": 2.4,
+   "fail": {},
+   "digest": [
+    9316,
+    23600,
+    14651054289791326436
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     8152,
+     0
+    ],
+    "HF": [
+     3982,
+     0
+    ],
+    "LW": [
+     9316,
+     0
+    ],
+    "P5": [
+     3982,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     0,
+     0
+    ],
+    "SWAP": [
+     3042,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     2292,
+     0
+    ]
+   }
+  },
+  "o1f": {
+   "states": 16844,
+   "complete": true,
+   "secs": 3.0,
+   "fail": {},
+   "digest": [
+    16844,
+    28410,
+    1251979121289717685
+   ],
+   "judged": {
+    "DL": [
+     95,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     9028,
+     0
+    ],
+    "LW": [
+     13957,
+     0
+    ],
+    "P5": [
+     9049,
+     0
+    ],
+    "POST": [
+     132,
+     132
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     8404,
+     0
+    ],
+    "SWAP": [
+     3514,
+     30
+    ],
+    "SWF": [
+     546,
+     504
+    ],
+    "WIN": [
+     2012,
+     110
+    ]
+   }
+  },
+  "s1": {
+   "states": 5503,
+   "complete": true,
+   "secs": 1.7,
+   "fail": {},
+   "digest": [
+    5503,
+    14422,
+    8746678215859477894
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     5503,
+     0
+    ],
+    "LW": [
+     5503,
+     0
+    ],
+    "P5": [
+     5503,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     3120,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     0,
+     0
+    ]
+   }
+  },
+  "rl": {
+   "states": 12594,
+   "complete": true,
+   "secs": 3.8,
+   "fail": {},
+   "digest": [
+    12594,
+    36889,
+    5202765137861299397
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     12594,
+     0
+    ],
+    "LW": [
+     12594,
+     0
+    ],
+    "P5": [
+     12594,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     6564,
+     0
+    ],
+    "SWAP": [
+     0,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     0,
+     0
+    ]
+   }
+  },
+  "r1s": {
+   "states": 41853,
+   "complete": true,
+   "secs": 16.0,
+   "fail": {},
+   "digest": [
+    41853,
+    156771,
+    9918086985681476325
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     4908,
+     0
+    ],
+    "LW": [
+     41853,
+     0
+    ],
+    "P5": [
+     4908,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     18554,
+     0
+    ],
+    "SF": [
+     0,
+     0
+    ],
+    "SWAP": [
+     13013,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     23932,
+     0
+    ]
+   }
+  },
+  "g1": {
+   "states": 75051,
+   "complete": true,
+   "secs": 19.8,
+   "fail": {},
+   "digest": [
+    75051,
+    194500,
+    552266752715118383
+   ],
+   "judged": {
+    "DL": [
+     3614,
+     0
+    ],
+    "GF": [
+     50995,
+     0
+    ],
+    "HF": [
+     29083,
+     0
+    ],
+    "LW": [
+     60199,
+     0
+    ],
+    "P5": [
+     29083,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     0,
+     0
+    ],
+    "SWAP": [
+     26120,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     14304,
+     72
+    ]
+   }
+  },
+  "gr": {
+   "states": 140114,
+   "complete": true,
+   "secs": 39.7,
+   "fail": {},
+   "digest": [
+    140114,
+    362630,
+    7872314051897267408
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     1020,
+     0
+    ],
+    "HF": [
+     55102,
+     0
+    ],
+    "LW": [
+     140114,
+     0
+    ],
+    "P5": [
+     55102,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     0,
+     0
+    ],
+    "SWAP": [
+     38064,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     46948,
+     0
+    ]
+   }
+  },
+  "s1s": {
+   "states": 99611,
+   "complete": true,
+   "secs": 39.7,
+   "fail": {},
+   "digest": [
+    99611,
+    313116,
+    16901643516970600445
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     19444,
+     0
+    ],
+    "LW": [
+     99611,
+     0
+    ],
+    "P5": [
+     19444,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     46961,
+     0
+    ],
+    "SWAP": [
+     42219,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     37948,
+     0
+    ]
+   }
+  },
+  "s2": {
+   "states": 35625,
+   "complete": true,
+   "secs": 9.5,
+   "fail": {},
+   "digest": [
+    35625,
+    89910,
+    365890135348618134
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     24693,
+     0
+    ],
+    "LW": [
+     35625,
+     0
+    ],
+    "P5": [
+     24693,
+     0
+    ],
+    "POST": [
+     0,
+     0
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     33160,
+     0
+    ],
+    "SWAP": [
+     8166,
+     0
+    ],
+    "SWF": [
+     0,
+     0
+    ],
+    "WIN": [
+     2766,
+     0
+    ]
+   }
+  },
+  "s1f": {
+   "states": 300523,
+   "complete": true,
+   "secs": 89.6,
+   "fail": {},
+   "digest": [
+    300523,
+    830125,
+    784139046799724606
+   ],
+   "judged": {
+    "DL": [
+     0,
+     0
+    ],
+    "GF": [
+     0,
+     0
+    ],
+    "HF": [
+     43709,
+     0
+    ],
+    "LW": [
+     58799,
+     0
+    ],
+    "P5": [
+     43709,
+     0
+    ],
+    "POST": [
+     1502,
+     1072
+    ],
+    "RC": [
+     0,
+     0
+    ],
+    "SF": [
+     44980,
+     0
+    ],
+    "SWAP": [
+     15520,
+     0
+    ],
+    "SWF": [
+     5494,
+     0
+    ],
+    "WIN": [
+     5964,
+     0
+    ]
+   }
+  }
+ },
+ "pass1": {
+  "grow.leader": null,
+  "grow.idle": [
+   "g0",
+   "P9",
+   11,
+   [
+    "P9"
+   ]
+  ],
+  "grow.small": [
+   "r1",
+   "P9W",
+   10,
+   [
+    "P9W"
+   ]
+  ],
+  "grow.cand": null,
+  "grow.append": [
+   "g0",
+   "GF",
+   0,
+   [
+    "GF",
+    "HF"
+   ]
+  ],
+  "pick.leader": null,
+  "pick.idle": [
+   "o1",
+   "P9",
+   11,
+   [
+    "P9"
+   ]
+  ],
+  "pick.need": [
+   "o1",
+   "P9",
+   17,
+   [
+    "P9"
+   ]
+  ],
+  "pick.wait": null,
+  "pick.cand": null,
+  "pick.new": null,
+  "pick.notret": null,
+  "pick.append": [
+   "r1s",
+   "HF",
+   1,
+   [
+    "HF",
+    "RC"
+   ]
+  ],
+  "add.leader": null,
+  "add.idle": [
+   "o1d",
+   "P9",
+   16,
+   [
+    "P9"
+   ]
+  ],
+  "add.placed": null,
+  "add.new": [
+   "r1",
+   "P9W",
+   10,
+   [
+    "P9W"
+   ]
+  ],
+  "add.cand": [
+   "o1f",
+   "P9",
+   23,
+   [
+    "P9"
+   ]
+  ],
+  "add.notret": [
+   "o1",
+   "P7",
+   12,
+   [
+    "P7"
+   ]
+  ],
+  "add.append": [
+   "r1s",
+   "HF",
+   1,
+   [
+    "HF",
+    "RC"
+   ]
+  ],
+  "standby.leader": null,
+  "standby.idle": [
+   "o1d",
+   "P9",
+   13,
+   [
+    "P9"
+   ]
+  ],
+  "standby.one": null,
+  "standby.new": [
+   "o1",
+   "P9",
+   17,
+   [
+    "P9"
+   ]
+  ],
+  "standby.cand": [
+   "o1d",
+   "P9",
+   18,
+   [
+    "P9"
+   ]
+  ],
+  "standby.notret": [
+   "o1",
+   "P7",
+   4,
+   [
+    "P7"
+   ]
+  ],
+  "standby.append": [
+   "o1d",
+   "HF",
+   4,
+   [
+    "HF"
+   ]
+  ],
+  "promote.leader": null,
+  "promote.idle": [
+   "g0",
+   "B2B",
+   10,
+   [
+    "B2B"
+   ]
+  ],
+  "promote.learner": [
+   "r1",
+   "P9W",
+   10,
+   [
+    "P9W"
+   ]
+  ],
+  "promote.placed": null,
+  "promote.caught": null,
+  "promote.live": [
+   "g1",
+   "OL",
+   10,
+   [
+    "OL"
+   ]
+  ],
+  "promote.notret": [
+   "gr",
+   "P7",
+   10,
+   [
+    "P7"
+   ]
+  ],
+  "promote.odd": null,
+  "promote.pair": [
+   "o1",
+   "B2B",
+   6,
+   [
+    "B2B"
+   ]
+  ],
+  "promote.append": [
+   "g0",
+   "GF",
+   0,
+   [
+    "GF",
+    "HF"
+   ]
+  ],
+  "remove.leader": null,
+  "remove.idle": [
+   "s1s",
+   "P9",
+   23,
+   [
+    "P9"
+   ]
+  ],
+  "remove.voter": null,
+  "remove.gone": [
+   "r1s",
+   "P9",
+   31,
+   [
+    "P9"
+   ]
+  ],
+  "remove.four": [
+   "g1",
+   "CK",
+   17,
+   [
+    "CK"
+   ]
+  ],
+  "remove.newok": null,
+  "remove.append": null,
+  "surplus.leader": null,
+  "surplus.idle": [
+   "r1s",
+   "P9",
+   18,
+   [
+    "P9"
+   ]
+  ],
+  "surplus.voter": null,
+  "surplus.four": [
+   "o1",
+   "OL",
+   5,
+   [
+    "OL"
+   ]
+  ],
+  "surplus.last": [
+   "r1s",
+   "P9",
+   33,
+   [
+    "P9"
+   ]
+  ],
+  "surplus.allheld": null,
+  "surplus.append": [
+   "r1s",
+   "HF",
+   1,
+   [
+    "HF",
+    "RC"
+   ]
+  ],
+  "dropl.leader": null,
+  "dropl.idle": [
+   "o1",
+   "P9",
+   13,
+   [
+    "P9"
+   ]
+  ],
+  "dropl.learner": [
+   "o1",
+   "P9",
+   21,
+   [
+    "P9"
+   ]
+  ],
+  "dropl.gone": [
+   "o1",
+   "P9",
+   17,
+   [
+    "P9"
+   ]
+  ],
+  "dropl.append": [
+   "o1d",
+   "DL",
+   1,
+   [
+    "DL",
+    "HF"
+   ]
+  ],
+  "stepback.leader": null,
+  "stepback.idle": [
+   "o1f",
+   "OV",
+   11,
+   [
+    "OV"
+   ]
+  ],
+  "stepback.two": [
+   "g1",
+   "CK",
+   16,
+   [
+    "CK",
+    "OL"
+   ]
+  ],
+  "stepback.other": [
+   "g1",
+   "P9",
+   42,
+   [
+    "P9"
+   ]
+  ],
+  "stepback.few": [
+   "g0",
+   "B2B",
+   11,
+   [
+    "B2B"
+   ]
+  ],
+  "stepback.noret": [
+   "o1",
+   "P9",
+   22,
+   [
+    "P9"
+   ]
+  ],
+  "stepback.append": [
+   "o1f",
+   "HF",
+   6,
+   [
+    "HF"
+   ]
+  ],
+  "leave.mark": [
+   "o1",
+   "SF",
+   1,
+   [
+    "SF"
+   ]
+  ],
+  "write.stay": [
+   "o1",
+   "LW",
+   8,
+   [
+    "LW",
+    "SF"
+   ]
+  ],
+  "handover.leader": null,
+  "handover.self": [
+   "s1",
+   "LIMIT",
+   2000001,
+   [
+    "LIMIT"
+   ]
+  ],
+  "handover.voter": null,
+  "handover.tvoter": [
+   "o1",
+   "SN",
+   7,
+   [
+    "SN"
+   ]
+  ],
+  "handover.notret": [
+   "rl",
+   "LD",
+   3,
+   [
+    "LD"
+   ]
+  ],
+  "handover.caught": [
+   "o1f",
+   "LW",
+   16,
+   [
+    "HF",
+    "LW",
+    "SF"
+   ]
+  ],
+  "handover.live": [
+   "o1f",
+   "P9L",
+   14,
+   [
+    "P9L"
+   ]
+  ],
+  "handover.transfer": null,
+  "opromote.leader": null,
+  "opromote.idle": [
+   "o1",
+   "P9",
+   10,
+   [
+    "P9"
+   ]
+  ],
+  "opromote.one": null,
+  "opromote.self": [
+   "o1",
+   "B2B",
+   3,
+   [
+    "B2B"
+   ]
+  ],
+  "opromote.learner": null,
+  "opromote.caught": null,
+  "opromote.live": [
+   "o1d",
+   "OL",
+   2,
+   [
+    "OL"
+   ]
+  ],
+  "opromote.notret": null,
+  "opromote.append": [
+   "o1",
+   "HF",
+   1,
+   [
+    "HF",
+    "SF"
+   ]
+  ],
+  "lrem.leader": null,
+  "lrem.idle": [
+   "o1",
+   "P9",
+   12,
+   [
+    "P9"
+   ]
+  ],
+  "lrem.voter": [
+   "gr",
+   "P9W",
+   40,
+   [
+    "P9W"
+   ]
+  ],
+  "lrem.ret": [
+   "gr",
+   "P9",
+   27,
+   [
+    "P9"
+   ]
+  ],
+  "lrem.maj": null,
+  "lrem.few": null,
+  "lrem.keep": null,
+  "lrem.newok": null,
+  "lrem.two": [
+   "r1",
+   "CK",
+   2,
+   [
+    "CK"
+   ]
+  ],
+  "lrem.append": [
+   "o1",
+   "HF",
+   1,
+   [
+    "HF",
+    "SF"
+   ]
+  ],
+  "ldead.leader": null,
+  "ldead.idle": [
+   "o1f",
+   "OV",
+   8,
+   [
+    "OV"
+   ]
+  ],
+  "ldead.voter": [
+   "o1d",
+   "P9",
+   19,
+   [
+    "P9"
+   ]
+  ],
+  "ldead.dead": [
+   "o1",
+   "P9",
+   23,
+   [
+    "P9"
+   ]
+  ],
+  "ldead.carry": [
+   "g1",
+   "CK",
+   16,
+   [
+    "CK"
+   ]
+  ],
+  "ldead.maj": [
+   "s1f",
+   "LW",
+   7,
+   [
+    "LW"
+   ]
+  ],
+  "ldead.append": [
+   "s2",
+   "SF",
+   2,
+   [
+    "SF"
+   ]
+  ],
+  "ldrop.leader": null,
+  "ldrop.idle": [
+   "o1",
+   "P9",
+   10,
+   [
+    "P9"
+   ]
+  ],
+  "ldrop.learner": [
+   "o1",
+   "P9",
+   18,
+   [
+    "P9"
+   ]
+  ],
+  "ldrop.leave": [
+   "o1",
+   "P9",
+   17,
+   [
+    "P9"
+   ]
+  ],
+  "ldrop.append": null,
+  "exit.unnamed": null,
+  "exit.nolead": null,
+  "exit.safe": [
+   "o1",
+   "LW",
+   8,
+   [
+    "LW"
+   ]
+  ],
+  "exit.held": null,
+  "exitms.lms": null,
+  "exitms.safe": [
+   "o1",
+   "LW",
+   9,
+   [
+    "LW"
+   ]
+  ],
+  "exitms.held": [
+   "s1",
+   "DX",
+   6,
+   [
+    "DX"
+   ]
+  ],
+  "exitalone.lms": null,
+  "exitalone.alone": [
+   "o1",
+   "LX",
+   3,
+   [
+    "LX"
+   ]
+  ],
+  "exitalone.stop": [
+   "solo",
+   "SF",
+   1,
+   [
+    "SF"
+   ]
+  ],
+  "stand.voter": [
+   "o1",
+   "SN",
+   10,
+   [
+    "SN"
+   ]
+  ],
+  "stand.go": [
+   "solo",
+   "HF",
+   4,
+   [
+    "HF",
+    "LW",
+    "P5"
+   ]
+  ],
+  "vote.cand": [
+   "r1s",
+   "LIMIT",
+   2000001,
+   [
+    "LIMIT"
+   ]
+  ],
+  "vote.term": null,
+  "vote.once": [
+   "s1f",
+   "ES",
+   12,
+   [
+    "DJ",
+    "ES"
+   ]
+  ],
+  "vote.log": [
+   "s1f",
+   "LC",
+   12,
+   [
+    "LC",
+    "VQ"
+   ]
+  ],
+  "vote.grant": [
+   "r1",
+   "DJ",
+   4,
+   [
+    "DJ"
+   ]
+  ],
+  "vote.count": [
+   "r1",
+   "HF",
+   2,
+   [
+    "HF",
+    "LW",
+    "P5"
+   ]
+  ],
+  "win.cand": [
+   "solo",
+   "P9W",
+   13,
+   [
+    "P9W"
+   ]
+  ],
+  "win.maj": [
+   "r1",
+   "DJ",
+   3,
+   [
+    "DJ"
+   ]
+  ],
+  "win.lead": [
+   "solo",
+   "P9W",
+   13,
+   [
+    "P9W"
+   ]
+  ],
+  "win.noop": [
+   "solo",
+   "HF",
+   4,
+   [
+    "HF",
+    "LW",
+    "P5"
+   ]
+  ],
+  "repl.term": [
+   "o1f",
+   "LW",
+   15,
+   [
+    "HF",
+    "LW",
+    "SF"
+   ]
+  ],
+  "repl.copy": [
+   "r1",
+   "HF",
+   2,
+   [
+    "HF",
+    "LW",
+    "P5"
+   ]
+  ],
+  "repl.ci": [
+   "o1",
+   "HF",
+   1,
+   [
+    "HF",
+    "LW",
+    "SF"
+   ]
+  ],
+  "commit.own": [
+   "o1f",
+   "LW",
+   12,
+   [
+    "LW",
+    "SF"
+   ]
+  ],
+  "commit.maj": [
+   "r1",
+   "NL",
+   5,
+   [
+    "NL",
+    "VQ"
+   ]
+  ],
+  "commit.set": [
+   "solo",
+   "HF",
+   4,
+   [
+    "HF",
+    "LW",
+    "P5"
+   ]
+  ],
+  "commit.down": [
+   "o1",
+   "SN",
+   7,
+   [
+    "SN"
+   ]
+  ]
+ },
+ "design": [
+  "grow.leader",
+  "grow.idle",
+  "grow.small",
+  "grow.cand",
+  "grow.append",
+  "pick.leader",
+  "pick.idle",
+  "pick.need",
+  "pick.wait",
+  "pick.cand",
+  "pick.new",
+  "pick.notret",
+  "pick.append",
+  "add.leader",
+  "add.idle",
+  "add.placed",
+  "add.new",
+  "add.cand",
+  "add.notret",
+  "add.append",
+  "standby.leader",
+  "standby.idle",
+  "standby.one",
+  "standby.new",
+  "standby.cand",
+  "standby.notret",
+  "standby.append",
+  "promote.leader",
+  "promote.idle",
+  "promote.learner",
+  "promote.placed",
+  "promote.caught",
+  "promote.live",
+  "promote.notret",
+  "promote.odd",
+  "promote.pair",
+  "promote.append",
+  "remove.leader",
+  "remove.idle",
+  "remove.voter",
+  "remove.gone",
+  "remove.four",
+  "remove.newok",
+  "remove.append",
+  "surplus.leader",
+  "surplus.idle",
+  "surplus.voter",
+  "surplus.four",
+  "surplus.last",
+  "surplus.allheld",
+  "surplus.append",
+  "dropl.leader",
+  "dropl.idle",
+  "dropl.learner",
+  "dropl.gone",
+  "dropl.append",
+  "stepback.leader",
+  "stepback.idle",
+  "stepback.two",
+  "stepback.other",
+  "stepback.few",
+  "stepback.noret",
+  "stepback.append",
+  "leave.mark",
+  "write.stay",
+  "handover.leader",
+  "handover.self",
+  "handover.voter",
+  "handover.tvoter",
+  "handover.notret",
+  "handover.caught",
+  "handover.live",
+  "handover.transfer",
+  "opromote.leader",
+  "opromote.idle",
+  "opromote.one",
+  "opromote.self",
+  "opromote.learner",
+  "opromote.caught",
+  "opromote.live",
+  "opromote.notret",
+  "opromote.append",
+  "lrem.leader",
+  "lrem.idle",
+  "lrem.voter",
+  "lrem.ret",
+  "lrem.maj",
+  "lrem.few",
+  "lrem.keep",
+  "lrem.newok",
+  "lrem.two",
+  "lrem.append",
+  "ldead.leader",
+  "ldead.idle",
+  "ldead.voter",
+  "ldead.dead",
+  "ldead.carry",
+  "ldead.maj",
+  "ldead.append",
+  "ldrop.leader",
+  "ldrop.idle",
+  "ldrop.learner",
+  "ldrop.leave",
+  "ldrop.append",
+  "exit.unnamed",
+  "exit.nolead",
+  "exit.safe",
+  "exit.held",
+  "exitms.lms",
+  "exitms.safe",
+  "exitms.held",
+  "exitalone.lms",
+  "exitalone.alone",
+  "exitalone.stop"
+ ],
+ "core": [
+  "stand.voter",
+  "stand.go",
+  "vote.cand",
+  "vote.term",
+  "vote.once",
+  "vote.log",
+  "vote.grant",
+  "vote.count",
+  "win.cand",
+  "win.maj",
+  "win.lead",
+  "win.noop",
+  "repl.term",
+  "repl.copy",
+  "repl.ci",
+  "commit.own",
+  "commit.maj",
+  "commit.set",
+  "commit.down"
+ ]
+}

@@ -1,0 +1,3 @@
+[      0s] design holds on 14 bounds; 114 design rules, 19 Raft-core rules
+[   2758s] pass 1: 69 of 114 design rules necessary alone (sweep and verify); 18 of 19 core rules caught
+[   2758s] stopped after pass 1 (E59_PASS1_ONLY)

@@ -1,0 +1,74 @@
+absent [drop exit.held, exit.safe, exitms.held, exitms.safe, ldead.append, lrem.append, opromote.append] o1: 14 states, 0.0s: DX (3 steps), LX (3 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+  LX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+absent [drop exit.held, exit.safe, exitms.held, exitms.safe, ldead.append, lrem.append, opromote.append] s2: 299 states, 0.0s: DX (6 steps), LX (6 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. leave (('m', 1),)
+     4. leave.ms 1
+     5. exitms (('m', 0),)
+     6. exitms (('m', 1),)
+  LX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. leave (('m', 1),)
+     4. leave.ms 1
+     5. exitms (('m', 0),)
+     6. exitms (('m', 1),)
+absent [drop exit.held, exit.safe, exitms.held, exitms.safe, ldead.append, lrem.append, opromote.append] gl: 138 states, 0.0s: DX (3 steps), LX (3 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+  LX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+shrink [drop exit.held, exit.safe, exitms.held, exitms.safe] o1: 16 states, 0.0s: DX (3 steps), LX (3 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+  LX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+shrink [drop exit.held, exit.safe, exitms.held, exitms.safe] s1: 403 states, 0.0s: DX (6 steps) (STOPPED AT THE STATE LIMIT) (peak 12 MB)
+  DX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. write (('n', 0),)
+     4. repl (('m', 1), ('n', 0))
+     5. commit (('k', 2), ('n', 0))
+     6. exitms (('m', 0),)
+shrink [drop exit.held, exit.safe, exitms.held, exitms.safe] s2: 619 states, 0.0s: DX (6 steps), LX (6 steps) (STOPPED AT THE STATE LIMIT) (peak 13 MB)
+  DX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. leave (('m', 1),)
+     4. leave.ms 1
+     5. exitms (('m', 0),)
+     6. exitms (('m', 1),)
+  LX: shortest trace, 6 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. leave (('m', 1),)
+     4. leave.ms 1
+     5. exitms (('m', 0),)
+     6. exitms (('m', 1),)
+shrink [drop exit.held, exit.safe, exitms.held, exitms.safe] gl: 138 states, 0.0s: DX (3 steps), LX (3 steps) (STOPPED AT THE STATE LIMIT) (peak 13 MB)
+  DX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
+  LX: shortest trace, 3 steps
+     1. leave (('m', 0),)
+     2. leave.ms 0
+     3. exitms (('m', 0),)
