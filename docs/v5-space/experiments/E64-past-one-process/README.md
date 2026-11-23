@@ -72,11 +72,13 @@ The full tables are in each option's `results/summary.md` and README.
 - **By slot (O3)** never waits at a move and survives a host failover in runs with real moves, but may show part of a commit and costs many more cells (about 230 times those by 16 groups at 1,000 buckets).
 - **By output key (O4)** is the way for views with very many keys, per-key windows and medians; a read of every key needs a barrier. Its front, shard map and ranges were not built.
 
+Decided: V5-20 ships the merger in the first build and puts O4 next (items 1 and 10); E-67 ran the fourth rule on seeds, and V5-22 took the form that passed.
+
 ## What this cannot show
 
 - **No network, no Raft, no threads.** In every option, groups are lists in one process and links are queues. No byte crossed a socket; the extra hop is reasoned.
-- **O1's move is one step at the groups**, and a resync's picture never passes a queued move. The probe shows what that hides; a seeded run with three-step moves and hosts that resume at their heads is owed.
-- **O1's and O3's partials are plain code**, not `data` 5's views. O1's partial rescans a bucket's rows for a max or `distinct` on every write that touches it, and that work was not timed.
+- **O1's move is one step at the groups**, and a resync's picture never passes a queued move. The probe shows what that hides; a seeded run with three-step moves and hosts that resume at their heads is owed (run since in E-67; V5-22 took its result).
+- **O1's and O3's partials are plain code**, not `data` 5's views. O1's partial rescans a bucket's rows for a max or `distinct` on every write that touches it, and that work was not timed here (E-67 timed it: 514 to 559 µs a record at about 2,000 rows a bucket).
 - **Reads at a pinned position** (a two-round page, an exact median) ran at the groups' heads with no write between rounds.
 - **Batching**: one frame per commit everywhere; frames per commit batch were not timed.
 - **Faults are drawn, not exhaustive**: no model checker ran any of this.

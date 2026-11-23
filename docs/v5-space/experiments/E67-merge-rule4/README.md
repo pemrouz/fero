@@ -283,7 +283,7 @@ Of each total, rule 4 itself is +2 in (a), +3 in (b) and +4 in (c), with the pai
 
 ## 8. What should change in MERGE.md and LAYERS
 
-Proposed only. Those pages are tracked and were not edited here.
+Proposed only. Those pages are tracked and were not edited here. V5-22 took these edits (its item 6 and its Consequences); MERGE.md and LAYERS now carry them.
 
 **MERGE.md**
 - **0, item 6** and **2, rule 4**: replace "not yet run on seeds" with the form that passed: a picture names every half between its floor and its own place, with rows or not, and the merger installs it with each half's partner, at one cut (E-67: 0 of 4,000 seeds failed). The floor is the merger's place at a takeover. At a rebuild it is one cut of the old merger: each ack carries the merger's whole cut, each group's copies keep the last one acked to them, and the new merger takes the oldest of the up groups' cuts and tells every host before the pictures. A removed group counts as past every half it held. Each group starting from its own place wedges the merger (E-67 `mixedfloor`).
@@ -296,7 +296,7 @@ Proposed only. Those pages are tracked and were not edited here.
 - **6 item 1**: done by E-67. Owed from it: the merger on real sockets (6 item 5), `data`'s views as the partials, the move's window timed (6 item 6), and the rebuild gap (section 6.2).
 
 **LAYERS.md**
-- **The row "A resource larger than one server's memory"** (section 10's list): "E-23's merger and its four rules" becomes the merger with rule 4 in form (a), checked on seeds (E-67).
+- **The row "A resource larger than one server's memory"** (in LAYERS 9.4's table; this study first placed it in section 10's list): "E-23's merger and its four rules" becomes the merger with rule 4 in form (a), checked on seeds (E-67).
 - **8.6 item 7**: a served view merged across groups sees a slot move as two halves taken at one cut; a partial's takeover carries the halves it passed; a new merger starts every picture from one cut of the old merger.
 - **4.6, owed**: the seeded merger on real sockets; the rebuild gap while a group is down; a partial whose max and distinct keep an index.
 - **4.3**: the merger's rules (+4 to +6, plus health) join the count where MERGE's rules are counted.
@@ -368,6 +368,8 @@ Where they differ, and why *(reasoned)*:
 - **N1**: section 0 item 8 (item 7 before) now marks the gap *(counted)* and *(reasoned)*. **N2**: the install at 1e6 rows names 1 and 4 groups only. **N3**: the move part's slots are "of 4,096". **N4**: the six-view resend is left out, and the 1e6 sums run is named as the noisy top of its range. **N5**: the ring's size sweep runs in elastic, where 64 frames missed. **N6**: the rule counts say what rule 4 itself costs in (c), and whether keys kept apart is new (section 7). **N7**: stated above.
 
 ## 11. Questions for the owner
+
+The owner answered these on 2026-11-23 in [V5-22](../../../DECISIONS.md), each as picked: the gap through a rebuild is stated and a standby merger is studied later (its item 4); (c) is a second fallback beside keys by blocks of slots; which one, if either, is chosen on the timed fence-to-open window, and neither is in the first build (item 5); and section 8's edits are made in the V5-20 and V5-21 rewrite, with MERGE's net at about +11 to +18 (item 6). The questions stand as they were put.
 
 1. **A new merger while a group is down.** V5-20 item 2 keeps a merged view serving with a down group frozen, but a merger rebuilt during that outage has no part for the group. Pick: state the gap (the view stays at its last frame until the group is back) and study a standby merger later. Other way: a standby merger fed the same frames, in the first build.
 2. **(c) as the fallback for the move's wait**, beside or before keys by blocks of slots (V5-20 item 12)? Pick: yes, judged on the timed move window.
