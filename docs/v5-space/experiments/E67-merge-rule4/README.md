@@ -283,7 +283,7 @@ Of each total, rule 4 itself is +2 in (a), +3 in (b) and +4 in (c), with the pai
 
 ## 8. What should change in MERGE.md and LAYERS
 
-Proposed only. Those pages are tracked and were not edited here.
+Proposed only. Those pages are tracked and were not edited here. V5-22 took these edits (its item 6 and its Consequences); MERGE.md and LAYERS now carry them.
 
 **MERGE.md**
 - **0, item 6** and **2, rule 4**: replace "not yet run on seeds" with the form that passed: a picture names every half between its floor and its own place, with rows or not, and the merger installs it with each half's partner, at one cut (E-67: 0 of 4,000 seeds failed). The floor is the merger's place at a takeover. At a rebuild it is one cut of the old merger: each ack carries the merger's whole cut, each group's copies keep the last one acked to them, and the new merger takes the oldest of the up groups' cuts and tells every host before the pictures. A removed group counts as past every half it held. Each group starting from its own place wedges the merger (E-67 `mixedfloor`).
@@ -369,7 +369,7 @@ Where they differ, and why *(reasoned)*:
 
 ## 11. Questions for the owner
 
-The owner answered these on 2026-11-23 in [V5-22](../../../DECISIONS.md), each as picked: the gap through a rebuild is stated and a standby merger is studied later (its item 4); (c) is a second fallback beside keys by blocks of slots; which one, if either, is chosen on the timed fence-to-open window, and neither is in the first build (item 5); and section 8's edits are made in the V5-20 rewrite, with MERGE's net at about +11 to +18 (item 6). The questions stand as they were put.
+The owner answered these on 2026-11-23 in [V5-22](../../../DECISIONS.md), each as picked: the gap through a rebuild is stated and a standby merger is studied later (its item 4); (c) is a second fallback beside keys by blocks of slots; which one, if either, is chosen on the timed fence-to-open window, and neither is in the first build (item 5); and section 8's edits are made in the V5-20 and V5-21 rewrite, with MERGE's net at about +11 to +18 (item 6). The questions stand as they were put.
 
 1. **A new merger while a group is down.** V5-20 item 2 keeps a merged view serving with a down group frozen, but a merger rebuilt during that outage has no part for the group. Pick: state the gap (the view stays at its last frame until the group is back) and study a standby merger later. Other way: a standby merger fed the same frames, in the first build.
 2. **(c) as the fallback for the move's wait**, beside or before keys by blocks of slots (V5-20 item 12)? Pick: yes, judged on the timed move window.
