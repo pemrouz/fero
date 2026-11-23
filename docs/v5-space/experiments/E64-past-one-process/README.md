@@ -72,6 +72,8 @@ The full tables are in each option's `results/summary.md` and README.
 - **By slot (O3)** never waits at a move and survives a host failover in runs with real moves, but may show part of a commit and costs many more cells (about 230 times those by 16 groups at 1,000 buckets).
 - **By output key (O4)** is the way for views with very many keys, per-key windows and medians; a read of every key needs a barrier. Its front, shard map and ranges were not built.
 
+Decided: V5-20 ships the merger in the first build and puts O4 next (items 1 and 10); E-67 ran the fourth rule on seeds, and V5-22 took the form that passed.
+
 ## What this cannot show
 
 - **No network, no Raft, no threads.** In every option, groups are lists in one process and links are queues. No byte crossed a socket; the extra hop is reasoned.

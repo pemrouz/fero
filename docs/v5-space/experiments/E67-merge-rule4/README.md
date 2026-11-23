@@ -2,7 +2,7 @@
 
 2026-11-23. V5-20 item 1 ([DECISIONS](../../../DECISIONS.md)) ships the merger ([MERGE.md](../../MERGE.md)'s O1) in the first build once its rule 4 passes seeded runs. Rule 4 is about a partial's host that fails while a slot move waits. MERGE section 6 item 1 asks for that run: real three-step moves, a new host that starts at its own place, a move that gives up, a partial down while a move to its group waits, and a pick between "a picture carries its moves" and "a ring of frames on every copy" (MERGE 3.7). V5-20 item 2 (a group that cannot be reached keeps serving, frozen) and item 12 (the merger waits at a move; keys by blocks of slots are the fallback) bear on the same run.
 
-**This is a rebuild.** A first run built this study and a skeptic reviewed it. A restart wiped the files before the review's fixes went in. This run rebuilt the study to the same design and took in every review finding from the start. A second skeptic then reviewed the rebuild; its findings are in too, with a rerun of every seeded line. Section 10 lists what both reviews changed. Every number here comes from this run. Section 9 compares them with the first run's.
+**This is a rebuild.** A first run built this study and a skeptic reviewed it. Its files were lost before the review's fixes went in. This run rebuilt the study to the same design and took in every review finding from the start. A second skeptic then reviewed the rebuild; its findings are in too, with a rerun of every seeded line. Section 10 lists what both reviews changed. Every number here comes from this run. Section 9 compares them with the first run's.
 
 **Marks.** *(measured)*: timed, three runs, each run alone on the box under a timing lock, a range. *(checked)*: a seeded run with an oracle, here, in [results/](results/summary.md). *(counted)*: a count from a run. *(reasoned)*: an argument; nothing ran it.
 
@@ -368,6 +368,8 @@ Where they differ, and why *(reasoned)*:
 - **N1**: section 0 item 8 (item 7 before) now marks the gap *(counted)* and *(reasoned)*. **N2**: the install at 1e6 rows names 1 and 4 groups only. **N3**: the move part's slots are "of 4,096". **N4**: the six-view resend is left out, and the 1e6 sums run is named as the noisy top of its range. **N5**: the ring's size sweep runs in elastic, where 64 frames missed. **N6**: the rule counts say what rule 4 itself costs in (c), and whether keys kept apart is new (section 7). **N7**: stated above.
 
 ## 11. Questions for the owner
+
+The owner answered these on 2026-11-23 in [V5-22](../../../DECISIONS.md), each as picked: the gap through a rebuild is stated and a standby merger is studied later (its item 4); (c) is a second fallback beside keys by blocks of slots; which one, if either, is chosen on the timed fence-to-open window, and neither is in the first build (item 5); and section 8's edits are made in the V5-20 rewrite, with MERGE's net at about +11 to +18 (item 6). The questions stand as they were put.
 
 1. **A new merger while a group is down.** V5-20 item 2 keeps a merged view serving with a down group frozen, but a merger rebuilt during that outage has no part for the group. Pick: state the gap (the view stays at its last frame until the group is back) and study a standby merger later. Other way: a standby merger fed the same frames, in the first build.
 2. **(c) as the fallback for the move's wait**, beside or before keys by blocks of slots (V5-20 item 12)? Pick: yes, judged on the timed move window.

@@ -1,6 +1,6 @@
 # Every row, past a fixed ceiling: what each feature needs
 
-2026-11-23. [MERGE.md](MERGE.md) split most work over every row across groups (the merger), and kept a fixed one-process ceiling for the four features it could not split: `hold: 'all'`, `f.data.connect()` over the whole resource, code over every row (root code, a handler's `ctx.data`), and a live median or quantile (its 5.4 item 1 and question 2). The next question was whether any fixed ceiling is needed, given that the asking process can read each group's rows from the servers that hold them; this page studies every way round it. In that design no server holds the whole resource. The limit sits on the **asker**, the process that wants every row: its memory, how fast it folds writes, and `data`'s cap of 16,777,216 rows a source.
+2026-11-23. [MERGE.md](MERGE.md) split most work over every row across groups (the merger), and kept a fixed one-process ceiling for the four features it could not split: `hold: 'all'`, `f.data.connect()` over the whole resource, code over every row (root code, a handler's `ctx.data`), and a live median or quantile (its 5.4 item 1 and question 2). The next question was whether any fixed ceiling is needed, given that the asking process can read each group's rows from the servers that hold them; this page studies every way round it. In that design no server holds the whole resource. The limit sits on the **asker**, the process that wants every row: its memory, how fast it folds writes, and `data`'s cap of 16,777,216 rows a source. The owner took this page's picks on 2026-11-23 as [V5-20](../DECISIONS.md) items 3 to 8, one at a time, and V5-20's Consequences put this page's limits in place of MERGE's ceiling. Question 9 went another way: V5-20 item 9 asked for a study of compact rows first ([COMPACT.md](COMPACT.md)), and [V5-21](../DECISIONS.md) then superseded it. The page now gives the picks as decided, keeps its first answer to question 9 as history, and says what is still owed (sections 8 and 9).
 
 **How it was made.** Five options were built small in [E-65](experiments/E65-every-row/README.md), each with a seeded oracle and planted bugs, and timed: X1 the asker's own `memory` (with stores by block or group, compact stores, workers, a sorted column), X2 a scan, X3 folds per group, X4 histograms per group, X5 a sample and the other ways. A comparison picked one per feature. A skeptic checked it against the code and the records. Its findings held, except one number (section 3.4), and are taken in here. The biggest: the speed limit of a whole-resource hold is not the fold (0.28 M writes a second) but `data`'s own live views on it, which move a flat array on every write. Four probes were added to E-65 to measure that and the other gaps.
 
@@ -11,16 +11,16 @@
 ## 0. The answer
 
 1. **No feature needs a fixed row count.** Five of the seven ways to work over every row need no row ceiling at all *(checked: X2, X3, X4, O1)*.
-2. **One-time work over every row is a scan**: every row once, in pages, from one copy of each group, at one cut. Its limit is time: 0.75 to 0.83 M rows a second at one asker *(measured, X2)*.
-3. **Live code over every row is a fold per group**: the server's author writes `emit` with one of fero's combines, and the merger adds the pieces *(checked, X3)*.
-4. **A live median keeps one number a row of one field, no rows**: a sorted column at the merger, exact, 12.8 B a value at 1e7 values *(measured, probe)*. Later, histograms (X4) need no values at all.
+2. **One-time work over every row is a scan**: every row once, in pages, from one copy of each group, at one cut. Its limit is time: 0.75 to 0.83 M rows a second at one asker *(measured, X2)*. Decided: `scan()`, a new read verb, in the first build, at one cut by default (V5-20 item 4).
+3. **Live code over every row is a fold per group**: the server's author writes `emit` with one of fero's combines, and the merger adds the pieces *(checked, X3)*. Decided, in the first build (V5-20 item 5).
+4. **A live median keeps one number a row of one field, no rows**: a sorted column at the merger, exact, 12.8 B a value at 1e7 values *(measured, probe)*. Later, histograms (X4) need no values at all. Decided: exact first (V5-20 item 6).
 5. **A one-time median is O1's read** at the scan's cut: it holds nothing *(measured, O1; reasoned, X2)*.
-6. **A sync read of every row** (`hold: 'all'`, a whole `connect()`) needs every row in this process. Its limit becomes the process's own `memory`, counted the way the box counts it (RSS): about 1.4 M small rows a GB *(measured, X1)*. Health warns at 80 %; past the line the hold ends `not-held`.
-7. **What really slows a big hold is `data`'s live views on it**, not the fold. At 1e6 rows a top 10 costs 2.5 to 2.6 ms a write and a median 0.15 to 0.19 ms *(measured)*. A chunked index in `data` 5 should fix both *(reasoned)*; one store per group inside the asker is the measured fallback.
-8. **A big hold pauses its process**: 0.9 to 1.3 s for one full collection at 5e6 rows *(measured, probe)*, past F-06's 1 s bar for a process that leads groups.
-9. **Rows read sync need not live in `data`**: a compact column store reads a row sync in 2.5 to 3.4 µs, at 0.4 times data's RSS and 1 % of its pauses, but loses data's operators *(measured, X1)*. Later, for big holds with a fixed row shape.
+6. **A sync read of every row** (`hold: 'all'`, a whole `connect()`) needs every row in this process. Its limit becomes the process's own `memory`, counted the way the box counts it (RSS): about 1.4 M small rows a GB *(measured, X1)*. Health warns at 80 %; past the line the hold ends `not-held`. Decided (V5-20 item 3), with two more parts: a hold that will not fit is refused at open, and near the line, whole-resource holds end first, then a server refuses writes `read-only`.
+7. **What really slows a big hold is `data`'s live views on it**, not the fold. At 1e6 rows a top 10 costs 2.5 to 2.6 ms a write and a median 0.15 to 0.19 ms *(measured)*. A chunked index in `data` 5 should fix both *(reasoned)*; one store per group inside the asker is the measured fallback. Decided: `data` 5 fixes them (V5-20 item 7).
+8. **A big hold pauses its process**: 0.9 to 1.3 s for one full collection at 5e6 rows *(measured, probe)*, past F-06's 1 s bar for a process that leads groups. Decided: allowed under `memory`, with a health warning once a full collection there passes 0.5 s (V5-20 item 8).
+9. **Rows read sync need not live in `data`**: a compact column store reads a row sync in 2.5 to 3.4 µs, at 0.4 times data's RSS and 1 % of its pauses, but loses data's operators *(measured, X1)*. This page said: later, for big holds with a fixed row shape. Superseded by V5-21: no compact store in the first build (item 1); when one comes, it sits inside `data` as a second backing, so every operator still runs (item 3), and a resource turns to it only by an explicit setting its author chooses (item 7). A store of fero's own for big holds is rejected.
 10. **Cost of the first build:** about +20 to +37 builder rules and +2 to +5 user rules over MERGE's pick, and 4 `data` 5 items *(reasoned)*.
-11. **Ten questions** for the owner end the page (section 9).
+11. **Ten questions** for the owner end the page (section 9). V5-20 answered them; question 9 is superseded by V5-21.
 
 ---
 
@@ -60,7 +60,7 @@ Only the first and the fifth rows need every row in one process *(reasoned)*.
 
 - **What.** The asker holds every row in one `data` source and folds every write (R0). About 1e6 to 5e6 rows, 2^24 a source, about 0.28 M writes a second *(G5, G6: checked and reasoned)*.
 - **Rules.** +1 builder, +1 user (G5).
-- **Against it.** A row count is a guess at the operator's memory; the same count is too small on a 64 GB box and too big on a 1 GB one *(reasoned)*.
+- **Against it.** A row count is a guess at the operator's memory; the same count is too small on a 64 GB box and too big on a 1 GB one *(reasoned)*. V5-20 rejects a fixed row ceiling (item 3).
 
 ### 3.2 X1-M, the budget: the asker's own `memory`, with variations
 
@@ -86,14 +86,14 @@ Only the first and the fifth rows need every row in one process *(reasoned)*.
 
 - **What.** A read verb beside `get()` and `connect()`: `for await (const [key, row] of f.data.scan())`. Pages from one copy of each group; at one cut by default (`cut: false` opts out); `fields`, `columns`, `pages`, `ahead`, `signal`; a plain-data filter left of it runs at the copies. On a server, groups held there are read in place, the rest by pages, with no download.
 - **Results.** 0 failed in 14,100 seeds over three modes (4,700 at one cut), 0 of 1,119,674 multi-slot commits torn *(checked, X2)*. 1e7 rows over 16 groups over TCP: 0.75 to 0.83 M whole rows a second, 16 to 20 M a second for one number field, the asker's heap 33 to 59 MB; own groups in place at 101 to 113 ns a row *(measured, X2)*. Most planted bugs failed 766 to 1,000 of 1,000 seeds in the hard world; `oldpair` failed only 63 (0 in the default world), a rare but real case *(checked)*.
-- **The cost to servers.** One cut keeps a before-image of a pinned row the first time it changes, on every copy, until the scan ends: up to about 70 MB a copy for a 625,000-row group *(counted, X2's pin model; the skeptic said 79 MB, the model gives 69.7)*. Those bytes count against the server's `memory`, whose line refuses writes. So an image budget is owed: past it the scan ends `scan-lost`, never the writes (X2's C6, not built).
+- **The cost to servers.** One cut keeps a before-image of a pinned row the first time it changes, on every copy, until the scan ends: up to about 70 MB a copy for a 625,000-row group *(counted, X2's pin model; the skeptic said 79 MB, the model gives 69.7)*. Those bytes count against the server's `memory`, whose line refuses writes. So an image budget is owed: past it the scan ends `scan-lost`, never the writes (X2's C6, not built; owed, V5-20).
 - **Rules.** One cut +9 to +19 builder (about 11), no cut alone +4 to +9; user +1 to +3 *(reasoned, X2)*.
 
 ### 3.5 X3, folds per group
 
 - **What.** The server's author declares `fold: { emit }` with one of fero's own combines: `sum`, `count`, `min`, `max`, `top(k)`, `distinct` (O1's merge classes, with exact sums). A partial per group on a copy that is not the leader; a merger on one server; clients read it as a served view.
 - **Results.** 0 wrong in 1,375,885 checks over 3,502 seeds, through moves, resyncs, outages and deploys *(checked, X3)*. A write at a group copy costs 0.73 to 4.47 µs (classes with remove), 5.7 to 19.6 µs (max, top k with a `keeps` hint); the merger takes 18,000 to 26,000 writes a second for max or top k at 256 groups, one write a frame, because it combines every group's piece of a touched bucket *(measured, X3)*. A tree over the groups would combine 8 pieces, not 256 *(reasoned, X3)*.
-- **What fero can and cannot see.** The self-check at build named the broken law in 300 of 300 seeds for each of 9 author mistakes *(checked)*. But fero's runtime checks flagged the merger's own planted bugs (`nopair`, `resyncadd`, `mixver`) in 0 of 30 seeds each; only the test oracle saw them *(checked, X3)*. So a merger audit is owed: now and then, rebuild the answer from fresh pieces of every group at one cut and compare *(reasoned)*. The self-check runs on pieces of real rows; on an empty resource it must run again once rows exist *(reasoned)*.
+- **What fero can and cannot see.** The self-check at build named the broken law in 300 of 300 seeds for each of 9 author mistakes *(checked)*. But fero's runtime checks flagged the merger's own planted bugs (`nopair`, `resyncadd`, `mixver`) in 0 of 30 seeds each; only the test oracle saw them *(checked, X3)*. So a merger audit is owed: now and then, rebuild the answer from fresh pieces of every group at one cut and compare *(reasoned)*. V5-20 item 5 takes it, and it is owed. The self-check runs on pieces of real rows; on an empty resource it must run again once rows exist *(reasoned)*.
 - **Rules.** +3 to +5 builder, +1 for the audit; user 0 to +1 *(reasoned, X3)*. User combines later: +8 to +13 builder in all, +3 to +5 user.
 
 ### 3.6 X4, histograms per group
@@ -114,7 +114,7 @@ Only the first and the fifth rows need every row in one process *(reasoned)*.
 
 - **Track the pivot for an exact median with no values at the merger.** Each group keeps a sorted column of its own rows; the merger keeps the median and the counts below and above it, and asks the groups for the next few values when a frame moves the rank: one trip a frame *(reasoned)*.
 - **A tree over groups** at the merger for max and top k (from X3).
-- **A compact hold** offering sync reads and the merge classes only (3.2's column form with fero's views).
+- **A compact hold** offering sync reads and the merge classes only (3.2's column form with fero's views). Superseded: V5-21 rejects a store of fero's own for big holds; a later compact store is a second backing inside `data` (V5-21 item 3).
 
 ---
 
@@ -135,16 +135,18 @@ Cells: **covers**, **partly** or **no**, with the number that decides it. "—":
 
 ## 5. The pick, feature by feature
 
+Decided as picked (V5-20 items 3 to 7), but for the compact hold in the first row's "Later", which V5-21 replaced with a compact backing inside `data`.
+
 | Feature | First build | Later |
 |---|---|---|
-| `hold: 'all'`, a whole `connect()` | one `data` store at the asker (R0); the limit is `memory`, counted as RSS; warn at 80 %; refuse a hold at open that will not fit; end a live one `not-held` past the line and remove its rows; `data` 5 makes ordered views and quantiles chunked, lifts 2^24 a source, frees a dropped source | a compact hold for big resources with a fixed row shape; worker threads for live views |
+| `hold: 'all'`, a whole `connect()` | one `data` store at the asker (R0); the limit is `memory`, counted as RSS; warn at 80 %; refuse a hold at open that will not fit; end a live one `not-held` past the line and remove its rows; `data` 5 makes ordered views and quantiles chunked, lifts 2^24 a source, frees a dropped source | a compact backing inside `data`, turned on only by its author's explicit setting (V5-21 items 3 and 7; this page first said a compact hold for big resources with a fixed row shape); worker threads for live views |
 | one-time code over every row | `scan()` at one cut, with an image budget and `scan-lost`; server root code and `ctx.data` loops read by scan, with no download | a pinned handle for two passes; a scan over threads |
 | live code over every row | folds with fero's combines, served as a view; a merger audit | user combines behind the self-check; a tree over groups |
 | live code that is not a fold | a hold under `memory` | a sized holder, if deployments need one |
 | a live median or quantile | the sorted column at the merger, a part per group, exact | X4's histograms: approximate first, then the exact band; then the column can go |
 | a one-time exact median | O1's selection at the scan's cut | X4's narrowing (1 to 3 trips) |
 
-**Why one store at the asker, not one per group.** Stores by group make data's views cheaper by the number of stores (3.2), but only operators that merge can run per store, so `data`'s operators right of `connect()` would no longer all work over every row. A chunked index in `data` 5 makes each view cost about the sorted column's (872 to 1,107 ns a change at 1e6 values) on one store, and keeps every operator *(reasoned from the column's numbers)*. Stores by group stay the fallback if `data` 5 slips.
+**Why one store at the asker, not one per group.** Stores by group make data's views cheaper by the number of stores (3.2), but only operators that merge can run per store, so `data`'s operators right of `connect()` would no longer all work over every row. A chunked index in `data` 5 makes each view cost about the sorted column's (872 to 1,107 ns a change at 1e6 values) on one store, and keeps every operator *(reasoned from the column's numbers)*. Stores by group stay the fallback if `data` 5 slips. Decided: `data` 5 fixes the views, and stores per group inside the asker are the measured fallback (V5-20 item 7).
 
 **Why RSS, not live heap.** The box kills on RSS, and RSS ran 2.3 to 2.6 times live heap *(measured)*. Counting live heap would let a hold set to the box's RAM be killed at about 40 % of its "budget", before the warning.
 
@@ -153,7 +155,7 @@ Cells: **covers**, **partly** or **no**, with the number that decides it. "—":
 | Pick | Builder rules | User rules | `data` 5 items |
 |---|---|---|---|
 | the budget by RSS: the guard, its order with a server's `read-only`, `gc()` without a flag, which hold ends when several share it | +5 to +8 | +1 (net: replaces G5's ceiling rule) | +3 (chunked ordered views, chunked quantiles, free a dropped source) |
-| lift 2^24 a source | 0 | 0 | +1 (or fero's stores by block, +2 to +4 builder) |
+| lift 2^24 a source | 0 | 0 | +1: `data` 5 splits each source's key index into small tables (V5-21 item 2). This page also offered fero's stores by block (+2 to +4 builder); lifting the cap only with sources by block is rejected (V5-21) |
 | `scan()` at one cut, with the image budget | +9 to +19 | +1 to +3 | 0 |
 | folds with fero's combines and the merger audit | +4 to +6 | 0 to +1 | 0 |
 | the sorted column at the merger | +3 to +5 | 0 | 0 |
@@ -167,17 +169,17 @@ All *(reasoned)*. A leaner first build, a scan with no cut, is +15 to +27 builde
 ## 6. What the API promises and states as a limit
 
 **Promises.**
-- `scan()`: every row once, at one cut (no commit shown in part), at any number of rows; the asker's memory stays flat (groups × 2 pages).
+- `scan()`: every row once, at one cut by default (no commit shown in part; `cut: false` opts out, V5-20 item 4), at any number of rows; the asker's memory stays flat (groups × 2 pages).
 - A fold: like any served view, at any number of rows, one cut, never back.
 - A live median or quantile over every row: exact, with `data`'s quantile arithmetic, at one cut.
 - `hold: 'all'` and a whole `connect()`: a sync `.value` of every row, live, at one cut, on any role (V5-16), while it fits `memory`.
 
 **Stated limits** (API.md 7, SC-10).
-1. "A whole-resource hold must fit this process's `memory`, counted as RSS: about 1.4 M rows of about 100 B a GB *(measured, X1)*. Health warns at 80 %; past the line the hold ends `not-held` and its rows are removed."
+1. "A whole-resource hold must fit this process's `memory`, counted as RSS: about 1.4 M rows of about 100 B a GB *(measured, X1)*. Health warns at 80 %; a hold that will not fit is refused at open; past the line the hold ends `not-held` and its rows are removed." (V5-20 item 3.)
 2. "Every write to the resource is folded on this process's main thread. Its rate is set by the slowest live view on the hold: about 0.28 M writes a second with none (big frames), and until `data` 5, a few hundred a second with a top k over 1e6 rows and a few thousand with a median *(measured)*."
-3. "A full collection of a hold pauses its process: about 1 s at 5e6 small rows *(measured)*. On a process that leads groups, health warns once a full collection there passes 0.5 s."
+3. "A full collection of a hold pauses its process: about 1 s at 5e6 small rows *(measured)*. On a process that leads groups, health warns once a full collection there passes 0.5 s." (V5-20 item 8.)
 4. "A scan's limit is time: about 0.8 M whole rows a second at one asker *(measured, X2)*. A scan at one cut keeps up to one before-image of each changed row on each copy until it ends; past the copy's image budget the scan ends `scan-lost`, never the writes."
-5. "A fold's pieces stay small and its buckets are capped; a max or top k over many groups costs the merger about 18,000 to 26,000 writes a second at 256 groups, one write a frame *(measured, X3)*."
+5. "A fold's pieces stay small and its buckets are capped; a max or top k over many groups costs the merger about 18,000 to 26,000 writes a second at 256 groups, one write a frame *(measured, X3)*." The cap is stated: about 1.6e5 buckets at 16 groups, as for `derive`'s view form, with `derive`'s record form past it (V5-20 item 10).
 6. "A live median over every row keeps one number a row of that field on one server: 12.8 B a value *(measured)*, within that server's `memory`."
 7. "A median read once over every row takes 17 to 39 trips to every group *(measured, O1)*."
 
@@ -185,12 +187,12 @@ All *(reasoned)*. A leaner first build, a scan with no cut, is +15 to +27 builde
 
 ## 7. What changes in the decisions and pages (amended, never deleted)
 
-Nothing here is edited yet; these are the amendments the owner's answers would make.
+V5-20 took the picks these amendments rest on. Its Consequences name the pages that change (MERGE.md, API.md 3.3 and 9, a new `scan()` and `fold` in API.md, LAYERS); the V5-20 rewrite makes the changes, and MERGE.md now carries its part.
 
 - **MERGE.md 0 item 4, 5.4 item 1 and question 2.** The fixed one-process ceiling (about 1e6 to 5e6 rows) is superseded: a sync read of every row is bounded by `memory` (section 6, limits 1 to 3); one-time work, live folds and medians have no row ceiling (limits 4 to 7). MERGE question 2's "other way" (keep running with a warning) stays the other way of question 7 here.
 - **MERGE.md 5.5, V5-14's frame.** "One store fed by slot stays only for `hold: 'all'`, a whole `connect()`, code over every row and a live median, under a stated ceiling" becomes: only for a sync read of every row and live code that is not a fold, under the asker's `memory`.
 - **V5-13** (four read verbs: `get`, `connect`, `changes`, `past`): `scan()` is a fifth, for one pass over every row.
-- **V5-14 pick 6** (`data` 5.0.0): four more items: chunked ordered views (`az`, `za`, `top`), chunked quantiles, free a dropped source, lift 2^24 a source.
+- **V5-14 pick 6** (`data` 5.0.0): four more items: chunked ordered views (`az`, `za`, `top`), chunked quantiles, free a dropped source, lift 2^24 a source. V5-21 item 2 says how the cap is lifted: each source's key index split into small tables.
 - **V5-16 pick 2**: unchanged; `.value` stays the one sync read, now bounded by `memory`, not a row count.
 - **GROUPS question 3** (a live view past the ceiling): a view that merges or folds has no ceiling; a hold past its line ends `not-held` (question 7 here).
 - **GROUPS question 12 and API.md question 28** (servers that hold some groups): one-time root code and `ctx.data` loops read by `scan()`, on every server, a spare too, with no download; live code that folds runs as a served fold. Only a sync read of every row downloads what the server lacks, and it is bounded by that server's `memory`. MERGE 5.5's "code over every row downloads (R0) and keeps the ceiling" narrows to that case.
@@ -204,25 +206,27 @@ Nothing here is edited yet; these are the amendments the owner's answers would m
 In order (sizes are guesses: S up to 2 days, M 3 to 5 days, L 1 to 2 weeks):
 1. **The sorted column at the merger (M).** A part per group, replaced on a resync, values moved on a slot move, a loud remove; seeded, with planted bugs, in O1's world.
 2. **The guard by RSS (S to M).** X1's seeded run with RSS as the measure; two holds and the app's own garbage in one budget; a long steady state near the line; how often it forces a collection.
-3. **`data` 5's chunked views (M, in `data`).** `za` and `median` timed at 1e6 and 1e7 rows on one store, against the sorted column's numbers here.
-4. **The scan's lease, `scan-lost` and image budget (M)**, and the pin on the wire (X2 owes it).
-5. **The merger audit for folds (S)**, run against X3's planted `nopair`, `resyncadd` and `mixver`.
+3. **`data` 5's chunked views (M, in `data`).** `za` and `median` timed at 1e6 and 1e7 rows on one store, against the sorted column's numbers here. Owed (V5-20), with `data` 5's quantiles and lifted source cap.
+4. **The scan's lease, `scan-lost` and image budget (M)**, and the pin on the wire (X2 owes it). Owed (V5-20).
+5. **The merger audit for folds (S)**, run against X3's planted `nopair`, `resyncadd` and `mixver`. Owed (V5-20).
 6. **The fold with a network decode (S).** 64 groups' frames of a few records each, decoded, into one store.
-7. **X1's 2e7-row run of sources by block (S)**, if `data` 5 does not lift the cap.
+7. **X1's 2e7-row run of sources by block (S)**, if `data` 5 does not lift the cap. `data` 5 lifts it by splitting each source's key index into small tables (V5-21 item 2), so this run is needed only if that piece slips.
 
-**Later:** X4 at real scale with groups on a network; a sample by row hash; the tree over groups; the compact hold; the pivot tracker (3.8).
+**Later:** X4 at real scale with groups on a network; a sample by row hash; the tree over groups; a compact backing inside `data` (V5-21, in place of the compact hold); the pivot tracker (3.8).
 
 ---
 
 ## 9. Questions for the owner, one at a time, most important first
 
-1. **The limit for a sync read of every row: a row count, or the process's own `memory`?** Pick: `memory`, counted as RSS (about 1.4 M small rows a GB), warned at 80 %. Other way: MERGE's fixed ceiling (about 1e6 to 5e6 rows, 2^24 a source).
-2. **One-time work over every row as `scan()`, with no ceiling, in the first build?** Pick: yes; root code, `ctx.data` loops, `migrate` and `export` read by pages. Other way: keep them under the hold's `memory`.
-3. **Live views on a big hold: fix them in `data` 5, or split the hold by group in fero?** Pick: `data` 5 (chunked ordered views and quantiles), so every operator still works over every row. Other way: one store per group inside the asker (23 to 25 µs a top 10 write at 64 stores), with only operators that merge.
-4. **Live code over every row as folds with fero's own combines, in the first build?** Pick: yes (+4 to +6 builder rules with the audit). Other way: all live code over every row runs as a hold under `memory`; folds later.
-5. **A live median: exact on one server, or approximate with no values?** Pick: exact, a sorted column at the merger (12.8 B a value), with X4's histograms later. Other way: X4 first, within 1 % by default or as an opt-in, and its exact band when built.
-6. **The scan's promise: one cut or no cut?** Pick: one cut by default (+9 to +19 builder rules), since `export` and reports should not show half a commit. Other way: no cut first (+4 to +9), one cut later.
-7. **A hold that grows past its line: end it or keep it?** Pick: it ends `not-held` and its rows go; a hold that will not fit is refused at open. Other way: keep it with a health warning until the process runs out, as MERGE's question 2 offered.
-8. **A big hold on a process that leads groups (pauses past 1 s)?** Pick: allowed under `memory`, and health warns once a full collection there passes 0.5 s. Other way: refuse a whole-resource hold on a process that leads groups.
-9. **A compact store for big holds, later?** Pick: later, when a deployment asks, with sync reads and the merge classes only. Other way: never; big holds stay in `data`.
-10. **User combines in folds (sketches, custom pieces), later?** Pick: yes, behind the self-check at build and the audit, the classes with remove first. Other way: only fero's combines, ever.
+The owner answered these on 2026-11-23, one at a time, in [V5-20](../DECISIONS.md): every question as picked but question 9, which V5-20 item 9 sent to a study ([COMPACT.md](COMPACT.md)) and [V5-21](../DECISIONS.md) then superseded. The questions stand as they were put; each now ends with what was decided.
+
+1. **The limit for a sync read of every row: a row count, or the process's own `memory`?** Pick: `memory`, counted as RSS (about 1.4 M small rows a GB), warned at 80 %. Other way: MERGE's fixed ceiling (about 1e6 to 5e6 rows, 2^24 a source). **Decided:** the pick (V5-20 item 3).
+2. **One-time work over every row as `scan()`, with no ceiling, in the first build?** Pick: yes; root code, `ctx.data` loops, `migrate` and `export` read by pages. Other way: keep them under the hold's `memory`. **Decided:** the pick: `scan()`, a new read verb, in the first build (V5-20 item 4).
+3. **Live views on a big hold: fix them in `data` 5, or split the hold by group in fero?** Pick: `data` 5 (chunked ordered views and quantiles), so every operator still works over every row. Other way: one store per group inside the asker (23 to 25 µs a top 10 write at 64 stores), with only operators that merge. **Decided:** the pick; stores per group are the measured fallback (V5-20 item 7).
+4. **Live code over every row as folds with fero's own combines, in the first build?** Pick: yes (+4 to +6 builder rules with the audit). Other way: all live code over every row runs as a hold under `memory`; folds later. **Decided:** the pick, with a merger audit that rebuilds the answer now and then (V5-20 item 5).
+5. **A live median: exact on one server, or approximate with no values?** Pick: exact, a sorted column at the merger (12.8 B a value), with X4's histograms later. Other way: X4 first, within 1 % by default or as an opt-in, and its exact band when built. **Decided:** the pick; histograms per group come later (V5-20 item 6).
+6. **The scan's promise: one cut or no cut?** Pick: one cut by default (+9 to +19 builder rules), since `export` and reports should not show half a commit. Other way: no cut first (+4 to +9), one cut later. **Decided:** the pick: one cut by default, `cut: false` opts out (V5-20 item 4).
+7. **A hold that grows past its line: end it or keep it?** Pick: it ends `not-held` and its rows go; a hold that will not fit is refused at open. Other way: keep it with a health warning until the process runs out, as MERGE's question 2 offered. **Decided:** the pick; near the line, whole-resource holds end first, then a server refuses writes `read-only` (V5-20 item 3).
+8. **A big hold on a process that leads groups (pauses past 1 s)?** Pick: allowed under `memory`, and health warns once a full collection there passes 0.5 s. Other way: refuse a whole-resource hold on a process that leads groups. **Decided:** the pick (V5-20 item 8).
+9. **A compact store for big holds, later?** Pick: later, when a deployment asks, with sync reads and the merge classes only. Other way: never; big holds stay in `data`. **Superseded by V5-21.** V5-20 item 9 did not leave it to a later build by default: it asked for a study now of whether fero wants one and where it would sit, which is [COMPACT.md](COMPACT.md). V5-21 then decided: no compact store in the first build, which does six small things so one stays a cheap addition (item 1); when one comes, it sits inside `data` as a second backing, so every operator still runs (item 3), designed to cover servers' own rows too (item 6); and a resource turns to it only by an explicit setting its author chooses (item 7). A store of fero's own for big holds, with the merge classes only, is rejected.
+10. **User combines in folds (sketches, custom pieces), later?** Pick: yes, behind the self-check at build and the audit, the classes with remove first. Other way: only fero's combines, ever. **Decided:** the pick: author-written combines come later, behind the build-time self-check and the audit (V5-20 item 5).

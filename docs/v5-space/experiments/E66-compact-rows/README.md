@@ -4,7 +4,7 @@
 
 ## The answer first
 
-- **Do not build it in the first build; make six fixes instead** (COMPACT.md section 5). Then a compact store is an addition inside `data`, not a rewrite *(reasoned, from the map)*.
+- **Do not build it in the first build; make six fixes instead** (COMPACT.md section 5). Then a compact store is an addition inside `data`, not a rewrite *(reasoned, from the map)*. Decided as V5-21, with a compact backing turned on only by an explicit setting, not by size (its item 7).
 - **The key index binds first.** One `Map` rebuilds in one step when it fills: 59 to 84 ms at 1.05e6 keys, 249 to 304 ms at 4.2e6, 631 to 688 ms at 8.4e6; it stops at 16,777,216. 64 small `Map`s kept every rebuild under 20 ms and passed that line *(measured)*.
 - **A row made for the fixed shape costs about twice `data`'s read at 1e6 rows**: 936 to 1,082 ns frozen, against 455 to 497. At 1e4 rows 199 to 251 ns against 42 to 65, so three to six times, and over P-01's 100 ns *(measured)*. The text field is a third to a half of it. E-65 X1's generic `get` costs 2,685 to 2,809 ns.
 - **A row view that copies nothing costs about what `data` costs**: one field 267 to 365 ns at 1e6, 77 to 88 at 1e4; kept, so the object must exist, 289 to 331 at 1e6 *(measured)*.

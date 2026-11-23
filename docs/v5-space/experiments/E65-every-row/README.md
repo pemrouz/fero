@@ -59,6 +59,8 @@ The skeptic's 23 findings were checked against the code and the records. All hel
 
 A fixed row ceiling is not the best answer for any feature. One-time work becomes a scan, live code a fold per group, a median a sorted column or a histogram: none holds rows. A sync read of every row keeps a limit, but it is the asker's `memory` counted the way the box counts it (RSS), and the speed of data's live views on the hold, which a chunked index in `data` 5 can fix. Stores by group inside the asker are a measured fallback for the views. A compact store is the later answer for big holds with a fixed row shape.
 
+Decided: V5-20 took EVERYROW.md's picks (items 3 to 8); V5-21 replaced the compact store's answer with no compact store in the first build and, later, a second backing inside `data`, turned on only by an explicit setting.
+
 ## Limits
 
 - X3, X4 and X5 ran in one process with no network; X4's world was scaled down. X2's replicated pin ran only in the seeded world. The lease, `scan-lost` and the image budget were not built.
