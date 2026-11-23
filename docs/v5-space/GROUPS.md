@@ -545,7 +545,7 @@ The pattern: the experiments that checked correctness across groups ran in one p
 
 ### 4.1 Decisions first
 
-None needs a model. Each one shapes the models after it. They are the owner's questions in 5.5: the slice, the one-process ceiling, `standbys`, SC-08(b)'s form, view placement, one group down, the home group down, growth, settings, handlers.
+None needs a model. Each one shapes the models after it. They are the owner's questions in 5.5: the slice, the one-process ceiling, `standbys`, SC-08(b)'s form, view placement, one group down, the home group down, growth, settings, handlers. All are taken now: V5-18 and V5-20 (5.5).
 
 ### 4.2 Before step 1: founding with several groups
 
