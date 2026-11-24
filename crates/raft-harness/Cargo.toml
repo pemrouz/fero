@@ -14,6 +14,10 @@ doctest = false
 name = "raft-datadriven"
 path = "src/bin/raft-datadriven.rs"
 
+[[bin]]
+name = "raft-diff"
+path = "src/bin/raft-diff.rs"
+
 [dependencies]
 raft = { path = "../raft" }
 

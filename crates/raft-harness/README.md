@@ -10,6 +10,7 @@ Test tooling for the [raft](../raft) crate. It is never shipped.
 | [src/confchange_dd.rs](src/confchange_dd.rs) | etcd's confchange test driver. |
 | [src/rafttest](src/rafttest) | etcd's `InteractionEnv`, which drives whole clusters: one module per Go file, all 21 handler files. |
 | [src/bin/raft-datadriven.rs](src/bin/raft-datadriven.rs) | Runs every file. |
+| [src/diff.rs](src/diff.rs), [src/bin/raft-diff.rs](src/bin/raft-diff.rs), [diff/](diff/README.md) | The differential fuzz: random scripts filled in by etcd's Go code, replayed on the port byte for byte. Adds `read-index` and `restart`. |
 | [scripts/negative-control.sh](scripts/negative-control.sh) | Proves the check can fail: three files with one corrupted line each must be the only new failures. |
 
 ## Run
@@ -18,6 +19,7 @@ Test tooling for the [raft](../raft) crate. It is never shipped.
     cargo run -q --release -p raft-harness --bin raft-datadriven -- --verbose --diff
     cargo test --release
     sh crates/raft-harness/scripts/negative-control.sh
+    RAFT_SRC=<etcd raft checkout> WORK=<scratch dir> sh crates/raft-harness/diff/run_diff.sh corpus
 
 The first command ends with `ok raft: 41 of 41 etcd files` when every file
 passes. Otherwise it prints one `FAIL <file> at <file:line>: <why>` line per

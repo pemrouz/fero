@@ -8,6 +8,7 @@
 //! - [`quorum_dd`], [`confchange_dd`]: etcd's two package-level test drivers.
 //! - [`rafttest`]: etcd's `InteractionEnv`, which drives whole clusters.
 //! - [`suites`]: runs every vendored etcd file.
+//! - [`diff`]: the differential fuzz against etcd's Go code, Rust side.
 
 #![forbid(unsafe_code)]
 // The raft crate keeps Go's names for enum values (`pb::MsgHup`).
@@ -15,6 +16,7 @@
 
 pub mod confchange_dd;
 pub mod datadriven;
+pub mod diff;
 pub mod gofmt;
 pub mod quorum_dd;
 pub mod rafttest;

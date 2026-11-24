@@ -1,0 +1,346 @@
+log-level info
+----
+
+
+add-nodes 4 voters=(1,2,3,4) index=2 prevote=true
+----
+
+
+campaign 1
+----
+
+
+stabilize
+----
+
+
+propose-conf-change 1 transition=explicit
+l3 l4
+----
+
+
+log-level warn
+----
+
+
+stabilize
+----
+
+
+propose 3 p1
+----
+
+
+propose 1 p2
+----
+
+
+transfer-leadership from=1 to=2
+----
+
+
+tick-election 3
+----
+
+
+propose 2 p3
+----
+
+
+propose 3 p4
+----
+
+
+propose 3 p5
+----
+
+
+log-level debug
+----
+
+
+deliver-msgs 3
+----
+
+
+process-ready 4
+----
+
+
+report-unreachable 1 3
+----
+
+
+log-level info
+----
+
+
+process-ready 2 1
+----
+
+
+deliver-msgs type=MsgVote 3
+----
+
+
+propose 3 p6
+----
+
+
+deliver-msgs type=MsgAppResp 3
+----
+
+
+propose 4 p7
+----
+
+
+stabilize
+----
+
+
+deliver-msgs drop=1
+----
+
+
+process-ready 1
+----
+
+
+report-unreachable 1 3
+----
+
+
+propose 1 p8
+----
+
+
+status 1
+----
+
+
+deliver-msgs 1
+----
+
+
+log-level warn
+----
+
+
+propose 4 p9
+----
+
+
+log-level info
+----
+
+
+propose-conf-change 3
+
+----
+
+
+propose 4 p10
+----
+
+
+deliver-msgs 4
+----
+
+
+deliver-msgs 4
+----
+
+
+log-level warn
+----
+
+
+propose 3 p11
+----
+
+
+deliver-msgs type=MsgPreVote 4
+----
+
+
+process-ready 3
+----
+
+
+tick-heartbeat 4
+----
+
+
+deliver-msgs 3
+----
+
+
+process-ready 1
+----
+
+
+deliver-msgs type=MsgApp 2
+----
+
+
+propose 4 p12
+----
+
+
+tick-election 1
+----
+
+
+restart 3
+----
+
+
+read-index 2 r456
+----
+
+
+propose 3 p13
+----
+
+
+deliver-msgs 4
+----
+
+
+process-ready 3
+----
+
+
+raft-state
+----
+
+
+deliver-msgs drop=3
+----
+
+
+process-ready 4
+----
+
+
+stabilize 4 1
+----
+
+
+propose 4 q14
+----
+
+
+process-ready 2
+----
+
+
+propose 4 q15
+----
+
+
+propose 1 q16
+----
+
+
+tick-heartbeat 3
+----
+
+
+deliver-msgs 1
+----
+
+
+report-unreachable 1 3
+----
+
+
+raft-state
+----
+
+
+process-ready 3
+----
+
+
+propose 2 p17
+----
+
+
+propose 4 q18
+----
+
+
+deliver-msgs 1
+----
+
+
+tick-election 4
+----
+
+
+raft-state
+----
+
+
+process-ready 4 3
+----
+
+
+raft-state
+----
+
+
+read-index 3 r457
+----
+
+
+read-index 1 r458
+----
+
+
+read-index 3 r459
+----
+
+
+log-level info
+----
+
+
+process-ready 4
+----
+
+
+propose 1 q19
+----
+
+
+propose-conf-change 1 transition=explicit
+r4 v3
+----
+
+
+stabilize
+----
+
+
+raft-state
+----
+
+
+raft-log 1
+----
+
+
+raft-log 2
+----
+
+
+raft-log 3
+----
+
+
+raft-log 4
+----
+
