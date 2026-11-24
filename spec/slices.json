@@ -201,7 +201,7 @@
  {
   "slice": 7,
   "name": "door and tools",
-  "adds": "TLS and the door in Rust, client tokens, hostile-client tests, the CLI, the protocol gateways, the fair runs against the rivals, prebuilt binaries for the listed platforms.",
+  "adds": "TLS and the door in Rust, client tokens, hostile-client tests, the CLI, the protocol gateways, the fair runs against the rivals, macOS and Windows servers (V5-27), prebuilt binaries for Linux, macOS and Windows.",
   "rules": {
    "records": 22,
    "low": 22,

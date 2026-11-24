@@ -32,3 +32,16 @@ Decision:
 REJECTED: restating F-12 too (a group that loses most of its servers would stay stuck until someone edits files by hand); bringing the `none` rung and the slow-leader rule back into a slice (about 7 to 20 more rules, past the 5 % headroom on some lines, so a budget card would follow); keeping all the bars as MUSTs unchanged (the first build would end with them knowingly unmet and red on the map).
 
 Consequences: the ledger grows by three records, to 829 (L1 221, slice 2 135), inside V5-25's headroom. How the command compares the answering copies' logs, and how it shows what may be lost, are settled at the start of slice 2. With V5-25 and V5-26 answered, slice 0 may start.
+
+## V5-27 — Servers run on Linux first; macOS and Windows servers come in slice 7 (2026-11-24; spec/NOTES.md question 35, asked one at a time)
+
+Context: the design record names no server platform. The Rust core touches the disk (fsync) and sockets directly, and both behave differently on Linux, macOS and Windows, so each platform adds tests and speed pins to keep green. Clients (the browser and Node) are not affected. V5-24 item 3 times the absolute bars on dedicated Linux machines from slice 1, and the owner's laptop runs slice 0's probes as provisional.
+
+Decision:
+1. fero's servers target Linux from slice 1. The tests, the pins and the absolute bars run there.
+2. macOS and Windows servers come in slice 7, with the tools, the prebuilt binaries and the rival runs.
+3. Slice 0's probes may still run on the owner's laptop, whatever it runs, with their times marked provisional (V5-24 item 3).
+
+REJECTED: Linux and macOS servers from slice 1 (about twice the disk and socket test matrix from the start, and macOS's fsync differs, so its pins could be relative only); Linux only, for good (a developer could not run a native server on a Mac or Windows laptop).
+
+Consequences: until slice 7, a developer on macOS or Windows runs a server in a Linux container or virtual machine. The shell's disk and socket code may use Linux's calls first, behind one seam, so the other platforms add an implementation and not a rewrite *(reasoned)*.

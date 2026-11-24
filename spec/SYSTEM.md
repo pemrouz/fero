@@ -24,7 +24,7 @@ Rust holds L0, L1 and the byte-moving part of L3. JavaScript holds the rest and 
 
 ## Server platforms
 
-**Open.** The record names none *(checked)*. Assumed: Linux first, others in slice 7 *(a guess until the owner picks)*. <sub>V5-24.3</sub>
+Servers run on Linux from slice 1, where speed is judged. macOS and Windows servers come in slice 7. Clients run anywhere. The owner's laptop runs slice 0's probes, timed as provisional. <sub>V5-24.3, V5-27</sub>
 
 ## The bars
 

@@ -100,7 +100,7 @@ A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as
 
 **The pages**
 
-35. Server platforms: the design record names none. [SYSTEM.md](SYSTEM.md) assumes Linux first.
+35. **Settled by V5-27.** Servers run on Linux from slice 1; macOS and Windows servers come in slice 7.
 36. [SHAPES.md](SHAPES.md) section 12 lists 30 open questions on bytes. It marks `SNAPSHOT` and `TIMEOUT-NOW` as first sent in slice 2, though their Raft rules are on from slice 1 (question 1). Two are conflicts in the record: whether a batch or a record is one Raft entry, and the two meanings of `busy`. Two need a card: the value's encoding, and one shared log against a journal plus segments.
 37. The budget: see [cards/0001-budget.md](cards/0001-budget.md).
 
