@@ -25,9 +25,11 @@ This branch holds only v5's spec and code. The design record (decisions V5-1 to 
 
 ## Layout
 
-Nothing is built yet. The code's shape follows BUILD 2.1 as each slice starts.
+Slice 0 is under way: the probes are being run. The code's shape follows BUILD 2.1 as each slice starts.
 
 | Dir | What lives there |
 |---|---|
 | [spec/](spec/README.md) | The spec (V5-23 item 7): [SYSTEM.md](spec/SYSTEM.md), the whole system on one screen; [ledger.json](spec/ledger.json), every first-build rule; [slices.json](spec/slices.json); [budget.json](spec/budget.json); [SHAPES.md](spec/SHAPES.md), the bytes (a draft); [NOTES.md](spec/NOTES.md), the open questions; `cards/`, the owner's questions. |
 | [tools/](tools) | `ledger-gate.mjs` (run it on every spec change; it must end `ok ledger-gate`), `grid.mjs` (the map), `gate-selftest.mjs`. Plain Node, nothing installed. |
+| [crates/](crates) | The Rust workspace (Rust 1.97, pinned). [raft](crates/raft/README.md): etcd's Raft at `c51f010`, ported to Rust (probe P1), `no_std`, no `unsafe`, no outside crates; Apache-2.0, see its NOTICE. [raft-harness](crates/raft-harness/README.md): its test tooling, never shipped. `cargo run -q --release -p raft-harness --bin raft-datadriven` must end `ok raft: 41 of 41 etcd files`; `cargo test --release` runs the rest. |
+| [probes/](probes/README.md) | Slice 0's probes: the sheet (each probe, its kill line, its number), and one folder per probe that is not code in `crates/` ([p5/](probes/p5/README.md), the TLA+ models). |
