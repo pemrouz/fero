@@ -16,6 +16,12 @@
 // c51f010c851edd0dada5af41bafbf68e54617767. See ../NOTICE (or ../../NOTICE).
 
 //! Port of `tracker/progress.go`.
+//!
+//! Go's `uint64` arithmetic wraps. `Match` and `Next` follow the indexes in
+//! a peer's messages, which can hold any value, so every `+ 1` and `- 1` on
+//! them wraps here too (`wrapping_add`, `wrapping_sub`). A differential run
+//! against Go with extreme values found these (see the harness's
+//! `tests/edge_values.rs`).
 
 use super::{Inflights, StateType};
 use alloc::collections::BTreeMap;
@@ -142,18 +148,19 @@ impl Progress {
         if self.state == StateType::StateSnapshot {
             let pending_snapshot = self.pending_snapshot;
             self.reset_state(StateType::StateProbe);
-            self.next = max(self.match_ + 1, pending_snapshot + 1);
+            self.next = max(self.match_.wrapping_add(1), pending_snapshot.wrapping_add(1));
         } else {
             self.reset_state(StateType::StateProbe);
-            self.next = self.match_ + 1;
+            self.next = self.match_.wrapping_add(1);
         }
-        self.sent_commit = min(self.sent_commit, self.next - 1);
+        self.sent_commit = min(self.sent_commit, self.next.wrapping_sub(1));
     }
 
     /// BecomeReplicate transitions into StateReplicate, resetting Next to Match+1.
     pub fn become_replicate(&mut self) {
         self.reset_state(StateType::StateReplicate);
-        self.next = self.match_ + 1;
+        // Go's Match+1 wraps at the top of uint64; so does this.
+        self.next = self.match_.wrapping_add(1);
     }
 
     /// BecomeSnapshot moves the Progress to StateSnapshot with the specified pending
@@ -161,7 +168,7 @@ impl Progress {
     pub fn become_snapshot(&mut self, snapshoti: u64) {
         self.reset_state(StateType::StateSnapshot);
         self.pending_snapshot = snapshoti;
-        self.next = snapshoti + 1;
+        self.next = snapshoti.wrapping_add(1);
         self.sent_commit = snapshoti;
     }
 
@@ -174,8 +181,8 @@ impl Progress {
         match self.state {
             StateType::StateReplicate => {
                 if entries > 0 {
-                    self.next += entries;
-                    self.inflights.add(self.next - 1, bytes);
+                    self.next = self.next.wrapping_add(entries);
+                    self.inflights.add(self.next.wrapping_sub(1), bytes);
                 }
                 // If this message overflows the in-flights tracker, or it was already full,
                 // consider this message being a probe, so that the flow is paused.
@@ -203,7 +210,7 @@ impl Progress {
         // Next-1 in normal operation, or higher in some rare cases. Allow sending a
         // commit index eagerly only if we haven't already sent one that bumps the
         // follower's commit all the way to Next-1.
-        index > self.sent_commit && self.sent_commit < self.next - 1
+        index > self.sent_commit && self.sent_commit < self.next.wrapping_sub(1)
     }
 
     /// SentCommit updates the sentCommit.
@@ -219,7 +226,8 @@ impl Progress {
             return false;
         }
         self.match_ = n;
-        self.next = max(self.next, n + 1); // invariant: Match < Next
+        // Go's n+1 wraps at the top of uint64; so does this.
+        self.next = max(self.next, n.wrapping_add(1)); // invariant: Match < Next
         self.msg_app_flow_paused = false;
         true
     }
@@ -245,9 +253,9 @@ impl Progress {
             // Directly decrease next to match + 1.
             //
             // TODO(tbg): why not use matchHint if it's larger?
-            self.next = self.match_ + 1;
+            self.next = self.match_.wrapping_add(1);
             // Regress the sentCommit since it unlikely has been applied.
-            self.sent_commit = min(self.sent_commit, self.next - 1);
+            self.sent_commit = min(self.sent_commit, self.next.wrapping_sub(1));
             return true;
         }
 
@@ -261,9 +269,9 @@ impl Progress {
         }
 
         // Go's matchHint+1 wraps at the top of uint64; so does this.
-        self.next = max(min(rejected, match_hint.wrapping_add(1)), self.match_ + 1);
+        self.next = max(min(rejected, match_hint.wrapping_add(1)), self.match_.wrapping_add(1));
         // Regress the sentCommit since it unlikely has been applied.
-        self.sent_commit = min(self.sent_commit, self.next - 1);
+        self.sent_commit = min(self.sent_commit, self.next.wrapping_sub(1));
         self.msg_app_flow_paused = false;
         true
     }

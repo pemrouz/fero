@@ -748,7 +748,8 @@ impl<S: Storage> Raft<S> {
         }
         let (pr_next, pr_state, inflights_full) = (pr.next, pr.state, pr.inflights.full());
 
-        let prev_index = pr_next - 1;
+        // Go's Next-1 wraps when Next is 0; so does this.
+        let prev_index = pr_next.wrapping_sub(1);
         let prev_term = match self.raft_log.term(prev_index) {
             Ok(t) => t,
             Err(_) => {
@@ -1823,7 +1824,9 @@ impl<S: Storage> Raft<S> {
                     {
                         if pr.state == tracker::StateType::StateProbe {
                             pr.become_replicate();
-                        } else if pr.state == tracker::StateType::StateSnapshot && pr.match_ + 1 >= first_index {
+                        } else if pr.state == tracker::StateType::StateSnapshot
+                            && pr.match_.wrapping_add(1) >= first_index
+                        {
                             // Note that we don't take into account PendingSnapshot to
                             // enter this branch. No matter at which index a snapshot
                             // was actually applied, as long as this allows catching up

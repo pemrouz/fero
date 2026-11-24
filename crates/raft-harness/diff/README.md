@@ -35,3 +35,25 @@ without Go. `regressions/` is for scripts that once found a difference.
 Limits (reasoned, from the generator): it never compacts storage at random, it keeps nodes 1
 and 2 voters, it never sets the size limits, and `restart` does not bring back the applied
 configuration (so a later leave-joint entry can panic, the same on both sides).
+
+## The edge value check
+
+The random scripts only send messages that a correct peer sends. A real peer's message can
+hold any number. Go's `uint64` arithmetic wraps; Rust's panics when overflow checks are on
+(they are, in every profile here). So where Go wraps, the port must say `wrapping_add` or
+`wrapping_sub`, or it is not the same machine.
+
+- `zz_edge_values_test.go` is the Go side. It steps messages with fields from the bottom and
+  the top of `uint64` into one node, in four states, and prints the node after each step, or
+  `P` when Go panics. It prints the number of cases and a hash of all the lines.
+- `../tests/edge_values.rs` builds the same lines on the port and wants the same hash. It runs
+  with `cargo test --release`: 1,035,000 single messages and 500,000 runs of four messages.
+
+The first run found three places where Go wraps and the port panicked (measured): a leader
+that gets an append answer for the top index (`Progress::maybe_update`, then
+`become_replicate` and `maybe_send_append`), and with runs of messages the other `+ 1` and
+`- 1` on `Match` and `Next`, and `Unstable::maybe_last_index`. They wrap now.
+
+Limits (reasoned): one node, at most four messages, no storage writes between them, values
+only from the two ends of the range. Two overflow panics are left where Go also panics at the
+same step, for its own reason: a campaign at the top term, and a snapshot at the top index.

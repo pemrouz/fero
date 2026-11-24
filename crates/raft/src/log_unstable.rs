@@ -72,7 +72,8 @@ impl Unstable {
     pub(crate) fn maybe_last_index(&self) -> Option<u64> {
         let l = len64(&self.entries);
         if l != 0 {
-            return Some(self.offset + l - 1);
+            // Go's sum wraps at the top of uint64; so does this.
+            return Some(self.offset.wrapping_add(l).wrapping_sub(1));
         }
         if let Some(snapshot) = &self.snapshot {
             return Some(snapshot.get_metadata_index());
