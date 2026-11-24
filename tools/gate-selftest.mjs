@@ -32,7 +32,8 @@ const breaks = [
   ['slices.json deleted', d => fs.rmSync(path.join(d, 'slices.json'))],
   ['retired.json deleted', d => fs.rmSync(path.join(d, 'retired.json'))],
   ['the budget raised alone', d => json(d, 'budget.json', v => { v.total = 9999; v.status = `accepted by card ${v.card}` })],
-  ['the budget raised with its card line, while the card is open', d => { json(d, 'budget.json', v => { v.total = 9999 }); edit(d, 'cards/0001-budget.md', t => t.replace(/\| whole \d+ \|/, '| whole 9999 |')) }],
+  // Card 0001 is answered. These two copies reopen it first: they test the check on whichever budget card is open next.
+  ['the budget raised with its card line, while the card is open', d => { json(d, 'budget.json', v => { v.total = 9999; v.status = `proposed by card ${v.card}; not yet accepted` }); edit(d, 'cards/0001-budget.md', t => t.replace(/\| whole \d+ \|/, '| whole 9999 |')) }],
   ['headroom of 500 %', d => json(d, 'budget.json', v => { v.headroom_pct = 500 })],
   ['the budget names no card', d => json(d, 'budget.json', v => { delete v.card })],
   ['the budget names a card that is not there', d => json(d, 'budget.json', v => { v.card = '0042'; v.status = 'accepted by card 0042' })],
@@ -44,7 +45,7 @@ const breaks = [
   ["SYSTEM.md's Raft count changed", d => edit(d, 'SYSTEM.md', t => t.replace(/carries \d+ of/, 'carries 63 of'))],
   ["README's line of counts by layer removed", d => edit(d, 'README.md', t => t.replace(/^Records by layer:.*$/m, ''))],
   ["README's count by slice changed", d => edit(d, 'README.md', t => t.replace(/S1 \d+/, 'S1 1'))],
-  ["the open card's picture changed", d => edit(d, 'cards/0001-budget.md', t => t.replace(/^(L1 the log.*)\d{3}$/m, '$1999'))],
+  ["the open card's picture changed", d => { json(d, 'budget.json', v => { v.status = `proposed by card ${v.card}; not yet accepted` }); edit(d, 'cards/0001-budget.md', t => t.replace(/^(L1 the log.*)\d{3}$/m, '$1999')) }],
   ['a page names an unknown rule id', d => edit(d, 'NOTES.md', t => t + '\n`no-such-rule.7`\n')],
   ['a Raft port rule moved out of slice 1', d => json(d, 'ledger.json', v => { first(v, 'raft-log.1').slice = 2 })],
 ]
