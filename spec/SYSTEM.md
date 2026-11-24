@@ -1,6 +1,6 @@
 # fero v5: the system
 
-Nothing is built yet. Rules: [ledger.json](ledger.json). Slices: [slices.json](slices.json). Budget: [budget.json](budget.json), proposed. Bytes: [SHAPES.md](SHAPES.md). Files, counts, the list of bars: [README.md](README.md). Why: [DECISIONS](https://github.com/pemrouz/fero/blob/design/docs/DECISIONS.md), [BUILD](https://github.com/pemrouz/fero/blob/design/docs/v5-space/BUILD.md), [LAYERS](https://github.com/pemrouz/fero/blob/design/docs/v5-space/LAYERS.md), [REQUIREMENTS](https://github.com/pemrouz/fero/blob/design/docs/v5-space/REQUIREMENTS.md).
+Nothing is built yet. Rules: [ledger.json](ledger.json). Slices: [slices.json](slices.json). Budget: [budget.json](budget.json), accepted (V5-25). Bytes: [SHAPES.md](SHAPES.md). Files, counts, the list of bars: [README.md](README.md). Why: [DECISIONS](https://github.com/pemrouz/fero/blob/design/docs/DECISIONS.md), [BUILD](https://github.com/pemrouz/fero/blob/design/docs/v5-space/BUILD.md), [LAYERS](https://github.com/pemrouz/fero/blob/design/docs/v5-space/LAYERS.md), [REQUIREMENTS](https://github.com/pemrouz/fero/blob/design/docs/v5-space/REQUIREMENTS.md).
 
 ## What fero is
 

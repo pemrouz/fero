@@ -5,7 +5,7 @@ Nothing is built yet. These pages are what the build is steered by.
 1. [SYSTEM.md](SYSTEM.md): what fero v5 is, on one screen. [SHAPES.md](SHAPES.md): the shapes in bytes, a draft.
 2. [ledger.json](ledger.json): every first-build rule, one record each, sorted by layer then id. [later.json](later.json): rules kept for after the first build. [retired.json](retired.json): ids that were given up and are never used again.
 3. [slices.json](slices.json): the nine slices, 0 to 8, each with its rule count, its models, its pins and what the owner sees and runs.
-4. [budget.json](budget.json): the most rule records each layer, each slice and the whole may hold. It is proposed by [cards/0001-budget.md](cards/0001-budget.md), the first question for the owner. The budget is on the margins only; no cell of the grid has one.
+4. [budget.json](budget.json): the most rule records each layer, each slice and the whole may hold. It was set by [cards/0001-budget.md](cards/0001-budget.md), the first question for the owner, and accepted as V5-25. The budget is on the margins only; no cell of the grid has one.
 5. [NOTES.md](NOTES.md): what the ledger leaves out and why, what was settled when it was put together, and every open question.
 
 ## The counts

@@ -1,5 +1,7 @@
 # Question 1. The rule budget
 
+**Answered 2026-11-24: A**, the record count with 5 % of headroom on any line. Recorded as V5-25 in [DECISIONS](../../docs/DECISIONS.md). The card below is kept as it was asked; its picture shows the budget as it stood before the answer.
+
 **Blocks:** slice 0, ground. Until it is answered, work goes on only on these pages: the open questions in [NOTES.md](../NOTES.md) and the draft shapes.
 
 ## Background
