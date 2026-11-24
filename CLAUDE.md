@@ -25,4 +25,9 @@ This branch holds only v5's spec and code. The design record (decisions V5-1 to 
 
 ## Layout
 
-Nothing is built yet. The first work is the spec (V5-23 item 7, BUILD 3.3): one page for the whole system, the rule ledger, and the first shapes in bytes. The code's shape follows BUILD 2.1 as each slice starts.
+Nothing is built yet. The code's shape follows BUILD 2.1 as each slice starts.
+
+| Dir | What lives there |
+|---|---|
+| [spec/](spec/README.md) | The spec (V5-23 item 7): [SYSTEM.md](spec/SYSTEM.md), the whole system on one screen; [ledger.json](spec/ledger.json), every first-build rule; [slices.json](spec/slices.json); [budget.json](spec/budget.json); [SHAPES.md](spec/SHAPES.md), the bytes (a draft); [NOTES.md](spec/NOTES.md), the open questions; `cards/`, the owner's questions. |
+| [tools/](tools) | `ledger-gate.mjs` (run it on every spec change; it must end `ok ledger-gate`), `grid.mjs` (the map), `gate-selftest.mjs`. Plain Node, nothing installed. |
