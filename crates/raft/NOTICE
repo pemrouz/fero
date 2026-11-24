@@ -1,0 +1,23 @@
+raft
+====
+
+This crate is a port to Rust of etcd raft (go.etcd.io/raft/v3),
+https://github.com/etcd-io/raft, at commit
+c51f010c851edd0dada5af41bafbf68e54617767.
+
+etcd raft is Copyright The etcd Authors and is licensed under the
+Apache License, Version 2.0. The text of the licence is in the LICENSE file.
+
+What was changed: the Go source was translated to Rust file by file. Go's
+names, order and control flow are kept; names are written in Rust's case
+(MaybeUpdate is maybe_update). Each source file says which Go file it ports.
+The comments of the Go source are carried over.
+
+What was left out:
+- node.go's goroutine-based Node. The port stops at RawNode, the
+  single-threaded core that Node wraps.
+- state_trace.go, the build-tagged TLA+ trace hooks.
+- The generated protobuf code (raftpb/raft.pb.go). The messages are plain
+  Rust structs that follow raft.proto.
+- Go's unit tests. The datadriven test files under testdata/ are carried
+  unchanged; see testdata/PROVENANCE.md.

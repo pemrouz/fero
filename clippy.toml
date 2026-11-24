@@ -1,0 +1,4 @@
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "its order can change between runs; use BTreeMap" },
+  { path = "std::collections::HashSet", reason = "its order can change between runs; use BTreeSet" },
+]

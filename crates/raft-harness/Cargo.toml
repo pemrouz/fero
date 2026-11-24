@@ -1,0 +1,25 @@
+[package]
+name = "raft-harness"
+version = "0.0.0"
+description = "Test tooling for the raft crate: the datadriven file reader and etcd's test drivers. Never shipped."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[[bin]]
+name = "raft-datadriven"
+path = "src/bin/raft-datadriven.rs"
+
+[dependencies]
+raft = { path = "../raft" }
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+disallowed_types = "deny"

@@ -1,0 +1,16 @@
+[package]
+name = "raft"
+version = "0.0.0"
+description = "A faithful port of etcd's Raft library to Rust. no_std, no dependencies."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = ["crates/raft", "crates/raft-harness"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.97"
+publish = false
+
+# The strict list. A crate opts in with `[lints] workspace = true`.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+unused_imports = "deny"
+unused_variables = "deny"
+unused_mut = "deny"
+dead_code = "warn"
+unreachable_patterns = "deny"
+non_ascii_idents = "deny"
+trivial_numeric_casts = "deny"
+unused_qualifications = "deny"
+elided_lifetimes_in_paths = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# Order between runs must not change: no hashed containers (see clippy.toml).
+disallowed_types = "deny"
+# The kernel has no floats and no lossy casts hidden in `as`.
+float_arithmetic = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_possible_wrap = "deny"
+# no_std hygiene.
+std_instead_of_core = "deny"
+std_instead_of_alloc = "deny"
+alloc_instead_of_core = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+
+[profile.release]
+opt-level = 3
+debug = false
+overflow-checks = true
