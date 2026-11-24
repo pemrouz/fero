@@ -1,0 +1,1352 @@
+[
+ {
+  "id": "m01",
+  "model": "OneNumber",
+  "rule": "take.before",
+  "note": "drop the guard \"the number before is at or below the mark\"",
+  "caught": true,
+  "by": "Truth on movedoor, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 5,
+    "distinct": 86,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m02",
+  "model": "OneNumber",
+  "rule": "take.above",
+  "note": "drop the guard \"the number is above the mark\"",
+  "caught": true,
+  "by": "Once on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 7,
+    "distinct": 427,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m03",
+  "model": "OneNumber",
+  "rule": "take.before",
+  "note": "flip <= to <",
+  "caught": true,
+  "by": "the goal cannot be reached on reach",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 84,
+    "secs": 1
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 84,
+    "secs": 1
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 110,
+    "secs": 1
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 53,
+    "secs": 1
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 15,
+    "secs": 1
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 15,
+    "secs": 1
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1320,
+    "secs": 2
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 56,
+    "secs": 1
+   },
+   {
+    "bound": "reach",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 15,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m04",
+  "model": "OneNumber",
+  "rule": "take.above",
+  "note": "flip < to <=",
+  "caught": true,
+  "by": "Once on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 7,
+    "distinct": 419,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m05",
+  "model": "OneNumber",
+  "rule": "read.logend",
+  "note": "read the mark from committed entries only, not the log end",
+  "caught": true,
+  "by": "Once on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 7,
+    "distinct": 321,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m06",
+  "model": "OneNumber",
+  "rule": "mark.entry",
+  "note": "the entry does not raise the mark to the write's number",
+  "caught": true,
+  "by": "InOrder on movedoor, 4 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 4,
+    "distinct": 23,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m08",
+  "model": "OneNumber",
+  "rule": "dup.first",
+  "note": "answer a repeat \"applied\" instead of its first answer",
+  "caught": true,
+  "by": "Truth on movedoor, 6 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 6,
+    "distinct": 138,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m09",
+  "model": "OneNumber",
+  "rule": "dup.committed",
+  "note": "answer a repeat from an entry that has not committed",
+  "caught": true,
+  "by": "Truth on movedoor, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 5,
+    "distinct": 41,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m10",
+  "model": "OneNumber",
+  "rule": "keep.floor",
+  "note": "flip >= to >: drop the answer at the floor",
+  "caught": true,
+  "by": "Truth on movedoor, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 5,
+    "distinct": 41,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m11",
+  "model": "OneNumber",
+  "rule": "carry.hi",
+  "note": "the move does not carry the high marks",
+  "caught": true,
+  "by": "Once on movedoor, 11 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 11,
+    "distinct": 5859,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "m12",
+  "model": "OneNumber",
+  "rule": "carry.ans",
+  "note": "the move does not carry the kept answers",
+  "caught": true,
+  "by": "NoSkip on movedoor, 9 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "NoSkip",
+    "steps": 9,
+    "distinct": 1990,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m13",
+  "model": "OneNumber",
+  "rule": "carry.seq",
+  "note": "the move does not carry the slot's own number",
+  "caught": true,
+  "by": "SlotSeq on movedoor, 11 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "SlotSeq",
+    "steps": 11,
+    "distinct": 6527,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "m14",
+  "model": "OneNumber",
+  "rule": "open.table",
+  "note": "the open ignores the carried table",
+  "caught": true,
+  "by": "Once on movedoor, 11 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 11,
+    "distinct": 5859,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "m17",
+  "model": "OneNumber",
+  "rule": "number.before",
+  "note": "a write names nothing before it",
+  "caught": true,
+  "by": "Truth on movedoor, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 5,
+    "distinct": 86,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m18",
+  "model": "OneNumber",
+  "rule": "number.order",
+  "note": "the client may send a write before it ever sent the one before",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16873,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 851,
+    "secs": 6
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6,
+    "secs": 5
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3674,
+    "secs": 3
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 45,
+    "secs": 11
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 487,
+    "secs": 79
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 86,
+    "secs": 27
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 509,
+    "secs": 69
+   },
+   {
+    "bound": "reach",
+    "verdict": "violated",
+    "inv": "NotGoal",
+    "steps": 13,
+    "distinct": 319,
+    "secs": 2
+   },
+   {
+    "bound": "reachdoor",
+    "verdict": "violated",
+    "inv": "NotDoorGoal",
+    "steps": 7,
+    "distinct": 53,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m19",
+  "model": "OneNumber",
+  "rule": "number.before",
+  "note": "a write names a number refused at the door as the one before it",
+  "caught": true,
+  "by": "the goal cannot be reached on reachdoor",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16353,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 225,
+    "secs": 6
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 48236,
+    "secs": 4
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3667,
+    "secs": 2
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 663,
+    "secs": 10
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 416,
+    "secs": 74
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 311,
+    "secs": 21
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 788,
+    "secs": 66
+   },
+   {
+    "bound": "reach",
+    "verdict": "violated",
+    "inv": "NotGoal",
+    "steps": 13,
+    "distinct": 314,
+    "secs": 1
+   },
+   {
+    "bound": "reachdoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 66,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d01",
+  "model": "OneNumberDerived",
+  "rule": "take.before",
+  "note": "drop the guard \"the number before is at or below the mark\"",
+  "caught": true,
+  "by": "Safe on d-small, 6 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 6,
+    "distinct": 102,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d02",
+  "model": "OneNumberDerived",
+  "rule": "take.above",
+  "note": "drop the guard \"the number is above the mark\"",
+  "caught": true,
+  "by": "Safe on d-small, 8 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 8,
+    "distinct": 703,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d03",
+  "model": "OneNumberDerived",
+  "rule": "take.before",
+  "note": "flip <= to <",
+  "caught": true,
+  "by": "CanFinish on d-small, the first state",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "CanFinish",
+    "steps": 0,
+    "distinct": null,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d04",
+  "model": "OneNumberDerived",
+  "rule": "take.above",
+  "note": "flip < to <=",
+  "caught": true,
+  "by": "Safe on d-small, 8 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 8,
+    "distinct": 703,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d05",
+  "model": "OneNumberDerived",
+  "rule": "read.logend",
+  "note": "read the mark from committed entries only",
+  "caught": true,
+  "by": "Safe on d-small, 8 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 8,
+    "distinct": 668,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d06",
+  "model": "OneNumberDerived",
+  "rule": "key.slot",
+  "note": "keep the mark per group, not per slot",
+  "caught": true,
+  "by": "CanFinish on d-small, 9 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "CanFinish",
+    "steps": 9,
+    "distinct": 1062,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "d07",
+  "model": "OneNumberDerived",
+  "rule": "open.table",
+  "note": "the open ignores the carried mark",
+  "caught": true,
+  "by": "Safe on d-small, 14 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 14,
+    "distinct": 22012,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "d08",
+  "model": "OneNumberDerived",
+  "rule": "carry.hi",
+  "note": "the move does not carry the mark",
+  "caught": true,
+  "by": "Safe on d-small, 14 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 14,
+    "distinct": 22012,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "d09",
+  "model": "OneNumberDerived",
+  "rule": "number.before",
+  "note": "a write names nothing before it",
+  "caught": true,
+  "by": "Safe on d-small, 6 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 6,
+    "distinct": 102,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d10",
+  "model": "OneNumberDerived",
+  "rule": "number.chain",
+  "note": "the deriver does not remember the last number it sent",
+  "caught": true,
+  "by": "Safe on d-small, 6 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 6,
+    "distinct": 102,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d11",
+  "model": "OneNumberDerived",
+  "rule": "number.start",
+  "note": "a new life goes on from the old life's last number",
+  "caught": true,
+  "by": "CanFinish on d-small, 2 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "CanFinish",
+    "steps": 2,
+    "distinct": 2,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d15",
+  "model": "OneNumberDerived",
+  "rule": "mark.entry",
+  "note": "the entry does not raise the mark to the write's number",
+  "caught": true,
+  "by": "Safe on d-small, 4 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 4,
+    "distinct": 21,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k01",
+  "model": "OneNumber",
+  "rule": "forward.once",
+  "note": "a relay forwards a copy twice (client-sessions.14 dropped)",
+  "caught": true,
+  "by": "DoorTrue on door, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 500,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 631,
+    "secs": 4
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3667,
+    "secs": 2
+   },
+   {
+    "bound": "door",
+    "verdict": "violated",
+    "inv": "DoorTrue",
+    "steps": 5,
+    "distinct": 131,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k02",
+  "model": "OneNumber",
+  "rule": "first.only",
+  "note": "a resend is refused outside the log (client-sessions.7 dropped)",
+  "caught": true,
+  "by": "DoorTrue on movedoor, 6 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "DoorTrue",
+    "steps": 6,
+    "distinct": 176,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k03",
+  "model": "OneNumber",
+  "rule": "recv.latest",
+  "note": "the client takes the answer to an old copy (client-sessions.1 dropped)",
+  "caught": true,
+  "by": "DoorTrue on movedoor, 6 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "DoorTrue",
+    "steps": 6,
+    "distinct": 164,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k04",
+  "model": "OneNumber",
+  "rule": "stamp.next",
+  "note": "stamp the slot's next number from committed entries only (slot-sequence.1)",
+  "caught": true,
+  "by": "SlotSeq on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "SlotSeq",
+    "steps": 7,
+    "distinct": 490,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k05",
+  "model": "OneNumber",
+  "rule": "new.session",
+  "note": "a restarted client keeps its session (client-sessions.2)",
+  "caught": true,
+  "by": "Truth on restart, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 80,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 7,
+    "distinct": 514,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k06",
+  "model": "OneNumber",
+  "rule": "take.live",
+  "note": "take a write of a lapsed session, whose row is forgotten (client-sessions.5)",
+  "caught": true,
+  "by": "Once on lapse, 8 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 887,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 53840,
+    "secs": 3
+   },
+   {
+    "bound": "lapse",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 8,
+    "distinct": 543,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k07",
+  "model": "OneNumberDerived",
+  "rule": "marks.committed",
+  "note": "a new life reads marks from the uncommitted tail (srchi-marks.14)",
+  "caught": true,
+  "by": "Safe on d-small, 15 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 15,
+    "distinct": 27405,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "k08",
+  "model": "OneNumberDerived",
+  "rule": "marks.lowest",
+  "note": "a new life starts from the highest mark, not the lowest (srchi-marks.11)",
+  "caught": true,
+  "by": "Safe on d-small, 14 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 14,
+    "distinct": 16699,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "k09",
+  "model": "OneNumberDerived",
+  "rule": "number.source",
+  "note": "the number leaves out the write's place within its record (srchi-marks.9)",
+  "caught": true,
+  "by": "Safe on d-crash, 14 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 637,
+    "secs": 19
+   },
+   {
+    "bound": "d-crash",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 14,
+    "distinct": 5796,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "x01",
+  "model": "OneNumber",
+  "rule": "carry.floor",
+  "note": "the move does not carry the floors (memory only: should NOT be caught)",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 440,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 56952,
+    "secs": 4
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3667,
+    "secs": 2
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 262,
+    "secs": 9
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 736,
+    "secs": 69
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 897,
+    "secs": 23
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 168,
+    "secs": 69
+   },
+   {
+    "bound": "reach",
+    "verdict": "violated",
+    "inv": "NotGoal",
+    "steps": 13,
+    "distinct": 314,
+    "secs": 1
+   },
+   {
+    "bound": "reachdoor",
+    "verdict": "violated",
+    "inv": "NotDoorGoal",
+    "steps": 7,
+    "distinct": 52,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c01",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "a copy carries the write's own number as the floor, not the lowest unanswered one",
+  "caught": true,
+  "by": "Truth on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 7,
+    "distinct": 288,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c02",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "a repeat exactly at the mark gets no answer (a stall only: the client model has no stall check)",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 15447,
+    "secs": 2
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 884,
+    "secs": 4
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 56952,
+    "secs": 4
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3369,
+    "secs": 1
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 599,
+    "secs": 8
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 592,
+    "secs": 52
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 684,
+    "secs": 32
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 465,
+    "secs": 45
+   },
+   {
+    "bound": "reach",
+    "verdict": "violated",
+    "inv": "NotGoal",
+    "steps": 13,
+    "distinct": 314,
+    "secs": 1
+   },
+   {
+    "bound": "reachdoor",
+    "verdict": "violated",
+    "inv": "NotDoorGoal",
+    "steps": 7,
+    "distinct": 52,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c03",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "the target opens the slot on a fence that has not committed",
+  "caught": true,
+  "by": "Truth on movedoor, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 7,
+    "distinct": 466,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c04",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "a new life takes the answer to an old life's copy",
+  "caught": true,
+  "by": "Truth on retrylife, 7 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 100,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 428,
+    "secs": 4
+   },
+   {
+    "bound": "lapse",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3667,
+    "secs": 2
+   },
+   {
+    "bound": "door",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 419,
+    "secs": 8
+   },
+   {
+    "bound": "lost",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 101,
+    "secs": 64
+   },
+   {
+    "bound": "all",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 64,
+    "secs": 25
+   },
+   {
+    "bound": "retrylife",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 7,
+    "distinct": 289,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c05",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "a write names the last answered number before it, not the last one made",
+  "caught": true,
+  "by": "Truth on movedoor, 5 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 5,
+    "distinct": 86,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c06",
+  "model": "OneNumber",
+  "rule": "-",
+  "note": "a new life takes the committed answer of an old life's write",
+  "caught": true,
+  "by": "Truth on restart, 6 steps",
+  "runs": [
+   {
+    "bound": "movedoor",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16849,
+    "secs": 3
+   },
+   {
+    "bound": "move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 761,
+    "secs": 5
+   },
+   {
+    "bound": "restart",
+    "verdict": "violated",
+    "inv": "Truth",
+    "steps": 6,
+    "distinct": 245,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "c07",
+  "model": "OneNumberDerived",
+  "rule": "-",
+  "note": "a new life starts at the record after the lowest mark, not at the mark's own record",
+  "caught": true,
+  "by": "CanFinish on d-small, 14 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "CanFinish",
+    "steps": 14,
+    "distinct": 16698,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c08",
+  "model": "OneNumberDerived",
+  "rule": "-",
+  "note": "the carried mark of the moved slot is read for every slot of the group",
+  "caught": true,
+  "by": "CanFinish on d-small, 11 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "CanFinish",
+    "steps": 11,
+    "distinct": 4005,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c09",
+  "model": "OneNumberDerived",
+  "rule": "-",
+  "note": "the target opens the slot on a fence that has not committed",
+  "caught": true,
+  "by": "Safe on d-small, 10 steps",
+  "runs": [
+   {
+    "bound": "d-small",
+    "verdict": "violated",
+    "inv": "Safe",
+    "steps": 10,
+    "distinct": 3713,
+    "secs": 1
+   }
+  ]
+ }
+]

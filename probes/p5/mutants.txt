@@ -1,0 +1,59 @@
+# Planted mistakes, one line each, on the marked lines of the two models.
+# id ; module ; rule ; old text ; new text ; what the mistake is
+# Kinds follow the study's convention (DEV-10 d): drop a guard, flip < and <=,
+# drop or weaken a state update, read the wrong place.
+#
+# m, d: mistakes in the rules of the one-number form (lines marked @rule).
+m01 ; OneNumber ; take.before ; m.p <= hi ; TRUE ; drop the guard "the number before is at or below the mark"
+m02 ; OneNumber ; take.above ; hi < m.n ; TRUE ; drop the guard "the number is above the mark"
+m03 ; OneNumber ; take.before ; m.p <= hi ; m.p < hi ; flip <= to <
+m04 ; OneNumber ; take.above ; hi < m.n ; hi <= m.n ; flip < to <=
+m05 ; OneNumber ; read.logend ; ReadEnd(g) == log[g] ; ReadEnd(g) == SubSeq(log[g], 1, ci[g]) ; read the mark from committed entries only, not the log end
+m06 ; OneNumber ; mark.entry ; n |-> m.n, ; n |-> m.p, ; the entry does not raise the mark to the write's number
+m08 ; OneNumber ; dup.first ; Told(m, a[3]) ; Told(m, "ok") ; answer a repeat "applied" instead of its first answer
+m09 ; OneNumber ; dup.committed ; AnsOf(L, ci[g]) ; AnsOf(L, Len(L)) ; answer a repeat from an entry that has not committed
+m10 ; OneNumber ; keep.floor ; a[2] >= Fl(L, a[1]) ; a[2] > Fl(L, a[1]) ; flip >= to >: drop the answer at the floor
+m11 ; OneNumber ; carry.hi ; Hi(L, s) ; 0 ; the move does not carry the high marks
+m12 ; OneNumber ; carry.ans ; AnsOf(L, Len(L)) ; {} ; the move does not carry the kept answers
+m13 ; OneNumber ; carry.seq ; SlotAt(L) ; 0 ; the move does not carry the slot's own number
+m14 ; OneNumber ; open.table ; L[CHOOSE i \in DOMAIN L : L[i].t = "open"].tab ; NoTab ; the open ignores the carried table
+m17 ; OneNumber ; number.before ; p |-> Before(n), ; p |-> 0, ; a write names nothing before it
+m18 ; OneNumber ; number.order ; PrevSent(n) ; TRUE ; the client may send a write before it ever sent the one before
+m19 ; OneNumber ; number.before ; p |-> Before(n), ; p |-> n - 1, ; a write names a number refused at the door as the one before it
+d01 ; OneNumberDerived ; take.before ; m.p <= hi ; TRUE ; drop the guard "the number before is at or below the mark"
+d02 ; OneNumberDerived ; take.above ; hi < m.n ; TRUE ; drop the guard "the number is above the mark"
+d03 ; OneNumberDerived ; take.before ; m.p <= hi ; m.p < hi ; flip <= to <
+d04 ; OneNumberDerived ; take.above ; hi < m.n ; hi <= m.n ; flip < to <=
+d05 ; OneNumberDerived ; read.logend ; ReadEnd(g) == log[g] ; ReadEnd(g) == CL(g) ; read the mark from committed entries only
+d06 ; OneNumberDerived ; key.slot ;  /\ L[i].slot = s} ; } ; keep the mark per group, not per slot
+d07 ; OneNumberDerived ; open.table ; L[CHOOSE i \in DOMAIN L : L[i].t = "open"].hi ; 0 ; the open ignores the carried mark
+d08 ; OneNumberDerived ; carry.hi ; Hi(SubSeq(log["b1"], 1, i), "Y") ; 0 ; the move does not carry the mark
+d09 ; OneNumberDerived ; number.before ; p |-> prev[w.slot], ; p |-> 0, ; a write names nothing before it
+d10 ; OneNumberDerived ; number.chain ; ![w.slot] = w.n ; ![w.slot] = @ ; the deriver does not remember the last number it sent
+d11 ; OneNumberDerived ; number.start ; FreshPrev == [s \in Slots |-> 0] ; FreshPrev == prev ; a new life goes on from the old life's last number
+d15 ; OneNumberDerived ; mark.entry ; n |-> m.n ; n |-> m.p ; the entry does not raise the mark to the write's number
+# k: mistakes in rules of today that stay (lines marked @keeps). The model
+# must still need them. Counted apart.
+k01 ; OneNumber ; forward.once ; keep => ~Door ; TRUE ; a relay forwards a copy twice (client-sessions.14 dropped)
+k02 ; OneNumber ; first.only ; m.c = 1 ; TRUE ; a resend is refused outside the log (client-sessions.7 dropped)
+k03 ; OneNumber ; recv.latest ; copies[m.n] = m.c ; TRUE ; the client takes the answer to an old copy (client-sessions.1 dropped)
+k04 ; OneNumber ; stamp.next ; SlotAt(L) + 1 ; SlotAt(SubSeq(L, 1, ci[g])) + 1 ; stamp the slot's next number from committed entries only (slot-sequence.1)
+k05 ; OneNumber ; new.session ; Sid(l) == l ; Sid(l) == 1 ; a restarted client keeps its session (client-sessions.2)
+k06 ; OneNumber ; take.live ; reg[m.sid] = "lapsed" ; FALSE ; take a write of a lapsed session, whose row is forgotten (client-sessions.5)
+k07 ; OneNumberDerived ; marks.committed ; MarkLog(g) == CL(g) ; MarkLog(g) == log[g] ; a new life reads marks from the uncommitted tail (srchi-marks.14)
+k08 ; OneNumberDerived ; marks.lowest ; Min({Mark(s) ; Max({Mark(s) ; a new life starts from the highest mark, not the lowest (srchi-marks.11)
+k09 ; OneNumberDerived ; number.source ; r * K + PlaceIn(r, i) ; r * K + 1 ; the number leaves out the write's place within its record (srchi-marks.9)
+# x: probes. Changes the design says are harmless. They are not rules.
+x01 ; OneNumber ; carry.floor ; Fl(L, s) ; 0 ; the move does not carry the floors (memory only: should NOT be caught)
+# c: a second check. Mistakes planted by a second reader on lines that hold no
+# mark (rule "-"): the floor on the wire, the repeat test, the move's steps,
+# the start of a new life, which life an answer belongs to.
+c01 ; OneNumber ; - ; fl |-> Floor, c |-> ; fl |-> n, c |-> ; a copy carries the write's own number as the floor, not the lowest unanswered one
+c02 ; OneNumber ; - ; IsDup(m, hi)   == m.n <= hi ; IsDup(m, hi)   == m.n < hi ; a repeat exactly at the mark gets no answer (a stall only: the client model has no stall check)
+c03 ; OneNumber ; - ; /\ \E i \in 1..ci["g0"] : ; /\ \E i \in 1..Len(log["g0"]) : ; the target opens the slot on a fence that has not committed
+c04 ; OneNumber ; - ; Told(m, x) == IF m.life = life /\ status[m.n] = "none" ; Told(m, x) == IF status[m.n] = "none" ; a new life takes the answer to an old life's copy
+c05 ; OneNumber ; - ; {k \in 1..(n - 1) : status[k] # "door"} ; {k \in 1..(n - 1) : status[k] \notin {"door", "none"}} ; a write names the last answered number before it, not the last one made
+c06 ; OneNumber ; - ; /\ e.t = "w" /\ e.life = life /\ status[e.n] = "none" ; /\ e.t = "w" /\ status[e.n] = "none" ; a new life takes the committed answer of an old life's write
+c07 ; OneNumberDerived ; - ; StartIdx(Max({1, LowMark \div K})) ; StartIdx(Max({1, LowMark \div K + 1})) ; a new life starts at the record after the lowest mark, not at the mark's own record
+c08 ; OneNumberDerived ; - ; IF s = "Y" /\ HasOpen(L) ; IF HasOpen(L) ; the carried mark of the moved slot is read for every slot of the group
+c09 ; OneNumberDerived ; - ; /\ \E i \in 1..ci["b1"] : ; /\ \E i \in 1..Len(log["b1"]) : ; the target opens the slot on a fence that has not committed
