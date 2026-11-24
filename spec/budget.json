@@ -1,0 +1,28 @@
+{
+ "status": "proposed by card 0001; not yet accepted",
+ "card": "0001",
+ "unit": "rule records. The budget is on the margins only: each layer, each slice and the whole. No cell of the grid has a budget of its own.",
+ "headroom_pct": 5,
+ "headroom_rule": "A layer, a slice or the whole may hold its number plus 5 %, rounded down, before a card. Past that the ledger gate fails and the change waits for a card.",
+ "layers": {
+  "L0": 86,
+  "L1": 218,
+  "L2": 106,
+  "L3": 146,
+  "L4": 107,
+  "L5": 110,
+  "D": 53
+ },
+ "slices": {
+  "0": 0,
+  "1": 257,
+  "2": 132,
+  "3": 54,
+  "4": 145,
+  "5": 78,
+  "6": 84,
+  "7": 22,
+  "8": 54
+ },
+ "total": 826
+}
