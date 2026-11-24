@@ -16,7 +16,7 @@ fero is shared, live data for apps. An app names a resource, `fero('orders')`, a
 - **L5, libraries.** Locks, queues, sagas, `derive`, the past, gateways, the CLI.
 - **`data` 5, beside them.** The sibling engine, in TypeScript. It holds the rows and runs views. Its rules are the ledger's row D. <sub>V5-14, V5-21</sub>
 
-The ledger holds 826 rule records (817 to 1,012 at their low and high counts) *(counted)*.
+The ledger holds 829 rule records (820 to 1,016 at their low and high counts) *(counted)*.
 
 ## Rust and JavaScript
 
@@ -30,7 +30,7 @@ Rust holds L0, L1 and the byte-moving part of L3. JavaScript holds the rest and 
 
 A **bar** is a requirement with an id; the bars are the rows REQUIREMENTS marks MUST. A **pin** is a test that holds a bar's number. The speed bars are judged on dedicated machines only: PERF-08, commit p99 within the disk's floor plus a round trip plus 0.5 ms; PERF-11, 3 million deliveries a core-second; PERF-09, 500,000 writes a second per process (a SHOULD, held as slice 1's stop line). <sub>V5-23.3, .4</sub>
 
-**MUSTs the first build does not reach**, because their mechanism waits: P-06's `none` rung and PERF-03, judged on it; P-18 and TEST-06 (forks); OPS-07 (restore); F-18 (the slow-leader rule). OPS-13 (erase) and F-12 (the recover command) have no rule yet. PERF-04 is a stated miss; DEP-19 is dropped; TEST-10 loses its twin clause. Restating these is the owner's pick ([NOTES](NOTES.md)). Most other MUSTs are not pinned to a slice yet. <sub>V5-23.6</sub>
+**MUSTs the first build does not reach** are restated as after the first build, each with its reason: P-06's `none` rung and PERF-03, judged on it (relays come later); P-18 and TEST-06 (forks need the tier); OPS-07 (restore comes with the tier); F-18 (the slow-leader rule waits; slice 2 catches only a stuck leader); OPS-13 (erase has no rule yet). F-12's recover command is built in slice 2. PERF-04 is a stated miss; DEP-19 is dropped; TEST-10 loses its twin clause. Most other MUSTs are not pinned to a slice yet. <sub>V5-23.6, V5-26</sub>
 
 ## The slices, in order
 

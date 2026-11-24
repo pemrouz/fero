@@ -48,9 +48,9 @@ One rule has one home. Where two layers held the same rule, one record stays.
 
 Each needs a pick before its slice. None blocks the budget card.
 
-**For the owner, after the budget card**
+**For the owner** (the budget card was answered as V5-25)
 
-A. **The first build misses MUSTs that no decision restated.** P-06's `none` rung and PERF-03 (judged on it); P-18 and TEST-06 (forks); OPS-07 (restore and forks); F-18 (a slow leader gives up the lead: `slow-leader-self.2`; the watchdog of slice 2 covers a stuck main thread only, *reasoned*); OPS-13 (erase) and F-12 (the operator's recover command), which have no rule and no slice. Either each bar is restated as "after the first build", or its mechanism comes back into a slice. It changes a bar, so it is the owner's card. Draft pick: restate them, and keep F-12's recover command in slice 2, since `meta-directory.2`, `meta-directory.3`, `meta-directory.7` and `slot-table.7` already hold its rules.
+A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as after the first build, each with its reason: P-06's `none` rung and PERF-03; P-18 and TEST-06 (forks); OPS-07 (restore); F-18 (the slow-leader rule; the watchdog of slice 2 covers a stuck main thread only, *reasoned*); OPS-13 (erase, no rule yet). F-12's recover command is built in slice 2: `recover.1` to `recover.3` hold the command, beside `meta-directory.2`, `meta-directory.3`, `meta-directory.7` and `slot-table.7` (slice 3, with slot epochs).
 
 **Slices**
 
@@ -78,9 +78,9 @@ A. **The first build misses MUSTs that no decision restated.** P-06's `none` run
 
 **Rules with no record yet**
 
-19. `fero.drop` and `fero.erase`: no page states their rules, so OPS-13 has no record (question A).
+19. `fero.drop` and `fero.erase`: no page states their rules, so OPS-13 has no record; V5-26 restated it as after the first build.
 20. A root write from an untyped or hostile client: refused at the client (`write-surface.5`); nothing makes the leader refuse it.
-21. Operator recovery (`meta-directory.2`, `meta-directory.3`, `meta-directory.7`, `slot-table.7`): no slice names a recover command, so F-12 is not placed (question A).
+21. **Settled by V5-26.** Operator recovery is the recover command of slice 2 (`recover.1` to `recover.3`), so F-12 is placed. Which copies' logs it compares, and how it lists what may be lost, are slice 2's to settle.
 22. Peer clock readings on Raft's messages, which `writer-time.1` needs.
 23. The two rules of the line (bytes cross in batches through a fixed list of calls; kernel code touches no file, socket, clock or thread) are held as budgets and pins, not as records.
 24. Health: every wait shows its reason. Read as an interface, not a rule.

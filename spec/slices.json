@@ -58,11 +58,11 @@
  {
   "slice": 2,
   "name": "groups that heal",
-  "adds": "Membership changes, learners, snapshots and leader transfer in use (their Raft rules are on from slice 1, with the port), healing, the hand-back, growth from one voter, a clean stop, the watchdog, the soft directory, founding with a candidate id, local snapshots and log trimming, repair from a peer, health in full.",
+  "adds": "Membership changes, learners, snapshots and leader transfer in use (their Raft rules are on from slice 1, with the port), healing, the hand-back, growth from one voter, a clean stop, the watchdog, the soft directory, founding with a candidate id, local snapshots and log trimming, repair from a peer, the operator's recover command, health in full.",
   "rules": {
-   "records": 132,
-   "low": 130,
-   "high": 171
+   "records": 135,
+   "low": 133,
+   "high": 175
   },
   "models": [
    "E-51",
@@ -77,6 +77,7 @@
    "PERF-12",
    "OPS-02",
    "OPS-05",
+   "F-12 (the recover command, V5-26)",
    "time from a death to a healed group; restart time (no bar id yet)"
   ],
   "data5": [

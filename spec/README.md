@@ -12,12 +12,12 @@ Nothing is built yet. These pages are what the build is steered by.
 
 Counted by the tools from `ledger.json`; the gate fails if these lines drift.
 
-Records by layer: L0 86, L1 218, L2 106, L3 146, L4 107, L5 110, D 53.
-Records by slice: S0 0, S1 257, S2 132, S3 54, S4 145, S5 78, S6 84, S7 22, S8 54.
+Records by layer: L0 86, L1 221, L2 106, L3 146, L4 107, L5 110, D 53.
+Records by slice: S0 0, S1 257, S2 135, S3 54, S4 145, S5 78, S6 84, S7 22, S8 54.
 
 ## The bars
 
-The bars are the rows REQUIREMENTS marks MUST *(checked against its last column)*: P-01 to P-22; PERF-01 to PERF-08 and PERF-10 to PERF-14; SC-01 to SC-15 without SC-06 and SC-12; F-01 to F-22; DEV-01 to DEV-03 and DEV-06 to DEV-10; DEP-01 to DEP-14, DEP-16 to DEP-18, DEP-20, DEP-21; TEST-01 to TEST-10, TEST-12, TEST-13; DATA-01 to DATA-09; OPS-01 to OPS-14. SYSTEM.md names the ones the first build does not reach. A bar that `slices.json` does not name is not placed in a slice yet.
+The bars are the rows REQUIREMENTS marks MUST *(checked against its last column)*: P-01 to P-22; PERF-01 to PERF-08 and PERF-10 to PERF-14; SC-01 to SC-15 without SC-06 and SC-12; F-01 to F-22; DEV-01 to DEV-03 and DEV-06 to DEV-10; DEP-01 to DEP-14, DEP-16 to DEP-18, DEP-20, DEP-21; TEST-01 to TEST-10, TEST-12, TEST-13; DATA-01 to DATA-09; OPS-01 to OPS-14. SYSTEM.md names the ones the first build does not reach; V5-26 restated them as after the first build. A bar that `slices.json` does not name is not placed in a slice yet.
 
 ## The tools
 

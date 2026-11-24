@@ -9,8 +9,7 @@ The one ledger for v5: where things stand, what is next, the open bugs and the d
 
 ## Next
 
-1. **The MUSTs the first build does not reach** ([spec/NOTES.md](spec/NOTES.md), question A): restate each bar as after the first build, or bring its mechanism back into a slice. An owner's pick, since it changes a bar.
-2. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change.
+1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change.
 
 ## Open bugs
 
@@ -21,3 +20,4 @@ None yet.
 V5-1 to V5-24 are on the `design` branch. Decisions made from here on are appended to [docs/DECISIONS.md](docs/DECISIONS.md), from V5-25.
 
 - **V5-25** (2026-11-24): the rule budget is the ledger's record count, 826 (773 for fero, 53 for `data` 5), with 5 % of headroom on any layer, slice or the whole; past that, a card. Card 0001, answered A.
+- **V5-26** (2026-11-24): the MUSTs the first build does not reach (P-06's `none` rung and PERF-03, P-18, TEST-06, OPS-07, F-18, OPS-13) are restated as after it, each with its reason; F-12's recover command is built in slice 2 (`recover.1` to `recover.3`). The ledger is 829 records.
