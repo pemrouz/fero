@@ -1,0 +1,252 @@
+[
+ {
+  "slice": 0,
+  "name": "ground",
+  "adds": "No product rule. Seven probes with kill lines: the Rust Raft, the kernel in the simulator, the time to change, judge-cross-fold on one thread, one number for write order, the markers, the commit path on real disks.",
+  "rules": {
+   "records": 0,
+   "low": 0,
+   "high": 0
+  },
+  "models": [
+   "etcd's 41 test files and 4,000 random scripts against the Rust port (P1)",
+   "the write-numbering study (P5)",
+   "started here: the one-commit slot move in full; founding with several groups"
+  ],
+  "pins": [
+   "kill line, not a pin: TEST-01 (P2: 200 full-stack seeds within 1 s)",
+   "kill line, not a pin: PERF-08 (P7: the commit path on real disks)",
+   "kill lines with no bar id: P1, P3 to P6 (BUILD 3.3)"
+  ],
+  "data5": [],
+  "owner_sees": "A one-page probe sheet: each probe passed or killed with its number, the timing machine's floors, the rivals' numbers alone, and this grid.",
+  "owner_runs": "one command that plays etcd's 41 files against the Rust port and ends ok (its name is set in slice 0)",
+  "data5_note": "data 5 items D1 and D2 start here; slice 4 needs them"
+ },
+ {
+  "slice": 1,
+  "name": "one write",
+  "adds": "One write through every layer: a resource founded with two groups on three servers, a commit on disk at a majority, a fold on every copy, a live link over both groups, and a deriver that writes exactly once per record.",
+  "rules": {
+   "records": 257,
+   "low": 254,
+   "high": 285
+  },
+  "models": [
+   "P1's proof on every change",
+   "write numbering (owed)",
+   "E-61 marks",
+   "monitors over 1,000 seeds: F-02, F-04, TEST-13, the total over both groups, the deriver's output",
+   "whether plain writes need a majority of the sessions resource (owed)"
+  ],
+  "pins": [
+   "PERF-08",
+   "PERF-09 (a SHOULD, held as the stop line; its per-writer half is advisory until slice 4)",
+   "PERF-11",
+   "TEST-01",
+   "DEP-20",
+   "the recorder's two pins (no bar id yet)",
+   "the time to change (DEV-03 a reading: BUILD gives the 30 s, not the id)"
+  ],
+  "data5": [
+   "data-lane",
+   "data-store"
+  ],
+  "owner_sees": "One write followed hop by hop in the viewer, 1,000 green seeds on the dashboard, the first example in four terminals, the pin sheet, and the map as a page.",
+  "owner_runs": "the first example's check, which ends ok (planned: node examples/01/check.ts)"
+ },
+ {
+  "slice": 2,
+  "name": "groups that heal",
+  "adds": "Membership changes, learners, snapshots and leader transfer in use (their Raft rules are on from slice 1, with the port), healing, the hand-back, growth from one voter, a clean stop, the watchdog, the soft directory, founding with a candidate id, local snapshots and log trimming, repair from a peer, health in full.",
+  "rules": {
+   "records": 132,
+   "low": 130,
+   "high": 171
+  },
+  "models": [
+   "E-51",
+   "E-52",
+   "E-59",
+   "GROUPS 4.2 models 1 to 3",
+   "founding with the directory",
+   "a clean stop behind a partition",
+   "many elections at once after a crash"
+  ],
+  "pins": [
+   "PERF-12",
+   "OPS-02",
+   "OPS-05",
+   "time from a death to a healed group; restart time (no bar id yet)"
+  ],
+  "data5": [
+   "data-snapshot"
+  ],
+  "owner_sees": "A server dies, a spare is promoted, the dead one returns and leadership is handed back, each step named in plain words; then the same in terminals with a fourth server joining.",
+  "owner_runs": "the healing example's check, which ends ok (name set at the slice's start)"
+ },
+ {
+  "slice": 3,
+  "name": "slot move",
+  "adds": "The slot move in one commit, the slot table in the home log, the carried set, the grow rule by size and load, clients that learn new routes, the fold's rules for a moved slot.",
+  "rules": {
+   "records": 54,
+   "low": 54,
+   "high": 64
+  },
+  "models": [
+   "the full one-commit move model at 85 % (READY M6)",
+   "GROUPS 4.3 models 8 to 11",
+   "the carried set as one final list",
+   "E-67 on the one-commit move",
+   "models for scan() at one cut and the merger's pairing"
+  ],
+  "pins": [
+   "SC-08(b): the move's window at or under 10 ms at p99 (a reading: BUILD gives the number, not the id)",
+   "growth from 1 to 16 groups, timed (SC-03 a reading)"
+  ],
+  "data5": [
+   "data-store"
+  ],
+  "owner_sees": "A resource under steady load grows from one group to sixteen; no write fails, the total never slips, and the viewer shows one move's window in milliseconds.",
+  "owner_runs": "the growth example's check, which ends ok (name set at the slice's start)"
+ },
+ {
+  "slice": 4,
+  "name": "read surface",
+  "adds": "The lens in full, the four read verbs, positions, credits and pacing, methods on a path and at the root, the shape rule, room writes, field guards, the memory guard, config, the browser client and its WebSocket listener.",
+  "rules": {
+   "records": 145,
+   "low": 144,
+   "high": 196
+  },
+  "models": [
+   "E-55 and E-56's claims as checks on real code",
+   "E-61's planted-mistake score from 84 % to 90 %",
+   "pacing in a real client and a reconnect storm",
+   "TEST-12's shuffle"
+  ],
+  "pins": [
+   "PERF-10",
+   "PERF-11 again with credits on",
+   "PERF-09's 2 million writes a second per writer",
+   "fan-out over WebSocket at least 0.7 times TCP's (no bar id yet)",
+   "the browser client's size (no bar id yet)"
+  ],
+  "data5": [
+   "data-contract",
+   "data-fixes",
+   "data-lens",
+   "data-paths",
+   "data-sink",
+   "data-store",
+   "data-views"
+  ],
+  "owner_sees": "The example ladder ported rung by rung, the API tour running as written, and a browser tab live on a row on the local machine.",
+  "owner_runs": "the example ladder's checks, each ending ok (planned: one npm script over all of them)"
+ },
+ {
+  "slice": 5,
+  "name": "served views",
+  "adds": "A served view on one copy off the leader, the cost-weighted cap and placement, pages, lookup, the order channel, the view selector, derive in its view form.",
+  "rules": {
+   "records": 78,
+   "low": 77,
+   "high": 110
+  },
+  "models": [
+   "E-57's checks as monitors, each planted bug failing seeds",
+   "E-60",
+   "paging across a failover",
+   "a data upgrade under live views"
+  ],
+  "pins": [
+   "no view build blocks its copy longer than a stated slice of time (no bar id yet)",
+   "the ordered index against its guessed bar (no bar id yet)",
+   "the cost of a served frame (no bar id yet)"
+  ],
+  "data5": [
+   "data-merge-contract",
+   "data-operators",
+   "data-views"
+  ],
+  "owner_sees": "A live leaderboard and a dashboard example, fed by one server and read by many clients.",
+  "owner_runs": "the leaderboard example's check, which ends ok (name set at the slice's start)"
+ },
+ {
+  "slice": 6,
+  "name": "libraries",
+  "adds": "Locks, queues, consumer groups, sagas and once calls, on slice 4's surface only.",
+  "rules": {
+   "records": 84,
+   "low": 82,
+   "high": 94
+  },
+  "models": [
+   "E-24",
+   "the fencing checker and the outside checker (TEST-13) on lock and queue histories",
+   "a paused holder, clock skew, a crash at every step of a saga"
+  ],
+  "pins": [
+   "the 22 patterns end to end (P-01 to P-22, a reading), but P-06 on the persisted rung only and P-18 without forks",
+   "lock acquire within one commit (no bar id yet)",
+   "queue take and ack rates (no bar id yet)",
+   "an empty take writes nothing (no bar id yet)"
+  ],
+  "data5": [],
+  "owner_sees": "The 22 patterns end to end, each a short example that runs.",
+  "owner_runs": "the 22 pattern checks, each ending ok (planned: one npm script over all of them)"
+ },
+ {
+  "slice": 7,
+  "name": "door and tools",
+  "adds": "TLS and the door in Rust, client tokens, hostile-client tests, the CLI, the protocol gateways, the fair runs against the rivals, prebuilt binaries for the listed platforms.",
+  "rules": {
+   "records": 22,
+   "low": 22,
+   "high": 28
+  },
+  "models": [
+   "a model of the door's rules (owed; reasoned today)",
+   "the fuzz corpus grown since slice 1"
+  ],
+  "pins": [
+   "PERF-02, PERF-05, PERF-06 and PERF-07 as far as the first build reaches (BUILD 3.5)",
+   "PERF-03 is not reached: it is judged on the none rung, which waits",
+   "PERF-04 stays a stated miss (V5-23 item 6)",
+   "PERF-01: the fair runs through the gateways",
+   "every earlier pin again with TLS on",
+   "OPS-06 and OPS-10 (a reading: BUILD names the door and the hostile-client tests, not the ids)"
+  ],
+  "data5": [],
+  "owner_sees": "One table: fero beside each rival, on the same machine, by the rival's own tool.",
+  "owner_runs": "the rival runs' check, which ends ok (name set at the slice's start)"
+ },
+ {
+  "slice": 8,
+  "name": "past one process",
+  "adds": "Partials and the merger, scan() at one cut, folds with fero's combines and the audit, the sorted column for a live median.",
+  "rules": {
+   "records": 54,
+   "low": 54,
+   "high": 64
+  },
+  "models": [
+   "E-67 on real code",
+   "the scan() and merger-pairing models as monitors",
+   "seeded checks for the folds (E-65, E-66)"
+  ],
+  "pins": [
+   "the cost of one change through a merged view (no bar id yet)",
+   "scan pages a second (no bar id yet)",
+   "the rebuilt merger's floor (no bar id yet)"
+  ],
+  "data5": [
+   "data-partials",
+   "data-store",
+   "data-views"
+  ],
+  "owner_sees": "A live total and a median over a resource larger than one process holds, right through slot moves and a server's death.",
+  "owner_runs": "the merged-view example's check, which ends ok (name set at the slice's start)"
+ }
+]
