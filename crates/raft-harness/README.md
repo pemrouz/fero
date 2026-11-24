@@ -12,6 +12,7 @@ Test tooling for the [raft](../raft) crate. It is never shipped.
 | [src/bin/raft-datadriven.rs](src/bin/raft-datadriven.rs) | Runs every file. |
 | [src/diff.rs](src/diff.rs), [src/bin/raft-diff.rs](src/bin/raft-diff.rs), [diff/](diff/README.md) | The differential fuzz: random scripts filled in by etcd's Go code, replayed on the port byte for byte. Adds `read-index` and `restart`. |
 | [tests/edge_values.rs](tests/edge_values.rs), [diff/zz_edge_values_test.go](diff/zz_edge_values_test.go) | The edge value check: messages with fields from the two ends of `u64`, stepped into one node, compared with Go by a hash. It finds a `+ 1` that panics where Go wraps. Runs with `cargo test --release`. |
+| [mutate/](mutate/RESULTS.md) | The mutation run: one-rule changes of the core, built one by one on a scratch copy, run against the 41 files and the fuzz corpora. Plain Node. |
 | [scripts/negative-control.sh](scripts/negative-control.sh) | Proves the check can fail: three files with one corrupted line each must be the only new failures. |
 
 ## Run
@@ -21,6 +22,7 @@ Test tooling for the [raft](../raft) crate. It is never shipped.
     cargo test --release
     sh crates/raft-harness/scripts/negative-control.sh
     RAFT_SRC=<etcd raft checkout> WORK=<scratch dir> sh crates/raft-harness/diff/run_diff.sh corpus
+    WORK=<scratch dir> CORPUS=<the diff work dir> node crates/raft-harness/mutate/mutate.mjs run
 
 The first command ends with `ok raft: 41 of 41 etcd files` when every file
 passes. Otherwise it prints one `FAIL <file> at <file:line>: <why>` line per

@@ -1,0 +1,2 @@
+swap survivors: 49; independent (equivalent) 48; other 1
+  other: log_unstable.rs:172:9 swap  self.offset = id.index + 1;  <->  self.offset_in_progress = max(self.offset_in_progress, self.offset);

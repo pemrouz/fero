@@ -1,0 +1,46 @@
+155 survivors that are not swaps; sample of 45, seed 10
+  quorum/joint.rs:66:17 rel: if idx0 < idx1 {  =>  if idx0 <= idx1 {
+  log_unstable.rs:183:13 drop: self.entries = Vec::new();  =>  /* dropped */
+  raft.rs:1697:41 rel: if m.get_log_term() > 0 {  =>  if m.get_log_term() >= 0 {
+  rawnode.rs:252:12 guard: if !is_empty_hard_state(Some(&hard_st)) && !is_hard_state_equal(&hard_st, &self.prev_hard_st) {  =>  if !is_hard_state_equal(&hard_st, &self.prev_hard_st) {
+  tracker/inflights.rs:135:52 eq: self.count == self.size || (self.max_bytes != 0 && self.bytes >= self.max_bytes)  =>  self.count == self.size || (self.max_bytes == 0 && self.bytes >= self.max_bytes)
+  raft.rs:2594:30 eq: if resp.get_to() != NONE {  =>  if resp.get_to() == NONE {
+  log_unstable.rs:173:9 drop: self.offset_in_progress = max(self.offset_in_progress, self.offset);  =>  /* dropped */
+  log_unstable.rs:138:13 drop: self.snapshot_in_progress = true;  =>  /* dropped */
+  raft.rs:338:31 rel: if self.election_tick <= self.heartbeat_tick {  =>  if self.election_tick < self.heartbeat_tick {
+  raft.rs:1063:56 guard: if self.state == StateType::StateLeader && self.lead_transferee != NONE {  =>  if self.state == StateType::StateLeader {
+  storage.rs:275:13 drop: entries = &entries[ix(first - entries[0].get_index())..];  =>  /* dropped */
+  tracker/progress.rs:145:13 drop: self.next = max(self.match_ + 1, pending_snapshot + 1);  =>  /* dropped */
+  rawnode.rs:543:8 guard: if !is_empty_snap(rd.snapshot.as_ref()) {  =>  if true {
+  tracker/progress.rs:142:12 guard: if self.state == StateType::StateSnapshot {  =>  if true {
+  tracker/inflights.rs:128:13 drop: self.start = 0;  =>  /* dropped */
+  raft.rs:580:18 rel: if c.applied > 0 {  =>  if c.applied >= 0 {
+  raft.rs:2592:12 guard: if self.trk.is_voter(self.id) && self.trk.is_singleton() {  =>  if self.trk.is_singleton() {
+  log.rs:610:17 rel: if size >= max_size {  =>  if size > max_size {
+  raft.rs:2313:20 guard: if *id == self.id {  =>  if true {
+  raft.rs:2562:13 drop: self.uncommitted_size -= s;  =>  /* dropped */
+  rawnode.rs:217:16 guard: if need_storage_append_resp_msg(&self.raft, rd) {  =>  if true {
+  raft.rs:2560:13 drop: self.uncommitted_size = 0;  =>  /* dropped */
+  storage.rs:225:9 drop: md.term = Some(term);  =>  /* dropped */
+  log.rs:617:27 eq: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if unstable.len() != 1 && size + ents_size(unstable) > max_size {
+  raft.rs:983:9 drop: self.uncommitted_size = 0;  =>  /* dropped */
+  log.rs:617:62 rel: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if unstable.len() == 1 && size + ents_size(unstable) >= max_size {
+  storage.rs:218:12 guard: if i > self.last_index_() {  =>  if true {
+  rawnode.rs:306:16 guard: if pr.is_learner {  =>  if true {
+  log_unstable.rs:74:12 guard: if l != 0 {  =>  if true {
+  rawnode.rs:411:8 guard: if !is_empty_hard_state(rd.hard_state.as_ref()) {  =>  if true {
+  raft.rs:2318:16 guard: if found {  =>  if true {
+  log.rs:617:12 guard: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if size + ents_size(unstable) > max_size {
+  storage.rs:213:14 rel: if i <= self.snapshot.get_metadata_index() {  =>  if i < self.snapshot.get_metadata_index() {
+  raft.rs:814:20 guard: if err == Error::SnapshotTemporarilyUnavailable {  =>  if true {
+  log.rs:154:22 rel: } else if ci <= self.committed {  =>  } else if ci < self.committed {
+  read_only.rs:71:12 guard: if !ctx.is_empty() {  =>  if true {
+  raft.rs:358:13 drop: self.max_inflight_bytes = noLimit;  =>  /* dropped */
+  storage.rs:279:30 rel: if len64(&self.ents) > offset {  =>  if len64(&self.ents) >= offset {
+  raft.rs:359:19 guard: } else if self.max_inflight_bytes < self.max_size_per_msg {  =>  } else if true {
+  rawnode.rs:323:26 eq: let rej = status == SnapshotStatus::SnapshotFailure;  =>  let rej = status != SnapshotStatus::SnapshotFailure;
+  log.rs:480:24 eq: if err == Error::Compacted || err == Error::Unavailable {  =>  if err != Error::Compacted || err == Error::Unavailable {
+  log.rs:480:51 eq: if err == Error::Compacted || err == Error::Unavailable {  =>  if err == Error::Compacted || err != Error::Unavailable {
+  raft.rs:2282:35 rel: if s.get_metadata_index() <= self.raft_log.committed {  =>  if s.get_metadata_index() < self.raft_log.committed {
+  raft.rs:2539:12 guard: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {
+  confchange/confchange.rs:451:12 guard: if !buf.is_empty() {  =>  if true {

@@ -1,0 +1,242 @@
+| Operator | Made | Do not compile | Mutants | Caught by the 41 files | + fuzz seed 2 | + seed 5 (read-index) | + seed 7 (restart) | Survived |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| rel | 104 | 0 | 104 | 55 (52.9%) | 4 | 1 | 2 | 42 |
+| guard | 341 | 0 | 341 | 243 (71.3%) | 28 | 14 | 2 | 54 |
+| drop | 201 | 5 | 196 | 118 (60.2%) | 22 | 5 | 4 | 47 |
+| swap | 52 | 0 | 52 | 3 (5.8%) | 0 | 0 | 0 | 49 |
+| eq | 143 | 0 | 143 | 111 (77.6%) | 11 | 9 | 0 | 12 |
+| **all** | 841 | 5 | 836 | 530 (63.4%) | 65 | 29 | 8 | 204 |
+
+| File | Made | Do not compile | Mutants | Caught by the 41 files | + fuzz seed 2 | + seed 5 | + seed 7 | Survived |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| raft.rs | 403 | 4 | 399 | 241 (60.4%) | 47 | 21 | 5 | 85 |
+| log.rs | 93 | 0 | 93 | 58 (62.4%) | 13 | 0 | 0 | 22 |
+| log_unstable.rs | 52 | 0 | 52 | 33 (63.5%) | 0 | 0 | 0 | 19 |
+| rawnode.rs | 64 | 0 | 64 | 43 (67.2%) | 0 | 2 | 0 | 19 |
+| storage.rs | 40 | 0 | 40 | 19 (47.5%) | 0 | 0 | 1 | 20 |
+| read_only.rs | 7 | 0 | 7 | 0 (0.0%) | 0 | 5 | 0 | 2 |
+| tracker/inflights.rs | 45 | 0 | 45 | 28 (62.2%) | 2 | 0 | 0 | 15 |
+| tracker/progress.rs | 53 | 0 | 53 | 33 (62.3%) | 3 | 0 | 2 | 15 |
+| tracker/state.rs | 0 | 0 | 0 | 0 (0.0%) | 0 | 0 | 0 | 0 |
+| tracker/tracker.rs | 11 | 0 | 11 | 10 (90.9%) | 0 | 1 | 0 | 0 |
+| quorum/joint.rs | 8 | 0 | 8 | 7 (87.5%) | 0 | 0 | 0 | 1 |
+| quorum/majority.rs | 24 | 1 | 23 | 21 (91.3%) | 0 | 0 | 0 | 2 |
+| quorum/quorum.rs | 2 | 0 | 2 | 2 (100.0%) | 0 | 0 | 0 | 0 |
+| quorum/voteresult_string.rs | 0 | 0 | 0 | 0 (0.0%) | 0 | 0 | 0 | 0 |
+| confchange/confchange.rs | 35 | 0 | 35 | 32 (91.4%) | 0 | 0 | 0 | 3 |
+| confchange/restore.rs | 4 | 0 | 4 | 3 (75.0%) | 0 | 0 | 0 | 1 |
+
+caught by a timeout (a mutant that never ends): 37
+
+survivors:
+  confchange/confchange.rs:118:9 drop: cfg.learners_next = None;  =>  /* dropped */
+  confchange/confchange.rs:129:9 drop: cfg.auto_leave = false;  =>  /* dropped */
+  confchange/confchange.rs:451:12 guard: if !buf.is_empty() {  =>  if true {
+  confchange/restore.rs:102:9 swap: chg.tracker.config = cfg;  =>  (swapped with) chg.tracker.progress = trk;
+  log_unstable.rs:74:12 guard: if l != 0 {  =>  if true {
+  log_unstable.rs:88:20 guard: if snapshot.get_metadata_index() == i {  =>  if true {
+  log_unstable.rs:137:12 guard: if self.snapshot.is_some() {  =>  if true {
+  log_unstable.rs:138:13 drop: self.snapshot_in_progress = true;  =>  /* dropped */
+  log_unstable.rs:172:9 swap: self.offset = id.index + 1;  =>  (swapped with) self.offset_in_progress = max(self.offset_in_progress, self.offset);
+  log_unstable.rs:173:9 drop: self.offset_in_progress = max(self.offset_in_progress, self.offset);  =>  /* dropped */
+  log_unstable.rs:183:13 drop: self.entries = Vec::new();  =>  /* dropped */
+  log_unstable.rs:189:16 guard: if snapshot.get_metadata_index() == i {  =>  if true {
+  log_unstable.rs:190:17 swap: self.snapshot = None;  =>  (swapped with) self.snapshot_in_progress = false;
+  log_unstable.rs:191:17 drop: self.snapshot_in_progress = false;  =>  /* dropped */
+  log_unstable.rs:198:9 swap: self.offset_in_progress = self.offset;  =>  (swapped with) self.entries = Vec::new();
+  log_unstable.rs:199:9 drop: self.entries = Vec::new();  =>  /* dropped */
+  log_unstable.rs:199:9 swap: self.entries = Vec::new();  =>  (swapped with) self.snapshot = Some(s.clone());
+  log_unstable.rs:200:9 swap: self.snapshot = Some(s.clone());  =>  (swapped with) self.snapshot_in_progress = false;
+  log_unstable.rs:201:9 drop: self.snapshot_in_progress = false;  =>  /* dropped */
+  log_unstable.rs:209:19 guard: } else if from_index <= self.offset {  =>  } else if true {
+  log_unstable.rs:213:13 swap: self.entries = ents.to_vec();  =>  (swapped with) self.offset = from_index;
+  log_unstable.rs:224:13 drop: self.offset_in_progress = min(self.offset_in_progress, from_index);  =>  /* dropped */
+  log_unstable.rs:238:15 rel: if lo > hi {  =>  if lo >= hi {
+  log.rs:154:22 rel: } else if ci <= self.committed {  =>  } else if ci < self.committed {
+  log.rs:161:40 rel: if ci.wrapping_sub(offset) > len64(&a.entries) {  =>  if ci.wrapping_sub(offset) >= len64(&a.entries) {
+  log.rs:231:21 rel: while index > 0 {  =>  while index >= 0 {
+  log.rs:282:15 rel: if lo >= hi {  =>  if lo > hi {
+  log.rs:376:27 rel: if self.committed < tocommit {  =>  if self.committed <= tocommit {
+  log.rs:395:9 swap: self.applied = i;  =>  (swapped with) self.applying = max(self.applying, i);
+  log.rs:397:12 guard: if self.applying_ents_size > size {  =>  if true {
+  log.rs:397:36 rel: if self.applying_ents_size > size {  =>  if self.applying_ents_size >= size {
+  log.rs:398:13 drop: self.applying_ents_size -= size;  =>  /* dropped */
+  log.rs:403:61 rel: self.applying_ents_paused = self.applying_ents_size >= self.max_applying_ents_size;  =>  self.applying_ents_paused = self.applying_ents_size > self.max_applying_ents_size;
+  log.rs:427:37 rel: self.applying_ents_size >= self.max_applying_ents_size || i < self.max_appliable_index(allow_unstable);  =>  self.applying_ents_size > self.max_applying_ents_size || i < self.max_appliable_index(allow_unstable);
+  log.rs:480:20 guard: if err == Error::Compacted || err == Error::Unavailable {  =>  if true {
+  log.rs:480:24 eq: if err == Error::Compacted || err == Error::Unavailable {  =>  if err != Error::Compacted || err == Error::Unavailable {
+  log.rs:480:51 eq: if err == Error::Compacted || err == Error::Unavailable {  =>  if err == Error::Compacted || err != Error::Unavailable {
+  log.rs:531:12 guard: if at.term != 0 && at.index > self.committed && self.match_term(at) {  =>  if at.index > self.committed && self.match_term(at) {
+  log.rs:531:57 guard: if at.term != 0 && at.index > self.committed && self.match_term(at) {  =>  if at.term != 0 && at.index > self.committed {
+  log.rs:597:15 rel: if hi <= self.unstable.offset {  =>  if hi < self.unstable.offset {
+  log.rs:610:17 rel: if size >= max_size {  =>  if size > max_size {
+  log.rs:617:12 guard: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if size + ents_size(unstable) > max_size {
+  log.rs:617:27 eq: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if unstable.len() != 1 && size + ents_size(unstable) > max_size {
+  log.rs:617:62 rel: if unstable.len() == 1 && size + ents_size(unstable) > max_size {  =>  if unstable.len() == 1 && size + ents_size(unstable) >= max_size {
+  log.rs:627:15 rel: if lo > hi {  =>  if lo >= hi {
+  quorum/joint.rs:66:17 rel: if idx0 < idx1 {  =>  if idx0 <= idx1 {
+  quorum/majority.rs:170:34 guard: let srt: &mut [u64] = if stk.len() >= n {  =>  let srt: &mut [u64] = if true {
+  quorum/majority.rs:170:44 rel: let srt: &mut [u64] = if stk.len() >= n {  =>  let srt: &mut [u64] = if stk.len() > n {
+  raft.rs:334:32 rel: if self.heartbeat_tick <= 0 {  =>  if self.heartbeat_tick < 0 {
+  raft.rs:338:31 rel: if self.election_tick <= self.heartbeat_tick {  =>  if self.election_tick < self.heartbeat_tick {
+  raft.rs:344:12 guard: if self.max_uncommitted_entries_size == 0 {  =>  if true {
+  raft.rs:354:35 rel: if self.max_inflight_msgs <= 0 {  =>  if self.max_inflight_msgs < 0 {
+  raft.rs:357:12 guard: if self.max_inflight_bytes == 0 {  =>  if true {
+  raft.rs:358:13 drop: self.max_inflight_bytes = noLimit;  =>  /* dropped */
+  raft.rs:359:19 guard: } else if self.max_inflight_bytes < self.max_size_per_msg {  =>  } else if true {
+  raft.rs:359:43 rel: } else if self.max_inflight_bytes < self.max_size_per_msg {  =>  } else if self.max_inflight_bytes <= self.max_size_per_msg {
+  raft.rs:364:13 drop: self.logger = Some(Arc::new(crate::logger::DiscardLogger));  =>  /* dropped */
+  raft.rs:575:8 guard: if !is_empty_hard_state(hs.as_ref()) {  =>  if true {
+  raft.rs:580:8 guard: if c.applied > 0 {  =>  if true {
+  raft.rs:580:18 rel: if c.applied > 0 {  =>  if c.applied >= 0 {
+  raft.rs:604:19 eq: self.lead != NONE  =>  self.lead == NONE
+  raft.rs:814:20 guard: if err == Error::SnapshotTemporarilyUnavailable {  =>  if true {
+  raft.rs:814:24 eq: if err == Error::SnapshotTemporarilyUnavailable {  =>  if err != Error::SnapshotTemporarilyUnavailable {
+  raft.rs:955:13 swap: self.term = term;  =>  (swapped with) self.vote = NONE;
+  raft.rs:960:9 swap: self.election_elapsed = 0;  =>  (swapped with) self.heartbeat_elapsed = 0;
+  raft.rs:961:9 drop: self.heartbeat_elapsed = 0;  =>  /* dropped */
+  raft.rs:978:17 drop: pr.match_ = last_index;  =>  /* dropped */
+  raft.rs:982:9 drop: self.pending_conf_index = 0;  =>  /* dropped */
+  raft.rs:982:9 swap: self.pending_conf_index = 0;  =>  (swapped with) self.uncommitted_size = 0;
+  raft.rs:983:9 drop: self.uncommitted_size = 0;  =>  /* dropped */
+  raft.rs:983:9 swap: self.uncommitted_size = 0;  =>  (swapped with) self.read_only = ReadOnly::new(self.read_only.option);
+  raft.rs:993:13 swap: e.term = Some(self.term);  =>  (swapped with) e.index = Some(li + 1 + i);
+  raft.rs:1048:9 swap: self.heartbeat_elapsed += 1;  =>  (swapped with) self.election_elapsed += 1;
+  raft.rs:1063:16 guard: if self.state == StateType::StateLeader && self.lead_transferee != NONE {  =>  if self.lead_transferee != NONE {
+  raft.rs:1063:56 guard: if self.state == StateType::StateLeader && self.lead_transferee != NONE {  =>  if self.state == StateType::StateLeader {
+  raft.rs:1072:12 guard: if self.heartbeat_elapsed >= self.heartbeat_timeout {  =>  if true {
+  raft.rs:1073:13 drop: self.heartbeat_elapsed = 0;  =>  /* dropped */
+  raft.rs:1085:9 swap: self.tick = TickFn::Election;  =>  (swapped with) self.lead = lead;
+  raft.rs:1086:9 swap: self.lead = lead;  =>  (swapped with) self.state = StateType::StateFollower;
+  raft.rs:1098:9 drop: self.tick = TickFn::Election;  =>  /* dropped */
+  raft.rs:1098:9 swap: self.tick = TickFn::Election;  =>  (swapped with) self.vote = self.id;
+  raft.rs:1099:9 swap: self.vote = self.id;  =>  (swapped with) self.state = StateType::StateCandidate;
+  raft.rs:1114:9 drop: self.tick = TickFn::Election;  =>  /* dropped */
+  raft.rs:1114:9 swap: self.tick = TickFn::Election;  =>  (swapped with) self.lead = NONE;
+  raft.rs:1115:9 swap: self.lead = NONE;  =>  (swapped with) self.state = StateType::StatePreCandidate;
+  raft.rs:1127:9 swap: self.tick = TickFn::Heartbeat;  =>  (swapped with) self.lead = self.id;
+  raft.rs:1128:9 swap: self.lead = self.id;  =>  (swapped with) self.state = StateType::StateLeader;
+  raft.rs:1139:9 drop: pr.recent_active = true;  =>  /* dropped */
+  raft.rs:1183:34 rel: if self.raft_log.applied >= self.raft_log.committed {  =>  if self.raft_log.applied > self.raft_log.committed {
+  raft.rs:1230:13 swap: vote_msg = pb::MsgVote;  =>  (swapped with) term = self.term;
+  raft.rs:1259:16 guard: if t == CampaignType::Transfer {  =>  if true {
+  raft.rs:1295:96 rel: let in_lease = self.check_quorum && self.lead != NONE && self.election_elapsed < self.election_timeout;  =>  let in_lease = self.check_quorum && self.lead != NONE && self.election_elapsed <= self.election_timeout;
+  raft.rs:1391:20 guard: if m.get_index() != 0 {  =>  if true {
+  raft.rs:1508:25 swap: self.election_elapsed = 0;  =>  (swapped with) self.vote = m.get_from();
+  raft.rs:1697:24 guard: if m.get_log_term() > 0 {  =>  if true {
+  raft.rs:1697:41 rel: if m.get_log_term() > 0 {  =>  if m.get_log_term() >= 0 {
+  raft.rs:1826:84 guard: } else if pr.state == tracker::StateType::StateSnapshot && pr.match_ + 1 >= first_index {  =>  } else if pr.state == tracker::StateType::StateSnapshot {
+  raft.rs:1847:35 guard: } else if pr.state == tracker::StateType::StateReplicate {  =>  } else if true {
+  raft.rs:1886:17 swap: pr.recent_active = true;  =>  (swapped with) pr.msg_app_flow_paused = false;
+  raft.rs:1920:20 guard: if self.pr(from).state != tracker::StateType::StateSnapshot {  =>  if true {
+  raft.rs:1920:40 eq: if self.pr(from).state != tracker::StateType::StateSnapshot {  =>  if self.pr(from).state == tracker::StateType::StateSnapshot {
+  raft.rs:1923:20 guard: if !m.get_reject() {  =>  if true {
+  raft.rs:1935:21 drop: pr.pending_snapshot = 0;  =>  /* dropped */
+  raft.rs:1947:17 drop: self.pr_mut(from).msg_app_flow_paused = true;  =>  /* dropped */
+  raft.rs:1996:17 swap: self.election_elapsed = 0;  =>  (swapped with) self.lead_transferee = lead_transferee;
+  raft.rs:2097:17 swap: self.election_elapsed = 0;  =>  (swapped with) self.lead = m.get_from();
+  raft.rs:2102:17 swap: self.election_elapsed = 0;  =>  (swapped with) self.lead = m.get_from();
+  raft.rs:2107:17 drop: self.election_elapsed = 0;  =>  /* dropped */
+  raft.rs:2107:17 swap: self.election_elapsed = 0;  =>  (swapped with) self.lead = m.get_from();
+  raft.rs:2108:17 drop: self.lead = m.get_from();  =>  /* dropped */
+  raft.rs:2282:35 rel: if s.get_metadata_index() <= self.raft_log.committed {  =>  if s.get_metadata_index() < self.raft_log.committed {
+  raft.rs:2313:20 guard: if *id == self.id {  =>  if true {
+  raft.rs:2313:24 eq: if *id == self.id {  =>  if *id != self.id {
+  raft.rs:2318:16 guard: if found {  =>  if true {
+  raft.rs:2348:9 drop: self.trk = tracker::ProgressTracker::make(self.trk.max_inflight, self.trk.max_inflight_bytes);  =>  /* dropped */
+  raft.rs:2411:9 swap: self.trk.config = cfg;  =>  (swapped with) self.trk.progress = trk;
+  raft.rs:2463:21 guard: if !t_ok && self.lead_transferee != 0 {  =>  if !t_ok {
+  raft.rs:2471:31 rel: if state.get_commit() < self.raft_log.committed || state.get_commit() > self.raft_log.last_index() {  =>  if state.get_commit() <= self.raft_log.committed || state.get_commit() > self.raft_log.last_index() {
+  raft.rs:2480:9 swap: self.raft_log.committed = state.get_commit();  =>  (swapped with) self.term = state.get_term();
+  raft.rs:2481:9 swap: self.term = state.get_term();  =>  (swapped with) self.vote = state.get_vote();
+  raft.rs:2539:12 guard: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {
+  raft.rs:2539:34 rel: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if self.uncommitted_size >= 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {
+  raft.rs:2539:41 guard: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if self.uncommitted_size > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {
+  raft.rs:2539:43 rel: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if self.uncommitted_size > 0 && s >= 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {
+  raft.rs:2539:88 rel: if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) > self.max_uncommitted_size {  =>  if self.uncommitted_size > 0 && s > 0 && self.uncommitted_size.wrapping_add(s) >= self.max_uncommitted_size {
+  raft.rs:2549:9 drop: self.uncommitted_size = self.uncommitted_size.wrapping_add(s);  =>  /* dropped */
+  raft.rs:2556:12 guard: if s > self.uncommitted_size {  =>  if true {
+  raft.rs:2556:14 rel: if s > self.uncommitted_size {  =>  if s >= self.uncommitted_size {
+  raft.rs:2560:13 drop: self.uncommitted_size = 0;  =>  /* dropped */
+  raft.rs:2562:13 drop: self.uncommitted_size -= s;  =>  /* dropped */
+  raft.rs:2592:12 guard: if self.trk.is_voter(self.id) && self.trk.is_singleton() {  =>  if self.trk.is_singleton() {
+  raft.rs:2594:16 guard: if resp.get_to() != NONE {  =>  if true {
+  raft.rs:2594:30 eq: if resp.get_to() != NONE {  =>  if resp.get_to() == NONE {
+  rawnode.rs:79:9 drop: self.raft.election_elapsed += 1;  =>  /* dropped */
+  rawnode.rs:156:12 guard: if r.raft_log.has_next_unstable_snapshot() {  =>  if true {
+  rawnode.rs:159:12 guard: if !r.read_states.is_empty() {  =>  if true {
+  rawnode.rs:197:12 guard: if !is_empty_hard_state(rd.hard_state.as_ref()) {  =>  if true {
+  rawnode.rs:202:12 guard: if !rd.read_states.is_empty() {  =>  if true {
+  rawnode.rs:217:16 guard: if need_storage_append_resp_msg(&self.raft, rd) {  =>  if true {
+  rawnode.rs:221:16 guard: if need_storage_apply_resp_msg(rd) {  =>  if true {
+  rawnode.rs:252:12 guard: if !is_empty_hard_state(Some(&hard_st)) && !is_hard_state_equal(&hard_st, &self.prev_hard_st) {  =>  if !is_hard_state_equal(&hard_st, &self.prev_hard_st) {
+  rawnode.rs:306:16 guard: if pr.is_learner {  =>  if true {
+  rawnode.rs:307:17 drop: typ = ProgressType::ProgressTypeLearner;  =>  /* dropped */
+  rawnode.rs:311:13 drop: p.inflights = tracker::Inflights::default();  =>  /* dropped */
+  rawnode.rs:323:26 eq: let rej = status == SnapshotStatus::SnapshotFailure;  =>  let rej = status != SnapshotStatus::SnapshotFailure;
+  rawnode.rs:411:8 guard: if !is_empty_hard_state(rd.hard_state.as_ref()) {  =>  if true {
+  rawnode.rs:420:13 swap: m.term = Some(hs.get_term());  =>  (swapped with) m.vote = Some(hs.get_vote());
+  rawnode.rs:421:13 swap: m.vote = Some(hs.get_vote());  =>  (swapped with) m.commit = Some(hs.get_commit());
+  rawnode.rs:425:8 guard: if !is_empty_snap(rd.snapshot.as_ref()) {  =>  if true {
+  rawnode.rs:426:9 drop: m.snapshot = rd.snapshot.clone();  =>  /* dropped */
+  rawnode.rs:540:9 swap: m.index = Some(last.index);  =>  (swapped with) m.log_term = Some(last.term);
+  rawnode.rs:543:8 guard: if !is_empty_snap(rd.snapshot.as_ref()) {  =>  if true {
+  read_only.rs:71:12 guard: if !ctx.is_empty() {  =>  if true {
+  read_only.rs:87:32 rel: if new_confirmed_reads <= self.confirmed_reads {  =>  if new_confirmed_reads < self.confirmed_reads {
+  storage.rs:190:12 guard: if ms_index != 0 && ms_index >= snap_index {  =>  if ms_index >= snap_index {
+  storage.rs:190:21 eq: if ms_index != 0 && ms_index >= snap_index {  =>  if ms_index == 0 && ms_index >= snap_index {
+  storage.rs:190:38 rel: if ms_index != 0 && ms_index >= snap_index {  =>  if ms_index != 0 && ms_index > snap_index {
+  storage.rs:213:12 guard: if i <= self.snapshot.get_metadata_index() {  =>  if true {
+  storage.rs:213:14 rel: if i <= self.snapshot.get_metadata_index() {  =>  if i < self.snapshot.get_metadata_index() {
+  storage.rs:218:12 guard: if i > self.last_index_() {  =>  if true {
+  storage.rs:218:14 rel: if i > self.last_index_() {  =>  if i >= self.last_index_() {
+  storage.rs:224:9 drop: md.index = Some(i);  =>  /* dropped */
+  storage.rs:224:9 swap: md.index = Some(i);  =>  (swapped with) md.term = Some(term);
+  storage.rs:225:9 drop: md.term = Some(term);  =>  /* dropped */
+  storage.rs:227:13 drop: md.conf_state = Some(cs.clone());  =>  /* dropped */
+  storage.rs:229:9 drop: self.snapshot.data = data;  =>  /* dropped */
+  storage.rs:238:26 rel: if compact_index <= offset {  =>  if compact_index < offset {
+  storage.rs:274:18 rel: if first > entries[0].get_index() {  =>  if first >= entries[0].get_index() {
+  storage.rs:275:13 drop: entries = &entries[ix(first - entries[0].get_index())..];  =>  /* dropped */
+  storage.rs:279:12 guard: if len64(&self.ents) > offset {  =>  if true {
+  storage.rs:279:30 rel: if len64(&self.ents) > offset {  =>  if len64(&self.ents) >= offset {
+  storage.rs:282:19 guard: } else if len64(&self.ents) == offset {  =>  } else if true {
+  storage.rs:302:15 rel: if lo <= offset {  =>  if lo < offset {
+  storage.rs:323:23 rel: if i - offset >= len64(&self.ents) {  =>  if i - offset > len64(&self.ents) {
+  tracker/inflights.rs:78:9 swap: self.buffer[ix(next)] = Inflight { index, bytes };  =>  (swapped with) self.count += 1;
+  tracker/inflights.rs:79:9 swap: self.count += 1;  =>  (swapped with) self.bytes += bytes;
+  tracker/inflights.rs:90:28 rel: } else if new_size > self.size {  =>  } else if new_size >= self.size {
+  tracker/inflights.rs:91:13 drop: new_size = self.size;  =>  /* dropped */
+  tracker/inflights.rs:111:13 drop: bytes += self.buffer[ix(idx)].bytes;  =>  /* dropped */
+  tracker/inflights.rs:122:9 swap: self.count -= i;  =>  (swapped with) self.bytes -= bytes;
+  tracker/inflights.rs:123:9 drop: self.bytes -= bytes;  =>  /* dropped */
+  tracker/inflights.rs:123:9 swap: self.bytes -= bytes;  =>  (swapped with) self.start = idx;
+  tracker/inflights.rs:128:13 drop: self.start = 0;  =>  /* dropped */
+  tracker/inflights.rs:135:52 eq: self.count == self.size || (self.max_bytes != 0 && self.bytes >= self.max_bytes)  =>  self.count == self.size || (self.max_bytes == 0 && self.bytes >= self.max_bytes)
+  tracker/inflights.rs:135:71 rel: self.count == self.size || (self.max_bytes != 0 && self.bytes >= self.max_bytes)  =>  self.count == self.size || (self.max_bytes != 0 && self.bytes > self.max_bytes)
+  tracker/inflights.rs:146:9 drop: self.start = 0;  =>  /* dropped */
+  tracker/inflights.rs:146:9 swap: self.start = 0;  =>  (swapped with) self.count = 0;
+  tracker/inflights.rs:147:9 swap: self.count = 0;  =>  (swapped with) self.bytes = 0;
+  tracker/inflights.rs:148:9 drop: self.bytes = 0;  =>  /* dropped */
+  tracker/progress.rs:130:9 swap: self.msg_app_flow_paused = false;  =>  (swapped with) self.pending_snapshot = 0;
+  tracker/progress.rs:131:9 swap: self.pending_snapshot = 0;  =>  (swapped with) self.state = state;
+  tracker/progress.rs:142:12 guard: if self.state == StateType::StateSnapshot {  =>  if true {
+  tracker/progress.rs:142:23 eq: if self.state == StateType::StateSnapshot {  =>  if self.state != StateType::StateSnapshot {
+  tracker/progress.rs:145:13 drop: self.next = max(self.match_ + 1, pending_snapshot + 1);  =>  /* dropped */
+  tracker/progress.rs:150:9 drop: self.sent_commit = min(self.sent_commit, self.next - 1);  =>  /* dropped */
+  tracker/progress.rs:163:9 swap: self.pending_snapshot = snapshoti;  =>  (swapped with) self.next = snapshoti + 1;
+  tracker/progress.rs:164:9 swap: self.next = snapshoti + 1;  =>  (swapped with) self.sent_commit = snapshoti;
+  tracker/progress.rs:206:54 rel: index > self.sent_commit && self.sent_commit < self.next - 1  =>  index > self.sent_commit && self.sent_commit <= self.next - 1
+  tracker/progress.rs:221:9 swap: self.match_ = n;  =>  (swapped with) self.next = max(self.next, n + 1); // invariant: Match < Next
+  tracker/progress.rs:222:9 swap: self.next = max(self.next, n + 1); // invariant: Match < Next  =>  (swapped with) self.msg_app_flow_paused = false;
+  tracker/progress.rs:242:25 rel: if rejected <= self.match_ {  =>  if rejected < self.match_ {
+  tracker/progress.rs:250:13 drop: self.sent_commit = min(self.sent_commit, self.next - 1);  =>  /* dropped */
+  tracker/progress.rs:266:9 drop: self.sent_commit = min(self.sent_commit, self.next - 1);  =>  /* dropped */
+  tracker/progress.rs:266:9 swap: self.sent_commit = min(self.sent_commit, self.next - 1);  =>  (swapped with) self.msg_app_flow_paused = false;
+
+do not compile:
+  quorum/majority.rs:173:13 drop: heap = vec![0u64; n];  [error[E0381]: used binding `heap` isn't initialized]
+  raft.rs:1225:13 drop: vote_msg = pb::MsgPreVote;  [error[E0381]: used binding `vote_msg` is possibly-uninitialized]
+  raft.rs:1227:13 drop: term = self.term + 1;  [error[E0381]: used binding `term` is possibly-uninitialized]
+  raft.rs:1230:13 drop: vote_msg = pb::MsgVote;  [error[E0381]: used binding `vote_msg` is possibly-uninitialized]
+  raft.rs:1231:13 drop: term = self.term;  [error[E0381]: used binding `term` is possibly-uninitialized]
