@@ -6,14 +6,17 @@ The one ledger for v5: where things stand, what is next, the open bugs and the d
 
 - **2026-11-24: the branch starts.** Nothing is built. The design is settled in V5-1 to V5-24 on the [`design`](https://github.com/pemrouz/fero/blob/design/docs/DECISIONS.md) branch. The way of working is [BUILD.md](https://github.com/pemrouz/fero/blob/design/docs/v5-space/BUILD.md): deep first, then wide; a rule ledger tools can read; a map drawn from it; nine gates that bring a decision to the owner.
 - **2026-11-24: the first spec pages are in** ([spec/](spec/README.md)). The ledger holds 826 rules: 773 for fero's six layers and 53 for `data` 5, against the plan's top guess of 640 for fero. `node tools/ledger-gate.mjs` checks it; `node tools/grid.mjs` prints the map. The byte shapes are a draft with 30 open questions.
+- **2026-11-24: slice 0, probes P1 and P5 ran; neither was killed** ([the sheet](probes/README.md)). P1: etcd's Raft is ported to Rust ([crates/raft](crates/raft/README.md)); all 41 of etcd's test files and 4,000 of 4,000 random scripts equal Go byte for byte, 48 minutes after the start against a line of 10 working days. Its mutant score is about 72.7 % by the files and 86.6 % with the scripts, 1 to 3 points under the TypeScript port's, inside the error. P5: one number per stream passes every complete model run; it saves 7 to 13 ledger rules, or 2 to 5 on the study's finer count, against a line of 3. Four questions wait on the owner (the sheet's list).
 
 ## Next
 
-1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change.
+1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change. Done: P1, P5. Next: P2 (the simulator, native and WASM) and P6 (the markers). P3, P4 and P7 wait for the laptop.
+2. **The owner's four answers on P1 and P5**: is a mutant score 1 to 3 points under the TypeScript port's, inside the error, a pass; wrap every `u64` sum in the Raft crate or refuse absurd numbers at the wire; which count P5's kill line means; is the one failed model run a mistake in the model's world.
 
 ## Open bugs
 
-None yet.
+- **raft: a plain `u64` sum may still panic where Go wraps.** The port keeps overflow checks on; Go's sums wrap. The edge check (`crates/raft-harness/tests/edge_values.rs`) found and fixed the sites one node and four messages deep reach; longer paths are not checked *(reasoned)*. Waits on the owner's choice: wrap every sum, or refuse absurd numbers at the wire in slice 1.
+- **raft: some rules have no test that fails without them.** The mutation run ([RESULTS.md](crates/raft-harness/mutate/RESULTS.md)) leaves about 100 live mutants; `maybe_commit` without its term check survives the files and the scripts, as it did in the TypeScript port. Go's unit tests, not ported, would close most *(reasoned)*.
 
 ## Decisions on this branch
 
