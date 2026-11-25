@@ -83,3 +83,16 @@ Decision:
 REJECTED: the study's grain (2 to 5, at the line; it would keep five mechanisms where one number does the work and every model passes); pass on the ledger's grain but have a second person recount the study's grain first (the record already carries both counts and both readers' cuts).
 
 Consequences: the ledger holds 823 records (L2 99; slice 1 256, slice 3 49). The budget is not changed; the saving shows as headroom. A write's wire form carries its stream, its number, the number before it and the floor, where the draft had a session's attempt id and an issue number; SHAPES question 9's first half is settled and its fields stay a draft for slice 1's codec. Still owed: a model of once names, the one-commit slot move (READY M6; `stream-numbers.10` and `.11` are a partial model), a session lapse that has not committed, and a stall check in the client model. P5's two models run again on every change to `stream-numbers` (slice 1's model list).
+
+## V5-31 — P2 passes: TEST-01's fresh world is read at p99 of warm worlds (2026-11-25; probes/README.md question 5, asked one at a time)
+
+Context: probe P2 runs the Rust simulator natively and as WASM under Node, with `data` 4 folding every committed batch. Its kill line is TEST-01's: 200 full-stack seeds over 1 s, or a fresh world over 5 ms, or the two builds giving different bytes on any of 1,000 seeds. Measured, provisional (a shared machine): 200 seeds in 287 ms; a fresh world in 0.21 ms at p99; 0 of 1,000 seeds different, and 0 of 1,000 fresh ones *(measured; the byte check checked)*. But single worlds do pass 5 ms: about 1 warm world in 10,000 (the largest 8.9 ms, a garbage collection of the fold's objects), and the first world of every new process (6 to 10 ms, while the code warms) *(measured)*. E-04, where the bar's numbers come from, measured the 99th percentile of warm worlds.
+
+Decision:
+1. "A fresh world over 5 ms" is read at the 99th percentile of warm worlds in one process. P2 passes on all three lines.
+2. The largest world and the first world of a process are recorded beside the pin, not judged.
+3. The simulator's executive stays in Rust, built native and as WASM (BUILD 2.1). P2's fallback, the TypeScript executive, is not needed.
+
+REJECTED: p99, with the first world of a cold process also under 5 ms (today 6 to 10 ms; it would need a warm-up step or a snapshot before slice 1, for a cost a developer pays once per run); a hard top on every world (P2 would fail today on rare pauses that a test run does not feel).
+
+Consequences: slice 1's TEST-01 pin measures warm worlds at p99, as E-04 did, and records the largest and the cold first world as advisory numbers. The absolute numbers are judged on the quiet machine; today's are provisional. The simulator is a speed and identity harness, not a safety checker: Raft's safety rests on P1.

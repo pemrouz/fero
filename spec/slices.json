@@ -43,7 +43,7 @@
    "PERF-08",
    "PERF-09 (a SHOULD, held as the stop line; its per-writer half is advisory until slice 4)",
    "PERF-11",
-   "TEST-01",
+   "TEST-01 (a fresh world at p99 of warm worlds; the largest and the first world of a process are recorded, not judged: V5-31)",
    "DEP-20",
    "the recorder's two pins (no bar id yet)",
    "the time to change (DEV-03 a reading: BUILD gives the 30 s, not the id)"
