@@ -15,10 +15,10 @@ Each claim is marked: *(measured)* a run here gave the number, *(counted)* count
 | **P3** The time to change | How long from a one-line edit of a Raft rule to 200 seeds run again? | Over 30 s, projected to a kernel of about 10,000 lines | none yet | **Not run yet.** Waits for the owner's laptop: it needs real timing |
 | **P4** Judge, cross and fold on one thread | Can one thread judge a write in JavaScript, hand it to Rust, and fold the committed records, fast enough? | Under 500,000 records a second at a million rows. Or over 0.3 ms on the main thread per batch at the 99th percentile | none yet | **Not run yet.** Waits for the owner's laptop |
 | **P5** One number for "applied once, in order" | Can one number per stream replace the five high marks and their 32 rules? | No saving of 3 rules or more, or a model fails | No model fails in 25 complete runs *(checked)*. Saving: 7 to 13 rules on the ledger's count, 2 to 5 on the study's count *(counted)* | **Passed.** The owner ruled the ledger's count the one that counts, and the failed early run a mistake in the model's setup (V5-30). The ledger now holds the form: 46 rules became 39. See P5 |
-| **P6** The markers | Is switching each rule off, one by one, cheap enough to do every night? | Over 30 minutes projected for 640 rules. Or fewer than 80 % of the rules can be a switch | Time: 28 minutes with short runs and 1 worker on 4 cores; 46 minutes on one real core; 6.5 hours with full suites *(measured per rule, then projected; provisional)*. Share: 75.6 % by the plan's own list, 86.6 % if a field carried in a message counts as a switch *(counted)* | **Passed** (V5-32). The owner read the time line as short runs on several cores (21 to 28 minutes) and counted a carried field the marker can blank as a switch (85.4 %). See P6 |
+| **P6** The markers | Is switching each rule off, one by one, cheap enough to do every night? | Over 30 minutes projected for 640 rules. Or fewer than 80 % of the rules can be a switch | Time: 28 minutes with short runs and 1 worker on 4 cores; 46 minutes on one real core; 6.5 hours with full suites *(measured per rule, then projected; provisional)*. Share: 75.6 % by the plan's own list, 86.6 % if a field carried in a message counts as a switch, 85.4 % with two rules that share one expression counted once *(counted)*. 21 minutes with 4 workers | **Passed** (V5-32). The owner read the time line as short runs on several cores (21 to 28 minutes) and counted a carried field the marker can blank as a switch (85.4 %). See P6 |
 | **P7** The commit path on real disks | Does a commit meet its time bar on real, separate disks with no JavaScript in the path? | Commit time at the 99th percentile over the disk's floor plus a round trip plus 0.5 ms | none yet | **Not run yet.** Waits for the owner's laptop |
 
-## What the owner must decide
+## What the owner decided
 
 1. **P1, the mutant score.** The kill line says the score must not fall below the TypeScript port's. The point estimates are below it by 1 to 3 points. The gap is inside the error of both estimates. Is that a pass? **Answered 2026-11-25: a pass** ([V5-28](../docs/DECISIONS.md)).
 2. **P1, numbers at the edge.** Go's numbers wrap when they overflow. The port stops with an error instead, unless a line says to wrap. A check found places where a peer's message could stop the port this way; those are fixed. Others may remain on longer paths. The choice: make every sum in the Raft crate wrap as Go does, or refuse absurd numbers where messages are decoded in slice 1. **Answered 2026-11-25: refuse them at the wire** (`links.7`, [V5-29](../docs/DECISIONS.md)); the port keeps its overflow checks.
@@ -68,7 +68,7 @@ No probe was killed, so there is no card.
 - **Go's unit tests are not ported** (8,575 code lines in Go). They would close most of the holes the mutants found *(reasoned)*.
 - **The rule "a leader counts only entries of its own term" can be removed and no test fails** *(measured: the mutant survives the files and the scripts)*. The same was true of the TypeScript port. Probe P6 later found that the edge value check, written after the mutation run, does catch it. Other holes: snapshots with storage writes in flight, a conflict in the middle of entries not yet stored, the edges of restoring a snapshot.
 - **The mutation run was not repeated after the edge fix.** Its line numbers are those of the source it ran on.
-- **The edge check is one node and four messages deep.** Other plain sums may still stop the port where Go wraps *(reasoned)*.
+- **The edge check is one node and four messages deep.** Other plain sums may still stop the port where Go wraps *(reasoned)*; slice 1 refuses such numbers at the wire (`links.7`, V5-29).
 - **The random scripts have limits** *(reasoned from the generator)*: they never trim the log at random, they keep nodes 1 and 2 as voters, they never set the size limits, and a restart does not bring back the applied membership.
 - **Not ported:** Go's threaded `Node` wrapper (the port stops at the single-threaded core it wraps), the trace hooks, and one small function that prints a state as JSON.
 - **Speed is not measured.** The port copies entries in places where Go shares them. That belongs with the wire format in slice 1.
@@ -215,7 +215,7 @@ The executive knows nothing about Raft. A world plugs in through one interface. 
 
 A **rule** is one record of the ledger. A **marker** wraps the code that holds a rule and carries the rule's id. A test build can **switch one rule off**: the marked code is not run, and a stated value stands in. The **switch-off pass** does that for each rule in turn and records which tests go red. A rule that no test catches is **unproven**. The marker is in [crates/rule](../crates/rule), the scan in [tools/rule-scan.mjs](../tools/rule-scan.mjs). The full page is [p6/README.md](p6/README.md).
 
-**P6 passed, on the owner's reading** ([V5-32](../docs/DECISIONS.md)). Each of its two kill lines holds on one reading and trips on another; by the plan's first words the share line tripped. The owner read the time line as short runs on several cores, and counted a carried field the marker can blank as a switch, which amends BUILD 2.6's list. With `raft-config.5` and `.6` counted as one, the share is 85.4 %.
+**P6 passed, on the owner's reading** ([V5-32](../docs/DECISIONS.md)). Each of its two kill lines held on one reading and tripped on another. On the plan's list as written, the share line tripped. The owner read the time line as short runs on several cores, and counted a carried field the marker can blank as a switch, which amends BUILD 2.6's list. With `raft-config.5` and `.6` counted as one, the share is 85.4 %.
 
 **Every time in this section is provisional.** It was taken on a shared cloud box with 4 cores, not on the quiet machine.
 
@@ -253,6 +253,7 @@ Sorted: the ledger's 80 Raft rules (the plan says 64; the ledger holds 80) and t
 | The same, at its most generous: two judgment calls moved to "switch" | | | 78.0 % (64 of 82) | **under** |
 | A carried field counts as a switch | 86.1 % | 90 % | **86.6 %** (71 of 82) | over |
 | The same, with the two rules that share one expression counted once | 84.7 % | 90 % | 85.4 % (70 of 82) | over |
+| The same, without the six rules switched by the marker's own off branch | | | 78.0 % (64 of 82) | **under** |
 
 All *(counted from the probe's sorting; the second reader read all 90 records against the marked code)*.
 
@@ -295,9 +296,9 @@ All *(counted from the probe's sorting; the second reader read all 90 records ag
 
 ### Had it been killed
 
-The plan's fallback was the way it first turned down: a rule id typed on each test. The map's "proven" then rests on a typed link, and the map says so. The second net stays either way.
+The plan's fallback was the way it first turned down: a rule id typed on each test. The map's "proven" would then have rested on a typed link, and the map would have said so. The second net stays.
 
-What stood whatever the answer *(reasoned)*: the marker costs nothing in a release build, a marked crate keeps the kernel's rules, and the pass needs short tests per rule, one process per rule, and the full suites only for a rule a change touches. One test in the Raft tooling ("raft has no outside crates") must learn that the marker crate is the workspace's own; fero's kernel crates will need the same.
+What holds either way *(reasoned)*: the marker costs nothing in a release build, a marked crate keeps the kernel's rules, and the pass needs short tests per rule, one process per rule, and the full suites only for a rule a change touches. One test in the Raft tooling ("raft has no outside crates") must learn that the marker crate is the workspace's own; fero's kernel crates will need the same.
 
 ### How to run it again
 
@@ -314,7 +315,7 @@ The full list of steps, the rules one by one and every per-rule time are on [the
 
 ## P5: one number for "applied once, in order"
 
-A **stream** is one writer's writes to one slot. A **high mark** is the highest number a copy of the slot has taken from a stream. Today five mechanisms each keep a mark of their own, so that a write is applied once and in order. The probe asks whether one number can do the work of all five. It is a model study; it builds no product code. The full page is [p5/README.md](p5/README.md).
+A **stream** is one writer's writes to one slot. A **high mark** is the highest number a copy of the slot has taken from a stream. Before P5, five mechanisms each kept a mark of their own, so that a write is applied once and in order. The owner ruled P5 a pass on the ledger's count, and the ledger took the form on the stricter count: 46 rules became 39 (V5-30). The probe asks whether one number can do the work of all five. It is a model study; it builds no product code. The full page is [p5/README.md](p5/README.md).
 
 ### The result
 

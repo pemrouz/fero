@@ -182,7 +182,7 @@ A second pass built everything from nothing and tried to break the claims above.
 - **The disk never fails.** A replica saves everything in a step before it sends; a crash comes between steps, never inside one.
 - **Only one fold layer.** `data` 4's `lane()` folds plain keyed rows. No view, no subscriber and no other TypeScript layer runs.
 - **The fold check runs at the end of a seed,** not at every step.
-- **The timed fresh worlds are warm.** The bench runs 200 worlds first. The first world of a new process takes 6 to 10 ms *(measured, provisional)*; whether TEST-01's bar counts it is the owner's call.
+- **The timed fresh worlds are warm.** The bench runs 200 worlds first. The first world of a new process takes 6 to 10 ms *(measured, provisional)*; the owner ruled that TEST-01's bar does not count it; it is recorded ([V5-31](../../docs/DECISIONS.md)).
 - **Cut links are looked at when a message is due,** not when it is sent, as in E-04.
 - **The two builds were made by one compiler version on one machine.**
 - **Seeds stop at 130 ticks.** Longer runs and bigger worlds were not tried.

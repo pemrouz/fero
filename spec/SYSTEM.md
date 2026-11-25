@@ -16,7 +16,7 @@ fero is shared, live data for apps. An app names a resource, `fero('orders')`, a
 - **L5, libraries.** Locks, queues, sagas, `derive`, the past, gateways, the CLI.
 - **`data` 5, beside them.** The sibling engine, in TypeScript. It holds the rows and runs views. Its rules are the ledger's row D. <sub>V5-14, V5-21</sub>
 
-The ledger holds 823 rule records (814 to 1,011 at their low and high counts) *(counted)*.
+The ledger holds 823 rule records (814 to 1,012 at their low and high counts) *(counted)*.
 
 ## Rust and JavaScript
 
@@ -40,7 +40,7 @@ Slice 0 builds no rule. It proves the Raft port, which carries 77 of the ledger'
 
 ## One write
 
-1. **L4, client.** `orders.data.x.set(row)` becomes one record with an attempt id. It does not show yet.
+1. **L4, client.** `orders.data.x.set(row)` becomes one record with its stream and number. It does not show yet.
 2. **L3, client.** A credit lets it out (from slice 4).
 3. **L1, client.** The key hashes to a slot; the write goes to that slot's leader.
 4. **L0, leader.** Rust reads it off the link and hands it up in a batch.

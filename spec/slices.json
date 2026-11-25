@@ -30,11 +30,12 @@
   "rules": {
    "records": 256,
    "low": 253,
-   "high": 285
+   "high": 286
   },
   "models": [
    "P1's proof on every change",
    "write numbering: P5's two models, OneNumber.tla and OneNumberDerived.tla (V5-30), on every change to stream-numbers",
+   "for the client model: a stall check, and a session lapse that has not committed (owed, V5-30)",
    "E-61 marks",
    "monitors over 1,000 seeds: F-02, F-04, TEST-13, the total over both groups, the deriver's output",
    "whether plain writes need a majority of the sessions resource (owed)"
@@ -186,7 +187,8 @@
   "models": [
    "E-24",
    "the fencing checker and the outside checker (TEST-13) on lock and queue histories",
-   "a paused holder, clock skew, a crash at every step of a saga"
+   "a paused holder, clock skew, a crash at every step of a saga",
+   "once names under one number per stream (owed, V5-30: caller-keys.10 and .11 stay until it runs)"
   ],
   "pins": [
    "the 22 patterns end to end (P-01 to P-22, a reading), but P-06 on the persisted rung only and P-18 without forks",

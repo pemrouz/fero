@@ -161,9 +161,9 @@ A record's offset is never stored: it is the batch's base offset plus the record
 | 2 | kind | `u8` | Bits 0 to 1: the change's type. Bits 2 to 4: the record kind (section 11.3). Bit 5: has `at`. Bit 6: has a mark. Bit 7: has more flags (field 3) | P |
 | 3 | more flags | `u8`, only when bit 7 is set | Kept for an expiry time and `while: 'session'` (slice 4), and for an answer stage (built second). Zero bits must be zero | O, question 21 |
 | 4 | slot sequence | `varint` | The slot's next sequence, read from the log end | S |
-| 5 | session id | `u64` | Whose attempt this is | S (field), O question 5 |
-| 6 | call id | `varint` | Which attempt of that session | S (field), P (encoding) |
-| 7 | write number | `varint` | The writer's count of its writes to this partition, so writes sent together commit in the order made. A later one that arrives first is refused `gap` | O, question 9 |
+| 5 | session id | `u64` | Whose attempt this is | O, question 9 (V5-30: becomes the stream), O question 5 |
+| 6 | call id | `varint` | Which attempt of that session | O, question 9 (V5-30: becomes the number and the number before it) |
+| 7 | write number | `varint` | The writer's number in its stream to this slot (V5-30; it was per partition), so writes sent together commit in the order made. A later one that arrives first is refused `gap` | O, question 9 |
 | 8 | mark: reader | `text`, when bit 6 is set | The deriver's or consumer's name | S (field), O question 30 |
 | 9 | mark: source slot | `u16`, when bit 6 is set | The slot of the source record this write came from | S (field), P (encoding) |
 | 10 | mark: place | `varint`, when bit 6 is set | The source record's sequence × 256 + the write's number within that record. At most 256 outputs of one record to one slot | S (LAYERS 3.2) |
@@ -173,7 +173,7 @@ Three things are not in a record, on purpose *(reasoned)*. The slot: it is the h
 
 **Record kinds in slice 1**: a data change; a refusal outcome (the refusal of a resent attempt, logged with no data so a late copy gets the same answer); a bare mark. The other kinds are listed in 11.3 and take their fields in their own slices.
 
-Rules that depend on it: `slot-sequence`, `client-sessions`, `srchi-marks`, `writer-judging`, `writer-time`, `raft-log`, `fold-all`, `subscribe`, `presence-rows`, `fence-tokens`.
+Rules that depend on it: `slot-sequence`, `stream-numbers`, `client-sessions`, `srchi-marks`, `writer-judging`, `writer-time`, `raft-log`, `fold-all`, `subscribe`, `presence-rows`, `fence-tokens`.
 
 ### 5.3 A batch
 
@@ -346,7 +346,7 @@ Rules that depend on it: `link-pings`, `writer-time`, `cluster-version`, `cluste
 
 ### 7.4 The Raft family (L1)
 
-Every Raft message starts with the same fields. They are the ported Raft's message, which is etcd's *(checked: BUILD 3.3, P1)*. The field list is etcd's; the bytes are this page's.
+Every Raft message starts with the same fields. They are the ported Raft's message, which is etcd's *(checked: BUILD 3.3, P1)*. The field list is etcd's; the bytes are this page's. A Raft term or log index at or above 2^62 is not legal in a peer's frame: the frame does not decode (`links.7`, V5-29).
 
 | # | Field | Bytes | Meaning | State |
 |---|---|---|---|---|
@@ -383,9 +383,9 @@ Rules that depend on it: `raft-log`, `raft-term-vote`, `raft-commit`, `raft-conf
 | 2 | ask kind | `u8` | 1 a write, 2 a call, 3 an `alter`, 4 a recover, 5 a hint | S (the kinds), P (codes) |
 | 3 | resource id | `id16`; zero on a client's first contact | Which resource | S (field), P (encoding) |
 | 4 | resource check | when flag bit 0 is set: resource name `text`, protocol version `u8`, home group incarnation `varint` | Rides the first `ASK` or `SUB` for a resource on a link, and its answer | S (a reading of LAYERS 7, not modelled), O question 26 |
-| 5 | session id | `u64` | Whose attempt | S (field), question 5 |
-| 6 | call id | `varint` | Which attempt | S |
-| 7 | floor | `varint` | The session's lowest call id not yet answered. Sent with every copy | S (`stream-numbers.9`) |
+| 5 | session id | `u64` | Whose attempt | O, question 9 (V5-30: becomes the stream), question 5 |
+| 6 | call id | `varint` | Which attempt | O, question 9 (V5-30: becomes the number and the number before it) |
+| 7 | floor | `varint` | The writer's lowest number not yet answered (in the draft's fields, the session's lowest call id). Sent with every copy | S (`stream-numbers.9`) |
 | 8 | copy number | `varint` | 0 for a first send, then 1, 2, … The client takes only the answer to its latest copy | S (field), P (0 means "not sent before") |
 | 9 | time left | `varint`, milliseconds | The attempt's budget. Every hop takes off the time it held it | S (field), P (encoding) |
 | 10 | write number | `varint` | As 5.2 field 7 | O, question 9 |
@@ -408,7 +408,7 @@ A room write, a deriver's bump and the admin asks take their fields in their own
 | 2 | stage | `u8` | Section 11.6: received, replicated, or the committed result | S (LAYERS 7), P (codes) |
 | 3 | code | `u8` | 0 for done, else a refusal code of section 11.7 | S (names), O question 19 |
 | 4 | version | a position, 3.1; when done | The row's version at this write | S (`ack.version`, V5-13), P (encoding) |
-| 5 | skipped | flag bit 0 | A marked write at or below its mark: handled before, not applied | S (V5-20 item 17), P (encoding) |
+| 5 | skipped | flag bit 0 | A write at or below its stream's high mark whose answer is no longer kept: handled before, not applied | S (`stream-numbers.8`), P (encoding) |
 | 6 | retry after | `varint` milliseconds; with `no-leader`, `moved`, `retry` and the "not now" codes | When to try again | S (field), P (encoding) |
 | 7 | where | `text`, an address; with `moved` | The server to ask instead | S (field), P (encoding) |
 | 8 | current | a position; with `conflict` and `fenced` | The version or token the leader holds | S (field), P (encoding) |
@@ -417,7 +417,7 @@ A room write, a deriver's bump and the admin asks take their fields in their own
 | 11 | method table version | `varint` | A newer number tells the client to fetch the table again | S (a reading of LAYERS 7), O question 26 |
 | 12 | resource check answer | when flag bit 1 is set: resource id, protocol version, home group incarnation, the method table | Answers field 4 of the ask | O, question 26 |
 
-Rules that depend on it: `client-sessions`, `caller-keys`, `writer-judging`, `slot-table`, `route-smart`, `route-forward`, `srchi-marks`, `fence-tokens`, `ack-stages` (later), `cluster-version`, `soft-directory`, `restore-mark` (later).
+Rules that depend on it: `stream-numbers`, `client-sessions`, `caller-keys`, `writer-judging`, `slot-table`, `route-smart`, `route-forward`, `srchi-marks`, `fence-tokens`, `ack-stages` (later), `cluster-version`, `soft-directory`, `restore-mark` (later).
 
 ### 7.6 The flow family (L3)
 
@@ -500,9 +500,9 @@ Shape state: **draft**. A picture on the wire (7.6) is built in slice 1. A local
 | 5 | members | the member change body of 5.3 | The group's voters and learners at that place | S (etcd), O question 11 |
 | 6 | cursor | as 3.3 fields 4 to 6 | One position per slot held | S |
 | 7 | rows | in blocks: `varint` count, then per row its key, version and bytes as 7.6 fields 6 to 8, then a `crc` per block | The folded rows | S (key, version, bytes), N (blocks) |
-| 8 | L2's tables | not drafted | What sits beside the rows: each session's outcomes and floor, the marks, the highest fence tokens, the last writer time | S (they ride a snapshot), O question 22 |
+| 8 | L2's tables | not drafted | What sits beside the rows: the stream tables (high marks, kept answers and floors), the highest fence tokens, the last writer time | S (they ride a snapshot), O question 22 |
 
-Rules that depend on it: `raft-snapshot`, `subscribe`, `client-sessions`, `srchi-marks`, `fence-tokens`, `tier`, `fold-version`, `forks` (later).
+Rules that depend on it: `raft-snapshot`, `subscribe`, `stream-numbers`, `client-sessions`, `srchi-marks`, `fence-tokens`, `tier`, `fold-version`, `forks` (later).
 
 ## 10. Across the line: the calls, the recorder and health
 
@@ -671,7 +671,7 @@ The names and their groups are settled *(checked: API section 8)*. The numbers a
 | 120 to 139 | At open, to an admin, or in health | 120 `config`, 121 `config-differs`, 122 `dir-held`, 123 `wrong-project`, 124 `wrong-cluster`, 125 `bucket-collision`, 126 `no-server-here`, 127 `unbound`, 128 `admin-only` |
 | 140 to 159 | Inside fero only: the client acts on them by itself | 140 `no-leader`, 141 `moved`, 142 `retry`, 143 `end`, 144 `gap`, 145 `stale-attempt`, 146 `empty` |
 
-72 names. 0 means "done". Slice 1 can meet these on a wire *(reasoned from BUILD 3.4's "in" column)*: `conflict`, `absent-row`, `too-large`, `unencodable`, `cross-partition`, `no-such-method`, `threw`, `unknown`, `timeout`, `bad-cursor`, `expired`, `wrong-project`, `no-leader`, `moved`, `retry`, `end`, `gap`, `stale-attempt`. Each thing slice 1 leaves out is a named refusal too; their names are owed to the slice's page.
+72 names. 0 means "done". Slice 1 can meet these on a wire *(reasoned from BUILD 3.4's "in" column)*: `conflict`, `absent-row`, `too-large`, `unencodable`, `cross-partition`, `no-such-method`, `threw`, `unknown`, `timeout`, `bad-cursor`, `expired`, `wrong-project`, `no-leader`, `moved`, `retry`, `end`, `gap`, `stale-attempt`. Since V5-30 no rule makes `stale-attempt`: a copy below the floor answers `skipped` (`stream-numbers.8`); whether the code goes is slice 1's codec's call. Each thing slice 1 leaves out is a named refusal too; their names are owed to the slice's page.
 
 ### 11.8 Selector kinds and modes
 
@@ -712,7 +712,7 @@ Each closes by a model, a probe of slice 0, a timing in slice 1, or an owner's c
 | 6 | Does a journal row or a Raft message name its group in full (18 bytes), or by a short number agreed per process or per link? | In full | Slice 1's counted pin on bytes per record |
 | 7 | How are a version's 63 bits split between epoch and sequence? (The alphabet is settled: Crockford's base 32, CONNECT 3.) | 16 and 47 | The read-cost timing in Rust (E-62 missed its 50 ns bar once a slot had moved) |
 | 8 | Where does a slot's epoch ride: in every record, once per batch, or only in the slot's open entry and once per slot in a `DELTA`? | The open entry and the `DELTA` | The slot move's model (slice 3); it is on the list of fields open past slice 1 |
-| 9 | Write numbering: one number per stream, or the five high marks (P5)? Which fields does a record and an `ASK` carry for it? | **One number per stream: settled by P5 (V5-30).** A write carries its stream, its number, the number before it and the floor (`stream-numbers.2`, `stream-numbers.9`); their fields and encoding are still the draft's | The fields: slice 1's codec |
+| 9 | Write numbering: one number per stream, or the five high marks (P5)? Which fields does a record and an `ASK` carry for it? | **One number per stream: settled by P5 (V5-30).** A write carries its stream, its number, the number before it and the floor (`stream-numbers.2`, `stream-numbers.9`). The draft's tables still show the old form (a call id and a write number, and no number before: 5.2 fields 5 to 7, the ask's fields 5 to 10); slice 1's codec redraws them | The fields: slice 1's codec |
 | 10 | Does the frame's checksum cover message bodies that hold no batch? | Yes: everything but batch bytes, which have their own | Slice 1's link timing; the decoder's fuzz test |
 | 11 | How do etcd's message types map onto the seven Raft verbs (heartbeat, its answer, read index, snapshot status)? Is the follower's early report a flag on `APPENDED` or a verb? What are a member change's bytes? What do `QUIET`, `REPAIR` and `REPAIRED` carry? | Flags on `APPEND` and `APPENDED`; etcd's own member change | P1's port; the repair model with lost and doubled messages (slice 2); the answer-stage step |
 | 12 | Do the directory's announce, take back and look up need verbs of their own? | Not drafted | The model of founding and the directory together (slice 2) |

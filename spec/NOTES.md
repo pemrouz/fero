@@ -6,7 +6,7 @@ What the ledger leaves out, what was settled when its layers were put together, 
 
 The design's base is 55 mechanisms and 418 rules in the study's `simplicity.json` *(counted)*. LAYERS 0.2 says 416, because it counts two records one rule lower: `route-smart` as 1, not 2, and `presence-rows` as 6, not 7 *(checked: LAYERS 2.3, 3.3 and 12)*.
 
-- **50 are in the ledger.** 49 are whole. `tier` is in part: 4 of its 10 rules.
+- **50 are in the ledger.** 49 are whole. `tier` is in part: 4 of its 10 rules. Since V5-30, `stream-numbers` holds what `issue-order` held, and part of `client-sessions` and `srchi-marks`.
 - **5 are written off for the first build.** BUILD 3.5 names three of the causes: answer stages, the tier and restore. The `none` rung, forks and the slow-leader rule are **a reading of LAYERS 11**, which was written for the older one-slice build; BUILD 3.5 does not name them. The write-offs cost bars: see question A below.
 
 | Mechanism | Base rules | Where it is | Why it waits |
@@ -40,8 +40,8 @@ One rule has one home. Where two layers held the same rule, one record stays.
 - **Four more were added from the decisions:** `derive-view.12` and `emit-fold.6` (the bucket limit, V5-20 item 10), `scan.17` (the verb on the surface, V5-20 item 4), `write-surface.15` (no bare mark and no claim for a client of a resource with methods, V5-17 item 13). `derive-view.9` now also holds the bump addressed to a group (GROUPS V6).
 - **Low has one meaning.** Low is 0 only where a named other record may already hold the rule. 9 records are so; 158 others that were at low 0 to match the study pages' ranges went to 1. Which 9 is this page's reading.
 - **High is over 1 where one sentence may hide more than one rule.** 34 records that join two rules in one sentence were raised; `methods.10` holds three. The pick of those 34 is a reading.
-- **A partial model is marked.** 33 records are known by a model of a smaller or an older form of the rule; their evidence starts with "partial model:". `handback.1`, whose pull form no model ran, is "reasoned".
-- **Five ids are retired** ([retired.json](retired.json)): rules dropped as repeats when the layers were put together.
+- **A partial model is marked.** 30 records are known by a model of a smaller or an older form of the rule; their evidence starts with "partial model:". `handback.1`, whose pull form no model ran, is "reasoned".
+- **23 ids are retired** ([retired.json](retired.json)): five dropped as repeats when the layers were put together, and 18 replaced by `stream-numbers.1` to `.11` (V5-30).
 - **Records that sit in a layer other than their mechanism's:** `srchi-marks.1` is L5, `srchi-marks.15` is L4 and `scan.17` is L4. The layer is a field, not part of the id.
 
 ## Open questions
@@ -68,7 +68,7 @@ A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as
 9. The answer after the commit has a side in three layers: `slot-table.2`, `subscribe.24` to `subscribe.26`, `writer-judging.10`. Kept as three; `slot-table.2` is at low 0.
 10. A full client queue has three records: `admission-credits.4` (the bound), `write-surface.12` (how it shows), `srchi-marks.13` (a marked write waits).
 11. `commit-object.1` and `data-sink.1` both say one commit object, by reference.
-12. Write numbering (`issue-order`, `slot-sequence`) is in L2; the plan lists it under L1.
+12. Write numbering (`stream-numbers`, `slot-sequence`) is in L2; the plan lists it under L1.
 13. `record-key.1` (the first key's hash picks the slot) is in L2; it may be L1's.
 14. `derive-view.6` is in L5, though the check runs at the leader.
 15. The four fences at the saga's intent rows (`saga-intents.20`, `saga-intents.21`, `saga-intents.28`, `saga-intents.29`) may be cases of `fence-tokens.1`.
