@@ -11,13 +11,13 @@ The one ledger for v5: where things stand, what is next, the open bugs and the d
 
 ## Next
 
-1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change. Done: P1, P2, P5; P6 open on its two lines. P3, P4 and P7 wait for the laptop.
-2. **The owner's answers to the sheet's questions** ([probes/README.md](probes/README.md)); questions 1 to 5 are answered (V5-28 to V5-31). Still open: whether P6's nightly pass is short runs on several cores; whether a carried field counts as a switch. Questions 6 and 7 decide whether P6 is killed.
+1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change. Done and passed: P1, P2, P5, P6 (V5-28 to V5-32). P3, P4 and P7 wait for the laptop: they need real timing.
+2. **Slice 1's ledger review** before its code starts: the five Raft records P6 found the port does not hold because they are the host's duty (`raft-readindex.4`, `raft-snapshot.1`, `.4`, `.5`, `.8`), and `raft-config.5` and `.6`, which share one expression in the port.
 
 ## Open bugs
 
 - **raft: a plain `u64` sum may still panic where Go wraps.** The port keeps overflow checks on; Go's sums wrap. The edge check (`crates/raft-harness/tests/edge_values.rs`) found and fixed the sites one node and four messages deep reach; longer paths are not checked *(reasoned)*. Closed when slice 1 builds `links.7`, which refuses such numbers at the wire (V5-29).
-- **raft: some rules have no test that fails without them.** The mutation run ([RESULTS.md](crates/raft-harness/mutate/RESULTS.md)) leaves about 100 live mutants; `maybe_commit` without its term check survives the files and the scripts, as it did in the TypeScript port. Go's unit tests, not ported, would close most *(reasoned)*.
+- **raft: some rules have no test that fails without them.** The mutation run ([RESULTS.md](crates/raft-harness/mutate/RESULTS.md)) leaves about 100 live mutants; `maybe_commit` without its term check survived the files and the scripts, as it did in the TypeScript port; since then the edge value check catches it (P6's pass, `raft-commit.6`). P6's pass leaves 4 of 62 marked Raft rules unproven (`raft-snapshot.2`, `.3`, `.9`, `raft-term-vote.3`). Go's unit tests, not ported, would close most *(reasoned)*.
 
 ## Decisions on this branch
 
@@ -30,3 +30,4 @@ V5-1 to V5-24 are on the `design` branch. Decisions made from here on are append
 - **V5-29** (2026-11-25): a peer's frame with a Raft term, index or commit at or above 2^62 does not decode (`links.7`, slice 1); the Raft crate keeps its overflow checks. The ledger is 830 records.
 - **V5-30** (2026-11-25): P5 passes on the ledger's count; its early failed run was the model's setup. One number per stream replaces the marks: 18 records retired, `stream-numbers.1` to `.11` added, 46 rules become 39. The ledger is 823 records.
 - **V5-31** (2026-11-25): P2 passes; TEST-01's fresh world is read at p99 of warm worlds, with the largest and the cold first world recorded, not judged. The simulator stays in Rust, native and WASM.
+- **V5-32** (2026-11-25): P6 passes. The nightly pass is short runs on a machine with several cores; a rule is a switch when its marker turns it off alone, a carried field the marker can blank included (BUILD 2.6's list amended). Share 85.4 %; time 21 to 28 minutes, provisional.

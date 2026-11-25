@@ -4,7 +4,7 @@ Slice 0 builds no product rule. It runs seven probes. Each probe has a **kill li
 
 Each claim is marked: *(measured)* a run here gave the number, *(counted)* counted from files, *(checked)* compared or proven by a tool, *(reasoned)* argued and not run.
 
-**State on 2026-11-25:** four probes ran, all in the cloud. None is marked killed. **P6 stands on its kill lines:** by the plan's own words one of them trips (75.6 % of the rules can be a switch; the line is 80 %), and the other holds only on short runs with several cores (28 minutes; the line is 30). Whether P6 is killed is the owner's call. P2 passed (V5-31), on provisional timing. P1 passed (V5-28, V5-29). P5 passed (V5-30). Three probes have not run; they wait for the owner's laptop.
+**State on 2026-11-25:** four probes ran, all in the cloud, and all four passed: P1 (V5-28, V5-29), P2 (V5-31), P5 (V5-30) and P6 (V5-32). Every question the four left is answered. Three probes have not run; they wait for the owner's laptop, because they need real timing.
 
 ## The seven probes
 
@@ -15,7 +15,7 @@ Each claim is marked: *(measured)* a run here gave the number, *(counted)* count
 | **P3** The time to change | How long from a one-line edit of a Raft rule to 200 seeds run again? | Over 30 s, projected to a kernel of about 10,000 lines | none yet | **Not run yet.** Waits for the owner's laptop: it needs real timing |
 | **P4** Judge, cross and fold on one thread | Can one thread judge a write in JavaScript, hand it to Rust, and fold the committed records, fast enough? | Under 500,000 records a second at a million rows. Or over 0.3 ms on the main thread per batch at the 99th percentile | none yet | **Not run yet.** Waits for the owner's laptop |
 | **P5** One number for "applied once, in order" | Can one number per stream replace the five high marks and their 32 rules? | No saving of 3 rules or more, or a model fails | No model fails in 25 complete runs *(checked)*. Saving: 7 to 13 rules on the ledger's count, 2 to 5 on the study's count *(counted)* | **Passed.** The owner ruled the ledger's count the one that counts, and the failed early run a mistake in the model's setup (V5-30). The ledger now holds the form: 46 rules became 39. See P5 |
-| **P6** The markers | Is switching each rule off, one by one, cheap enough to do every night? | Over 30 minutes projected for 640 rules. Or fewer than 80 % of the rules can be a switch | Time: 28 minutes with short runs and 1 worker on 4 cores; 46 minutes on one real core; 6.5 hours with full suites *(measured per rule, then projected; provisional)*. Share: 75.6 % by the plan's own list, 86.6 % if a field carried in a message counts as a switch *(counted)* | **Open, on both lines.** Each line holds on one reading and trips on another. By the plan's own words the share line trips. Not marked killed: the reading is the owner's. See P6 |
+| **P6** The markers | Is switching each rule off, one by one, cheap enough to do every night? | Over 30 minutes projected for 640 rules. Or fewer than 80 % of the rules can be a switch | Time: 28 minutes with short runs and 1 worker on 4 cores; 46 minutes on one real core; 6.5 hours with full suites *(measured per rule, then projected; provisional)*. Share: 75.6 % by the plan's own list, 86.6 % if a field carried in a message counts as a switch *(counted)* | **Passed** (V5-32). The owner read the time line as short runs on several cores (21 to 28 minutes) and counted a carried field the marker can blank as a switch (85.4 %). See P6 |
 | **P7** The commit path on real disks | Does a commit meet its time bar on real, separate disks with no JavaScript in the path? | Commit time at the 99th percentile over the disk's floor plus a round trip plus 0.5 ms | none yet | **Not run yet.** Waits for the owner's laptop |
 
 ## What the owner must decide
@@ -25,10 +25,10 @@ Each claim is marked: *(measured)* a run here gave the number, *(counted)* count
 3. **P5, which count the kill line means.** On the ledger's count the saving is 7 to 13 rules. On the study's own count, the one the "32" is in, it is 2 to 5. The kill line is "no saving of 3 or more". **Answered 2026-11-25: the ledger's count** ([V5-30](../docs/DECISIONS.md)); P5 passes.
 4. **P5, one run that failed on the way.** An early version of one model broke a property. The cause was read as a mistake in the model's world, not in the design. Two readers agree. The kill line says "or a model fails", so the reading needs a yes. **Answered 2026-11-25: yes, the model's setup** (V5-30); `client-sessions.14` stays.
 5. **P2, what "a fresh world over 5 ms" means.** At the 99th percentile a fresh world takes 0.21 ms. But single worlds do go over 5 ms: about 1 warm world in 10,000 (the largest seen was 8.9 ms), and the first world of every new process (6 to 10 ms). Is the bar the 99th percentile, or a hard top? Does the first world of a cold process count? **Answered 2026-11-25: the 99th percentile of warm worlds** ([V5-31](../docs/DECISIONS.md)); the largest and the cold first world are recorded, not judged.
-6. **P6, what the nightly pass is.** With short runs it is 28 minutes with 1 worker on 4 cores, and 46 minutes on one real core. With each layer's full tests for every rule it is 6.5 hours. The kill line is "more than 30 minutes projected for 640 rules". Is the pass made of short runs, on a machine with several cores?
-7. **P6, whether a field carried in a message counts as a switch.** The plan lists such a rule as held by an oracle. On that list 75.6 % of the rules are a switch, under the 80 % line. The marker could blank these fields, and tests went red for 6 of the 9. Counted as switches they give 86.6 %. A no here kills P6: the plan then falls back to a rule id typed on each test.
+6. **P6, what the nightly pass is.** With short runs it is 28 minutes with 1 worker on 4 cores, and 46 minutes on one real core. With each layer's full tests for every rule it is 6.5 hours. The kill line is "more than 30 minutes projected for 640 rules". Is the pass made of short runs, on a machine with several cores? **Answered 2026-11-25: yes** (V5-32).
+7. **P6, whether a field carried in a message counts as a switch.** The plan lists such a rule as held by an oracle. On that list 75.6 % of the rules are a switch, under the 80 % line. The marker could blank these fields, and tests went red for 6 of the 9. Counted as switches they give 86.6 %. A no here kills P6: the plan then falls back to a rule id typed on each test. **Answered 2026-11-25: yes, a carried field the marker can blank counts** ([V5-32](../docs/DECISIONS.md)); P6 passes at 85.4 %, with `raft-config.5` and `.6` as one.
 
-No probe is marked killed, so there is no card yet. P6 is the one that may be: questions 6 and 7 decide it.
+No probe was killed, so there is no card.
 
 ## P1: the Rust Raft
 
@@ -215,7 +215,7 @@ The executive knows nothing about Raft. A world plugs in through one interface. 
 
 A **rule** is one record of the ledger. A **marker** wraps the code that holds a rule and carries the rule's id. A test build can **switch one rule off**: the marked code is not run, and a stated value stands in. The **switch-off pass** does that for each rule in turn and records which tests go red. A rule that no test catches is **unproven**. The marker is in [crates/rule](../crates/rule), the scan in [tools/rule-scan.mjs](../tools/rule-scan.mjs). The full page is [p6/README.md](p6/README.md).
 
-**P6 is not marked killed, and it is not a clean pass.** Each of its two kill lines holds on one reading and trips on another. By the plan's own words the share line trips. The choice is the owner's (questions 6 and 7).
+**P6 passed, on the owner's reading** ([V5-32](../docs/DECISIONS.md)). Each of its two kill lines holds on one reading and trips on another; by the plan's first words the share line tripped. The owner read the time line as short runs on several cores, and counted a carried field the marker can blank as a switch, which amends BUILD 2.6's list. With `raft-config.5` and `.6` counted as one, the share is 85.4 %.
 
 **Every time in this section is provisional.** It was taken on a shared cloud box with 4 cores, not on the quiet machine.
 
@@ -293,11 +293,11 @@ All *(counted from the probe's sorting; the second reader read all 90 records ag
 - **The ledger does not say that 5 more Raft rules are the host's duty** *(checked by reading)*. The ledger's tools name 3 Raft rules that sit on top of the port. The probe found 5 more with no code in the ported core. The ledger was not edited.
 - **Not tried:** one process that walks all rules; the type checker in strict mode on the marked prototype; the switch under WASM tests; the plan's second net, the one-line changes to unmarked lines.
 
-### If it is killed
+### Had it been killed
 
-The plan's fallback is the way it first turned down: a rule id typed on each test. The map's "proven" then rests on a typed link, and the map says so. The second net stays either way.
+The plan's fallback was the way it first turned down: a rule id typed on each test. The map's "proven" then rests on a typed link, and the map says so. The second net stays either way.
 
-What stands whatever the answer *(reasoned)*: the marker costs nothing in a release build, a marked crate keeps the kernel's rules, and the pass needs short tests per rule, one process per rule, and the full suites only for a rule a change touches. One test in the Raft tooling ("raft has no outside crates") must learn that the marker crate is the workspace's own; fero's kernel crates will need the same.
+What stood whatever the answer *(reasoned)*: the marker costs nothing in a release build, a marked crate keeps the kernel's rules, and the pass needs short tests per rule, one process per rule, and the full suites only for a rule a change touches. One test in the Raft tooling ("raft has no outside crates") must learn that the marker crate is the workspace's own; fero's kernel crates will need the same.
 
 ### How to run it again
 
