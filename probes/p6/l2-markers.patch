@@ -1,0 +1,86 @@
+diff -ruN a/proto/l2.ts b/proto/l2.ts
+--- a/proto/l2.ts
++++ b/proto/l2.ts
+@@ -10,6 +10,7 @@
+ import type { Refusal } from './errors.ts'
+ import { source, fold, rowOf, hasRow, keysOf } from './seam.ts'
+ import { Heap, deepEqual, wireCopy } from './util.ts'
++import { rule } from './rule.ts'
+ 
+ // ── the request a writer judges, and its answer ─────────────────────────────
+ export type Path = (string | number)[]
+@@ -105,7 +106,7 @@
+       const reborn = !before.get(k) || (e.m?.born?.includes(k) ?? false)
+       const m: RowMeta = reborn || !old
+         ? { v: e.v, born: e.v, t: e.t, dl: 0, p: e.p, slot: e.slot }
+-        : { ...old, v: e.v, t: e.recs.some((r) => String(r.key[0]) === k) ? e.t : old.t }
++        : { ...old, v: rule('row-version.1', () => e.v, old.v), t: e.recs.some((r) => String(r.key[0]) === k) ? e.t : old.t }
+       if (reborn && old) { m.ttl = undefined; m.lease = undefined; m.ses = undefined }
+       const ttl = e.m?.ttl?.[k]
+       if (ttl !== undefined) { m.ttl = e.t + ttl; m.td = ttl }
+@@ -177,10 +178,10 @@
+     if (c.version !== undefined && (m?.v ?? '') !== c.version) return conflict()
+     if (c.expired) { if (!this.#expired(k, t, overlay)) return conflict(); born.add(k) }
+     if (c.absent) born.add(k)
+-    if (c.equals !== undefined && !deepEqual(leafAt(row, key.slice(1)), c.equals)) return conflict()
++    if (rule('field-guards.1', () => c.equals !== undefined && !deepEqual(leafAt(row, key.slice(1)), c.equals), false)) return conflict()
+     if (c.fence) {
+       const seen = this.#fenceSeen(c.fence.lock)
+-      if (c.fence.token < seen) return { code: 'fenced', current: seen }
++      if (rule('fence-tokens.1', () => c.fence!.token < seen, false)) return { code: 'fenced', current: seen }
+     }
+     return null
+   }
+@@ -201,7 +202,7 @@
+       return refuse({ code: this.sealed.has(`${req.slot}:${ep}`) || [...this.sealed.keys()].some((s) => s.startsWith(`${req.slot}:`)) ? 'moved' : 'wrong-group' })
+     }
+     // 1. dedup
+-    const seen = this.attempts.get(req.a)
++    const seen = rule('client-sessions.3', () => this.attempts.get(req.a), undefined)
+     if (seen) {
+       this.l2.stats.dedup++
+       if (seen.i > this.g.commit) this.l2.stats.dedupTail++
+@@ -225,6 +226,7 @@
+     try {
+       built = req.kind === 'w' ? this.#judgeWrites(req, t) : req.kind === 'claim' ? this.#judgeClaim(req, t) : this.#judgeTouch(req, t)
+     } catch (e) {
++      if (!rule('leader-code.1', () => true, false)) throw e
+       built = { code: 'rule-threw', reason: String((e as Error)?.message ?? e) }
+     }
+     // a refusal, or a claim that finds nothing, was judged against the log end, which may hold
+@@ -272,7 +274,7 @@
+       if (key.length > 1 && row === undefined && !wr.remove) return { code: 'absent-row' }
+       if (key.length > 2 && !wr.remove) {
+         const parent = leafAt(row, key.slice(1, -1))
+-        if (parent === null || typeof parent !== 'object') return { code: 'absent-path' }
++        if (rule('shape-rule.1', () => parent === null || typeof parent !== 'object', false)) return { code: 'absent-path' }
+       }
+       if (wr.remove && key.length > 1) {
+         const parent = leafAt(row, key.slice(1, -1))
+@@ -294,13 +296,13 @@
+       const why = this.#userChecks(rec, req.who, row, after)
+       if (why) return why
+       // 4. conditions
+-      if (wr.if) { const c = this.#cond(wr.if, key, t, overlay, born); if (c) return c; if (wr.if.fence) m.fence = [wr.if.fence.lock, wr.if.fence.token] }
++      if (wr.if) { const c = rule('judged-writes.1', () => this.#cond(wr.if!, key, t, overlay, born), null); if (c) return c; if (wr.if.fence) m.fence = [wr.if.fence.lock, wr.if.fence.token] }
+       recs.push(rec)
+       overlay.set(k, after)
+       // ttl and session binding
+       const ttl = wr.ttl ?? (opts.rows?.ttl !== undefined ? msOf(opts.rows.ttl) : undefined)
+       if (ttl !== undefined && !wr.remove) (m.ttl ??= {})[k] = ttl
+-      if ((wr.while === 'session' || opts.rows?.while === 'session') && !wr.remove) (m.ses ??= {})[k] = req.who.session
++      if ((wr.while === 'session' || opts.rows?.while === 'session') && !wr.remove) rule('presence-rows.4', () => { (m.ses ??= {})[k] = req.who.session })
+     }
+     if (born.size > 0) m.born = [...born]
+     m.ans = req.writes!.length === 1 ? answers[0] : answers
+@@ -453,7 +455,9 @@
+     return {
+       owned: [...this.owned], sealed: [...this.sealed], arrived: [...this.arrived], sealedState: [...this.sealedState],
+       rows: keysOf(this.rows).map((k) => [k, rowOf(this.rows, k)]),
+-      rowMeta: [...this.rowMeta], attempts: [...this.attempts], fences: [...this.fences], lastT: this.lastT,
++      rowMeta: [...this.rowMeta],
++      attempts: rule('judging-state.1', () => [...this.attempts], []),
++      fences: rule('judging-state.1', () => [...this.fences], []), lastT: this.lastT,
+     }
+   }
+   load(s: any): void {

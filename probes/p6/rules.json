@@ -1,0 +1,452 @@
+{
+ "learners.1": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: the commit count walks the voter set, and a learner is not in it. No line says \"skip learners\""
+ },
+ "learners.2": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: the send loop walks every tracked copy and has no filter for learners"
+ },
+ "learners.3": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "fero's own rule; etcd does not check it. When built it is a guard, so a switch (reasoned)"
+ },
+ "raft-commit.1": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`reset`: the loop that sets each follower's progress. Off: the old progress stays"
+ },
+ "raft-commit.2": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the stale-term gate, for an append ack. Off: an ack from an older term is counted"
+ },
+ "raft-commit.3": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`Progress::maybe_update`: the line that raises the match index. Off: it never rises"
+ },
+ "raft-commit.4": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "An order held by the message path: the leader's own ack is a message that comes back after the write. Switching it off needs new code, not a skipped block"
+ },
+ "raft-commit.5": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`MajorityConfig::committed_index`: the position of the majority in the sorted acks. Off: the highest ack of any voter"
+ },
+ "raft-commit.6": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`RaftLog::maybe_commit`: the term match. Off: an entry of an older term is counted"
+ },
+ "raft-commit.7": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`send_heartbeat`: the smaller of match and commit. Off: the plain commit index"
+ },
+ "raft-commit.8": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`maybe_append`: the smaller of the leader's commit and the last new entry. Off: the leader's commit"
+ },
+ "raft-config.1": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by a type: the vote count walks the voter set of the configuration. No block to skip"
+ },
+ "raft-config.2": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`become_leader`: the line that sets the pending-change mark. Off: it stays 0"
+ },
+ "raft-config.3": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`become_leader`: the empty entry. Off: none is appended"
+ },
+ "raft-config.4": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: only the leader's step has code that appends. A follower forwards, a candidate drops"
+ },
+ "raft-config.5": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`: the pending-change test. Off: a second change is taken at once"
+ },
+ "raft-config.6": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "The same test as raft-config.5 (the mark is compared with the applied index). One block, two ids"
+ },
+ "raft-config.7": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by a type: a change is an entry of the conf-change type"
+ },
+ "raft-config.8": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`step_leader`: the line that sets the mark on a proposal. Off: not set"
+ },
+ "raft-config.9": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`switch_to_config`: the two lines that put the new configuration in force. Off: the old one stays"
+ },
+ "raft-config.10": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`switch_to_config`: step down when removed. Off: the leader stays"
+ },
+ "raft-config.11": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`hup`: the unapplied-change test. Off: it stands anyway"
+ },
+ "raft-config.12": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`promotable`: not a learner, and in the configuration. Off: anyone may stand"
+ },
+ "raft-config.13": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "An order held by the interface: a configuration changes only through `apply_conf_change`, which the host calls for a committed entry"
+ },
+ "raft-config.14": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: the vote code has no test for a learner"
+ },
+ "raft-config.15": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "fero's own rule (placement). Not sorted"
+ },
+ "raft-leader-transfer.1": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`: a write during a transfer. Off: it is taken"
+ },
+ "raft-leader-transfer.2": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`step_leader`: the refusal that is returned. Off: the write is dropped with no word. The target's name is fero's own part and is not in the port"
+ },
+ "raft-leader-transfer.3": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`, two places: the target holds the whole log. Off: TimeoutNow goes out at once"
+ },
+ "raft-leader-transfer.4": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`step_follower`: stand on TimeoutNow. Off: the message is ignored"
+ },
+ "raft-leader-transfer.5": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: a transfer's vote request passes the lease. Off: it is treated as any other"
+ },
+ "raft-leader-transfer.6": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`tick_heartbeat`: give the transfer up after an election timeout. Off: never"
+ },
+ "raft-log.1": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: only the leader's step has code that appends"
+ },
+ "raft-log.2": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`append_entry`: the line that stamps the term on a new entry. Off: no term"
+ },
+ "raft-log.3": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`maybe_send_append`: the two fields of the append message. Off: both empty"
+ },
+ "raft-log.4": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the stale-term gate, for an append or a snapshot. Off: it is taken"
+ },
+ "raft-log.5": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`maybe_append`: the match test on the entry before. Off: always a match"
+ },
+ "raft-log.6": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`Unstable::truncate_and_append` and `MemoryStorage::append`: the cut. Off: nothing is cut"
+ },
+ "raft-log.7": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`maybe_append`: the first index that differs. Off: the first entry of the message, so everything is written again"
+ },
+ "raft-log.8": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`send`: an append ack to another node waits for the write. Off: it goes out at once"
+ },
+ "raft-log.9": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`handle_append_entries`: the index field of the ack. Off: empty"
+ },
+ "raft-log.10": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`: step back after a refusal. Off: the refusal is ignored"
+ },
+ "raft-prevote-checkquorum.1": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: stand with a pre-vote first. Off: a plain election"
+ },
+ "raft-prevote-checkquorum.2": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: record a vote only for a real vote. Off: a pre-vote records one too"
+ },
+ "raft-prevote-checkquorum.3": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the lease test. Off: a vote request is never ignored"
+ },
+ "raft-prevote-checkquorum.4": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`step_candidate`: the count of pre-votes. Off: a pre-candidate has won at the first reply"
+ },
+ "raft-prevote-checkquorum.5": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`step_leader`, two places: note the follower as heard. Off: not noted"
+ },
+ "raft-prevote-checkquorum.6": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`: step down with no majority heard. Off: never"
+ },
+ "raft-prevote-checkquorum.7": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "fero's own rule (link pings). When built it is a block, so a switch (reasoned)"
+ },
+ "raft-readindex.1": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step_leader`: wait for an entry of the own term. Off: answer at once"
+ },
+ "raft-readindex.2": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`send_msg_read_index_response`: the commit index kept with the read. Off: 0"
+ },
+ "raft-readindex.3": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`send_msg_read_index_response`: the mode. Off: the lease mode, which answers with no round"
+ },
+ "raft-readindex.4": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "The host's duty (the fold). The port only hands the read index out. When built it is a guard, so a switch (reasoned)"
+ },
+ "raft-snapshot.1": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "The host's duty (the journal cuts the snapshot). When built it is a guard, so a switch (reasoned)"
+ },
+ "raft-snapshot.2": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`MemoryStorage::create_snapshot`: the index and term fields. Off: not set"
+ },
+ "raft-snapshot.3": {
+  "suite": "raft",
+  "kind": "field",
+  "why": "`MemoryStorage::create_snapshot`: the configuration field. Off: not set"
+ },
+ "raft-snapshot.4": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "The host's duty (the journal). An order of two writes, so an oracle (reasoned)"
+ },
+ "raft-snapshot.5": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "The host's duty (the journal). When built it is a guard, so a switch (reasoned)"
+ },
+ "raft-snapshot.6": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`maybe_send_append`, two places: send a snapshot. Off: nothing is sent"
+ },
+ "raft-snapshot.7": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`restore`: at or below the commit index. Off: it is used"
+ },
+ "raft-snapshot.8": {
+  "suite": "raft",
+  "kind": "not in the port",
+  "why": "The host's duty (the link and the journal). An order, so an oracle (reasoned)"
+ },
+ "raft-snapshot.9": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`restore`: the log holds the last entry. Off: the whole log is dropped every time"
+ },
+ "raft-snapshot.10": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`restore`: reset the log from the snapshot. Off: the log is left"
+ },
+ "raft-term-vote.1": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`send`: a vote reply waits for the write. Off: it goes out at once. The candidate's own requests are the host's duty"
+ },
+ "raft-term-vote.2": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`tick_election`: the timer ran out. Off: never"
+ },
+ "raft-term-vote.3": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`reset_randomized_election_timeout`: the random part. Off: 0"
+ },
+ "raft-term-vote.4": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`become_candidate`: term plus one. Off: the same term"
+ },
+ "raft-term-vote.5": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`become_candidate`: vote for itself. Off: no vote"
+ },
+ "raft-term-vote.6": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`reset` and `become_pre_candidate`: clear the tally. Off: kept"
+ },
+ "raft-term-vote.7": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the stale-term gate, for a vote request. Off: it is judged"
+ },
+ "raft-term-vote.8": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: has not voted, or voted for the same one. Off: always free to vote"
+ },
+ "raft-term-vote.9": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the candidate's log is up to date. Off: any log"
+ },
+ "raft-term-vote.10": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`step`: record the vote. Off: not recorded"
+ },
+ "raft-term-vote.11": {
+  "suite": "raft",
+  "kind": "switch (guard)",
+  "why": "`step`: the stale-term gate, for a vote reply. Off: it is counted"
+ },
+ "raft-term-vote.12": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`poll`: add the vote to the tally. Off: not added"
+ },
+ "raft-term-vote.13": {
+  "suite": "raft",
+  "kind": "oracle",
+  "why": "Held by absence: a follower's step has no arm for a vote reply"
+ },
+ "raft-term-vote.14": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`step`: the term to take. Off: the own term"
+ },
+ "raft-term-vote.15": {
+  "suite": "raft",
+  "kind": "switch (value)",
+  "why": "`step`: become a follower. Off: only take the term"
+ },
+ "raft-term-vote.16": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`reset`: clear the vote. Off: kept"
+ },
+ "raft-term-vote.17": {
+  "suite": "raft",
+  "kind": "switch (block)",
+  "why": "`step_candidate`, three places: become the leader's follower. Off: stay a candidate"
+ },
+ "client-sessions.3": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`handle`: look the attempt up among the outcomes. Off: never found, so it is applied again"
+ },
+ "fence-tokens.1": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`#cond`: the token is below the highest seen. Off: never"
+ },
+ "field-guards.1": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`#cond`: equals, on the field's value. Off: always passes"
+ },
+ "fold-all.1": {
+  "suite": "ts",
+  "kind": "oracle",
+  "why": "An order held by the log's index and one fold loop. No block to skip"
+ },
+ "judged-writes.1": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`#judgeWrites`: test the condition. Off: no condition fails"
+ },
+ "judging-state.1": {
+  "suite": "ts",
+  "kind": "field",
+  "why": "`dump`: the outcomes and the fence table in the snapshot. Off: both empty"
+ },
+ "leader-code.1": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`handle`: a rule that throws becomes a refusal. Off: the error goes up"
+ },
+ "presence-rows.4": {
+  "suite": "ts",
+  "kind": "field",
+  "why": "`#judgeWrites`: the session id on the row. Off: not set"
+ },
+ "row-version.1": {
+  "suite": "ts",
+  "kind": "field",
+  "why": "`apply`: the version of the last write. Off: the old version stays"
+ },
+ "shape-rule.1": {
+  "suite": "ts",
+  "kind": "switch (guard)",
+  "why": "`#judgeWrites`: a missing parent field. Off: never refused"
+ }
+}

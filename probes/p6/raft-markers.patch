@@ -1,0 +1,702 @@
+diff -ruN a/crates/raft/Cargo.toml b/crates/raft/Cargo.toml
+--- a/crates/raft/Cargo.toml
++++ b/crates/raft/Cargo.toml
+@@ -11,6 +11,11 @@
+ doctest = false
+ 
+ [dependencies]
++rule = { path = "../rule" }
++
++[features]
++# A test build: one marked rule can be switched off with RULE_OFF=<id>.
++switch = ["rule/switch-env"]
+ 
+ [lints]
+ workspace = true
+diff -ruN a/crates/raft/src/log.rs b/crates/raft/src/log.rs
+--- a/crates/raft/src/log.rs
++++ b/crates/raft/src/log.rs
+@@ -142,14 +142,18 @@
+     /// maybeAppend returns (0, false) if the entries cannot be appended. Otherwise,
+     /// it returns (last index of new entries, true).
+     pub(crate) fn maybe_append(&mut self, a: &LogSlice, committed: u64) -> Option<u64> {
+-        if !self.match_term(a.prev) {
++        if rule::rule!("raft-log.5", !self.match_term(a.prev), off = false) {
+             return None;
+         }
+         // TODO(pav-kv): propagate logSlice down the stack. It will be used all the
+         // way down in unstable, for safety checks, and for useful bookkeeping.
+ 
+         let lastnewi = a.prev.index + len64(&a.entries);
+-        let ci = self.find_conflict(&a.entries);
++        let ci = rule::rule!(
++            "raft-log.7",
++            self.find_conflict(&a.entries),
++            off = if a.entries.is_empty() { 0 } else { a.prev.index + 1 }
++        );
+         if ci == 0 {
+         } else if ci <= self.committed {
+             self.logger
+@@ -167,7 +171,7 @@
+             }
+             self.append(&a.entries[crate::num::ix(ci - offset)..]);
+         }
+-        self.commit_to(min(committed, lastnewi));
++        self.commit_to(rule::rule!("raft-commit.8", min(committed, lastnewi), off = committed));
+         Some(lastnewi)
+     }
+ 
+@@ -528,7 +532,7 @@
+         // NB: term should never be 0 on a commit because the leader campaigned at
+         // least at term 1. But if it is 0 for some reason, we don't consider this a
+         // term match.
+-        if at.term != 0 && at.index > self.committed && self.match_term(at) {
++        if at.term != 0 && at.index > self.committed && rule::rule!("raft-commit.6", self.match_term(at), off = true) {
+             self.commit_to(at.index);
+             return true;
+         }
+diff -ruN a/crates/raft/src/log_unstable.rs b/crates/raft/src/log_unstable.rs
+--- a/crates/raft/src/log_unstable.rs
++++ b/crates/raft/src/log_unstable.rs
+@@ -218,7 +218,9 @@
+             // Truncate to fromIndex (exclusive), and append the new entries.
+             self.logger.infof(format_args!("truncate the unstable entries before index {from_index}"));
+             self.must_check_out_of_bounds(self.offset, from_index);
+-            self.entries.truncate(ix(from_index - self.offset));
++            rule::rule!("raft-log.6", {
++                self.entries.truncate(ix(from_index - self.offset));
++            });
+             self.entries.extend_from_slice(ents);
+             // Only in-progress entries before fromIndex are still considered to be
+             // in-progress.
+diff -ruN a/crates/raft/src/quorum/majority.rs b/crates/raft/src/quorum/majority.rs
+--- a/crates/raft/src/quorum/majority.rs
++++ b/crates/raft/src/quorum/majority.rs
+@@ -192,7 +192,7 @@
+         // The smallest index into the array for which the value is acked by a
+         // quorum. In other words, from the end of the slice, move n/2+1 to the
+         // left (accounting for zero-indexing).
+-        let pos = n - (n / 2 + 1);
++        let pos = rule::rule!("raft-commit.5", n - (n / 2 + 1), off = n - 1);
+         Index(srt[pos])
+     }
+ 
+diff -ruN a/crates/raft/src/raft.rs b/crates/raft/src/raft.rs
+--- a/crates/raft/src/raft.rs
++++ b/crates/raft/src/raft.rs
+@@ -671,7 +671,10 @@
+                 m.term = Some(self.term);
+             }
+         }
+-        if m.get_type() == pb::MsgAppResp || m.get_type() == pb::MsgVoteResp || m.get_type() == pb::MsgPreVoteResp {
++        if (m.get_type() == pb::MsgAppResp || m.get_type() == pb::MsgVoteResp || m.get_type() == pb::MsgPreVoteResp)
++            && rule::rule!("raft-log.8", true, off = m.get_type() != pb::MsgAppResp || m.get_to() == self.id)
++            && rule::rule!("raft-term-vote.1", true, off = m.get_type() == pb::MsgAppResp || m.get_to() == self.id)
++        {
+             // If async storage writes are enabled, messages added to the msgs slice
+             // are allowed to be sent out before unstable state (e.g. log entry
+             // writes and election votes) have been durably synced to the local
+@@ -755,7 +758,7 @@
+             Err(_) => {
+                 // The log probably got truncated at >= pr.Next, so we can't catch up the
+                 // follower log anymore. Send a snapshot instead.
+-                return self.maybe_send_snapshot(to);
++                return rule::rule!("raft-snapshot.6", self.maybe_send_snapshot(to), off = false);
+             }
+         };
+ 
+@@ -779,7 +782,7 @@
+         // TODO(pav-kv): move this check up to where err is returned.
+         if err.is_some() {
+             // send a snapshot if we failed to get the entries
+-            return self.maybe_send_snapshot(to);
++            return rule::rule!("raft-snapshot.6", self.maybe_send_snapshot(to), off = false);
+         }
+ 
+         // Send the actual MsgApp otherwise, and update the progress accordingly.
+@@ -789,8 +792,8 @@
+         self.send(pb::Message {
+             to: Some(to),
+             r#type: Some(pb::MsgApp),
+-            index: Some(prev_index),
+-            log_term: Some(prev_term),
++            index: rule::rule!("raft-log.3", Some(prev_index), off = None),
++            log_term: rule::rule!("raft-log.3", Some(prev_term), off = None),
+             entries: ents,
+             commit: Some(committed),
+             ..Default::default()
+@@ -861,7 +864,11 @@
+         // or it might not have all the committed entries.
+         // The leader MUST NOT forward the follower's commit to
+         // an unmatched index.
+-        let commit = min(self.pr(to).match_, self.raft_log.committed);
++        let commit = rule::rule!(
++            "raft-commit.7",
++            min(self.pr(to).match_, self.raft_log.committed),
++            off = self.raft_log.committed
++        );
+         self.send(pb::Message {
+             to: Some(to),
+             r#type: Some(pb::MsgHeartbeat),
+@@ -954,7 +961,9 @@
+     pub(crate) fn reset(&mut self, term: u64) {
+         if self.term != term {
+             self.term = term;
+-            self.vote = NONE;
++            rule::rule!("raft-term-vote.16", {
++                self.vote = NONE;
++            });
+         }
+         self.lead = NONE;
+ 
+@@ -964,20 +973,24 @@
+ 
+         self.abort_leader_transfer();
+ 
+-        self.trk.reset_votes();
++        rule::rule!("raft-term-vote.6", {
++            self.trk.reset_votes();
++        });
+         let last_index = self.raft_log.last_index();
+         let (self_id, max_inflight, max_inflight_bytes) = (self.id, self.trk.max_inflight, self.trk.max_inflight_bytes);
+-        self.trk.visit(|id, pr| {
+-            *pr = tracker::Progress {
+-                match_: 0,
+-                next: last_index + 1,
+-                inflights: tracker::Inflights::new(max_inflight, max_inflight_bytes),
+-                is_learner: pr.is_learner,
+-                ..Default::default()
+-            };
+-            if id == self_id {
+-                pr.match_ = last_index;
+-            }
++        rule::rule!("raft-commit.1", {
++            self.trk.visit(|id, pr| {
++                *pr = tracker::Progress {
++                    match_: 0,
++                    next: last_index + 1,
++                    inflights: tracker::Inflights::new(max_inflight, max_inflight_bytes),
++                    is_learner: pr.is_learner,
++                    ..Default::default()
++                };
++                if id == self_id {
++                    pr.match_ = last_index;
++                }
++            });
+         });
+ 
+         self.pending_conf_index = 0;
+@@ -991,7 +1004,9 @@
+         // caller's entries stay as they were. Here the caller hands the
+         // entries over, so there is nothing to protect.
+         for (i, e) in (0_u64..).zip(es.iter_mut()) {
+-            e.term = Some(self.term);
++            rule::rule!("raft-log.2", {
++                e.term = Some(self.term);
++            });
+             e.index = Some(li + 1 + i);
+         }
+         // Track the size of this uncommitted proposal.
+@@ -1034,7 +1049,7 @@
+     pub(crate) fn tick_election(&mut self) {
+         self.election_elapsed += 1;
+ 
+-        if self.promotable() && self.past_election_timeout() {
++        if self.promotable() && rule::rule!("raft-term-vote.2", self.past_election_timeout(), off = false) {
+             self.election_elapsed = 0;
+             if let Err(err) =
+                 self.step(pb::Message { from: Some(self.id), r#type: Some(pb::MsgHup), ..Default::default() })
+@@ -1061,7 +1076,11 @@
+                 }
+             }
+             // If current leader cannot transfer leadership in electionTimeout, it becomes leader again.
+-            if self.state == StateType::StateLeader && self.lead_transferee != NONE {
++            if rule::rule!(
++                "raft-leader-transfer.6",
++                self.state == StateType::StateLeader && self.lead_transferee != NONE,
++                off = false
++            ) {
+                 self.abort_leader_transfer();
+             }
+         }
+@@ -1095,9 +1114,11 @@
+             panic!("invalid transition [leader -> candidate]");
+         }
+         self.step = StepFn::Candidate;
+-        self.reset(self.term + 1);
++        self.reset(rule::rule!("raft-term-vote.4", self.term + 1, off = self.term));
+         self.tick = TickFn::Election;
+-        self.vote = self.id;
++        rule::rule!("raft-term-vote.5", {
++            self.vote = self.id;
++        });
+         self.state = StateType::StateCandidate;
+         self.logger.infof(format_args!("{:x} became candidate at term {}", self.id, self.term));
+     }
+@@ -1111,7 +1132,9 @@
+         // but doesn't change anything else. In particular it does not increase
+         // r.Term or change r.Vote.
+         self.step = StepFn::Candidate;
+-        self.trk.reset_votes();
++        rule::rule!("raft-term-vote.6", {
++            self.trk.reset_votes();
++        });
+         self.tick = TickFn::Election;
+         self.lead = NONE;
+         self.state = StateType::StatePreCandidate;
+@@ -1144,10 +1167,12 @@
+         // safe to delay any future proposals until we commit all our
+         // pending log entries, and scanning the entire tail of the log
+         // could be expensive.
+-        self.pending_conf_index = self.raft_log.last_index();
++        rule::rule!("raft-config.2", {
++            self.pending_conf_index = self.raft_log.last_index();
++        });
+ 
+         let empty_ent = pb::Entry { data: None, ..Default::default() };
+-        if !self.append_entry(vec![empty_ent]) {
++        if rule::rule!("raft-config.3", !self.append_entry(vec![empty_ent]), off = false) {
+             // This won't happen because we just called reset() above.
+             self.logger.panicf(format_args!("empty entry was dropped"));
+         }
+@@ -1168,7 +1193,7 @@
+             self.logger.warningf(format_args!("{:x} is unpromotable and can not campaign", self.id));
+             return;
+         }
+-        if self.has_unapplied_conf_changes() {
++        if rule::rule!("raft-config.11", self.has_unapplied_conf_changes(), off = false) {
+             self.logger.warningf(format_args!(
+                 "{:x} cannot campaign at term {} since there are still pending configuration changes to apply",
+                 self.id, self.term
+@@ -1279,7 +1304,9 @@
+             self.logger
+                 .infof(format_args!("{:x} received {} rejection from {:x} at term {}", self.id, t, id, self.term));
+         }
+-        self.trk.record_vote(id, v);
++        rule::rule!("raft-term-vote.12", {
++            self.trk.record_vote(id, v);
++        });
+         self.trk.tally_votes()
+     }
+ 
+@@ -1292,8 +1319,16 @@
+             // local message
+         } else if m.get_term() > self.term {
+             if m.get_type() == pb::MsgVote || m.get_type() == pb::MsgPreVote {
+-                let force = m.get_context() == CampaignType::Transfer.as_bytes();
+-                let in_lease = self.check_quorum && self.lead != NONE && self.election_elapsed < self.election_timeout;
++                let force = rule::rule!(
++                    "raft-leader-transfer.5",
++                    m.get_context() == CampaignType::Transfer.as_bytes(),
++                    off = false
++                );
++                let in_lease = rule::rule!(
++                    "raft-prevote-checkquorum.3",
++                    self.check_quorum && self.lead != NONE && self.election_elapsed < self.election_timeout,
++                    off = false
++                );
+                 if !force && in_lease {
+                     // If a server receives a RequestVote request within the minimum election timeout
+                     // of hearing from a current leader, it does not update its term or grant its vote
+@@ -1333,12 +1368,28 @@
+                     m.get_term()
+                 ));
+                 if m.get_type() == pb::MsgApp || m.get_type() == pb::MsgHeartbeat || m.get_type() == pb::MsgSnap {
+-                    self.become_follower(m.get_term(), m.get_from());
++                    rule::rule!(
++                        "raft-term-vote.15",
++                        self.become_follower(
++                            rule::rule!("raft-term-vote.14", m.get_term(), off = self.term),
++                            m.get_from()
++                        ),
++                        off = self.reset(rule::rule!("raft-term-vote.14", m.get_term(), off = self.term))
++                    );
+                 } else {
+-                    self.become_follower(m.get_term(), NONE);
++                    rule::rule!(
++                        "raft-term-vote.15",
++                        self.become_follower(rule::rule!("raft-term-vote.14", m.get_term(), off = self.term), NONE),
++                        off = self.reset(rule::rule!("raft-term-vote.14", m.get_term(), off = self.term))
++                    );
+                 }
+             }
+-        } else if m.get_term() < self.term {
++        } else if m.get_term() < self.term
++            && rule::rule!("raft-commit.2", true, off = m.get_type() != pb::MsgAppResp)
++            && rule::rule!("raft-log.4", true, off = m.get_type() != pb::MsgApp && m.get_type() != pb::MsgSnap)
++            && rule::rule!("raft-term-vote.7", true, off = m.get_type() != pb::MsgVote)
++            && rule::rule!("raft-term-vote.11", true, off = m.get_type() != pb::MsgVoteResp)
++        {
+             if (self.check_quorum || self.pre_vote) && (m.get_type() == pb::MsgHeartbeat || m.get_type() == pb::MsgApp)
+             {
+                 // We have received messages from a leader at a lower term. It is possible
+@@ -1424,7 +1475,7 @@
+ 
+         match m.get_type() {
+             pb::MsgHup => {
+-                if self.pre_vote {
++                if rule::rule!("raft-prevote-checkquorum.1", self.pre_vote, off = false) {
+                     self.hup(CampaignType::PreElection);
+                 } else {
+                     self.hup(CampaignType::Election);
+@@ -1458,7 +1509,9 @@
+                 // ...and we believe the candidate is up to date.
+                 let last_id = self.raft_log.last_entry_id();
+                 let cand_last_id = EntryID { term: m.get_log_term(), index: m.get_index() };
+-                if can_vote && self.raft_log.is_up_to_date(cand_last_id) {
++                if rule::rule!("raft-term-vote.8", can_vote, off = true)
++                    && rule::rule!("raft-term-vote.9", self.raft_log.is_up_to_date(cand_last_id), off = true)
++                {
+                     // Note: it turns out that that learners must be allowed to cast votes.
+                     // This seems counter- intuitive but is necessary in the situation in which
+                     // a learner has been promoted (i.e. is now a voter) but has not learned
+@@ -1504,10 +1557,12 @@
+                         r#type: Some(vote_resp_msg_type(m.get_type())),
+                         ..Default::default()
+                     });
+-                    if m.get_type() == pb::MsgVote {
++                    if rule::rule!("raft-prevote-checkquorum.2", m.get_type() == pb::MsgVote, off = true) {
+                         // Only record real votes.
+                         self.election_elapsed = 0;
+-                        self.vote = m.get_from();
++                        rule::rule!("raft-term-vote.10", {
++                            self.vote = m.get_from();
++                        });
+                     }
+                 } else {
+                     self.logger.infof(format_args!(
+@@ -1549,7 +1604,7 @@
+                 return Ok(());
+             }
+             pb::MsgCheckQuorum => {
+-                if !self.trk.quorum_active() {
++                if rule::rule!("raft-prevote-checkquorum.6", !self.trk.quorum_active(), off = false) {
+                     self.logger
+                         .warningf(format_args!("{:x} stepped down to follower since quorum is not active", self.id));
+                     self.become_follower(self.term, NONE);
+@@ -1574,12 +1629,12 @@
+                     // drop any new proposals.
+                     return Err(Error::ProposalDropped);
+                 }
+-                if self.lead_transferee != NONE {
++                if rule::rule!("raft-leader-transfer.1", self.lead_transferee != NONE, off = false) {
+                     self.logger.debugf(format_args!(
+                         "{:x} [term {}] transfer leadership to {:x} is in progress; dropping proposal",
+                         self.id, self.term, self.lead_transferee
+                     ));
+-                    return Err(Error::ProposalDropped);
++                    return rule::rule!("raft-leader-transfer.2", Err(Error::ProposalDropped), off = Ok(()));
+                 }
+ 
+                 for (i, e) in (0_u64..).zip(m.entries.iter_mut()) {
+@@ -1596,7 +1651,11 @@
+                         }
+                     }
+                     if let Some(cc) = cc {
+-                        let already_pending = self.pending_conf_index > self.raft_log.applied;
++                        let already_pending = rule::rule!(
++                            "raft-config.5",
++                            rule::rule!("raft-config.6", self.pending_conf_index > self.raft_log.applied, off = false),
++                            off = false
++                        );
+                         let already_joint = !self.trk.config.voters.0[1].is_empty();
+                         let wants_leave_joint = cc.as_v2().changes.is_empty();
+ 
+@@ -1623,7 +1682,9 @@
+                             ));
+                             *e = pb::Entry { r#type: Some(pb::EntryNormal), ..Default::default() };
+                         } else {
+-                            self.pending_conf_index = self.raft_log.last_index() + i + 1;
++                            rule::rule!("raft-config.8", {
++                                self.pending_conf_index = self.raft_log.last_index() + i + 1;
++                            });
+                         }
+                     }
+                 }
+@@ -1637,7 +1698,7 @@
+             pb::MsgReadIndex => {
+                 // Postpone read only request when this leader has not committed
+                 // any log entry at its term.
+-                if !self.committed_entry_in_current_term() {
++                if rule::rule!("raft-readindex.1", !self.committed_entry_in_current_term(), off = false) {
+                     self.pending_read_index_messages.push(m);
+                     return Ok(());
+                 }
+@@ -1663,7 +1724,9 @@
+                 // NB: this code path is also hit from (*raft).advance, where the leader steps
+                 // an MsgAppResp to acknowledge the appended entries in the last Ready.
+ 
+-                self.pr_mut(from).recent_active = true;
++                rule::rule!("raft-prevote-checkquorum.5", {
++                    self.pr_mut(from).recent_active = true;
++                });
+ 
+                 if m.get_reject() {
+                     // RejectHint is the suggested next base entry for appending (i.e.
+@@ -1796,7 +1859,11 @@
+                         (next_probe_idx, _) =
+                             self.raft_log.find_conflict_by_term(m.get_reject_hint(), m.get_log_term());
+                     }
+-                    if self.pr_mut(from).maybe_decr_to(m.get_index(), next_probe_idx) {
++                    if rule::rule!(
++                        "raft-log.10",
++                        self.pr_mut(from).maybe_decr_to(m.get_index(), next_probe_idx),
++                        off = false
++                    ) {
+                         self.logger.debugf(format_args!(
+                             "{:x} decreased progress of {:x} to [{}]",
+                             self.id,
+@@ -1873,7 +1940,13 @@
+                             while self.maybe_send_append(from, false /* sendIfEmpty */) {}
+                         }
+                         // Transfer leadership is in progress.
+-                        if from == self.lead_transferee && self.pr(from).match_ == self.raft_log.last_index() {
++                        if from == self.lead_transferee
++                            && rule::rule!(
++                                "raft-leader-transfer.3",
++                                self.pr(from).match_ == self.raft_log.last_index(),
++                                off = true
++                            )
++                        {
+                             self.logger.infof(format_args!(
+                                 "{:x} sent MsgTimeoutNow to {:x} after received MsgAppResp",
+                                 self.id, from
+@@ -1886,7 +1959,9 @@
+             pb::MsgHeartbeatResp => {
+                 let last_index = self.raft_log.last_index();
+                 let pr = self.pr_mut(from);
+-                pr.recent_active = true;
++                rule::rule!("raft-prevote-checkquorum.5", {
++                    pr.recent_active = true;
++                });
+                 pr.msg_app_flow_paused = false;
+ 
+                 // NB: if the follower is paused (full Inflights), this will still send an
+@@ -1998,7 +2073,8 @@
+                 // Transfer leadership should be finished in one electionTimeout, so reset r.electionElapsed.
+                 self.election_elapsed = 0;
+                 self.lead_transferee = lead_transferee;
+-                if self.pr(from).match_ == self.raft_log.last_index() {
++                if rule::rule!("raft-leader-transfer.3", self.pr(from).match_ == self.raft_log.last_index(), off = true)
++                {
+                     self.send_timeout_now(lead_transferee);
+                     self.logger.infof(format_args!(
+                         "{:x} sends MsgTimeoutNow to {:x} immediately as {:x} already has up-to-date log",
+@@ -2029,15 +2105,21 @@
+                 return Err(Error::ProposalDropped);
+             }
+             pb::MsgApp => {
+-                self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                rule::rule!("raft-term-vote.17", {
++                    self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                });
+                 self.handle_append_entries(m);
+             }
+             pb::MsgHeartbeat => {
+-                self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                rule::rule!("raft-term-vote.17", {
++                    self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                });
+                 self.handle_heartbeat(m);
+             }
+             pb::MsgSnap => {
+-                self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                rule::rule!("raft-term-vote.17", {
++                    self.become_follower(m.get_term(), m.get_from()); // always m.Term == r.Term
++                });
+                 self.handle_snapshot(m);
+             }
+             t if t == my_vote_resp_type => {
+@@ -2049,7 +2131,11 @@
+                     m.get_type(),
+                     rj
+                 ));
+-                match res {
++                match rule::rule!(
++                    "raft-prevote-checkquorum.4",
++                    res,
++                    off = if self.state == StateType::StatePreCandidate { quorum::VoteResult::VoteWon } else { res }
++                ) {
+                     quorum::VoteResult::VoteWon => {
+                         if self.state == StateType::StatePreCandidate {
+                             self.campaign(CampaignType::Election);
+@@ -2143,7 +2229,9 @@
+                 // Leadership transfers never use pre-vote even if r.preVote is true; we
+                 // know we are not recovering from a partition so there is no need for the
+                 // extra round trip.
+-                self.hup(CampaignType::Transfer);
++                rule::rule!("raft-leader-transfer.4", {
++                    self.hup(CampaignType::Transfer);
++                });
+             }
+             pb::MsgReadIndex => {
+                 if self.lead == NONE {
+@@ -2192,7 +2280,7 @@
+             self.send(pb::Message {
+                 to: m.from,
+                 r#type: Some(pb::MsgAppResp),
+-                index: Some(mlast_index),
++                index: rule::rule!("raft-log.9", Some(mlast_index), off = None),
+                 ..Default::default()
+             });
+             return;
+@@ -2282,7 +2370,7 @@
+     /// configuration of state machine. If this method returns false, the snapshot was
+     /// ignored, either because it was obsolete or because of an error.
+     pub(crate) fn restore(&mut self, mut s: pb::Snapshot) -> bool {
+-        if s.get_metadata_index() <= self.raft_log.committed {
++        if rule::rule!("raft-snapshot.7", s.get_metadata_index() <= self.raft_log.committed, off = false) {
+             return false;
+         }
+         if self.state != StateType::StateFollower {
+@@ -2334,7 +2422,7 @@
+         // Now go ahead and actually restore.
+ 
+         let id = EntryID { term: s.get_metadata_term(), index: s.get_metadata_index() };
+-        if self.raft_log.match_term(id) {
++        if rule::rule!("raft-snapshot.9", self.raft_log.match_term(id), off = false) {
+             // TODO(pav-kv): can print %+v of the id, but it will change the format.
+             let last = self.raft_log.last_entry_id();
+             self.logger.infof(format_args!(
+@@ -2345,7 +2433,9 @@
+             return false;
+         }
+ 
+-        self.raft_log.restore(&s);
++        rule::rule!("raft-snapshot.10", {
++            self.raft_log.restore(&s);
++        });
+ 
+         // Reset the configuration and add the (potentially updated) peers in anew.
+         self.trk = tracker::ProgressTracker::make(self.trk.max_inflight, self.trk.max_inflight_bytes);
+@@ -2376,8 +2466,11 @@
+     /// which is true when its own id is in progress list.
+     pub(crate) fn promotable(&self) -> bool {
+         match self.trk.progress.get(&self.id) {
+-            Some(pr) => !pr.is_learner && !self.raft_log.has_next_or_in_progress_snapshot(),
+-            None => false,
++            Some(pr) => {
++                rule::rule!("raft-config.12", !pr.is_learner, off = true)
++                    && !self.raft_log.has_next_or_in_progress_snapshot()
++            }
++            None => rule::rule!("raft-config.12", false, off = true),
+         }
+     }
+ 
+@@ -2411,8 +2504,10 @@
+     ///
+     /// The inputs usually result from restoring a ConfState or applying a ConfChange.
+     pub(crate) fn switch_to_config(&mut self, cfg: tracker::Config, trk: tracker::ProgressMap) -> pb::ConfState {
+-        self.trk.config = cfg;
+-        self.trk.progress = trk;
++        rule::rule!("raft-config.9", {
++            self.trk.config = cfg;
++            self.trk.progress = trk;
++        });
+ 
+         self.logger.infof(format_args!("{:x} switched to configuration {}", self.id, self.trk.config));
+         let cs = self.trk.conf_state();
+@@ -2434,7 +2529,7 @@
+             // TODO(tbg): ask follower with largest Match to TimeoutNow (to avoid
+             // interruption). This might still drop some proposals but it's better than
+             // nothing.
+-            if self.step_down_on_removal {
++            if rule::rule!("raft-config.10", self.step_down_on_removal, off = false) {
+                 self.become_follower(self.term, NONE);
+             }
+             return cs;
+@@ -2493,7 +2588,8 @@
+     }
+ 
+     pub(crate) fn reset_randomized_election_timeout(&mut self) {
+-        self.randomized_election_timeout = self.election_timeout + self.rand.intn(self.election_timeout);
++        self.randomized_election_timeout =
++            self.election_timeout + rule::rule!("raft-term-vote.3", self.rand.intn(self.election_timeout), off = 0);
+     }
+ 
+     pub(crate) fn send_timeout_now(&mut self, to: u64) {
+@@ -2599,9 +2695,9 @@
+             }
+             return;
+         }
+-        match self.read_only.option {
++        match rule::rule!("raft-readindex.3", self.read_only.option, off = ReadOnlyOption::ReadOnlyLeaseBased) {
+             ReadOnlyOption::ReadOnlySafe => {
+-                self.read_only.add_request(self.raft_log.committed, m);
++                self.read_only.add_request(rule::rule!("raft-readindex.2", self.raft_log.committed, off = 0), m);
+                 // The local node automatically acks the request.
+                 let ctx = self.read_only.heartbeat_ctx();
+                 self.read_only.recv_ack(self.id, ctx.as_deref().unwrap_or(&[]));
+diff -ruN a/crates/raft/src/storage.rs b/crates/raft/src/storage.rs
+--- a/crates/raft/src/storage.rs
++++ b/crates/raft/src/storage.rs
+@@ -221,10 +221,14 @@
+ 
+         let term = self.ents[ix(i - offset)].get_term();
+         let md = pb::ensure_snapshot_metadata(&mut self.snapshot.metadata);
+-        md.index = Some(i);
+-        md.term = Some(term);
++        rule::rule!("raft-snapshot.2", {
++            md.index = Some(i);
++            md.term = Some(term);
++        });
+         if let Some(cs) = cs {
+-            md.conf_state = Some(cs.clone());
++            rule::rule!("raft-snapshot.3", {
++                md.conf_state = Some(cs.clone());
++            });
+         }
+         self.snapshot.data = data;
+         Ok(self.snapshot.clone())
+@@ -277,7 +281,9 @@
+ 
+         let offset = entries[0].get_index() - self.ents[0].get_index();
+         if len64(&self.ents) > offset {
+-            self.ents.truncate(ix(offset));
++            rule::rule!("raft-log.6", {
++                self.ents.truncate(ix(offset));
++            });
+             self.ents.extend_from_slice(entries);
+         } else if len64(&self.ents) == offset {
+             self.ents.extend_from_slice(entries);
+diff -ruN a/crates/raft/src/tracker/progress.rs b/crates/raft/src/tracker/progress.rs
+--- a/crates/raft/src/tracker/progress.rs
++++ b/crates/raft/src/tracker/progress.rs
+@@ -225,7 +225,9 @@
+         if n <= self.match_ {
+             return false;
+         }
+-        self.match_ = n;
++        rule::rule!("raft-commit.3", {
++            self.match_ = n;
++        });
+         // Go's n+1 wraps at the top of uint64; so does this.
+         self.next = max(self.next, n.wrapping_add(1)); // invariant: Match < Next
+         self.msg_app_flow_paused = false;
+diff -ruN a/crates/raft-harness/Cargo.toml b/crates/raft-harness/Cargo.toml
+--- a/crates/raft-harness/Cargo.toml
++++ b/crates/raft-harness/Cargo.toml
+@@ -21,6 +21,9 @@
+ [dependencies]
+ raft = { path = "../raft" }
+ 
++[features]
++switch = ["raft/switch"]
++
+ [lints.rust]
+ unsafe_code = "forbid"
+ unused_must_use = "deny"
+diff -ruN a/crates/raft-harness/tests/rules.rs b/crates/raft-harness/tests/rules.rs
+--- a/crates/raft-harness/tests/rules.rs
++++ b/crates/raft-harness/tests/rules.rs
+@@ -101,6 +101,10 @@
+             in_deps = line.contains("dependencies");
+             continue;
+         }
++        // The marked copy: the marker crate is in this workspace, so it is not an outside crate.
++        if line == r#"rule = { path = "../rule" }"# {
++            continue;
++        }
+         assert!(!(in_deps && !line.is_empty() && !line.starts_with('#')), "raft has a dependency: {line}");
+     }
+ }

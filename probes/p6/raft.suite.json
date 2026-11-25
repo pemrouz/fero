@@ -1,0 +1,18 @@
+{
+ "name": "raft",
+ "scan": ["${MARKED}/crates"],
+ "tests": [
+  { "name": "files", "group": "files", "cwd": "${MARKED}", "cmd": ["${MARKED}/bins/raft-datadriven"], "timeout_ms": 20000 },
+  { "name": "unit-raft", "group": "harness tests", "cwd": "${MARKED}/crates/raft", "cmd": ["${MARKED}/bins/lib-raft"], "timeout_ms": 60000 },
+  { "name": "unit-harness", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/lib-raft_harness"], "timeout_ms": 60000 },
+  { "name": "test-datadriven", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/test-datadriven"], "timeout_ms": 60000 },
+  { "name": "test-go_vectors", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/test-go_vectors"], "timeout_ms": 60000 },
+  { "name": "test-rules", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/test-rules"], "timeout_ms": 60000 },
+  { "name": "test-diff", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/test-diff"], "timeout_ms": 60000 },
+  { "name": "test-edge_values", "group": "harness tests", "cwd": "${MARKED}/crates/raft-harness", "cmd": ["${MARKED}/bins/test-edge_values"], "timeout_ms": 30000 },
+  { "name": "scripts-seed2", "group": "scripts", "cwd": "${MARKED}", "cmd": ["${MARKED}/bins/raft-diff", "${CORPUS}/seed2/out", "${CORPUS}/seed2/in"], "timeout_ms": 30000 },
+  { "name": "scripts-seed3", "group": "scripts", "cwd": "${MARKED}", "cmd": ["${MARKED}/bins/raft-diff", "${CORPUS}/seed3/out", "${CORPUS}/seed3/in"], "timeout_ms": 30000 },
+  { "name": "scripts-seed5", "group": "scripts", "cwd": "${MARKED}", "cmd": ["${MARKED}/bins/raft-diff", "${CORPUS}/seed5/out", "${CORPUS}/seed5/in"], "timeout_ms": 30000 },
+  { "name": "scripts-seed7", "group": "scripts", "cwd": "${MARKED}", "cmd": ["${MARKED}/bins/raft-diff", "${CORPUS}/seed7/out", "${CORPUS}/seed7/in"], "timeout_ms": 30000 }
+ ]
+}
