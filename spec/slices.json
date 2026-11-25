@@ -28,9 +28,9 @@
   "name": "one write",
   "adds": "One write through every layer: a resource founded with two groups on three servers, a commit on disk at a majority, a fold on every copy, a live link over both groups, and a deriver that writes exactly once per record.",
   "rules": {
-   "records": 257,
-   "low": 254,
-   "high": 285
+   "records": 258,
+   "low": 255,
+   "high": 286
   },
   "models": [
    "P1's proof on every change",

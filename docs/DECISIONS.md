@@ -57,3 +57,16 @@ Decision:
 REJECTED: pass, but port Go's unit tests for the core (about 8,600 Go lines) and rerun the mutants before slice 1 (a few days for a gap the estimates cannot tell from zero); a fail on the literal reading (it would send P1 to a card with no ready fallback, over a difference inside the error).
 
 Consequences: the Raft port is the base for slice 1. Its proof stays etcd's 41 files, the 4,000 scripts against Go, the edge value check and the mutant run. Since the mutant run, the rule "a leader counts only its own term's entries" (raft-commit.6) is caught by the edge value check (P6's pass), so one known hole is closed *(measured)*.
+
+## V5-29 — Absurd Raft numbers are refused at the wire; the port keeps its overflow checks (2026-11-25; probes/README.md question 2, asked one at a time)
+
+Context: etcd's Go code wraps its `uint64` sums at the top of the range. The Rust port keeps overflow checks on, so a peer's message with a term or index near 2^64 could stop the port where Go goes on. P1's edge value check found such sites one node and four messages deep and fixed them by wrapping as Go does; longer paths are not checked *(reasoned)*. No honest peer sends such a number: a peer proves it holds the secret before it is admitted (the door, slice 7), and until then a server listens only on its own machine (`links.6`). So the number means a bug or damage, not a normal input.
+
+Decision:
+1. `links.7` (L0, slice 1): a peer's frame that carries a Raft term, index or commit at or above 2^62 does not decode. It closes its link as `links.3` says and never reaches Raft.
+2. The Raft crate keeps overflow checks on. A sum that still overflows is a loud stop and a bug to fix, not a value to carry on with. The wraps already made stay; they match Go.
+3. The decoder's fuzz test (BUILD 2.5 T7) sends such values.
+
+REJECTED: wrap every sum in the Raft crate, as Go does (closest to etcd byte for byte, but an overflow would then corrupt state silently, as in Go); both (the most code to change and the hardest port to read, for a value no honest peer can send).
+
+Consequences: the ledger gains one record and holds 830. 2^62 is far past any real log: at a million writes a second it is about 146,000 years of writes *(reasoned)*. A sum of two values under 2^62 cannot overflow, so the port's plain sums are safe behind the wire.
