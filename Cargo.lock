@@ -16,3 +16,10 @@ dependencies = [
 [[package]]
 name = "rule"
 version = "0.0.0"
+
+[[package]]
+name = "sim"
+version = "0.0.0"
+dependencies = [
+ "raft",
+]

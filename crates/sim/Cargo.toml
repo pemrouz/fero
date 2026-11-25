@@ -1,0 +1,23 @@
+[package]
+name = "sim"
+version = "0.0.0"
+description = "The simulation executive: a seeded scheduler, a fake network, crashes and a trace. no_std, no outside crates."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[features]
+# Used only by probe P2's byte check, never in a normal build. It hashes a
+# machine-sized number into the trace, so the native and the WASM build must
+# differ. It proves the byte check can fail.
+trap-width = []
+
+[dependencies]
+raft = { path = "../raft" }
+
+[lints]
+workspace = true
