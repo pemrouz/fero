@@ -12,3 +12,7 @@ version = "0.0.0"
 dependencies = [
  "raft",
 ]
+
+[[package]]
+name = "rule"
+version = "0.0.0"

@@ -1,0 +1,24 @@
+[package]
+name = "rule"
+version = "0.0.0"
+description = "The rule marker: wraps the code that holds a ledger rule. Costs nothing in a normal build; a test build can switch one rule off."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[features]
+# A test build. One rule id can be switched off while the program runs, with no rebuild.
+# Still no_std: the test harness names the rule with `rule::switch_off`.
+switch = []
+# A test build that also reads the rule id from the environment (RULE_OFF) at the first
+# marker it meets, so no test binary needs a line of code. Uses std; never in a release.
+switch-env = ["switch"]
+
+[dependencies]
+
+[lints]
+workspace = true
