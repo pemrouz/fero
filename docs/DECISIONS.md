@@ -45,3 +45,15 @@ Decision:
 REJECTED: Linux and macOS servers from slice 1 (about twice the disk and socket test matrix from the start, and macOS's fsync differs, so its pins could be relative only); Linux only, for good (a developer could not run a native server on a Mac or Windows laptop).
 
 Consequences: until slice 7, a developer on macOS or Windows runs a server in a Linux container or virtual machine. The shell's disk and socket code may use Linux's calls first, behind one seam, so the other platforms add an implementation and not a rewrite *(reasoned)*.
+
+## V5-28 — P1 passes: the Rust port's mutant score is inside the error of the TypeScript port's (2026-11-25; probes/README.md question 1, asked one at a time)
+
+Context: probe P1's kill line (BUILD 3.3) asks for 41 of 41 etcd test files and 4,000 random scripts byte for byte against etcd's Go code within 10 working days, and a mutant score not below the TypeScript port's (about 74 % by the files, about 89 % with the scripts, both estimated from a hand-read sample). The Rust port met the files, the scripts and the clock (48 minutes). Its score is about 72.7 % by the files (70.8 to 75.0) and about 86.6 % with the scripts (84.4 to 89.4): 1 to 3 points under, inside the error of both estimates *(measured counts; the shares are estimated)*. About 100 live mutants survive in each port; the tests are the same, so the holes are the same, and Rust makes fewer mutants in all (836 against 1,147), so the same 100 are a bigger share *(reasoned from the counts)*.
+
+Decision:
+1. P1 passes. The gap is read as noise of two sampled estimates, not as a weaker oracle.
+2. The holes the mutants found stay listed as an open issue in STATUS.md (Go's unit tests, not ported, would close most). They do not block slice 1.
+
+REJECTED: pass, but port Go's unit tests for the core (about 8,600 Go lines) and rerun the mutants before slice 1 (a few days for a gap the estimates cannot tell from zero); a fail on the literal reading (it would send P1 to a card with no ready fallback, over a difference inside the error).
+
+Consequences: the Raft port is the base for slice 1. Its proof stays etcd's 41 files, the 4,000 scripts against Go, the edge value check and the mutant run. Since the mutant run, the rule "a leader counts only its own term's entries" (raft-commit.6) is caught by the edge value check (P6's pass), so one known hole is closed *(measured)*.
