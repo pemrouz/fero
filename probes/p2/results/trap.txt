@@ -1,0 +1,3 @@
+with the trap planted (a machine-sized length hashed into the trace), seeds 1 to 1000:
+native against WASM: 1000 seeds differ
+WASM with the fold on against WASM with the fold off: 0 seeds differ

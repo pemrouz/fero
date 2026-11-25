@@ -1,0 +1,5 @@
+seeds 1 to 1000: 1000 lines in each list, 2067731 events
+native against WASM with the fold on:  0 seeds differ
+native against WASM with the fold off: 0 seeds differ
+what the fold did: {"mode":"fold","seeds":1000,"batches":112922,"entries":175286,"writes":162040,"refolds":3461,"foldPairsCompared":2679}
+sha256 of the list: 32d8082a28840d1d54a612f5b09532c7ac34ac2c94bc5ec26e40ce3727e94737

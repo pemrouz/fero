@@ -1,0 +1,42 @@
+{"run":1,"loadavg":"1.63 3.59 2.89 1/123 13762"}
+{"node":"v22.23.5","measure":"fold-work","seeds":200,"batches":22453,"entries":35159,"writes":32511,"refolds":704,"foldPairsCompared":510,"memoryBytes":1245184}
+{"node":"v22.23.5","measure":"seeds-200","seeds":200,"ms":296.533,"min":243.821,"max":339.261,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":719.258,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-nofold","seeds":200,"ms":221.933,"min":218.852,"max":245.361,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":538.313,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-fresh-instance","seeds":200,"ms":383.647,"min":360.43,"max":514.741,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":930.558,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world","n":2000,"p50ms":0.1148,"p50min":0.1095,"p50max":0.1399,"p99ms":0.2626,"p99min":0.1998,"p99max":0.342,"p999ms":3.0429,"p999max":4.1461,"maxms":3.729,"maxOfMax":4.956,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world-fresh-instance","n":2000,"p50ms":0.3723,"p50min":0.3484,"p50max":0.3891,"p99ms":5.0273,"p99min":4.2153,"p99max":5.7741,"p999ms":39.1539,"p999max":78.4457,"maxms":39.943,"maxOfMax":84.438,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"module","bytes":317659,"compileUs":48.973,"instanceUs":352.876}
+{"run":1,"loadavg":"1.73 3.51 2.88 1/121 13785"}
+{"measure":"native","rep":0,"seeds":200,"ns":168497929,"events":412276}
+{"measure":"native","rep":1,"seeds":200,"ns":180361089,"events":412276}
+{"measure":"native","rep":2,"seeds":200,"ns":169733757,"events":412276}
+{"measure":"native","rep":3,"seeds":200,"ns":161793911,"events":412276}
+{"measure":"native","rep":4,"seeds":200,"ns":176458743,"events":412276}
+{"run":2,"loadavg":"1.67 3.47 2.87 1/121 13874"}
+{"node":"v22.23.5","measure":"fold-work","seeds":200,"batches":22453,"entries":35159,"writes":32511,"refolds":704,"foldPairsCompared":510,"memoryBytes":1245184}
+{"node":"v22.23.5","measure":"seeds-200","seeds":200,"ms":338.981,"min":315.189,"max":409.946,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":822.219,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-nofold","seeds":200,"ms":220.645,"min":192.813,"max":224.784,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":535.188,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-fresh-instance","seeds":200,"ms":360.904,"min":344.372,"max":371.882,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":875.395,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world","n":2000,"p50ms":0.1042,"p50min":0.1031,"p50max":0.1265,"p99ms":0.1854,"p99min":0.1676,"p99max":0.3224,"p999ms":3.3338,"p999max":4.0516,"maxms":3.983,"maxOfMax":5.011,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world-fresh-instance","n":2000,"p50ms":0.332,"p50min":0.3099,"p50max":0.3819,"p99ms":4.7717,"p99min":3.607,"p99max":5.0159,"p999ms":39.7007,"p999max":67.2466,"maxms":45.133,"maxOfMax":79.104,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"module","bytes":317659,"compileUs":49.542,"instanceUs":535.444}
+{"run":2,"loadavg":"2.41 3.55 2.90 1/124 13887"}
+{"measure":"native","rep":0,"seeds":200,"ns":158991982,"events":412276}
+{"measure":"native","rep":1,"seeds":200,"ns":157677225,"events":412276}
+{"measure":"native","rep":2,"seeds":200,"ns":169324563,"events":412276}
+{"measure":"native","rep":3,"seeds":200,"ns":176448003,"events":412276}
+{"measure":"native","rep":4,"seeds":200,"ns":206284506,"events":412276}
+{"run":3,"loadavg":"2.41 3.55 2.90 2/125 13927"}
+{"node":"v22.23.5","measure":"fold-work","seeds":200,"batches":22453,"entries":35159,"writes":32511,"refolds":704,"foldPairsCompared":510,"memoryBytes":1245184}
+{"node":"v22.23.5","measure":"seeds-200","seeds":200,"ms":302.911,"min":279.895,"max":323.14,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":734.728,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-nofold","seeds":200,"ms":227.172,"min":220.031,"max":261.9,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":551.019,"reps":5}
+{"node":"v22.23.5","measure":"seeds-200-fresh-instance","seeds":200,"ms":369.172,"min":357.183,"max":467.442,"events":412276,"eventsPerSeed":2061.38,"nsPerEvent":895.45,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world","n":2000,"p50ms":0.1128,"p50min":0.1077,"p50max":0.1534,"p99ms":0.2497,"p99min":0.1934,"p99max":0.2667,"p999ms":3.6801,"p999max":5.7527,"maxms":3.838,"maxOfMax":7.032,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"fresh-world-fresh-instance","n":2000,"p50ms":0.3868,"p50min":0.2957,"p50max":0.3933,"p99ms":5.6297,"p99min":4.3336,"p99max":6.0288,"p999ms":36.3248,"p999max":44.5765,"maxms":41.17,"maxOfMax":100.668,"eventsPerWorld":230.998,"reps":5}
+{"node":"v22.23.5","measure":"module","bytes":317659,"compileUs":37.606,"instanceUs":353.113}
+{"run":3,"loadavg":"2.42 3.49 2.90 1/121 13942"}
+{"measure":"native","rep":0,"seeds":200,"ns":215328554,"events":412276}
+{"measure":"native","rep":1,"seeds":200,"ns":189896202,"events":412276}
+{"measure":"native","rep":2,"seeds":200,"ns":203021126,"events":412276}
+{"measure":"native","rep":3,"seeds":200,"ns":153918050,"events":412276}
+{"measure":"native","rep":4,"seeds":200,"ns":156673021,"events":412276}
