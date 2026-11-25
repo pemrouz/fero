@@ -1,0 +1,47 @@
+[package]
+name = "wasm"
+version = "0.0.0"
+description = "The simulator built as WASM, behind a byte ABI. The boundary with JavaScript; no outside crates."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "fero_sim"
+crate-type = ["cdylib"]
+doctest = false
+test = false
+
+[dependencies]
+sim = { path = "../sim" }
+
+# The workspace list, with one change: `unsafe_code` is "deny" here, not
+# "forbid". This is a boundary crate. Each place that needs `unsafe` allows it
+# by name and says why.
+[lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+unused_imports = "deny"
+unused_variables = "deny"
+unused_mut = "deny"
+dead_code = "warn"
+unreachable_patterns = "deny"
+non_ascii_idents = "deny"
+trivial_numeric_casts = "deny"
+unused_qualifications = "deny"
+elided_lifetimes_in_paths = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+disallowed_types = "deny"
+float_arithmetic = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_possible_wrap = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+undocumented_unsafe_blocks = "deny"
