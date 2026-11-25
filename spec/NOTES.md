@@ -26,7 +26,7 @@ One rule has one home. Where two layers held the same rule, one record stays.
 
 - **`link-pings`** lives in L0 only.
 - **The protocol version** is `cluster-version.1`: every frame carries it. `links.2` no longer repeats it.
-- **The carried set of a slot move.** `slot-move.15` holds the list and the rule that the target opens only with every part. Each part's own carry rule stays with its mechanism (`client-sessions.10` to `client-sessions.13`, `srchi-marks.4`, `srchi-marks.5`, `slot-sequence.2`, `writer-time.7`, `issue-order.4`, `caller-keys.11`, `subscribe.23`). So `slot-move.15` counts as 1.
+- **The carried set of a slot move.** `slot-move.15` holds the list and the rule that the target opens only with every part. Each part's own carry rule stays with its mechanism (`stream-numbers.10` and `stream-numbers.11`, which took over the session, mark and issue-number carries in V5-30, `slot-sequence.2`, `writer-time.7`, `caller-keys.11`, `subscribe.23`). So `slot-move.15` counts as 1.
 - **A diff entry's version.** `data-sink.4` holds it; `row-version.1` holds where the version comes from. L3's copy is dropped.
 - **The version column** is `data-store.2`, slice 3. `row-version.1`, slice 1, no longer says how `data` keeps the version.
 - **Ready when every group's picture has come** is `selection.1`. `open.3` is the open's promise on top, at low 0.

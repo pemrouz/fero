@@ -16,7 +16,7 @@ fero is shared, live data for apps. An app names a resource, `fero('orders')`, a
 - **L5, libraries.** Locks, queues, sagas, `derive`, the past, gateways, the CLI.
 - **`data` 5, beside them.** The sibling engine, in TypeScript. It holds the rows and runs views. Its rules are the ledger's row D. <sub>V5-14, V5-21</sub>
 
-The ledger holds 830 rule records (821 to 1,017 at their low and high counts) *(counted)*.
+The ledger holds 823 rule records (814 to 1,011 at their low and high counts) *(counted)*.
 
 ## Rust and JavaScript
 

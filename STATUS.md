@@ -12,7 +12,7 @@ The one ledger for v5: where things stand, what is next, the open bugs and the d
 ## Next
 
 1. **Slice 0, ground** (BUILD 3.3): seven probes, each with a kill line, timed first on the owner's laptop (V5-24 item 3); the relative pins on every change. Done: P1, P2, P5; P6 open on its two lines. P3, P4 and P7 wait for the laptop.
-2. **The owner's answers to the sheet's questions** ([probes/README.md](probes/README.md)); questions 1 and 2 are answered (V5-28, V5-29). Still open: which count P5's kill line means; P5's one failed model run; what P2's 5 ms bar means; whether P6's nightly pass is short runs on several cores; whether a carried field counts as a switch. Questions 6 and 7 decide whether P6 is killed.
+2. **The owner's answers to the sheet's questions** ([probes/README.md](probes/README.md)); questions 1 to 4 are answered (V5-28 to V5-30). Still open: what P2's 5 ms bar means; whether P6's nightly pass is short runs on several cores; whether a carried field counts as a switch. Questions 6 and 7 decide whether P6 is killed.
 
 ## Open bugs
 
@@ -28,3 +28,4 @@ V5-1 to V5-24 are on the `design` branch. Decisions made from here on are append
 - **V5-27** (2026-11-24): servers run on Linux from slice 1; macOS and Windows servers come in slice 7.
 - **V5-28** (2026-11-25): P1 passes; the Rust port's mutant score (about 72.7 % and 86.6 %) is inside the error of the TypeScript port's (about 74 % and 89 %). The holes stay an open issue, not a block.
 - **V5-29** (2026-11-25): a peer's frame with a Raft term, index or commit at or above 2^62 does not decode (`links.7`, slice 1); the Raft crate keeps its overflow checks. The ledger is 830 records.
+- **V5-30** (2026-11-25): P5 passes on the ledger's count; its early failed run was the model's setup. One number per stream replaces the marks: 18 records retired, `stream-numbers.1` to `.11` added, 46 rules become 39. The ledger is 823 records.

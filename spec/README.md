@@ -12,8 +12,8 @@ Nothing is built yet. These pages are what the build is steered by.
 
 Counted by the tools from `ledger.json`; the gate fails if these lines drift.
 
-Records by layer: L0 87, L1 221, L2 106, L3 146, L4 107, L5 110, D 53.
-Records by slice: S0 0, S1 258, S2 135, S3 54, S4 145, S5 78, S6 84, S7 22, S8 54.
+Records by layer: L0 87, L1 221, L2 99, L3 146, L4 107, L5 110, D 53.
+Records by slice: S0 0, S1 256, S2 135, S3 49, S4 145, S5 78, S6 84, S7 22, S8 54.
 
 ## The bars
 

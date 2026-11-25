@@ -385,7 +385,7 @@ Rules that depend on it: `raft-log`, `raft-term-vote`, `raft-commit`, `raft-conf
 | 4 | resource check | when flag bit 0 is set: resource name `text`, protocol version `u8`, home group incarnation `varint` | Rides the first `ASK` or `SUB` for a resource on a link, and its answer | S (a reading of LAYERS 7, not modelled), O question 26 |
 | 5 | session id | `u64` | Whose attempt | S (field), question 5 |
 | 6 | call id | `varint` | Which attempt | S |
-| 7 | floor | `varint` | The session's lowest call id not yet answered. Sent with every copy | S (`client-sessions.4`) |
+| 7 | floor | `varint` | The session's lowest call id not yet answered. Sent with every copy | S (`stream-numbers.9`) |
 | 8 | copy number | `varint` | 0 for a first send, then 1, 2, … The client takes only the answer to its latest copy | S (field), P (0 means "not sent before") |
 | 9 | time left | `varint`, milliseconds | The attempt's budget. Every hop takes off the time it held it | S (field), P (encoding) |
 | 10 | write number | `varint` | As 5.2 field 7 | O, question 9 |
@@ -712,7 +712,7 @@ Each closes by a model, a probe of slice 0, a timing in slice 1, or an owner's c
 | 6 | Does a journal row or a Raft message name its group in full (18 bytes), or by a short number agreed per process or per link? | In full | Slice 1's counted pin on bytes per record |
 | 7 | How are a version's 63 bits split between epoch and sequence? (The alphabet is settled: Crockford's base 32, CONNECT 3.) | 16 and 47 | The read-cost timing in Rust (E-62 missed its 50 ns bar once a slot had moved) |
 | 8 | Where does a slot's epoch ride: in every record, once per batch, or only in the slot's open entry and once per slot in a `DELTA`? | The open entry and the `DELTA` | The slot move's model (slice 3); it is on the list of fields open past slice 1 |
-| 9 | Write numbering: one number per stream, or the five high marks (P5)? Which fields does a record and an `ASK` carry for it? | One `varint` write number per writer per partition | P5's model study in slice 0 |
+| 9 | Write numbering: one number per stream, or the five high marks (P5)? Which fields does a record and an `ASK` carry for it? | **One number per stream: settled by P5 (V5-30).** A write carries its stream, its number, the number before it and the floor (`stream-numbers.2`, `stream-numbers.9`); their fields and encoding are still the draft's | The fields: slice 1's codec |
 | 10 | Does the frame's checksum cover message bodies that hold no batch? | Yes: everything but batch bytes, which have their own | Slice 1's link timing; the decoder's fuzz test |
 | 11 | How do etcd's message types map onto the seven Raft verbs (heartbeat, its answer, read index, snapshot status)? Is the follower's early report a flag on `APPENDED` or a verb? What are a member change's bytes? What do `QUIET`, `REPAIR` and `REPAIRED` carry? | Flags on `APPEND` and `APPENDED`; etcd's own member change | P1's port; the repair model with lost and doubled messages (slice 2); the answer-stage step |
 | 12 | Do the directory's announce, take back and look up need verbs of their own? | Not drafted | The model of founding and the directory together (slice 2) |

@@ -250,7 +250,7 @@ Three checks on rules of today are worth a line each, because they say what must
 
 **Pass.** DEV-03's bar for the models (85 % of planted mistakes caught, each run under an hour) is met *(measured)*: 27 of 28, and the longest counted run is 26 minutes. The probe took about three and a half hours of wall clock, start to end *(measured)*.
 
-Two things the lead should know before taking it.
+Two things to know before taking it.
 
 1. **It is one design for two shapes of number.** A client's numbers are 1, 2, 3. A deriver's have holes. Naming "the number before" on each write is what lets one rule serve both. Without it the deriver would need a second number (today's issue number beside the mark).
 2. **Three more rules could go, at a price that was not taken.** If every final refusal went in the log, `client-sessions.1`, `.7` and `.14` would not be needed: with no refusal outside the log the model holds with a relay that forwards twice and a client that takes any answer (bounds `lost` and `move`, *checked*). But a forbidden write would then cost a log entry, which a flood could abuse *(reasoned)*. So the form keeps refusals outside the log, and keeps the three rules.
@@ -270,7 +270,7 @@ A second reader went over this probe to break it. What it found *(each marked)*:
   - With those two, and rules 1 and 5 cut in two, the form is 12 rules: 46 become 37, a saving of 9. Once names are not modelled; if `caller-keys.10` and `.11` are kept until they are, the saving is 7.
 - **The study's count can fall to 2** *(reasoned)*. "Each writer numbers its writes in order" is one of the 16 counted as replaced, but a writer still numbers its writes in the new form. Counted on both sides, or on neither, 15 become 11 to 13: a saving of 2 to 4. So the study's count gives 2 to 5, not 3 to 5.
 
-**What this means for the verdict.** No model fails. On the ledger, the grain the build's budget is cut in, the saving is 7 to 13: a pass. On the study's own grain, the grain the "32" is in, the saving is 2 to 5: at the line, and under it on the strictest count. The kill line does not say which grain it means. That is the lead's call.
+**What this means for the verdict.** No model fails. On the ledger, the grain the build's budget is cut in, the saving is 7 to 13: a pass. On the study's own grain, the grain the "32" is in, the saving is 2 to 5: at the line, and under it on the strictest count. The kill line does not say which grain it means. **The owner answered: the ledger's count, so P5 passes** ([V5-30](../../docs/DECISIONS.md)). The ledger took the form at the strict cut: 18 records retired, 11 added as `stream-numbers.1` to `.11`, with `slot-sequence.2` and `caller-keys.10` and `.11` kept, a saving of 7.
 
 ## What is not checked
 

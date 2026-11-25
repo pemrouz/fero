@@ -28,13 +28,13 @@
   "name": "one write",
   "adds": "One write through every layer: a resource founded with two groups on three servers, a commit on disk at a majority, a fold on every copy, a live link over both groups, and a deriver that writes exactly once per record.",
   "rules": {
-   "records": 258,
-   "low": 255,
-   "high": 286
+   "records": 256,
+   "low": 253,
+   "high": 285
   },
   "models": [
    "P1's proof on every change",
-   "write numbering (owed)",
+   "write numbering: P5's two models, OneNumber.tla and OneNumberDerived.tla (V5-30), on every change to stream-numbers",
    "E-61 marks",
    "monitors over 1,000 seeds: F-02, F-04, TEST-13, the total over both groups, the deriver's output",
    "whether plain writes need a majority of the sessions resource (owed)"
@@ -91,9 +91,9 @@
   "name": "slot move",
   "adds": "The slot move in one commit, the slot table in the home log, the carried set, the grow rule by size and load, clients that learn new routes, the fold's rules for a moved slot.",
   "rules": {
-   "records": 54,
-   "low": 54,
-   "high": 64
+   "records": 49,
+   "low": 49,
+   "high": 59
   },
   "models": [
    "the full one-commit move model at 85 % (READY M6)",
