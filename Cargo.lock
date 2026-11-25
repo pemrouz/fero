@@ -25,6 +25,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sim-run"
+version = "0.0.0"
+dependencies = [
+ "sim",
+]
+
+[[package]]
 name = "wasm"
 version = "0.0.0"
 dependencies = [

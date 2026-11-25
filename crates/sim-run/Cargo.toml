@@ -1,0 +1,37 @@
+[package]
+name = "sim-run"
+version = "0.0.0"
+description = "The native runner of the simulator: seeds in, one line per seed out. No Node, no fold."
+license = "Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "sim-run"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+sim = { path = "../sim" }
+
+# A command line tool: it prints, and it reads the clock for its own timing.
+# So it takes the workspace list without the no_std and no-print lines.
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+unused_imports = "deny"
+unused_variables = "deny"
+unused_mut = "deny"
+unreachable_patterns = "deny"
+non_ascii_idents = "deny"
+
+[lints.clippy]
+disallowed_types = "deny"
+float_arithmetic = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_possible_wrap = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
