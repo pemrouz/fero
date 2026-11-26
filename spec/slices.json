@@ -11,7 +11,7 @@
   "models": [
    "etcd's 41 test files and 4,000 random scripts against the Rust port (P1)",
    "the write-numbering study (P5)",
-   "started here: the one-commit slot move in full; founding with several groups"
+   "the one-commit slot move in full (models/slot-move) and founding with several groups (models/founding), both run; their findings wait on card 0002"
   ],
   "pins": [
    "kill line, not a pin: TEST-01 (P2: 200 full-stack seeds within 1 s)",
@@ -69,7 +69,7 @@
    "E-51",
    "E-52",
    "E-59",
-   "GROUPS 4.2 models 1 to 3",
+   "GROUPS 4.2 models 1 to 3 (models/founding: 90 % of planted mistakes caught; the leader spread past three groups is owed)",
    "founding with the directory",
    "a clean stop behind a partition",
    "many elections at once after a crash"
@@ -97,7 +97,7 @@
    "high": 59
   },
   "models": [
-   "the full one-commit move model at 85 % (READY M6)",
+   "the full one-commit move model at 85 % (READY M6): models/slot-move; its first two models pass, its members model is at 62 % and owed",
    "GROUPS 4.3 models 8 to 11",
    "the carried set as one final list",
    "E-67 on the one-commit move",
