@@ -1,0 +1,22 @@
+Finding 6, one of its cases: a recovered target that gives a move up without saying
+that its old life's records may be lost (planted mistake u09), second model, bound msg-rec.
+NoBack fails at the last state: the source serves again in epoch 1 with no record,
+where a reader had already seen position (1, 1) at the target. One line per step.
+
+ 1 the start: A serves the slot, epoch 1
+ 2 the home log takes the row of move 1, A to B (it names both groups' life 0)
+ 3 A logs the fence of move 1
+ 4 A's fence commits; its report exists
+ 5 B logs the final copy of move 1
+ 6 B's final copy commits: B serves the slot
+ 7 B takes write 1 of stream x at position (1, 1)
+ 8 that write commits; a reader may see it
+ 9 B is recovered from a copy that is empty: its log is cut to nothing, its life is now 1
+10 B gives move 1 up: an abort entry, NOT marked "lost" (the planted mistake)
+11 the abort commits; its report exists
+12 the home log writes the row back to A, as an ordinary row, in epoch 1
+13 A reopens the slot in epoch 1
+14 the reopen commits: A serves in epoch 1 with no record; position (1, 1) will be handed out again
+
+With the rules as the model has them: step 10 marks the abort "lost" (R5), step 12 writes
+a new row above every other at epoch 2 (R6), and step 13 reopens in epoch 2 (R7).

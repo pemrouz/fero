@@ -1,0 +1,1714 @@
+[
+ {
+  "id": "e01",
+  "module": "SlotMove",
+  "note": "a leader reads the stream table and the sequence from its committed log, not its log end",
+  "caught": true,
+  "by": "PosUnique on core, 5 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 5,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e02",
+  "module": "SlotMove",
+  "note": "the voters are counted in the committed log, not at the log end (Finding 9, first model)",
+  "caught": true,
+  "by": "OpenFull on ver, 9 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 9,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "e04",
+  "module": "SlotMove",
+  "note": "\"the last move has ended\" is read from the committed table, not the leader's log end",
+  "caught": true,
+  "by": "TableRight on twice, 9 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e05",
+  "module": "SlotMove",
+  "note": "the abort names the target as the move's source",
+  "caught": true,
+  "by": "TableRight on core, 7 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 7,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "e06",
+  "module": "SlotMove",
+  "note": "the row is written back to the target, not the source",
+  "caught": true,
+  "by": "TableRight on core, 7 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 7,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e07",
+  "module": "SlotMove",
+  "note": "(world) a dropped tail comes back after a later commit",
+  "caught": true,
+  "by": "PosUnique on crash, 7 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 7,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e08",
+  "module": "SlotMove",
+  "note": "a refused write moves the row's version",
+  "caught": true,
+  "by": "VerRight on ver2, 9 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 11
+   },
+   {
+    "bound": "ver2",
+    "verdict": "violated",
+    "inv": "VerRight",
+    "steps": 9,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e09",
+  "module": "SlotMove",
+  "note": "the lock fence table forgets the tokens of the group's own writes",
+  "caught": true,
+  "by": "TokOrder on lock, 5 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 8
+   },
+   {
+    "bound": "lock",
+    "verdict": "violated",
+    "inv": "TokOrder",
+    "steps": 5,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e10",
+  "module": "SlotMove",
+  "note": "the last stamp forgets the group's own writes",
+  "caught": true,
+  "by": "StampOrder on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "StampOrder",
+    "steps": 11,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e11",
+  "module": "SlotMove",
+  "note": "the kept answers forget the group's own writes",
+  "caught": true,
+  "by": "AnswersKept on core, 3 steps",
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "AnswersKept",
+    "steps": 3,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "e14",
+  "module": "SlotMove",
+  "note": "probe: the target does not check that the fence names it",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 6
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 11
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 8
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 35
+   },
+   {
+    "bound": "x-ver-copy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 8
+   },
+   {
+    "bound": "x-lock-ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 93
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "secs": 1
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f01",
+  "module": "SlotMoveMsg",
+  "note": "the final copy keeps the target's own epoch, not the source's",
+  "caught": true,
+  "by": "InOrder on msg-core, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 10,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f02",
+  "module": "SlotMoveMsg",
+  "note": "a leader reads the stream table and the sequence from its committed log",
+  "caught": true,
+  "by": "InOrder on msg-core, 5 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 5,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f03",
+  "module": "SlotMoveMsg",
+  "note": "the row is written back to the target, not the source",
+  "caught": true,
+  "by": "TableRight on msg-core, 5 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 5,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f04",
+  "module": "SlotMoveMsg",
+  "note": "a group reopens on another group's recovery row",
+  "caught": true,
+  "by": "StateRight on msg-rec2, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 61
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 6,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f05",
+  "module": "SlotMoveMsg",
+  "note": "a recovery's row takes no new number",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 1
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 14
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 60
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 75
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 13,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f06",
+  "module": "SlotMoveMsg",
+  "note": "the recovery's own entry is not committed, so a leader change can drop it",
+  "caught": true,
+  "by": "NoBack on msg-rec, 4 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 1
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 1
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 4,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f07",
+  "module": "SlotMoveMsg",
+  "note": "a plain reopen makes up a new epoch the home log does not know",
+  "caught": true,
+  "by": "TableRight on msg-core, 9 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f08",
+  "module": "SlotMoveMsg",
+  "note": "the target's final copy makes no report",
+  "caught": true,
+  "by": "the goal cannot be reached on msg-r-twice",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 1
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 1
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 10
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 38
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 60
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f09",
+  "module": "SlotMoveMsg",
+  "note": "the row written back takes its epoch from any move's row",
+  "caught": true,
+  "by": "PosUnique on msg-rec2, 24 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 14
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 68
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 24,
+    "secs": 68
+   }
+  ]
+ },
+ {
+  "id": "f11",
+  "module": "SlotMoveMsg",
+  "note": "probe: the fence binds the target's incarnation of now, not the row's",
+  "caught": true,
+  "by": "TableRight on msg-rec, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 10,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f12",
+  "module": "SlotMoveMsg",
+  "note": "probe: the target does not check that the fence names it",
+  "caught": true,
+  "by": "OneTaker on msg-rec2, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 57
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 8,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f13",
+  "module": "SlotMoveMsg",
+  "note": "probe: the fence takes its base from another move's ready report",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 14
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 58
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 71
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 13,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f14",
+  "module": "SlotMoveMsg",
+  "note": "probe: the row is written back twice",
+  "caught": false,
+  "by": "(a run on msg-rec-three passed the time limit)",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 7
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 59
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 63
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "timeout",
+    "inv": null,
+    "steps": 0,
+    "secs": 900
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 638
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 13,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f15",
+  "module": "SlotMoveMsg",
+  "note": "probe: a leader takes writes behind an open that has not committed (Finding 5's one-commit window, with a recovery)",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 61
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 76
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 13,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "g01",
+  "module": "SlotMoveMembers",
+  "note": "a leader reads the stream table and the sequence from the log it knows committed",
+  "caught": true,
+  "by": "PosUnique on mem-src-core, 6 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 6,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "g02",
+  "module": "SlotMoveMembers",
+  "note": "a member takes the leader's whole log as committed",
+  "caught": true,
+  "by": "RaftSafe on mem-src-cfg2, 13 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 7
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 10
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 10
+   },
+   {
+    "bound": "mem-src-cfg2",
+    "verdict": "violated",
+    "inv": "RaftSafe",
+    "steps": 13,
+    "secs": 6
+   }
+  ]
+ },
+ {
+  "id": "g03",
+  "module": "SlotMoveMembers",
+  "note": "a leader that votes for another goes on leading in the new term",
+  "caught": true,
+  "by": "the model stops with an error on mem-dst-fault",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "error",
+    "inv": null,
+    "steps": 7,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "g04",
+  "module": "SlotMoveMembers",
+  "note": "half of the voters count as a majority",
+  "caught": true,
+  "by": "the model stops with an error on mem-dst-grow",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "error",
+    "inv": null,
+    "steps": 6,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "g05",
+  "module": "SlotMoveMembers",
+  "note": "the final copy takes the records of a member's whole log, not the committed part before the fence",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 12
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 22
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 32
+   },
+   {
+    "bound": "mem-src-cfg2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "secs": 29
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "secs": 3
+   },
+   {
+    "bound": "mem-r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "secs": 2
+   }
+  ]
+ }
+]

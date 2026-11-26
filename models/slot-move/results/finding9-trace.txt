@@ -1,0 +1,17 @@
+Finding 9: the voters counted in the committed configuration, not in the newest one in
+the leader's log (planted mistake n09), third model, bound mem-dst-shrink.
+The target group B has three members, all voters. OpenFull fails at the last state:
+a final copy has committed in a group whose configuration, just before it, has two voters.
+
+ 1 the start
+ 2 m1 is elected leader of B, term 1, by m1 and m2; it logs its own first entry
+ 3 m1 hands its log to m2
+ 4 m1 learns that its first entry is committed
+ 5 m1 logs a membership change: the voters are now m2 and m3 (one voter less)
+ 6 the source group A logs the fence
+ 7 the fence commits
+ 8 m1 logs the final copy. The planted mistake: it counts the voters of the configuration
+   it knows committed (three), not of the newest in its log (two)
+ 9 m1 hands its log to m2
+10 m1 learns that the change and the final copy are committed: the slot has opened in a
+   group of two voters

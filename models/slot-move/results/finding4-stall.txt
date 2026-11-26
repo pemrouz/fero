@@ -1,0 +1,9 @@
+Finding 4: a source that may fence one move a second time (planted mistake m22), stall bound s-twice.
+The slot moves from A to B and back. Then A, reading an old state of the table, fences move 1 again.
+B already holds move 1's final copy, so it can neither take it again nor abort. The slot stays fenced.
+
+The shortest way in, one step per word:
+StartMove Commit Fence Commit Final Commit StartMove Commit Fence Commit Final Commit Fence
+
+stall.py on the planted model: 8 of 5,860 states with the home group up cannot finish their writes;
+4 of 2,930 with it down. On the model as it is: 0 and 0.

@@ -1,0 +1,5 @@
+home up: the writes can finish: 0 stuck of 13376
+home up: and the table names the server: 0 stuck of 13376
+home down: the writes can finish without it: 998 stuck of 6688
+   shortest way in: StartMove Commit Fence Down
+stall: FOUND

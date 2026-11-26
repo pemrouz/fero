@@ -1,0 +1,14 @@
+Finding 1: a move that counts as ended once its abort commits (planted mistake t06), bound twice.
+TableRight fails at the last state: A serves the slot, the table names B. One line per step: the step, then what changed.
+
+ 1 Initial   
+ 2 StartMove  log[H] = <<[t |-> "row", m |-> 1, step |-> 0, own |-> "B", src |-> "A"]>>
+ 3 Commit     ci = [B |-> 0, A |-> 0, H |-> 1]
+ 4 Abort      log[B] = <<[t |-> "abort", v |-> 1, src |-> "A"]>>
+ 5 Commit     ci = [B |-> 1, A |-> 0, H |-> 1]
+ 6 StartMove  log[H] = << [t |-> "row", m |-> 1, step |-> 0, own |-> "B", src |-> "A"], [t |-> "row", m |-> 2, step |-> 0, own |-> "A", src |-> "B"] >>
+ 7 Commit     ci = [B |-> 1, A |-> 0, H |-> 2]
+ 8 Abort      log[A] = <<[t |-> "abort", v |-> 2, src |-> "B"]>>
+ 9 Commit     ci = [B |-> 1, A |-> 1, H |-> 2]
+10 Back       log[H] = << [t |-> "row", m |-> 1, step |-> 0, own |-> "B", src |-> "A"], [t |-> "row", m |-> 2, step |-> 0, own |-> "A", src |-> "B"], [t |-> "row", m |-> 2, step |-> 1, own |-> "B", src |-> "A"] >>
+11 Commit     ci = [B |-> 1, A |-> 1, H |-> 3]

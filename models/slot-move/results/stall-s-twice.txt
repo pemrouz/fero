@@ -1,0 +1,4 @@
+home up: the writes can finish: 0 stuck of 1680
+home up: and the table names the server: 0 stuck of 1680
+home down: the writes can finish without it: 0 stuck of 840
+stall: none

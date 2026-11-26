@@ -1,0 +1,8 @@
+Planted mistake k01 (a leader takes writes on an open that has not committed), run on five bounds with every property, OneTaker included.
+TLC, 2 workers, -fp 31.
+
+twice: No error has been found. 44690 states generated, 17008 distinct states found, 0 states left on queue.
+lazy: No error has been found. 90481 states generated, 27180 distinct states found, 0 states left on queue.
+down: No error has been found. 647702 states generated, 185655 distinct states found, 0 states left on queue.
+big-streams: No error has been found. 2602279 states generated, 828616 distinct states found, 0 states left on queue.
+big-all: No error has been found. 6101470 states generated, 1757820 distinct states found, 0 states left on queue.

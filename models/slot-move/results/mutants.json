@@ -1,0 +1,6966 @@
+[
+ {
+  "id": "c01",
+  "rule": "slot-sequence.2 seq",
+  "note": "the move does not carry the slot's sequence",
+  "caught": true,
+  "by": "PosUnique on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 11,
+    "distinct": 97,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c02",
+  "rule": "slot-sequence.2 epoch",
+  "note": "the move does not carry the slot's epoch",
+  "caught": true,
+  "by": "PosUnique on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 9,
+    "distinct": 78,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c03",
+  "rule": "stream-numbers.10 marks",
+  "note": "the move does not carry the streams' high marks",
+  "caught": true,
+  "by": "Once on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 11,
+    "distinct": 98,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c04",
+  "rule": "stream-numbers.10 answers",
+  "note": "the move does not carry the kept answers",
+  "caught": true,
+  "by": "AnswersKept on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "AnswersKept",
+    "steps": 9,
+    "distinct": 73,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c05",
+  "rule": "slot-move.6",
+  "note": "the move does not carry the highest lock token",
+  "caught": true,
+  "by": "TokOrder on lock, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 108,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 351,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "violated",
+    "inv": "TokOrder",
+    "steps": 11,
+    "distinct": 1342,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c06",
+  "rule": "slot-move.15 versions",
+  "note": "the move does not carry the row versions",
+  "caught": true,
+  "by": "VerRight on ver, 13 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 491,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 764,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "violated",
+    "inv": "VerRight",
+    "steps": 13,
+    "distinct": 751,
+    "secs": 6
+   }
+  ]
+ },
+ {
+  "id": "c07",
+  "rule": "writer-time.7 carry",
+  "note": "the move does not carry the last stamp",
+  "caught": true,
+  "by": "StampOrder on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "StampOrder",
+    "steps": 11,
+    "distinct": 97,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c08",
+  "rule": "slot-move.15 rest",
+  "note": "the move does not carry the parts that are only bytes here",
+  "caught": true,
+  "by": "Whole on core, 7 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 236,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 193,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 421,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 922,
+    "secs": 31
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 3
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 11
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 5
+   },
+   {
+    "bound": "core",
+    "verdict": "violated",
+    "inv": "Whole",
+    "steps": 7,
+    "distinct": 47,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "k01",
+  "rule": "slot-table.1",
+  "note": "a leader takes writes for a slot its committed log does not hold open",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 119,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4512,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 273,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 46,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2551,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 268,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1043,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 117,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 985,
+    "secs": 32
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 219,
+    "secs": 1
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 113,
+    "secs": 1
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 496,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 10
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 4
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 119,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4512,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 203,
+    "secs": 6
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 702,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2551,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 247,
+    "secs": 11
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1043,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 922,
+    "secs": 8
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 415,
+    "secs": 32
+   }
+  ]
+ },
+ {
+  "id": "k02",
+  "rule": "stream-numbers.4",
+  "note": "a write at or below the high mark is taken again",
+  "caught": true,
+  "by": "Once on core, 5 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 5,
+    "distinct": 20,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k03",
+  "rule": "fence-tokens.1",
+  "note": "a write under an old lock token is taken",
+  "caught": true,
+  "by": "TokOrder on lock, 5 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 1
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 83,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 878,
+    "secs": 6
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "violated",
+    "inv": "TokOrder",
+    "steps": 5,
+    "distinct": 71,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k04",
+  "rule": "slot-sequence.1",
+  "note": "a record is stamped with the last sequence, not the next",
+  "caught": true,
+  "by": "PosUnique on core, 3 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 3,
+    "distinct": 6,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "k05",
+  "rule": "writer-time.7 stamp",
+  "note": "the target stamps by its own clock, below the carried stamp",
+  "caught": true,
+  "by": "StampOrder on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "StampOrder",
+    "steps": 11,
+    "distinct": 97,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "k06",
+  "rule": "row-version.1",
+  "note": "a conditional write is applied whatever the row's version",
+  "caught": true,
+  "by": "VerRight on ver2, 7 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 462,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 390,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 0,
+    "secs": 10
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "violated",
+    "inv": "VerRight",
+    "steps": 7,
+    "distinct": 90,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "k07",
+  "rule": "home-records.2",
+  "note": "a group that never held the slot answers retry, not moved by its home records",
+  "caught": true,
+  "by": "the stall check on s-lazy (home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it)",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 536,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 348,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 855,
+    "secs": 10
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 554,
+    "secs": 7
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 964,
+    "secs": 29
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "stall",
+    "what": "home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it",
+    "secs": 10
+   }
+  ]
+ },
+ {
+  "id": "m01",
+  "rule": "slot-move.3",
+  "note": "the fence does not stop the source",
+  "caught": true,
+  "by": "OneTaker on core, 6 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 6,
+    "distinct": 38,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "m02",
+  "rule": "slot-move.7",
+  "note": "the final copy's commit does not open the slot",
+  "caught": true,
+  "by": "the goal cannot be reached on r-moved",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 106,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4135,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 406,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 24,
+    "secs": 6
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2310,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 488,
+    "secs": 10
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 861,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 904,
+    "secs": 7
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 63,
+    "secs": 29
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 319,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m03",
+  "rule": "slot-move.1",
+  "note": "the source takes a write after its fence is in its log",
+  "caught": true,
+  "by": "Views on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 9,
+    "distinct": 116,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m04",
+  "rule": "slot-move.2",
+  "note": "the source fences a slot its committed log does not hold open",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 915,
+    "secs": 5
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 123,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 592,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 107,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 409,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 565,
+    "secs": 32
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 478,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 11
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 6
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 358,
+    "secs": 6
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 8
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 4
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 281,
+    "secs": 12
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 208,
+    "secs": 8
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 31
+   }
+  ]
+ },
+ {
+  "id": "m05",
+  "rule": "slot-move.1 once",
+  "note": "the source fences a slot whose fence is already in its log",
+  "caught": true,
+  "by": "OneTaker on twice, 15 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 9,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 15,
+    "distinct": 4116,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "m06",
+  "rule": "slot-move.4",
+  "note": "the final copy is sent from a fence that has not committed",
+  "caught": true,
+  "by": "OneServer on core, 6 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 6,
+    "distinct": 33,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m07",
+  "rule": "slot-move.18",
+  "note": "the target takes a final copy after its abort",
+  "caught": true,
+  "by": "TableRight on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 11,
+    "distinct": 111,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m08",
+  "rule": "slot-move.8",
+  "note": "the target takes the final copy twice",
+  "caught": true,
+  "by": "Views on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 11,
+    "distinct": 151,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m09",
+  "rule": "slot-move.22",
+  "note": "the slot opens in a group that is a voter short",
+  "caught": true,
+  "by": "OpenFull on ver, 6 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 515,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 684,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 6,
+    "distinct": 483,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m10",
+  "rule": "slot-move.15 whole",
+  "note": "the target opens with a part of the carried set missing",
+  "caught": true,
+  "by": "AnswersKept on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "AnswersKept",
+    "steps": 9,
+    "distinct": 221,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m11",
+  "rule": "slot-move.5",
+  "note": "the final copy starts one record late",
+  "caught": true,
+  "by": "Views on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 9,
+    "distinct": 73,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m12",
+  "rule": "slot-move.5",
+  "note": "the final copy's records replace what the target holds",
+  "caught": true,
+  "by": "Views on crash, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 11,
+    "distinct": 1531,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "m13",
+  "rule": "slot-move.5",
+  "note": "the final copy sends records the target already holds",
+  "caught": true,
+  "by": "Views on crash, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 11,
+    "distinct": 1531,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m14",
+  "rule": "slot-move.17",
+  "note": "the target aborts a move whose final copy is in its log",
+  "caught": true,
+  "by": "TableRight on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 11,
+    "distinct": 119,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m15",
+  "rule": "slot-move.19 fenced",
+  "note": "the source reopens on a fence that has not committed",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 126,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5064,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 945,
+    "secs": 7
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 348,
+    "secs": 12
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2891,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 815,
+    "secs": 16
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1100,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 359,
+    "secs": 23
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 806,
+    "secs": 38
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 219,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 120,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 609,
+    "secs": 3
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 18
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 7
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 126,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5064,
+    "secs": 4
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 995,
+    "secs": 7
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 479,
+    "secs": 12
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2891,
+    "secs": 4
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 501,
+    "secs": 16
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1100,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 147,
+    "secs": 24
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 513,
+    "secs": 41
+   }
+  ]
+ },
+ {
+  "id": "m16",
+  "rule": "slot-move.19",
+  "note": "the source reopens on an abort that has not committed",
+  "caught": true,
+  "by": "OneTaker on lazy, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 575,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 270,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 938,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 9,
+    "distinct": 1129,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "m17",
+  "rule": "slot-move.19",
+  "note": "the source reopens with no abort",
+  "caught": true,
+  "by": "OneTaker on lazy, 7 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 463,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 187,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 770,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 7,
+    "distinct": 406,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m18",
+  "rule": "slot-move.11",
+  "note": "the early copy takes records that have not committed",
+  "caught": true,
+  "by": "CopyTrue on crash, 4 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "violated",
+    "inv": "CopyTrue",
+    "steps": 4,
+    "distinct": 22,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m19",
+  "rule": "stream-numbers.11",
+  "note": "the target opens without the carried table",
+  "caught": true,
+  "by": "AnswersKept on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "AnswersKept",
+    "steps": 9,
+    "distinct": 73,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "m20",
+  "rule": "moved.fence",
+  "note": "a fenced source answers retry, not moved",
+  "caught": true,
+  "by": "the stall check on s-lazy (home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it)",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 100,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 151,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 462,
+    "secs": 10
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 711,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 100,
+    "secs": 31
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "stall",
+    "what": "home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it",
+    "secs": 10
+   }
+  ]
+ },
+ {
+  "id": "m21",
+  "rule": "moved.abort",
+  "note": "a target that gave up answers retry, not moved",
+  "caught": true,
+  "by": "the stall check on s-lazy (home down: the writes can finish without it)",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 233,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 166,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 2
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 925,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 545,
+    "secs": 30
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "stall",
+    "what": "home down: the writes can finish without it",
+    "secs": 12
+   }
+  ]
+ },
+ {
+  "id": "m22",
+  "rule": "fence.once",
+  "note": "the source fences one move a second time",
+  "caught": true,
+  "by": "the stall check on s-twice (home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it)",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 150,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5538,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 17,
+    "secs": 7
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 388,
+    "secs": 18
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3188,
+    "secs": 4
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 598,
+    "secs": 16
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1603,
+    "secs": 4
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 324,
+    "secs": 28
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 497,
+    "secs": 47
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 109,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 528,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 19
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "stall",
+    "what": "home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it",
+    "secs": 10
+   }
+  ]
+ },
+ {
+  "id": "m23",
+  "rule": "slot-move.17 target",
+  "note": "the source, not the target, aborts a move",
+  "caught": true,
+  "by": "TableRight on core, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 11,
+    "distinct": 441,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n01",
+  "rule": "slot-move.3",
+  "note": "the fence does not stop the source",
+  "caught": true,
+  "by": "OneServer on mem-src-core, 7 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 7,
+    "distinct": 370,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n02",
+  "rule": "slot-move.1",
+  "note": "a leader takes a write after the fence is in its own log",
+  "caught": true,
+  "by": "Views on mem-src-core, 8 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 8,
+    "distinct": 663,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n03",
+  "rule": "slot-table.1",
+  "note": "a leader takes a write for a slot the log it knows committed does not hold open",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1020,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 771,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 562,
+    "secs": 7
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 408,
+    "secs": 7
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 636,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 12,
+    "distinct": 526,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 130,
+    "secs": 27
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 225,
+    "secs": 41
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 97,
+    "secs": 59
+   }
+  ]
+ },
+ {
+  "id": "n04",
+  "rule": "slot-move.2",
+  "note": "a leader fences a slot the log it knows committed does not hold open",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 728,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 970,
+    "secs": 7
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5568,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 520,
+    "secs": 21
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 332,
+    "secs": 32
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 600,
+    "secs": 49
+   }
+  ]
+ },
+ {
+  "id": "n05",
+  "rule": "fence.once",
+  "note": "a leader fences the move a second time",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1473,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 933,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 363,
+    "secs": 7
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 849,
+    "secs": 8
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 842,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 298,
+    "secs": 29
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 611,
+    "secs": 55
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 703,
+    "secs": 96
+   }
+  ]
+ },
+ {
+  "id": "n06",
+  "rule": "slot-move.4",
+  "note": "the final copy is sent from a fence some member holds but no one knows committed",
+  "caught": true,
+  "by": "OneServer on mem-src-core, 5 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 5,
+    "distinct": 85,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n07",
+  "rule": "slot-move.18",
+  "note": "a leader takes a final copy after an abort is in its log",
+  "caught": true,
+  "by": "OneServer on mem-src-core, 12 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 12,
+    "distinct": 1125,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "n08",
+  "rule": "slot-move.8",
+  "note": "a leader takes the final copy twice",
+  "caught": true,
+  "by": "Views on mem-src-core, 11 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "Views",
+    "steps": 11,
+    "distinct": 1082,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "n09",
+  "rule": "slot-move.22",
+  "note": "the voters are counted in the committed configuration, not the newest in the leader's log",
+  "caught": true,
+  "by": "OpenFull on mem-dst-shrink, 10 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6631,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 10,
+    "distinct": 2137,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "n10",
+  "rule": "slot-move.22",
+  "note": "the slot opens in a group that is a voter short",
+  "caught": true,
+  "by": "OpenFull on mem-dst-grow, 7 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 7,
+    "distinct": 404,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n11",
+  "rule": "slot-move.17",
+  "note": "a leader aborts a move whose final copy is in its log",
+  "caught": true,
+  "by": "OneServer on mem-src-core, 12 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 12,
+    "distinct": 1113,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "n12",
+  "rule": "slot-move.19 fenced",
+  "note": "a leader reopens on a fence it does not know committed",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1428,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 763,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 155,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 225,
+    "secs": 6
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 718,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 890,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 437,
+    "secs": 19
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 953,
+    "secs": 43
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 744,
+    "secs": 58
+   }
+  ]
+ },
+ {
+  "id": "n13",
+  "rule": "slot-move.19",
+  "note": "a leader reopens on an abort some member holds but no one knows committed",
+  "caught": true,
+  "by": "OneServer on mem-dst-fault, 11 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1109,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 834,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 377,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 685,
+    "secs": 5
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 652,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 6757,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 11,
+    "distinct": 622,
+    "secs": 7
+   }
+  ]
+ },
+ {
+  "id": "n14",
+  "rule": "slot-move.7",
+  "note": "the final copy's commit does not open the slot",
+  "caught": true,
+  "by": "the goal cannot be reached on mem-src-r",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 914,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 636,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 756,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5758,
+    "secs": 4
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 914,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n15",
+  "rule": "stream-numbers.11",
+  "note": "the target opens without the carried table",
+  "caught": true,
+  "by": "PosUnique on mem-src-core, 10 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "PosUnique",
+    "steps": 10,
+    "distinct": 739,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n16",
+  "rule": "stream-numbers.4",
+  "note": "a write at or below the high mark is taken again",
+  "caught": true,
+  "by": "Once on mem-src-core, 6 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "violated",
+    "inv": "Once",
+    "steps": 6,
+    "distinct": 187,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n17",
+  "rule": "raft-term-vote log",
+  "note": "a member votes for a candidate whose log is behind its own",
+  "caught": true,
+  "by": "RaftSafe on mem-dst-fault, 7 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6710,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 852,
+    "secs": 5
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5568,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "violated",
+    "inv": "RaftSafe",
+    "steps": 7,
+    "distinct": 2863,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n18",
+  "rule": "raft-term-vote term",
+  "note": "a member votes in a term it has already passed",
+  "caught": true,
+  "by": "the model stops with an error on mem-src-core",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "error",
+    "inv": null,
+    "steps": 7,
+    "distinct": 397,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n19",
+  "rule": "raft-config.1",
+  "note": "a candidate wins without a majority of its configuration",
+  "caught": true,
+  "by": "the model stops with an error on mem-src-core",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "error",
+    "inv": null,
+    "steps": 7,
+    "distinct": 509,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n20",
+  "rule": "raft-commit quorum",
+  "note": "a leader counts an entry committed on its own copy alone",
+  "caught": true,
+  "by": "RaftSafe on mem-dst-fault, 5 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1409,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 893,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 248,
+    "secs": 6
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 9901,
+    "secs": 4
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 8,
+    "distinct": 751,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 7871,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "violated",
+    "inv": "RaftSafe",
+    "steps": 5,
+    "distinct": 116,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "n21",
+  "rule": "raft-commit term",
+  "note": "a leader commits an older term's entry by counting copies",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6710,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6391,
+    "secs": 3
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5568,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 800,
+    "secs": 14
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 27
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 307,
+    "secs": 40
+   }
+  ]
+ },
+ {
+  "id": "n22",
+  "rule": "raft-log term",
+  "note": "a member takes the log of a leader from an older term",
+  "caught": true,
+  "by": "RaftSafe on mem-dst-fault, 7 steps",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 472,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 57,
+    "secs": 5
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5568,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "violated",
+    "inv": "RaftSafe",
+    "steps": 7,
+    "distinct": 1329,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "n23",
+  "rule": "raft-config.5",
+  "note": "a leader proposes a membership change while one is not committed",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6710,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6391,
+    "secs": 3
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5568,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 750,
+    "secs": 12
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 576,
+    "secs": 20
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 142,
+    "secs": 30
+   },
+   {
+    "bound": "mem-src-cfg2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 147,
+    "secs": 69
+   }
+  ]
+ },
+ {
+  "id": "n24",
+  "rule": "raft-config.2",
+  "note": "a new leader proposes a membership change before it has committed in its term",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 11726,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 9375,
+    "secs": 3
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 7522,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 194,
+    "secs": 11
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 686,
+    "secs": 20
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 621,
+    "secs": 42
+   },
+   {
+    "bound": "mem-src-cfg2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 722,
+    "secs": 47
+   }
+  ]
+ },
+ {
+  "id": "n25",
+  "rule": "raft-config.12",
+  "note": "a member outside its configuration stands for election",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6828,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6391,
+    "secs": 4
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 5686,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 541,
+    "secs": 14
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 58,
+    "secs": 23
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 236,
+    "secs": 32
+   }
+  ]
+ },
+ {
+  "id": "n26",
+  "rule": "raft-config.10",
+  "note": "a leader its change removed goes on leading",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 801,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 281,
+    "secs": 5
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 6048,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 422,
+    "secs": 14
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 651,
+    "secs": 22
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 226,
+    "secs": 33
+   }
+  ]
+ },
+ {
+  "id": "n27",
+  "rule": "raft-config.13",
+  "note": "a configuration takes effect when it is appended",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 8540,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5091,
+    "secs": 5
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 14,
+    "distinct": 7188,
+    "secs": 4
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 853,
+    "secs": 14
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 701,
+    "secs": 24
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 54,
+    "secs": 27
+   }
+  ]
+ },
+ {
+  "id": "n28",
+  "rule": "learners.3",
+  "note": "a member is made a voter before its log has caught up",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 948,
+    "secs": 3
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 678,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 480,
+    "secs": 5
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 6391,
+    "secs": 3
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 623,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 13,
+    "distinct": 5610,
+    "secs": 2
+   },
+   {
+    "bound": "mem-dst-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 79,
+    "secs": 12
+   },
+   {
+    "bound": "mem-src-fault",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 153,
+    "secs": 23
+   },
+   {
+    "bound": "mem-src-cfg",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 943,
+    "secs": 33
+   }
+  ]
+ },
+ {
+  "id": "n29",
+  "rule": "raft-config.3",
+  "note": "a new leader adds no entry of its own term",
+  "caught": true,
+  "by": "the goal cannot be reached on mem-dst-r",
+  "runs": [
+   {
+    "bound": "mem-src-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 370,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 209,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-grow",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1080,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1464,
+    "secs": 1
+   },
+   {
+    "bound": "mem-src-r",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 9,
+    "distinct": 237,
+    "secs": 1
+   },
+   {
+    "bound": "mem-dst-r",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1080,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "t01",
+  "rule": "slot-table.4 committed",
+  "note": "the source fences on a row that has not committed",
+  "caught": true,
+  "by": "RowFirst on core, 3 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "RowFirst",
+    "steps": 3,
+    "distinct": 7,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "t02",
+  "rule": "slot-table.4",
+  "note": "the source fences on a row that was written back",
+  "caught": true,
+  "by": "TableRight on twice, 17 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 884,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 17,
+    "distinct": 6337,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "t03",
+  "rule": "slot-table.5",
+  "note": "the source reopens before the row is written back",
+  "caught": true,
+  "by": "TableRight on core, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "distinct": 79,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "t04",
+  "rule": "slot-table.6",
+  "note": "the table keeps the last row written, not the highest version",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 787,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 260,
+    "secs": 8
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 407,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 404,
+    "secs": 7
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 895,
+    "secs": 32
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 1
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 9
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 4
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 27,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 751,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 697,
+    "secs": 10
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 380,
+    "secs": 7
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 297,
+    "secs": 31
+   }
+  ]
+ },
+ {
+  "id": "t05",
+  "rule": "back.committed",
+  "note": "the row is written back on an abort that has not committed",
+  "caught": true,
+  "by": "TableRight on crash, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 143,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 11,
+    "distinct": 2521,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "t06",
+  "rule": "ended.back",
+  "note": "a move counts as ended once its abort commits, row or no row",
+  "caught": true,
+  "by": "TableRight on twice, 11 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 139,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 11,
+    "distinct": 1635,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "t07",
+  "rule": "ended.open",
+  "note": "a move counts as ended on a final copy that has not committed",
+  "caught": true,
+  "by": "TableRight on twice, 19 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 32,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 19,
+    "distinct": 933,
+    "secs": 5
+   }
+  ]
+ },
+ {
+  "id": "t08",
+  "rule": "move-policy.4",
+  "note": "the home group starts a second move while one is under way",
+  "caught": true,
+  "by": "TableRight on twice, 9 steps",
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 180,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "distinct": 1080,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u01",
+  "rule": "recover.shut",
+  "note": "a recovered group goes on serving the slot from its cut log",
+  "caught": true,
+  "by": "OneServer on msg-rec, 2 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 4
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 5
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 664,
+    "secs": 7
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "OneServer",
+    "steps": 2,
+    "distinct": 4,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u02",
+  "rule": "meta-directory.2",
+  "note": "a recovery does not raise the group's incarnation",
+  "caught": true,
+  "by": "TableRight on msg-rec, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 3
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 5
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 785,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 10,
+    "distinct": 459,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u03",
+  "rule": "row.inc write-src",
+  "note": "a move's row does not hold the source's incarnation",
+  "caught": true,
+  "by": "the goal cannot be reached on msg-r-aftersrc",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1083,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 74,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 432,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 525,
+    "secs": 7
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2166,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 799,
+    "secs": 6
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 735,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 219,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 417,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1083,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u04",
+  "rule": "row.inc write-dst",
+  "note": "a move's row does not hold the target's incarnation",
+  "caught": true,
+  "by": "the goal cannot be reached on msg-r-afterdst",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1320,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 798,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 701,
+    "secs": 17
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 181,
+    "secs": 8
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 671,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 249,
+    "secs": 7
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 772,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 199,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 391,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 786,
+    "secs": 5
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 229,
+    "secs": 5
+   }
+  ]
+ },
+ {
+  "id": "u05",
+  "rule": "row.inc source",
+  "note": "a recovered source fences a move ordered for its old life",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 821,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 962,
+    "secs": 14
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 245,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 207,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 461,
+    "secs": 60
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 90,
+    "secs": 71
+   }
+  ]
+ },
+ {
+  "id": "u06",
+  "rule": "row.inc target",
+  "note": "a recovered target takes a final copy ordered for its old life",
+  "caught": true,
+  "by": "TableRight on msg-rec, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 10,
+    "distinct": 579,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u07",
+  "rule": "row.inc copy",
+  "note": "a recovered target copies early for a move ordered for its old life",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 54,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 919,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 14,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4218,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 1
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 493,
+    "secs": 62
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 66,
+    "secs": 73
+   }
+  ]
+ },
+ {
+  "id": "u08",
+  "rule": "ended.inc",
+  "note": "a move counts as ended though its target has had a new life since",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 310,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 872,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 726,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4218,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 922,
+    "secs": 61
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 618,
+    "secs": 74
+   }
+  ]
+ },
+ {
+  "id": "u09",
+  "rule": "abort.lost",
+  "note": "a recovered target does not say its old life's records may be lost",
+  "caught": true,
+  "by": "NoBack on msg-rec, 14 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 14,
+    "distinct": 899,
+    "secs": 5
+   }
+  ]
+ },
+ {
+  "id": "u10",
+  "rule": "back.lost",
+  "note": "the row written back after a lost target is an ordinary one",
+  "caught": true,
+  "by": "NoBack on msg-rec, 14 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 14,
+    "distinct": 1074,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u11",
+  "rule": "back.lost last",
+  "note": "a lost target's old move overrides a newer move into it",
+  "caught": true,
+  "by": "TableRight on msg-rec-three, 20 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 842,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 549,
+    "secs": 18
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 63,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 842,
+    "secs": 5
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 6
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 20,
+    "distinct": 342,
+    "secs": 27
+   }
+  ]
+ },
+ {
+  "id": "u12",
+  "rule": "back.lost holder",
+  "note": "a lost target's old move overrides its own recovery row",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 175,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 591,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 940,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4218,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 1
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 346,
+    "secs": 56
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 929,
+    "secs": 72
+   }
+  ]
+ },
+ {
+  "id": "u13",
+  "rule": "back.lost giver",
+  "note": "a move out of the lost target hides that the slot went back",
+  "caught": true,
+  "by": "NoBack on msg-rec-twice, 15 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 809,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 15,
+    "distinct": 633,
+    "secs": 7
+   }
+  ]
+ },
+ {
+  "id": "u14",
+  "rule": "back.lost top",
+  "note": "the row written back after a lost target is not above the later rows",
+  "caught": true,
+  "by": "TableRight on msg-rec-twice, 16 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 100,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 16,
+    "distinct": 806,
+    "secs": 8
+   }
+  ]
+ },
+ {
+  "id": "u15",
+  "rule": "back.epoch",
+  "note": "the row written back after a lost target keeps the old epoch",
+  "caught": true,
+  "by": "NoBack on msg-rec, 14 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 14,
+    "distinct": 1096,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u16",
+  "rule": "unf.epoch",
+  "note": "the source reopens in its old epoch after a lost target",
+  "caught": true,
+  "by": "NoBack on msg-rec, 14 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 14,
+    "distinct": 1096,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "u17",
+  "rule": "unf.wait",
+  "note": "the source reopens after a lost target before the row is written back",
+  "caught": true,
+  "by": "the model stops with an error on msg-rec-lazy",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 303,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "error",
+    "inv": null,
+    "steps": 7,
+    "distinct": 370,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u18",
+  "rule": "recover.copy",
+  "note": "a recovered group asks for a slot its copy does not hold",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 899,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 124,
+    "secs": 12
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 323,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4218,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 31,
+    "secs": 56
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 863,
+    "secs": 71
+   }
+  ]
+ },
+ {
+  "id": "u19",
+  "rule": "recover.table",
+  "note": "a recovered group gets a row for a slot the table gives to another group",
+  "caught": true,
+  "by": "TableRight on msg-rec, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 8,
+    "distinct": 391,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u20",
+  "rule": "recover.final",
+  "note": "a recovered group gets a row though its copy is older than the last move into it",
+  "caught": true,
+  "by": "TableRight on msg-rec-twice, 9 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "distinct": 600,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u21",
+  "rule": "slot-table.7",
+  "note": "a recovery writes the slot's row at the old epoch",
+  "caught": true,
+  "by": "NoBack on msg-rec, 7 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 7,
+    "distinct": 199,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u22",
+  "rule": "recover.row",
+  "note": "a group reopens on the recovery row of an older life",
+  "caught": true,
+  "by": "NoBack on msg-rec2, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 37,
+    "secs": 13
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 268,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 752,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2812,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4218,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 188,
+    "secs": 61
+   },
+   {
+    "bound": "msg-rec2",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 10,
+    "distinct": 2652,
+    "secs": 5
+   }
+  ]
+ },
+ {
+  "id": "u23",
+  "rule": "recover.epoch",
+  "note": "a recovered group reopens in its old epoch",
+  "caught": true,
+  "by": "NoBack on msg-rec, 7 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 7,
+    "distinct": 199,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u24",
+  "rule": "fence.newer",
+  "note": "the source fences a move older than one it already acted on",
+  "caught": true,
+  "by": "InOrder on msg-rec-twice, 24 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 116,
+    "secs": 6
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 24,
+    "distinct": 464,
+    "secs": 17
+   }
+  ]
+ },
+ {
+  "id": "u25",
+  "rule": "final.shut",
+  "note": "a group that holds the slot open takes a final copy",
+  "caught": true,
+  "by": "NoBack on msg-rec-twice, 19 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 19,
+    "distinct": 77,
+    "secs": 11
+   }
+  ]
+ },
+ {
+  "id": "u26",
+  "rule": "final.newer",
+  "note": "a group takes the final copy of a move older than one it already acted on",
+  "caught": true,
+  "by": "OneTaker on msg-rec-three, 20 steps",
+  "runs": [
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 215,
+    "secs": 15
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 617,
+    "secs": 17
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 532,
+    "secs": 7
+   },
+   {
+    "bound": "msg-rec-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 423,
+    "secs": 5
+   },
+   {
+    "bound": "msg-rec-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 659,
+    "secs": 5
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-aftersrc",
+    "verdict": "violated",
+    "inv": "NotAfterSrc",
+    "steps": 12,
+    "distinct": 866,
+    "secs": 3
+   },
+   {
+    "bound": "msg-r-afterdst",
+    "verdict": "violated",
+    "inv": "NotAfterDst",
+    "steps": 9,
+    "distinct": 456,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 20,
+    "distinct": 574,
+    "secs": 20
+   }
+  ]
+ },
+ {
+  "id": "u27",
+  "rule": "slot-move.14",
+  "note": "the target takes an early copy for the final copy",
+  "caught": true,
+  "by": "OneTaker on msg-early, 3 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 3,
+    "distinct": 8,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u28",
+  "rule": "delta.base",
+  "note": "the target merges a delta onto a copy that stands at another place",
+  "caught": true,
+  "by": "InOrder on msg-early, 12 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 12,
+    "distinct": 270,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u29",
+  "rule": "delta.base source",
+  "note": "the source cuts the delta at the wrong place",
+  "caught": true,
+  "by": "InOrder on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 10,
+    "distinct": 184,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u30",
+  "rule": "slot-move.5",
+  "note": "the delta starts one record late",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 178,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u31",
+  "rule": "delta.marks",
+  "note": "the delta leaves out the high marks that changed",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 178,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u32",
+  "rule": "delta.answers",
+  "note": "the delta leaves out the new kept answers",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 178,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u33",
+  "rule": "delta.rest",
+  "note": "a full final copy leaves out the parts that are only bytes here",
+  "caught": true,
+  "by": "StateRight on msg-crash, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 6,
+    "distinct": 100,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u34",
+  "rule": "slot-sequence.2 seq",
+  "note": "the delta carries the sequence of the early copy's place",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 178,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u35",
+  "rule": "slot-sequence.2 epoch",
+  "note": "the delta does not carry the epoch",
+  "caught": true,
+  "by": "Whole on msg-early, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "Whole",
+    "steps": 8,
+    "distinct": 107,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u36",
+  "rule": "merge.seq",
+  "note": "the merge keeps the early copy's sequence",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 178,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u37",
+  "rule": "merge.epoch",
+  "note": "the merge keeps the early copy's epoch",
+  "caught": true,
+  "by": "Whole on msg-crash, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "violated",
+    "inv": "Whole",
+    "steps": 6,
+    "distinct": 100,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u38",
+  "rule": "merge.marks",
+  "note": "the merge drops the early copy's high marks",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 184,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u39",
+  "rule": "merge.answers",
+  "note": "the merge drops the early copy's kept answers",
+  "caught": true,
+  "by": "StateRight on msg-early, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 10,
+    "distinct": 184,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u40",
+  "rule": "merge.rest",
+  "note": "the merge drops the early copy's byte parts",
+  "caught": true,
+  "by": "StateRight on msg-early, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 8,
+    "distinct": 107,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u41",
+  "rule": "slot-move.13 early",
+  "note": "the early copy does not hold the carried set",
+  "caught": true,
+  "by": "StateRight on msg-early, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 8,
+    "distinct": 107,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u42",
+  "rule": "slot-move.12 report",
+  "note": "the ready report names the wrong place",
+  "caught": true,
+  "by": "the goal cannot be reached on msg-r-early",
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 292,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 788,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 200,
+    "secs": 7
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 359,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u43",
+  "rule": "copy.forward",
+  "note": "a later early copy may stand before an earlier one",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 740,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 947,
+    "secs": 4
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "u44",
+  "rule": "slot-move.3",
+  "note": "the fence does not stop the source",
+  "caught": true,
+  "by": "OneTaker on msg-core, 5 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 5,
+    "distinct": 32,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u45",
+  "rule": "slot-move.1",
+  "note": "the source takes a write after its fence is in its log",
+  "caught": true,
+  "by": "NoLoss on msg-core, 8 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "NoLoss",
+    "steps": 8,
+    "distinct": 103,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u46",
+  "rule": "slot-move.18",
+  "note": "the target takes a final copy after its abort",
+  "caught": true,
+  "by": "TableRight on msg-core, 9 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "distinct": 81,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u47",
+  "rule": "slot-move.8",
+  "note": "the target takes the final copy twice",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 1
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 1
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 604,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 983,
+    "secs": 12
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 137,
+    "secs": 58
+   }
+  ]
+ },
+ {
+  "id": "u48",
+  "rule": "slot-move.17",
+  "note": "the target aborts a move whose final copy is in its log",
+  "caught": true,
+  "by": "TableRight on msg-core, 9 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 9,
+    "distinct": 84,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u49",
+  "rule": "slot-move.19",
+  "note": "the source reopens on the abort of another move",
+  "caught": true,
+  "by": "OneTaker on msg-rec-twice, 10 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 3
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "OneTaker",
+    "steps": 10,
+    "distinct": 1030,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "u50",
+  "rule": "slot-table.4",
+  "note": "the source fences on a row that was written back",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 1
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 1
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 390,
+    "secs": 11
+   },
+   {
+    "bound": "msg-rec-lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 198,
+    "secs": 12
+   },
+   {
+    "bound": "msg-r-early",
+    "verdict": "violated",
+    "inv": "NotEarly",
+    "steps": 14,
+    "distinct": 338,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-lostback",
+    "verdict": "violated",
+    "inv": "NotLostBack",
+    "steps": 12,
+    "distinct": 850,
+    "secs": 2
+   },
+   {
+    "bound": "msg-r-reopen",
+    "verdict": "violated",
+    "inv": "NotReopen",
+    "steps": 7,
+    "distinct": 234,
+    "secs": 1
+   },
+   {
+    "bound": "msg-r-oldreport",
+    "verdict": "violated",
+    "inv": "NotOldReport",
+    "steps": 9,
+    "distinct": 448,
+    "secs": 2
+   },
+   {
+    "bound": "msg-rec-three",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 853,
+    "secs": 59
+   }
+  ]
+ },
+ {
+  "id": "u51",
+  "rule": "slot-table.6",
+  "note": "the table keeps the last row written, not the highest version",
+  "caught": true,
+  "by": "TableRight on msg-rec-twice, 16 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 16,
+    "distinct": 517,
+    "secs": 5
+   }
+  ]
+ },
+ {
+  "id": "u52",
+  "rule": "move-policy.4",
+  "note": "the home group starts a second move while one is under way",
+  "caught": true,
+  "by": "TableRight on msg-rec-twice, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 2
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 4
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 6,
+    "distinct": 218,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u53",
+  "rule": "ended.open",
+  "note": "a move counts as ended with no final copy",
+  "caught": true,
+  "by": "TableRight on msg-rec-twice, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 92,
+    "secs": 2
+   },
+   {
+    "bound": "msg-early",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 356,
+    "secs": 3
+   },
+   {
+    "bound": "msg-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 804,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1406,
+    "secs": 3
+   },
+   {
+    "bound": "msg-rec-twice",
+    "verdict": "violated",
+    "inv": "TableRight",
+    "steps": 6,
+    "distinct": 208,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u54",
+  "rule": "stream-numbers.11",
+  "note": "the target opens without the carried table",
+  "caught": true,
+  "by": "StateRight on msg-core, 6 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "StateRight",
+    "steps": 6,
+    "distinct": 41,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u55",
+  "rule": "stream-numbers.4",
+  "note": "a write at or below the high mark is taken again",
+  "caught": true,
+  "by": "InOrder on msg-core, 5 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 5,
+    "distinct": 24,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "u56",
+  "rule": "slot-sequence.1",
+  "note": "a record is stamped with the last sequence, not the next",
+  "caught": true,
+  "by": "InOrder on msg-core, 3 steps",
+  "runs": [
+   {
+    "bound": "msg-core",
+    "verdict": "violated",
+    "inv": "InOrder",
+    "steps": 3,
+    "distinct": 6,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "x01",
+  "rule": "slot-move.4 at",
+  "note": "the final copy reads the source's committed log today, not at the fence",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 697,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 838,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 167,
+    "secs": 10
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 956,
+    "secs": 8
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 266,
+    "secs": 30
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 10
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 4
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4322,
+    "secs": 3
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 87,
+    "secs": 5
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 846,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2436,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 769,
+    "secs": 10
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 957,
+    "secs": 8
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 274,
+    "secs": 31
+   }
+  ]
+ },
+ {
+  "id": "x02",
+  "rule": "start.other",
+  "note": "the home group starts a move to the group that already holds the slot",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 165,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5857,
+    "secs": 4
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 408,
+    "secs": 6
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 769,
+    "secs": 10
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3348,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 315,
+    "secs": 13
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1601,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 553,
+    "secs": 11
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 805,
+    "secs": 38
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 316,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 159,
+    "secs": 2
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 1034,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 11
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 5
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 165,
+    "secs": 2
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5857,
+    "secs": 4
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 376,
+    "secs": 6
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 734,
+    "secs": 10
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3348,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 226,
+    "secs": 13
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1601,
+    "secs": 2
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 859,
+    "secs": 11
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 67,
+    "secs": 39
+   }
+  ]
+ },
+ {
+  "id": "x03",
+  "rule": "copy.server",
+  "note": "the early copy is taken from a group that no longer serves the slot",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "core (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 2
+   },
+   {
+    "bound": "crash (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4345,
+    "secs": 3
+   },
+   {
+    "bound": "bulk (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 273,
+    "secs": 5
+   },
+   {
+    "bound": "twice (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 51,
+    "secs": 7
+   },
+   {
+    "bound": "lock (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2464,
+    "secs": 3
+   },
+   {
+    "bound": "ver (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 514,
+    "secs": 11
+   },
+   {
+    "bound": "ver2 (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 564,
+    "secs": 7
+   },
+   {
+    "bound": "down (no Whole)",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 292,
+    "secs": 31
+   },
+   {
+    "bound": "r-moved",
+    "verdict": "violated",
+    "inv": "NotMoved",
+    "steps": 11,
+    "distinct": 214,
+    "secs": 2
+   },
+   {
+    "bound": "r-back",
+    "verdict": "violated",
+    "inv": "NotBack",
+    "steps": 13,
+    "distinct": 107,
+    "secs": 1
+   },
+   {
+    "bound": "r-twice",
+    "verdict": "violated",
+    "inv": "NotTwice",
+    "steps": 17,
+    "distinct": 470,
+    "secs": 2
+   },
+   {
+    "bound": "s-lazy",
+    "verdict": "pass",
+    "what": "",
+    "secs": 10
+   },
+   {
+    "bound": "s-twice",
+    "verdict": "pass",
+    "what": "",
+    "secs": 5
+   },
+   {
+    "bound": "core",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 113,
+    "secs": 1
+   },
+   {
+    "bound": "crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4345,
+    "secs": 4
+   },
+   {
+    "bound": "bulk",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 215,
+    "secs": 6
+   },
+   {
+    "bound": "twice",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 979,
+    "secs": 7
+   },
+   {
+    "bound": "lock",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2464,
+    "secs": 3
+   },
+   {
+    "bound": "ver",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 906,
+    "secs": 10
+   },
+   {
+    "bound": "ver2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 987,
+    "secs": 3
+   },
+   {
+    "bound": "lazy",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 245,
+    "secs": 8
+   },
+   {
+    "bound": "down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 949,
+    "secs": 31
+   }
+  ]
+ }
+]

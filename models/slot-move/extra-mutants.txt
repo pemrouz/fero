@@ -1,0 +1,40 @@
+# More planted mistakes, from a second reading of the three models.
+# They sit on lines that mutants.txt does not list, most of them unmarked.
+# id ; module ; old text (it must occur once in the module; \n is a line end) ; new text ; what the mistake is
+# Run by extra.py.  Ids: e first model, f second model, g third model.
+# A "probe" is a change the reader expected to be harmless; it is not counted.
+#
+e01 ; SlotMove ; /\ LET L == log[g] ; /\ LET L == CL(g) ; a leader reads the stream table and the sequence from its committed log, not its log end
+e02 ; SlotMove ; /\ Voters(d, L) >= Copies ; /\ Voters(d, CL(d)) >= Copies ; the voters are counted in the committed log, not at the log end (Finding 9, first model)
+e04 ; SlotMove ; LET T == Table(log["H"]) IN ; LET T == Table(CL("H")) IN ; "the last move has ended" is read from the committed table, not the leader's log end
+e05 ; SlotMove ; v |-> T.m, src |-> T.src]) ; v |-> T.m, src |-> d]) ; the abort names the target as the move's source
+e06 ; SlotMove ; own |-> log[d][j].src, src |-> d]) ; own |-> d, src |-> d]) ; the row is written back to the target, not the source
+e07 ; SlotMove ; /\ alt' = [alt EXCEPT ![g] = <<>>] ; /\ alt' = alt ; (world) a dropped tail comes back after a later commit
+e08 ; SlotMove ; ELSE L[Max(Ok)].pos, ; ELSE L[Max(W)].pos, ; a refused write moves the row's version
+e09 ; SlotMove ; tok  |-> Max({B.tok} \cup {L[i].tok : i \in W}), ; tok  |-> B.tok, ; the lock fence table forgets the tokens of the group's own writes
+e10 ; SlotMove ; st   |-> Max({B.st} \cup {L[i].st : i \in W}), ; st   |-> B.st, ; the last stamp forgets the group's own writes
+e11 ; SlotMove ; ans  |-> B.ans \cup {<<L[i].s, L[i].n, L[i].out>> : i \in W}, ; ans  |-> B.ans, ; the kept answers forget the group's own writes
+# probes in the first model
+e14 ; SlotMove ; /\ log[a][i].t = "fence" /\ log[a][i].to = d ; /\ log[a][i].t = "fence" ; probe: the target does not check that the fence names it
+#
+f01 ; SlotMoveMsg ; ep   |-> f.dtab.ep, ; ep   |-> EpOf(d, L), ; the final copy keeps the target's own epoch, not the source's
+f02 ; SlotMoveMsg ; /\ LET T == Tab(g, log[g]) ; /\ LET T == Tab(g, CL(g)) ; a leader reads the stream table and the sequence from its committed log
+f03 ; SlotMoveMsg ; step |-> 1, own |-> f.src, src |-> f.g, for |-> f.m, ; step |-> 1, own |-> f.g, src |-> f.g, for |-> f.m, ; the row is written back to the target, not the source
+f04 ; SlotMoveMsg ; /\ home[i].step = 2 /\ home[i].own = g ; /\ home[i].step = 2 ; a group reopens on another group's recovery row
+f05 ; SlotMoveMsg ; [m |-> TopM(home) + 1, step |-> 2, own |-> g, ; [m |-> T.m, step |-> 2, own |-> g, ; a recovery's row takes no new number
+f06 ; SlotMoveMsg ; /\ ci' = [ci EXCEPT ![g] = k + 1] ; /\ ci' = [ci EXCEPT ![g] = k] ; the recovery's own entry is not committed, so a leader change can drop it
+f07 ; SlotMoveMsg ; ELSE EpOf(a, L)]) ; ELSE EpOf(a, L) + 1]) ; a plain reopen makes up a new epoch the home log does not know
+f08 ; SlotMoveMsg ; [] e.t = "final" -> {[k |-> "final", m |-> e.v]} ; [] e.t = "abort" /\ FALSE -> {} ; the target's final copy makes no report
+f09 ; SlotMoveMsg ; /\ home[j].m = f.m /\ home[j].step = 0 ; /\ home[j].step = 0 ; the row written back takes its epoch from any move's row
+# probes in the second model
+f11 ; SlotMoveMsg ; dinc |-> T.dinc]) ; dinc |-> inc[d]]) ; probe: the fence binds the target's incarnation of now, not the row's
+f12 ; SlotMoveMsg ; {f \in Said("fence") : f.to = d} ; Said("fence") ; probe: the target does not check that the fence names it
+f13 ; SlotMoveMsg ; {f.p + 1 : f \in Ready(T.m)} ; {f.p + 1 : f \in Said("ready")} ; probe: the fence takes its base from another move's ready report
+f14 ; SlotMoveMsg ; /\ ~ \E i \in DOMAIN home : home[i].for = f.m /\ home[i].step = 1 ; /\ Cardinality({i \in DOMAIN home : home[i].for = f.m /\ home[i].step = 1}) < 2 ; probe: the row is written back twice
+#
+g01 ; SlotMoveMembers ; LET T == Tab(End(g, a)) ; LET T == Tab(Com(g, a)) ; a leader reads the stream table and the sequence from the log it knows committed
+g02 ; SlotMoveMembers ; mci'  = [mci EXCEPT ![j] = Max({mci[j], mci[l]})] ; mci'  = [mci EXCEPT ![j] = Len(mlog[l])] ; a member takes the leader's whole log as committed
+g03 ; SlotMoveMembers ; IF j = i THEN TRUE ELSE IF j \in Q THEN FALSE ELSE lead[j]] ; IF j = i THEN TRUE ELSE lead[j]] ; a leader that votes for another goes on leading in the new term
+g04 ; SlotMoveMembers ; 2 * Cardinality(Q \cap V) > Cardinality(V) ; 2 * Cardinality(Q \cap V) >= Cardinality(V) ; half of the voters count as a majority
+g05 ; SlotMoveMembers ; recs |-> Vis(SubSeq(C, 1, i - 1)), ; recs |-> Vis(End("A", t)), ; the final copy takes the records of a member's whole log, not the committed part before the fence
+f15 ; SlotMoveMsg ; /\ Mode(g, CL(g)) = "open"                                  \* @rule slot-table.1 ; /\ TRUE ; probe: a leader takes writes behind an open that has not committed (Finding 5's one-commit window, with a recovery)
