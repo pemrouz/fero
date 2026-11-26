@@ -1,0 +1,2736 @@
+[
+ {
+  "id": "c01",
+  "model": "Selection",
+  "rule": "subscribe.14",
+  "note": "the client takes a record that is not the next one",
+  "caught": true,
+  "by": "Exact on c-small, 12 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 12,
+    "distinct": 927,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c02",
+  "model": "Selection",
+  "rule": "new:picture-per-slot",
+  "note": "the client takes a picture of a slot from before its cursor",
+  "caught": true,
+  "by": "NoBack on c-small, 10 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoBack",
+    "steps": 10,
+    "distinct": 706,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c03",
+  "model": "Selection",
+  "rule": "subscribe.13",
+  "note": "a picture does not set the slot's cursor",
+  "caught": true,
+  "by": "Exact on c-small, 5 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 5,
+    "distinct": 107,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c04",
+  "model": "Selection",
+  "rule": "subscribe.12",
+  "note": "a picture does not put in the slot's rows",
+  "caught": true,
+  "by": "Exact on c-small, 5 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 5,
+    "distinct": 78,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c05",
+  "model": "Selection",
+  "rule": "subscribe.16",
+  "note": "a record does not move the cursor on",
+  "caught": true,
+  "by": "Exact on c-small, 7 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 7,
+    "distinct": 278,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c06",
+  "model": "Selection",
+  "rule": "subscribe.15",
+  "note": "a record taken is not applied",
+  "caught": true,
+  "by": "Exact on c-small, 7 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 7,
+    "distinct": 274,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c07",
+  "model": "Selection",
+  "rule": "subscribe.29 end",
+  "note": "END names the old group, not the new one",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1871,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 392,
+    "secs": 17
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 727,
+    "secs": 25
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 910,
+    "secs": 8
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 529,
+    "secs": 9
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 226,
+    "secs": 13,
+    "judged": 13472,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 119,
+    "secs": 27,
+    "judged": 76839,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "c08",
+  "model": "Selection",
+  "rule": "subscribe.29 turn",
+  "note": "the client ignores END",
+  "caught": true,
+  "by": "NoStuck on c-small, 12 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 12,
+    "distinct": 931,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c09",
+  "model": "Selection",
+  "rule": "subscribe.29 again",
+  "note": "the client never asks the new group for the slot",
+  "caught": true,
+  "by": "cannot always finish on c-live: 1177 of 7770 judged states",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 938,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 538,
+    "secs": 8
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 698,
+    "secs": 11
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2978,
+    "secs": 5
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 534,
+    "secs": 8
+   },
+   {
+    "bound": "c-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 12,
+    "secs": 9,
+    "judged": 7770,
+    "cannot": 1177
+   }
+  ]
+ },
+ {
+  "id": "c10",
+  "model": "Selection",
+  "rule": "new:picture-names-moved",
+  "note": "a picture does not name the slots the group handed off",
+  "caught": true,
+  "by": "NoStuck on c-small, 9 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 9,
+    "distinct": 640,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c11",
+  "model": "Selection",
+  "rule": "new:turn-on-moved",
+  "note": "a slot the client never held is not asked for at the new group",
+  "caught": true,
+  "by": "NoStuck on c-small, 9 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 9,
+    "distinct": 656,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c12",
+  "model": "Selection",
+  "rule": "new:ready-per-slot",
+  "note": "ready as soon as every group's picture has come",
+  "caught": true,
+  "by": "Whole on c-small, 8 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Whole",
+    "steps": 8,
+    "distinct": 497,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c13",
+  "model": "Selection",
+  "rule": "selection.1 ready",
+  "note": "ready once one group's picture has come",
+  "caught": true,
+  "by": "Waits on c-down, 7 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1092,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 357,
+    "secs": 9
+   },
+   {
+    "bound": "c-down",
+    "verdict": "violated",
+    "inv": "Waits",
+    "steps": 7,
+    "distinct": 1541,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c14",
+  "model": "Selection",
+  "rule": "subscribe.3",
+  "note": "a picture names the wrong position",
+  "caught": true,
+  "by": "NoStuck on c-small, 8 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 8,
+    "distinct": 362,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "c15",
+  "model": "Selection",
+  "rule": "subscribe.5",
+  "note": "a server sends a record that has not committed",
+  "caught": true,
+  "by": "Exact on c-small, 6 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 6,
+    "distinct": 133,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c16",
+  "model": "Selection",
+  "rule": "slot-move.9",
+  "note": "a group answers for a slot another group holds",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1092,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 992,
+    "secs": 10
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 86,
+    "secs": 11
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 442,
+    "secs": 5
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 757,
+    "secs": 7
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 444,
+    "secs": 5,
+    "judged": 9075,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 11,
+    "secs": 14,
+    "judged": 61347,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "c17",
+  "model": "Selection",
+  "rule": "subscribe.1",
+  "note": "a group streams slots it does not hold",
+  "caught": true,
+  "by": "NoStuck on c-small, 11 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 11,
+    "distinct": 823,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c18",
+  "model": "Selection",
+  "rule": "subscribe.6",
+  "note": "a record is sent under the next position",
+  "caught": true,
+  "by": "NoStuck on c-small, 10 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 10,
+    "distinct": 588,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c19",
+  "model": "Selection",
+  "rule": "line:spic-src",
+  "note": "a slot's picture does not set the group the slot is taken from",
+  "caught": true,
+  "by": "NoStuck on c-back, 17 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1115,
+    "secs": 2
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 76,
+    "secs": 5
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 781,
+    "secs": 8
+   },
+   {
+    "bound": "c-back",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 17,
+    "distinct": 4234,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c20",
+  "model": "Selection",
+  "rule": "new:picture-per-slot",
+  "note": "a picture that does not cover a slot is taken for it",
+  "caught": true,
+  "by": "Exact on c-small, 4 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "Exact",
+    "steps": 4,
+    "distinct": 33,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c21",
+  "model": "Selection",
+  "rule": "line:spic-position",
+  "note": "a slot's picture names position 0",
+  "caught": true,
+  "by": "NoStuck on c-small, 13 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 13,
+    "distinct": 964,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c22",
+  "model": "Selection",
+  "rule": "line:spic-sent",
+  "note": "after a slot's picture the group skips a record",
+  "caught": true,
+  "by": "NoStuck on c-small, 13 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 13,
+    "distinct": 1007,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c23",
+  "model": "Selection",
+  "rule": "line:end-src",
+  "note": "an END from a group the slot is not taken from clears where it is taken from",
+  "caught": true,
+  "by": "NoStuck on c-back, 16 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1111,
+    "secs": 2
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 93,
+    "secs": 6
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 454,
+    "secs": 9
+   },
+   {
+    "bound": "c-back",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 16,
+    "distinct": 3833,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c24",
+  "model": "Selection",
+  "rule": "subscribe.29 turn",
+  "note": "an END from any group turns the client, an old END too",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1160,
+    "secs": 2
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 626,
+    "secs": 6
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 324,
+    "secs": 12
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 8516,
+    "secs": 4
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 163,
+    "secs": 8
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 656,
+    "secs": 7,
+    "judged": 9746,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 734,
+    "secs": 16,
+    "judged": 57636,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "c25",
+  "model": "Selection",
+  "rule": "new:ask-ended",
+  "note": "an ask for a slot the group handed off waits for ever",
+  "caught": true,
+  "by": "NoStuck on c-back, 12 steps",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1092,
+    "secs": 2
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 402,
+    "secs": 8
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 274,
+    "secs": 12
+   },
+   {
+    "bound": "c-back",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 12,
+    "distinct": 2272,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "c26",
+  "model": "Selection",
+  "rule": "subscribe.29 turn",
+  "note": "an END that answers an ask does not turn the client",
+  "caught": true,
+  "by": "cannot always finish on c-back-live: 1484 of 37757 judged states",
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1092,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 79,
+    "secs": 8
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 634,
+    "secs": 14
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4725,
+    "secs": 4
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 434,
+    "secs": 8
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 293,
+    "secs": 8,
+    "judged": 9075,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 847,
+    "secs": 13,
+    "judged": 37757,
+    "cannot": 1484
+   }
+  ]
+ },
+ {
+  "id": "f01",
+  "model": "Found",
+  "rule": "genesis-conditional-create.1",
+  "note": "the store's create succeeds over a stored id",
+  "caught": true,
+  "by": "OneId on f-small, 6 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneId",
+    "steps": 6,
+    "distinct": 47,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f02",
+  "model": "Found",
+  "rule": "genesis-conditional-create.3",
+  "note": "an opener founds though the stored id is not its own",
+  "caught": true,
+  "by": "OneId on f-small, 5 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneId",
+    "steps": 5,
+    "distinct": 29,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f03",
+  "model": "Found",
+  "rule": "genesis-conditional-create.2",
+  "note": "an opener makes a candidate though its dir holds an id",
+  "caught": true,
+  "by": "OneLog on f-small, 6 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneLog",
+    "steps": 6,
+    "distinct": 75,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f04",
+  "model": "Found",
+  "rule": "genesis-conditional-create.6",
+  "note": "an opener adopts though its dir holds an id",
+  "caught": true,
+  "by": "cannot always finish on f-live: 81 of 18263 judged states",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2066,
+    "secs": 4
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 15,
+    "secs": 5
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 723,
+    "secs": 5
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 382,
+    "secs": 321
+   },
+   {
+    "bound": "f-four",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 435,
+    "secs": 297
+   },
+   {
+    "bound": "f-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 17,
+    "distinct": 11311,
+    "secs": 3
+   },
+   {
+    "bound": "f-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 331,
+    "secs": 9,
+    "judged": 18263,
+    "cannot": 81
+   }
+  ]
+ },
+ {
+  "id": "f05",
+  "model": "Found",
+  "rule": "genesis-conditional-create.5",
+  "note": "an opener adopts an id that is not the stored one",
+  "caught": true,
+  "by": "OneId on f-small, 4 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneId",
+    "steps": 4,
+    "distinct": 18,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f06",
+  "model": "Found",
+  "rule": "growth.5 first-voter",
+  "note": "any machine makes the group, not only the one the record names",
+  "caught": true,
+  "by": "OneLog on f-small, 8 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneLog",
+    "steps": 8,
+    "distinct": 115,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f07",
+  "model": "Found",
+  "rule": "growth.5 once",
+  "note": "a machine makes a group it already holds",
+  "caught": true,
+  "by": "OneLog on f-small, 7 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneLog",
+    "steps": 7,
+    "distinct": 105,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f08",
+  "model": "Found",
+  "rule": "slot-move.22",
+  "note": "a group opens its slots before it has its voters",
+  "caught": true,
+  "by": "AllVoters on f-small, 5 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "AllVoters",
+    "steps": 5,
+    "distinct": 47,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f09",
+  "model": "Found",
+  "rule": "slot-move.22",
+  "note": "flip >= to >",
+  "caught": true,
+  "by": "NoStuck on f-small, 13 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 13,
+    "distinct": 184,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f10",
+  "model": "Found",
+  "rule": "genesis-conditional-create.8 table",
+  "note": "a group opens every slot, not its share",
+  "caught": true,
+  "by": "OnceSlot on f-small, 9 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OnceSlot",
+    "steps": 9,
+    "distinct": 135,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f11",
+  "model": "Found",
+  "rule": "genesis-conditional-create.8 share",
+  "note": "the first entry opens every slot in the home group",
+  "caught": true,
+  "by": "OnceSlot on f-small, 4 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OnceSlot",
+    "steps": 4,
+    "distinct": 8,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f12",
+  "model": "Found",
+  "rule": "genesis-conditional-create.4 seed",
+  "note": "the first entry applies the whole seed in the home group",
+  "caught": true,
+  "by": "SeedOnce on f-small, 4 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "SeedOnce",
+    "steps": 4,
+    "distinct": 16,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f13",
+  "model": "Found",
+  "rule": "slot-table.1",
+  "note": "a group takes a write for a slot it does not hold open",
+  "caught": true,
+  "by": "SeedOnce on f-small, 5 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "SeedOnce",
+    "steps": 5,
+    "distinct": 49,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f14",
+  "model": "Found",
+  "rule": "handback.2",
+  "note": "leadership is handed to a machine that is not a voter",
+  "caught": true,
+  "by": "LeadVoter on f-small, 10 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "LeadVoter",
+    "steps": 10,
+    "distinct": 147,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f15",
+  "model": "Found",
+  "rule": "healing-self.19",
+  "note": "a placement ignores load",
+  "caught": true,
+  "by": "Even on f-four, 14 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 2
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3412,
+    "secs": 3
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3637,
+    "secs": 4
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 959,
+    "secs": 33
+   },
+   {
+    "bound": "f-four",
+    "verdict": "violated",
+    "inv": "Even",
+    "steps": 14,
+    "distinct": 734,
+    "secs": 6
+   }
+  ]
+ },
+ {
+  "id": "f16",
+  "model": "Found",
+  "rule": "move-policy.6",
+  "note": "a new group's preferred member ignores load",
+  "caught": true,
+  "by": "Spread on f-small, 10 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "Spread",
+    "steps": 10,
+    "distinct": 156,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f17",
+  "model": "Found",
+  "rule": "healing-self.16",
+  "note": "a placement names a machine the leader cannot reach",
+  "caught": true,
+  "by": "OneId on f-small, 6 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneId",
+    "steps": 6,
+    "distinct": 93,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f18",
+  "model": "Found",
+  "rule": "genesis-conditional-create.4",
+  "note": "the founder is not the home group's only voter",
+  "caught": true,
+  "by": "VoterHas on f-small, 4 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "VoterHas",
+    "steps": 4,
+    "distinct": 19,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "f19",
+  "model": "Found",
+  "rule": "handback.1",
+  "note": "leadership is never handed to the preferred member",
+  "caught": true,
+  "by": "cannot always finish on f-live: 2039 of 2213 judged states",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 272,
+    "secs": 2
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2764,
+    "secs": 3
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3013,
+    "secs": 3
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 312,
+    "secs": 30
+   },
+   {
+    "bound": "f-four",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 459,
+    "secs": 14
+   },
+   {
+    "bound": "f-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 18,
+    "distinct": 2346,
+    "secs": 3
+   },
+   {
+    "bound": "f-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 37,
+    "secs": 5,
+    "judged": 2213,
+    "cannot": 2039
+   }
+  ]
+ },
+ {
+  "id": "f20",
+  "model": "Found",
+  "rule": "new:first-voter-by-load",
+  "note": "a group record names any machine, whatever it was named for already",
+  "caught": true,
+  "by": "Spread on f-quiet, 10 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 2
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3412,
+    "secs": 3
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3637,
+    "secs": 3
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "violated",
+    "inv": "Spread",
+    "steps": 10,
+    "distinct": 2333,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "f21",
+  "model": "Found",
+  "rule": "line:record-once",
+  "note": "a group record is written again, by a later leader",
+  "caught": true,
+  "by": "OneLog on f-crash, 14 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 3
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "violated",
+    "inv": "OneLog",
+    "steps": 14,
+    "distinct": 1405,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "f22",
+  "model": "Found",
+  "rule": "line:place-leader",
+  "note": "a placement leaves the group's leader out",
+  "caught": true,
+  "by": "PrefPlaced on f-small, 7 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "PrefPlaced",
+    "steps": 7,
+    "distinct": 96,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f23",
+  "model": "Found",
+  "rule": "line:open-once",
+  "note": "a group opens its share again",
+  "caught": true,
+  "by": "SeedOnce on f-small, 10 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "SeedOnce",
+    "steps": 10,
+    "distinct": 148,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f24",
+  "model": "Found",
+  "rule": "line:adopt-stored",
+  "note": "an opener adopts when nothing is stored",
+  "caught": true,
+  "by": "OneId on f-small, 4 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "OneId",
+    "steps": 4,
+    "distinct": 32,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "f25",
+  "model": "Found",
+  "rule": "growth.5 record",
+  "note": "a group record names any machine as first voter",
+  "caught": true,
+  "by": "Even on f-four, 14 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 812,
+    "secs": 4
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 373,
+    "secs": 9
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 564,
+    "secs": 10
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 749,
+    "secs": 88
+   },
+   {
+    "bound": "f-four",
+    "verdict": "violated",
+    "inv": "Even",
+    "steps": 14,
+    "distinct": 90,
+    "secs": 38
+   }
+  ]
+ },
+ {
+  "id": "f26",
+  "model": "Found",
+  "rule": "handback.5",
+  "note": "the preferred member is picked again though it has not left the placement",
+  "caught": true,
+  "by": "Spread on f-small, 10 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "violated",
+    "inv": "Spread",
+    "steps": 10,
+    "distinct": 174,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "f27",
+  "model": "Found",
+  "rule": "growth.1",
+  "note": "a full placement is written again",
+  "caught": true,
+  "by": "Even on f-four, 15 steps",
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 452,
+    "secs": 4
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 495,
+    "secs": 9
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 96,
+    "secs": 9
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "timeout",
+    "inv": null,
+    "steps": 0,
+    "distinct": 673,
+    "secs": 900
+   },
+   {
+    "bound": "f-four",
+    "verdict": "violated",
+    "inv": "Even",
+    "steps": 15,
+    "distinct": 653,
+    "secs": 17
+   }
+  ]
+ },
+ {
+  "id": "f28",
+  "model": "Found",
+  "rule": "growth.2",
+  "note": "a group grows to machines that do not answer",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 4
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 253,
+    "secs": 7
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 615,
+    "secs": 5
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 765,
+    "secs": 67
+   },
+   {
+    "bound": "f-four",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 508,
+    "secs": 63
+   },
+   {
+    "bound": "f-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 17,
+    "distinct": 2501,
+    "secs": 4
+   },
+   {
+    "bound": "f-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 599,
+    "secs": 9,
+    "judged": 2567,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "f29",
+  "model": "Found",
+  "rule": "line:handback-up",
+  "note": "leadership is handed to a preferred member that is down",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "f-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 362,
+    "secs": 3
+   },
+   {
+    "bound": "f-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 450,
+    "secs": 5
+   },
+   {
+    "bound": "f-homefirst",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 494,
+    "secs": 6
+   },
+   {
+    "bound": "f-quiet",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 629,
+    "secs": 61
+   },
+   {
+    "bound": "f-four",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 934,
+    "secs": 58
+   },
+   {
+    "bound": "f-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 17,
+    "distinct": 2619,
+    "secs": 4
+   },
+   {
+    "bound": "f-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 246,
+    "secs": 10,
+    "judged": 2867,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "h01",
+  "model": "HomeRecords",
+  "rule": "slot-table.1",
+  "note": "a leader takes a write for a slot its log does not hold open",
+  "caught": true,
+  "by": "Right on h-small, 5 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "Right",
+    "steps": 5,
+    "distinct": 134,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "h02",
+  "model": "HomeRecords",
+  "rule": "soft-directory.8",
+  "note": "drop the resource check",
+  "caught": true,
+  "by": "TrueOk on h-foreign, 4 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4848,
+    "secs": 2
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "violated",
+    "inv": "TrueOk",
+    "steps": 4,
+    "distinct": 289,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "h03",
+  "model": "HomeRecords",
+  "rule": "slot-table.6",
+  "note": "the client takes any row, older ones too",
+  "caught": true,
+  "by": "Forward on h-small, 9 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "Forward",
+    "steps": 9,
+    "distinct": 2029,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "h04",
+  "model": "HomeRecords",
+  "rule": "route-forward.1",
+  "note": "a copy that cannot forward drops the write",
+  "caught": true,
+  "by": "NoStuck on h-small, 8 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 8,
+    "distinct": 965,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "h05",
+  "model": "HomeRecords",
+  "rule": "route-smart.2",
+  "note": "the client takes no answer as the end and never sends again",
+  "caught": true,
+  "by": "NoStuck on h-small, 7 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 7,
+    "distinct": 514,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "h06",
+  "model": "HomeRecords",
+  "rule": "home-records.2",
+  "note": "a follower keeps no home records: it knows only its own group's log",
+  "caught": true,
+  "by": "cannot always finish on h-live: 732 of 41135 judged states",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3353,
+    "secs": 2
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 16273,
+    "secs": 4
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 30,
+    "secs": 10
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 766,
+    "secs": 2
+   },
+   {
+    "bound": "h-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 333,
+    "secs": 9,
+    "judged": 41135,
+    "cannot": 732
+   }
+  ]
+ },
+ {
+  "id": "h07",
+  "model": "HomeRecords",
+  "rule": "home-records.1",
+  "note": "a leader keeps no home records: it knows only its own group's log",
+  "caught": true,
+  "by": "cannot always finish on h-live: 732 of 56057 judged states",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4145,
+    "secs": 2
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 17697,
+    "secs": 4
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 384,
+    "secs": 12
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 967,
+    "secs": 2
+   },
+   {
+    "bound": "h-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 26,
+    "secs": 12,
+    "judged": 56057,
+    "cannot": 732
+   }
+  ]
+ },
+ {
+  "id": "h08",
+  "model": "HomeRecords",
+  "rule": "home-records.2",
+  "note": "a follower hands out the home records only, never what its own log knows",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4801,
+    "secs": 2
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 20338,
+    "secs": 4
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 672,
+    "secs": 13
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 771,
+    "secs": 2
+   },
+   {
+    "bound": "h-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 720,
+    "secs": 12,
+    "judged": 74135,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "h09",
+  "model": "HomeRecords",
+  "rule": "slot-table.3",
+  "note": "a \"moved\" answer names no owner",
+  "caught": true,
+  "by": "NoRepeat on h-small, 7 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 7,
+    "distinct": 488,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "h10",
+  "model": "HomeRecords",
+  "rule": "route-smart.1",
+  "note": "the client always writes to the home group",
+  "caught": true,
+  "by": "NoRepeat on h-small, 7 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 7,
+    "distinct": 993,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "h11",
+  "model": "HomeRecords",
+  "rule": "soft-directory.9",
+  "note": "the client never asks the directory again",
+  "caught": true,
+  "by": "cannot always finish on h-live: 2496 of 35965 judged states",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3008,
+    "secs": 3
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 701,
+    "secs": 6
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 919,
+    "secs": 12
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 845,
+    "secs": 3
+   },
+   {
+    "bound": "h-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 720,
+    "secs": 15,
+    "judged": 35965,
+    "cannot": 2496
+   }
+  ]
+ },
+ {
+  "id": "h12",
+  "model": "HomeRecords",
+  "rule": "line:dial-newer",
+  "note": "on a new link the client takes the copy's row, older or not",
+  "caught": true,
+  "by": "NoRepeat on h-small, 10 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 10,
+    "distinct": 2745,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "h13",
+  "model": "HomeRecords",
+  "rule": "line:moved-newer",
+  "note": "on moved the client takes the row in the answer, older or not",
+  "caught": true,
+  "by": "NoRepeat on h-small, 12 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 12,
+    "distinct": 2577,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "h14",
+  "model": "HomeRecords",
+  "rule": "line:moved-own-log",
+  "note": "a leader answers moved from its copy of the home records only, not its own log",
+  "caught": true,
+  "by": "NoRepeat on h-pre, 7 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4848,
+    "secs": 5
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 723,
+    "secs": 9
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 7,
+    "distinct": 1732,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "h15",
+  "model": "HomeRecords",
+  "rule": "route-forward.2 pass",
+  "note": "a forwarding copy never passes a moved answer on to the client",
+  "caught": true,
+  "by": "NoStuck on h-small, 8 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 8,
+    "distinct": 1164,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "h16",
+  "model": "HomeRecords",
+  "rule": "line:higher",
+  "note": "a copy keeps the older of two rows",
+  "caught": true,
+  "by": "NoRepeat on h-pre, 7 steps",
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 5485,
+    "secs": 5
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 992,
+    "secs": 7
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "violated",
+    "inv": "NoRepeat",
+    "steps": 7,
+    "distinct": 1582,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "h17",
+  "model": "HomeRecords",
+  "rule": "route-smart.2",
+  "note": "no answer is not counted as a failure of the member",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4371,
+    "secs": 4
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 478,
+    "secs": 8
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 478,
+    "secs": 20
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 893,
+    "secs": 3
+   },
+   {
+    "bound": "h-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 58,
+    "secs": 20,
+    "judged": 69669,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "s01",
+  "model": "Settings",
+  "rule": "meta-catalog.5 home-committed",
+  "note": "a group takes up a home entry that has not committed",
+  "caught": true,
+  "by": "Same on s-small, 5 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "Same",
+    "steps": 5,
+    "distinct": 41,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "s02",
+  "model": "Settings",
+  "rule": "meta-catalog.5",
+  "note": "the alter is answered on a take-up that has not committed",
+  "caught": true,
+  "by": "InForce on s-small, 6 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "InForce",
+    "steps": 6,
+    "distinct": 84,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "s03",
+  "model": "Settings",
+  "rule": "meta-catalog.5",
+  "note": "the alter is answered once one group took it up",
+  "caught": true,
+  "by": "InForce on s-two, 7 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 520,
+    "secs": 2
+   },
+   {
+    "bound": "s-two",
+    "verdict": "violated",
+    "inv": "InForce",
+    "steps": 7,
+    "distinct": 2456,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s04",
+  "model": "Settings",
+  "rule": "meta-catalog.5",
+  "note": "flip >= to >: the alter waits for a version past its own",
+  "caught": true,
+  "by": "NoStuck on s-small, 8 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 8,
+    "distinct": 267,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s05",
+  "model": "Settings",
+  "rule": "meta-catalog.5",
+  "note": "the alter is answered without waiting for the other groups",
+  "caught": true,
+  "by": "InForce on s-small, 4 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "InForce",
+    "steps": 4,
+    "distinct": 45,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s06",
+  "model": "Settings",
+  "rule": "meta-catalog.4",
+  "note": "drop the read-only gate",
+  "caught": true,
+  "by": "GateGroup on s-small, 6 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "GateGroup",
+    "steps": 6,
+    "distinct": 186,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s07",
+  "model": "Settings",
+  "rule": "meta-catalog.4",
+  "note": "the gate is read from committed entries only, not the log end",
+  "caught": true,
+  "by": "GateGroup on s-small, 6 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "GateGroup",
+    "steps": 6,
+    "distinct": 163,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s08",
+  "model": "Settings",
+  "rule": "writer-judging.1",
+  "note": "a write is judged under the committed settings, not the ones at the log end",
+  "caught": true,
+  "by": "JudgeOrder on s-small, 6 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "JudgeOrder",
+    "steps": 6,
+    "distinct": 158,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s09",
+  "model": "Settings",
+  "rule": "new:settings-behind",
+  "note": "drop the refusal of a write made under settings the group has not taken up",
+  "caught": true,
+  "by": "AsMade on s-small, 7 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "AsMade",
+    "steps": 7,
+    "distinct": 214,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s10",
+  "model": "Settings",
+  "rule": "new:settings-behind",
+  "note": "flip > to >=: a write made under the group's own settings is sent back",
+  "caught": true,
+  "by": "cannot always finish on s-live: 191 of 1102 judged states",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 351,
+    "secs": 2
+   },
+   {
+    "bound": "s-two",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 230,
+    "secs": 11
+   },
+   {
+    "bound": "s-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 15,
+    "distinct": 468,
+    "secs": 9
+   },
+   {
+    "bound": "s-reach-ro",
+    "verdict": "violated",
+    "inv": "NotRefused",
+    "steps": 8,
+    "distinct": 137,
+    "secs": 2
+   },
+   {
+    "bound": "s-live",
+    "verdict": "stuck",
+    "inv": null,
+    "steps": 0,
+    "distinct": 2360,
+    "secs": 3,
+    "judged": 1102,
+    "cannot": 191
+   }
+  ]
+ },
+ {
+  "id": "s11",
+  "model": "Settings",
+  "rule": "meta-catalog.5 own-entry",
+  "note": "the take-up entry drops the gate",
+  "caught": true,
+  "by": "Same on s-small, 5 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "Same",
+    "steps": 5,
+    "distinct": 111,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "s12",
+  "model": "Settings",
+  "rule": "writer-judging.2",
+  "note": "the read-only refusal is sent before the gate's entry has committed",
+  "caught": true,
+  "by": "RoTrue on s-small, 4 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "RoTrue",
+    "steps": 4,
+    "distinct": 53,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "s13",
+  "model": "Settings",
+  "rule": "line:learn-committed",
+  "note": "a copy hands out a settings version its group has not committed",
+  "caught": true,
+  "by": "Shape on s-alter2, 5 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 520,
+    "secs": 3
+   },
+   {
+    "bound": "s-two",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 881,
+    "secs": 28
+   },
+   {
+    "bound": "s-alter2",
+    "verdict": "violated",
+    "inv": "Shape",
+    "steps": 5,
+    "distinct": 677,
+    "secs": 3
+   }
+  ]
+ },
+ {
+  "id": "s14",
+  "model": "Settings",
+  "rule": "line:ack-committed",
+  "note": "ok is told before the write commits",
+  "caught": true,
+  "by": "Told on s-small, 4 steps",
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "violated",
+    "inv": "Told",
+    "steps": 4,
+    "distinct": 16,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "s15",
+  "model": "Settings",
+  "rule": "line:send-names-version",
+  "note": "a first send names no settings version",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "s-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 477,
+    "secs": 3
+   },
+   {
+    "bound": "s-two",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 455,
+    "secs": 25
+   },
+   {
+    "bound": "s-alter2",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 207,
+    "secs": 80
+   },
+   {
+    "bound": "s-reach",
+    "verdict": "violated",
+    "inv": "NotDone",
+    "steps": 15,
+    "distinct": 831,
+    "secs": 14
+   },
+   {
+    "bound": "s-reach-ro",
+    "verdict": "violated",
+    "inv": "NotRefused",
+    "steps": 8,
+    "distinct": 145,
+    "secs": 2
+   },
+   {
+    "bound": "s-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 3203,
+    "secs": 5,
+    "judged": 1509,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "x01",
+  "model": "Selection",
+  "rule": "subscribe.29 at-fence",
+  "note": "END goes out before the last records below the fence (a picture replaces them in state mode)",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1160,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 505,
+    "secs": 8
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 907,
+    "secs": 13
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 8646,
+    "secs": 4
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 100,
+    "secs": 8
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 330,
+    "secs": 8,
+    "judged": 9581,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 545,
+    "secs": 17,
+    "judged": 56155,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "x02",
+  "model": "Selection",
+  "rule": "subscribe.14",
+  "note": "the client takes a record past the next one (no stream here has a gap)",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "c-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1092,
+    "secs": 3
+   },
+   {
+    "bound": "c-move",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 546,
+    "secs": 9
+   },
+   {
+    "bound": "c-down",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 754,
+    "secs": 9
+   },
+   {
+    "bound": "c-back",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 8110,
+    "secs": 4
+   },
+   {
+    "bound": "c-reach",
+    "verdict": "violated",
+    "inv": "NotFinishedDown",
+    "steps": 15,
+    "distinct": 328,
+    "secs": 9
+   },
+   {
+    "bound": "c-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 721,
+    "secs": 8,
+    "judged": 9075,
+    "cannot": 0
+   },
+   {
+    "bound": "c-back-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 905,
+    "secs": 15,
+    "judged": 53504,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "x03",
+  "model": "HomeRecords",
+  "rule": "slot-table.6",
+  "note": "flip > to >=: a row of the same epoch is the same row",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "h-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 4848,
+    "secs": 1
+   },
+   {
+    "bound": "h-foreign",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 21053,
+    "secs": 2
+   },
+   {
+    "bound": "h-pre",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 30,
+    "secs": 5
+   },
+   {
+    "bound": "h-reach",
+    "verdict": "violated",
+    "inv": "NotFound",
+    "steps": 6,
+    "distinct": 891,
+    "secs": 1
+   },
+   {
+    "bound": "h-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 721,
+    "secs": 8,
+    "judged": 74557,
+    "cannot": 0
+   }
+  ]
+ }
+]

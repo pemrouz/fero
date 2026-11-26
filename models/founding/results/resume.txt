@@ -1,0 +1,13 @@
+# A stop and a resume, tried on c-big (2026-11-25).
+#   EVERY=1 ./run.sh big c-big      stopped by hand after 79 s, 18 s after its first checkpoint
+#   EVERY=1 ./run.sh resume c-big   went on from that checkpoint
+#
+# stopped run:  2,174,583 distinct states at its last progress line; the checkpoint held 2,174,383 states, 317,758 on the queue
+# resumed run:  ok Selection c-big: pass (want pass); 12196369 generated, 4140146 distinct; depth 39; 52 s
+# whole run, never stopped (results/runs.txt): 4,140,146 distinct, depth 39, 182 s
+#
+# The resumed run ends with the same distinct states and depth as the run that was never stopped.
+# Its "generated" count is lower: TLC starts that count again from the checkpoint's states.
+#
+# A first try, on h-big, resumed with another fingerprint function: TLC picks one at random for each run.
+# TLC warned "Changed: seed, fingerprint", and that run was thrown away. run.sh now pins both for the big bounds.

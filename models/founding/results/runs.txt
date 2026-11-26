@@ -1,0 +1,107 @@
+# Every counted run. Each line is one TLC run on its own bound.
+# 2 TLC workers on a shared 4-core box, one run of this folder at a time, beside another job.
+#
+# ./run.sh   (the small bounds, the reach checks, the probes)   Wed Nov 25 22:26:56 UTC 2026
+ok Settings s-small: pass (want pass); 1204 generated, 520 distinct; depth 14; 1 s
+ok Settings s-two: pass (want pass); 868643 generated, 200225 distinct; depth 22; 7 s
+ok Settings s-alter2: pass (want pass); 3305287 generated, 840096 distinct; depth 26; 28 s
+ok Settings s-reach: violated (want violated); 272959 generated, 79297 distinct; depth 15; 4 s; NotDone fails
+ok Settings s-reach-ro: violated (want violated); 320 generated, 175 distinct; depth 9; 1 s; NotRefused fails
+ok Settings s-reach-behind: violated (want violated); 166 generated, 104 distinct; depth 7; 0 s; NotBehind fails
+ok Settings s-live: live (want live); 9363 generated, 3487 distinct; depth 15; 2 s; live: 3487 states, 1647 judged, 324 goals, 0 cannot finish
+ok HomeRecords h-small: pass (want pass); 10047 generated, 4848 distinct; depth 21; 1 s
+ok HomeRecords h-foreign: pass (want pass); 61287 generated, 21053 distinct; depth 23; 1 s
+ok HomeRecords h-pre: pass (want pass); 722698 generated, 216831 distinct; depth 24; 6 s
+ok HomeRecords h-reach: violated (want violated); 1431 generated, 841 distinct; depth 8; 1 s; NotFound fails
+ok HomeRecords h-reach-far: violated (want violated); 975884 generated, 397504 distinct; depth 12; 7 s; NotFoundFar fails
+ok HomeRecords h-live: live (want live); 171006 generated, 75010 distinct; depth 26; 9 s; live: 75010 states, 74557 judged, 10718 goals, 0 cannot finish
+ok Found f-small: pass (want pass); 820 generated, 362 distinct; depth 17; 1 s
+ok Found f-crash: pass (want pass); 9991 generated, 3412 distinct; depth 21; 2 s
+ok Found f-homefirst: pass (want pass); 11251 generated, 3637 distinct; depth 20; 1 s
+ok Found f-four: pass (want pass); 428345 generated, 125632 distinct; depth 25; 18 s
+ok Found f-quiet: pass (want pass); 345713 generated, 125704 distinct; depth 23; 20 s
+ok Found f-quiet-crash: pass (want pass); 5503 generated, 2098 distinct; depth 19; 1 s
+ok Found f-quiet-load: violated (want violated); 1335902 generated, 444262 distinct; depth 18; 80 s; NotSpared fails
+ok Found f-reach: violated (want violated); 6417 generated, 2466 distinct; depth 17; 1 s; NotDone fails
+ok Found f-reach-spread: violated (want violated); 9522 generated, 3102 distinct; depth 24; 2 s; NotSpread fails
+ok Found f-live: live (want live); 14377 generated, 5087 distinct; depth 21; 2 s; live: 5087 states, 2567 judged, 66 goals, 0 cannot finish
+ok Selection c-small: pass (want pass); 2695 generated, 1092 distinct; depth 18; 0 s
+ok Selection c-move: pass (want pass); 177278 generated, 50555 distinct; depth 27; 2 s
+ok Selection c-down: pass (want pass); 300047 generated, 94346 distinct; depth 29; 4 s
+ok Selection c-both: pass (want pass); 1137359 generated, 291596 distinct; depth 31; 6 s
+ok Selection c-reach: violated (want violated); 110814 generated, 40334 distinct; depth 15; 1 s; NotFinishedDown fails
+ok Selection c-live: live (want live); 37632 generated, 12936 distinct; depth 22; 3 s; live: 12936 states, 9075 judged, 248 goals, 0 cannot finish
+ok Settings s-early: violated (want violated); 780 generated, 388 distinct; depth 9; 1 s; EarlyKept fails
+ok Found f-aswritten: violated (want violated); 364 generated, 145 distinct; depth 10; 0 s; Spread fails
+ok Found f-onebox: violated (want violated); 6 generated, 6 distinct; depth 6; 1 s; NoStuck fails
+ok Selection c-asread: violated (want violated); 1110 generated, 500 distinct; depth 9; 1 s; Whole fails
+ok founding
+#
+# ./run.sh big NAME   (the big bounds, one at a time)   2026-11-25
+ok Settings s-big: pass (want pass); 52768107 generated, 10337625 distinct; depth 30; 792 s
+ok HomeRecords h-two: pass (want pass); 12840344 generated, 4290944 distinct; depth 33; 84 s
+ok HomeRecords h-big: pass (want pass); 95934548 generated, 21511833 distinct; depth 41; 444 s
+ok Found f-big: pass (want pass); 12091481 generated, 2916816 distinct; depth 29; 606 s
+ok Found f-load: pass (want pass); 1390076 generated, 411782 distinct; depth 22; 122 s
+ok Selection c-big: pass (want pass); 18746163 generated, 4140146 distinct; depth 39; 182 s
+#
+# A second pass, on a busier box (2026-11-25). The models got marks on more lines (comments only),
+# two more properties (NotFoundOther, SpreadEven) and, in Selection, a slot that may move back (Back).
+# With Back = FALSE the state counts of every earlier Selection bound are as before.
+#
+# ./run.sh   (the small bounds, the reach checks, the probes; 10 of them are new)
+ok Settings s-small: pass (want pass); 1204 generated, 520 distinct; depth 13; 2 s
+ok Settings s-two: pass (want pass); 868643 generated, 200225 distinct; depth 22; 21 s
+ok Settings s-alter2: pass (want pass); 3305287 generated, 840096 distinct; depth 26; 76 s
+ok Settings s-reach: violated (want violated); 265443 generated, 77487 distinct; depth 15; 9 s; NotDone fails
+ok Settings s-reach-ro: violated (want violated); 302 generated, 167 distinct; depth 8; 2 s; NotRefused fails
+ok Settings s-reach-behind: violated (want violated); 156 generated, 101 distinct; depth 7; 1 s; NotBehind fails
+ok Settings s-live: live (want live); 9363 generated, 3487 distinct; depth 15; 3 s; live: 3487 states, 1647 judged, 324 goals, 0 cannot finish
+ok HomeRecords h-small: pass (want pass); 10047 generated, 4848 distinct; depth 21; 2 s
+ok HomeRecords h-foreign: pass (want pass); 61287 generated, 21053 distinct; depth 23; 5 s
+ok HomeRecords h-pre: pass (want pass); 722698 generated, 216831 distinct; depth 24; 14 s
+ok HomeRecords h-reach: violated (want violated); 1521 generated, 870 distinct; depth 7; 2 s; NotFound fails
+ok HomeRecords h-reach-far: violated (want violated); 1045890 generated, 422436 distinct; depth 13; 17 s; NotFoundFar fails
+ok HomeRecords h-reach-other: violated (want violated); 2478 generated, 1397 distinct; depth 7; 1 s; NotFoundOther fails
+ok HomeRecords h-live: live (want live); 171006 generated, 75010 distinct; depth 26; 12 s; live: 75010 states, 74557 judged, 10718 goals, 0 cannot finish
+ok Found f-small: pass (want pass); 820 generated, 362 distinct; depth 17; 2 s
+ok Found f-crash: pass (want pass); 9991 generated, 3412 distinct; depth 21; 4 s
+ok Found f-crash2: pass (want pass); 43816 generated, 12786 distinct; depth 23; 5 s
+ok Found f-homefirst: pass (want pass); 11251 generated, 3637 distinct; depth 20; 5 s
+ok Found f-four: pass (want pass); 428345 generated, 125632 distinct; depth 25; 39 s
+ok Found f-quiet: pass (want pass); 345713 generated, 125704 distinct; depth 23; 42 s
+ok Found f-quiet-crash: pass (want pass); 5503 generated, 2098 distinct; depth 19; 3 s
+ok Found f-quiet-load: violated (want violated); 1129890 generated, 378602 distinct; depth 18; 130 s; NotSpared fails
+ok Found f-reach: violated (want violated); 6524 generated, 2505 distinct; depth 17; 3 s; NotDone fails
+ok Found f-reach-spread: violated (want violated); 9568 generated, 3112 distinct; depth 24; 4 s; NotSpread fails
+ok Found f-live: live (want live); 14377 generated, 5087 distinct; depth 21; 3 s; live: 5087 states, 2567 judged, 66 goals, 0 cannot finish
+ok Selection c-small: pass (want pass); 2695 generated, 1092 distinct; depth 18; 1 s
+ok Selection c-move: pass (want pass); 177278 generated, 50555 distinct; depth 27; 3 s
+ok Selection c-down: pass (want pass); 300047 generated, 94346 distinct; depth 29; 5 s
+ok Selection c-both: pass (want pass); 1137359 generated, 291596 distinct; depth 31; 9 s
+ok Selection c-down2: pass (want pass); 868357 generated, 244907 distinct; depth 31; 9 s
+ok Selection c-back: pass (want pass); 23591 generated, 8110 distinct; depth 32; 3 s
+ok Selection c-back-drop: pass (want pass); 2686245 generated, 626505 distinct; depth 40; 34 s
+ok Selection c-reach: violated (want violated); 110814 generated, 40334 distinct; depth 15; 5 s; NotFinishedDown fails
+ok Selection c-back-reach: violated (want violated); 867985 generated, 300187 distinct; depth 17; 15 s; NotFinishedBack fails
+ok Selection c-live: live (want live); 37632 generated, 12936 distinct; depth 22; 6 s; live: 12936 states, 9075 judged, 248 goals, 0 cannot finish
+ok Selection c-back-live: live (want live); 229967 generated, 70509 distinct; depth 34; 12 s; live: 70509 states, 53504 judged, 4842 goals, 0 cannot finish
+ok Settings s-early: violated (want violated); 770 generated, 382 distinct; depth 10; 2 s; EarlyKept fails
+ok Found f-aswritten: violated (want violated); 362 generated, 144 distinct; depth 10; 2 s; Spread fails
+ok Found f-onebox: violated (want violated); 6 generated, 6 distinct; depth 6; 2 s; NoStuck fails
+ok Found f-many: violated (want violated); 430517 generated, 133687 distinct; depth 17; 29 s; SpreadEven fails
+ok Selection c-asread: violated (want violated); 995 generated, 455 distinct; depth 9; 1 s; Whole fails
+ok founding
+#
+# ./run.sh big NAME   (the big bounds again, and two new ones: h-down2, c-back-down)
+ok Settings s-big: pass (want pass); 52768107 generated, 10337625 distinct; depth 30; 772 s
+ok HomeRecords h-two: pass (want pass); 12840344 generated, 4290944 distinct; depth 33; 224 s
+ok HomeRecords h-big: pass (want pass); 95934548 generated, 21511833 distinct; depth 41; 1592 s
+ok HomeRecords h-down2: pass (want pass); 5390126 generated, 1415694 distinct; depth 28; 90 s
+ok Found f-big: pass (want pass); 12091481 generated, 2916816 distinct; depth 29; 849 s
+ok Found f-load: pass (want pass); 1390076 generated, 411782 distinct; depth 22; 193 s
+ok Selection c-big: pass (want pass); 18746163 generated, 4140146 distinct; depth 39; 185 s
+ok Selection c-back-down: pass (want pass); 27621209 generated, 6370476 distinct; depth 56; 394 s
+#
+# Not counted: way B of finding 5 on the bound of f-many (FirstVoter = "quiet", 4 machines, 4 groups, SpreadEven).
+# The run was stopped by the box for lack of memory at 2,195,739 distinct states, 650,221 on the queue, no failure up to there.

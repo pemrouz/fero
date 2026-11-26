@@ -1,0 +1,157 @@
+# The runs behind the findings: the steps of each trace TLC printed, by name.
+# A probe is a bound that must fail. A reach bound's trace is a run that reaches its goal.
+# In Settings a step TLC names "Calm" is Take: a leader takes, refuses or sends back the write.
+
+## s-early: Invariant EarlyKept is violated
+1 Initial predicate
+2 Send(1,"h")
+3 Calm
+4 Crash("h")
+5 Resend(1)
+6 Alter(TRUE)
+7 Commit("h")
+8 Calm
+
+## f-aswritten: Invariant Spread is violated
+1 Initial predicate
+2 Cand("m1")
+3 Put("m1")
+4 First("m1")
+5 Record(1,"m1")
+6 Adopt("m3")
+7 Make(1,"m1")
+8 Adopt("m2")
+9 Place(0,{"m2", "m3"},"m1")
+10 Place(1,{"m2", "m3"},"m1")
+
+## f-onebox: Invariant NoStuck is violated
+1 Initial predicate
+2 Cand("m1")
+3 Put("m1")
+4 First("m1")
+5 Record(1,"m1")
+6 Make(1,"m1")
+
+## c-asread: Invariant Whole is violated
+1 Initial predicate
+2 Sub("A")
+3 Sub("B")
+4 ServeSub("B")
+5 Fence("s1")
+6 ServeSub("A")
+7 Recv("A")
+8 Recv("B")
+
+## h-reach: Invariant NotFound is violated
+1 Initial predicate
+2 Move("h","g1")
+3 Down("h")
+4 Dial(<<"g1", "L"
+5 SendDirect
+6 LeadTake
+
+## h-reach-far: Invariant NotFoundFar is violated
+1 Initial predicate
+2 Move("h","g2")
+3 Move("g2","g1")
+4 Down("h")
+5 Dial(<<"g1", "F"
+6 SendDirect
+7 Timeout
+8 Unlink
+9 Dial(<<"g1", "L"
+10 SendDirect
+11 LeadTake
+
+## s-reach-ro: Invariant NotRefused is violated
+1 Initial predicate
+2 Send(1,"g1")
+3 Alter(TRUE)
+4 Commit("h")
+5 Adopt("g1")
+6 Commit("g1")
+7 Answer(1)
+8 Calm
+
+## f-reach-spread: Invariant NotSpread is violated
+1 Initial predicate
+2 Cand("m1")
+3 Put("m1")
+4 First("m1")
+5 Adopt("m2")
+6 Adopt("m3")
+7 Record(1,"m1")
+8 Record(2,"m1")
+9 Make(1,"m1")
+10 Make(2,"m1")
+11 Place(0,{"m2", "m3"},"m1")
+12 Grow(0)
+13 Open(0)
+14 Place(1,{"m2", "m3"},"m2")
+15 Grow(1)
+16 Open(1)
+17 Handback(1)
+18 Place(2,{"m2", "m3"},"m3")
+19 Grow(2)
+20 Open(2)
+21 Handback(2)
+22 Write(1,1)
+23 Write(0,0)
+24 Write(2,2)
+
+## c-reach: Invariant NotFinishedDown is violated
+1 Initial predicate
+2 Sub("A")
+3 ServeSub("A")
+4 Recv("A")
+5 WriteRec("s1")
+6 Fence("s1")
+7 OpenAt("s1")
+8 WriteRec("s2")
+9 Down("B")
+10 Sub("B")
+11 Up("B")
+12 ServeSub("B")
+13 Recv("B")
+14 Fence("s2")
+15 OpenAt("s2")
+
+## h-reach-other: Invariant NotFoundOther is violated
+1 Initial predicate
+2 Down("h")
+3 Dial(<<"g2", "F"
+4 SendDirect
+5 LeadTake
+
+## f-many: Invariant SpreadEven is violated
+1 Initial predicate
+2 Cand("m1")
+3 Put("m1")
+4 First("m1")
+5 Adopt("m2")
+6 Adopt("m3")
+7 Adopt("m4")
+8 Record(1,"m1")
+9 Make(1,"m1")
+10 Record(2,"m1")
+11 Make(2,"m1")
+12 Place(0,{"m2", "m3"},"m1")
+13 Record(3,"m1")
+14 Make(3,"m1")
+15 Place(1,{"m2", "m4"},"m2")
+16 Place(2,{"m3", "m4"},"m3")
+17 Place(3,{"m2", "m3"},"m1")
+
+## c-back with the mistake c25 planted (no answer to an ask for a slot handed off): Invariant NoStuck is violated
+1 Initial predicate
+2 Sub("A")
+3 Sub("B")
+4 ServeSub("B")
+5 Recv("B")
+6 Fence("s1")
+7 ServeSub("A")
+8 Recv("A")
+9 AskSlot("s1")
+10 OpenAt("s1")
+11 Fence("s1")
+12 OpenAt("s1")

@@ -1,0 +1,106 @@
+# Planted mistakes, one line each, on the marked lines of the four models.
+# id ; module ; rule ; old text ; new text ; what the mistake is
+# Kinds: drop a guard, flip a comparison, drop or weaken an update, read the
+# wrong place.  An id that starts with x is a probe: a change the design
+# says is harmless here, which should NOT be caught.
+#
+# Ids s13 to s15, h11 to h17, f21 to f29 and c17 to c26 were planted on a second
+# pass, many on lines marked line:<name> (a line with no ledger id of its own).
+#
+# s: Settings (row 1).
+s01 ; Settings ; meta-catalog.5 home-committed ; SubSeq(log[Home], 1, ci[Home]) ; log[Home] ; a group takes up a home entry that has not committed
+s02 ; Settings ; meta-catalog.5 ; Taken(g) >= v ; TakenEnd(g) >= v ; the alter is answered on a take-up that has not committed
+s03 ; Settings ; meta-catalog.5 ; \A g \in Groups ; \E g \in Data ; the alter is answered once one group took it up
+s04 ; Settings ; meta-catalog.5 ; Taken(g) >= v ; Taken(g) > v ; flip >= to >: the alter waits for a version past its own
+s05 ; Settings ; meta-catalog.5 ; \A g \in Groups ; \A g \in {Home} ; the alter is answered without waiting for the other groups
+s06 ; Settings ; meta-catalog.4 ; IF RoAt(L, n) ; IF FALSE ; drop the read-only gate
+s07 ; Settings ; meta-catalog.4 ; IF RoAt(L, n) ; IF RoAt(L, ci[m.g]) ; the gate is read from committed entries only, not the log end
+s08 ; Settings ; writer-judging.1 ; JudgeAt(g) == Len(log[g]) ; JudgeAt(g) == ci[g] ; a write is judged under the committed settings, not the ones at the log end
+s09 ; Settings ; new:settings-behind ; m.cv > a ; FALSE ; drop the refusal of a write made under settings the group has not taken up
+s10 ; Settings ; new:settings-behind ; m.cv > a ; m.cv >= a ; flip > to >=: a write made under the group's own settings is sent back
+s11 ; Settings ; meta-catalog.5 own-entry ; SetE(v, RoAt(H, Len(H))) ; SetE(v, FALSE) ; the take-up entry drops the gate
+s12 ; Settings ; writer-judging.2 ; LastSet(L, n) <= ci[m.g] ; TRUE ; the read-only refusal is sent before the gate's entry has committed
+s13 ; Settings ; line:learn-committed ; cver' = Taken(g) ; cver' = TakenEnd(g) ; a copy hands out a settings version its group has not committed
+s14 ; Settings ; line:ack-committed ; Done(w, wg[w]) ; InLog(w, wg[w]) ; ok is told before the write commits
+s15 ; Settings ; line:send-names-version ; cv |-> cver ; cv |-> 0 ; a first send names no settings version
+#
+# h: HomeRecords (row 2).
+h01 ; HomeRecords ; slot-table.1 ; gl[msg.g].st = "open" ; TRUE ; a leader takes a write for a slot its log does not hold open
+h02 ; HomeRecords ; soft-directory.8 ; c # X ; TRUE ; drop the resource check
+h03 ; HomeRecords ; slot-table.6 ; new.e > old.e ; new.g # "none" ; the client takes any row, older ones too
+h04 ; HomeRecords ; route-forward.1 ; Msg("cmoved", "down", NoC, Best(msg.c), 0) ; NoMsg ; a copy that cannot forward drops the write
+h05 ; HomeRecords ; route-smart.2 ; wst' = "idle" ; wst' = "sent" ; the client takes no answer as the end and never sends again
+h06 ; HomeRecords ; home-records.2 ; Higher(OwnRow(fol[c[1]].own, c[1]), fol[c[1]].hr) ; OwnRow(fol[c[1]].own, c[1]) ; a follower keeps no home records: it knows only its own group's log
+h07 ; HomeRecords ; home-records.1 ; Higher(OwnRow(gl[c[1]], c[1]), Lhr(c[1])) ; OwnRow(gl[c[1]], c[1]) ; a leader keeps no home records: it knows only its own group's log
+h08 ; HomeRecords ; home-records.2 ; Higher(OwnRow(fol[c[1]].own, c[1]), fol[c[1]].hr) ; fol[c[1]].hr ; a follower hands out the home records only, never what its own log knows
+h09 ; HomeRecords ; slot-table.3 ; IF r.g = msg.g THEN NoRow ELSE r ; NoRow ; a "moved" answer names no owner
+h10 ; HomeRecords ; route-smart.1 ; Msg("lead", crow.g, NoC, NoRow, 0) ; Msg("lead", Home, NoC, NoRow, 0) ; the client always writes to the home group
+h11 ; HomeRecords ; soft-directory.9 ; fail \/ ~UpC(link) ; FALSE ; the client never asks the directory again
+h12 ; HomeRecords ; line:dial-newer ; crow' = TakeRow(crow, r) ; crow' = r ; on a new link the client takes the copy's row, older or not
+h13 ; HomeRecords ; line:moved-newer ; crow' = TakeRow(crow, msg.row) ; crow' = msg.row ; on moved the client takes the row in the answer, older or not
+h14 ; HomeRecords ; line:moved-own-log ; Best(<<msg.g, "L">>) ; Lhr(msg.g) ; a leader answers moved from its copy of the home records only, not its own log
+h15 ; HomeRecords ; route-forward.2 pass ; \/ msg' = Msg("cmoved", "moved", NoC, msg.row, 0) ; \/ FALSE /\ msg' = Msg("cmoved", "moved", NoC, msg.row, 0) ; a forwarding copy never passes a moved answer on to the client
+h16 ; HomeRecords ; line:higher ; a.e >= b.e ; a.e <= b.e ; a copy keeps the older of two rows
+h17 ; HomeRecords ; route-smart.2 ; fail' = TRUE ; fail' = fail ; no answer is not counted as a failure of the member
+#
+# f: Found (row 3).
+f01 ; Found ; genesis-conditional-create.1 ; store = "none" ; TRUE ; the store's create succeeds over a stored id
+f02 ; Found ; genesis-conditional-create.3 ; store = m ; store # "none" ; an opener founds though the stored id is not its own
+f03 ; Found ; genesis-conditional-create.2 ; dir[m].k = "none" ; TRUE ; an opener makes a candidate though its dir holds an id
+f04 ; Found ; genesis-conditional-create.6 ; dir[m].k = "none" ; TRUE ; an opener adopts though its dir holds an id
+f05 ; Found ; genesis-conditional-create.5 ; id |-> store ; id |-> m ; an opener adopts an id that is not the stored one
+f06 ; Found ; growth.5 first-voter ; rec[g] = m ; rec[g] # "none" ; any machine makes the group, not only the one the record names
+f07 ; Found ; growth.5 once ; g \notin has[m] ; TRUE ; a machine makes a group it already holds
+f08 ; Found ; slot-move.22 ; Cardinality(voters[g]) >= Copies ; TRUE ; a group opens its slots before it has its voters
+f09 ; Found ; slot-move.22 ; Cardinality(voters[g]) >= Copies ; Cardinality(voters[g]) > Copies ; flip >= to >
+f10 ; Found ; genesis-conditional-create.8 table ; MySlots(g) == Share(g) ; MySlots(g) == Slots ; a group opens every slot, not its share
+f11 ; Found ; genesis-conditional-create.8 share ; THEN Share(0) ELSE {} ; THEN Slots ELSE Slots ; the first entry opens every slot in the home group
+f12 ; Found ; genesis-conditional-create.4 seed ; THEN Share(0) ELSE {} ; THEN Slots ELSE Slots ; the first entry applies the whole seed in the home group
+f13 ; Found ; slot-table.1 ; s \in open[g] ; TRUE ; a group takes a write for a slot it does not hold open
+f14 ; Found ; handback.2 ; pref[g] \in voters[g] ; TRUE ; leadership is handed to a machine that is not a voter
+f15 ; Found ; healing-self.19 ; Load(a) <= Load(b) ; TRUE ; a placement ignores load
+f16 ; Found ; move-policy.6 ; PLoad(p, g) <= PLoad(q, g) ; TRUE ; a new group's preferred member ignores load
+f17 ; Found ; healing-self.16 ; S \subseteq Avail \ {lead[g]} ; S \subseteq M \ {lead[g]} ; a placement names a machine the leader cannot reach
+f18 ; Found ; genesis-conditional-create.4 ; voters' = [voters EXCEPT ![0] = {m}] ; voters' = [voters EXCEPT ![0] = M] ; the founder is not the home group's only voter
+f20 ; Found ; new:first-voter-by-load ; RLoad(m) <= RLoad(q) ; TRUE ; a group record names any machine, whatever it was named for already
+f19 ; Found ; handback.1 ; lead' = [lead EXCEPT ![g] = pref[g]] ; lead' = lead ; leadership is never handed to the preferred member
+f21 ; Found ; line:record-once ; /\ g # 0 /\ rec[g] = "none" ; /\ g # 0 ; a group record is written again, by a later leader
+f22 ; Found ; line:place-leader ; S \cup {lead[g]}] ; S] ; a placement leaves the group's leader out
+f23 ; Found ; line:open-once ; /\ open[g] = {} /\ Share(g) # {} ; /\ Share(g) # {} ; a group opens its share again
+f24 ; Found ; line:adopt-stored ; store # "none" ; TRUE ; an opener adopts when nothing is stored
+f25 ; Found ; growth.5 record ; m = lead[0] ; m \in M ; a group record names any machine as first voter
+f26 ; Found ; handback.5 ; p = pref[g] ; p \in S ; the preferred member is picked again though it has not left the placement
+f27 ; Found ; growth.1 ; Cardinality(place[g]) < Copies ; Cardinality(place[g]) <= Copies ; a full placement is written again
+f28 ; Found ; growth.2 ; \A m \in place[g] : up[m] ; TRUE ; a group grows to machines that do not answer
+f29 ; Found ; line:handback-up ; pref[g] # lead[g] /\ up[pref[g]] ; pref[g] # lead[g] ; leadership is handed to a preferred member that is down
+#
+# c: Selection (row 4).
+c01 ; Selection ; subscribe.14 ; n = cur[s] + 1 ; TRUE ; the client takes a record that is not the next one
+c02 ; Selection ; new:picture-per-slot ; n >= cur[s] ; TRUE ; the client takes a picture of a slot from before its cursor
+c03 ; Selection ; subscribe.13 ; THEN f.at[s] ELSE cur[s]] ; THEN cur[s] ELSE cur[s]] ; a picture does not set the slot's cursor
+c04 ; Selection ; subscribe.12 ; THEN f.at[s] ELSE view[s]] ; THEN view[s] ELSE view[s]] ; a picture does not put in the slot's rows
+c05 ; Selection ; subscribe.16 ; THEN f.n ELSE @] ; THEN @ ELSE @] ; a record does not move the cursor on
+c06 ; Selection ; subscribe.15 ; THEN @ + 1 ELSE @] ; THEN @ ELSE @] ; a record taken is not applied
+c07 ; Selection ; subscribe.29 end ; Other(g), NoAt, NoGone ; g, NoAt, NoGone ; END names the old group, not the new one
+c08 ; Selection ; subscribe.29 turn ; THEN f.to ELSE @] ; THEN @ ELSE @] ; the client ignores END
+c09 ; Selection ; subscribe.29 again ; req' = req \cup {[t |-> "slot", g |-> ask[s], s |-> s]} ; req' = req ; the client never asks the new group for the slot
+c10 ; Selection ; new:picture-names-moved ; THEN Other(g) ELSE "none"] ; THEN "none" ELSE "none"] ; a picture does not name the slots the group handed off
+c11 ; Selection ; new:turn-on-moved ; src[s] \in {g, "none"} ; src[s] = g ; a slot the client never held is not asked for at the new group
+c12 ; Selection ; new:ready-per-slot ; ReadyBySlots => \A s \in Slots : has[s] ; TRUE ; ready as soon as every group's picture has come
+c13 ; Selection ; selection.1 ready ; \A g \in Groups : cs[g] = "live" ; \E g \in Groups : cs[g] = "live" ; ready once one group's picture has come
+c14 ; Selection ; subscribe.3 ; THEN pos[s] ELSE NoP] ; THEN 0 ELSE NoP] ; a picture names the wrong position
+c15 ; Selection ; subscribe.5 ; sent[g][s] < Last(g, s) ; sent[g][s] < MaxRec ; a server sends a record that has not committed
+c16 ; Selection ; slot-move.9 ; hold[s] = g ; hold[s] # "none" ; a group answers for a slot another group holds
+c17 ; Selection ; subscribe.1 ; {s \in Slots : hold[s] = g}] ; Slots] ; a group streams slots it does not hold
+c18 ; Selection ; subscribe.6 ; sent[g][s] + 1, ; sent[g][s] + 2, ; a record is sent under the next position
+c19 ; Selection ; line:spic-src ; [src EXCEPT ![f.s] = g] ; src ; a slot's picture does not set the group the slot is taken from
+c20 ; Selection ; new:picture-per-slot ; n # NoP /\ ( ; ( ; a picture that does not cover a slot is taken for it
+c21 ; Selection ; line:spic-position ; Frame("spic", s, Last(g, s), ; Frame("spic", s, 0, ; a slot's picture names position 0
+c22 ; Selection ; line:spic-sent ; = Last(g, s)] ; = Last(g, s) + 1] ; after a slot's picture the group skips a record
+c23 ; Selection ; line:end-src ; IF @ = g THEN "none" ELSE @] ; "none"] ; an END from a group the slot is not taken from clears where it is taken from
+c24 ; Selection ; subscribe.29 turn ; IF src[f.s] = g \/ @ = g THEN ; IF TRUE THEN ; an END from any group turns the client, an old END too
+c25 ; Selection ; new:ask-ended ; fenceAt[g][s] # NoP ; FALSE ; an ask for a slot the group handed off waits for ever
+c26 ; Selection ; subscribe.29 turn ; src[f.s] = g \/ @ = g ; src[f.s] = g ; an END that answers an ask does not turn the client
+x01 ; Selection ; subscribe.29 at-fence ; sent[g][s] = fenceAt[g][s] ; TRUE ; END goes out before the last records below the fence (a picture replaces them in state mode)
+x02 ; Selection ; subscribe.14 ; n = cur[s] + 1 ; n >= cur[s] + 1 ; the client takes a record past the next one (no stream here has a gap)
+x03 ; HomeRecords ; slot-table.6 ; new.e > old.e ; new.e >= old.e ; flip > to >=: a row of the same epoch is the same row
