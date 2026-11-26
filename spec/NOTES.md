@@ -40,7 +40,7 @@ One rule has one home. Where two layers held the same rule, one record stays.
 - **Four more were added from the decisions:** `derive-view.12` and `emit-fold.6` (the bucket limit, V5-20 item 10), `scan.17` (the verb on the surface, V5-20 item 4), `write-surface.15` (no bare mark and no claim for a client of a resource with methods, V5-17 item 13). `derive-view.9` now also holds the bump addressed to a group (GROUPS V6).
 - **Low has one meaning.** Low is 0 only where a named other record may already hold the rule. 9 records are so; 158 others that were at low 0 to match the study pages' ranges went to 1. Which 9 is this page's reading.
 - **High is over 1 where one sentence may hide more than one rule.** 34 records that join two rules in one sentence were raised; `methods.10` holds three. The pick of those 34 is a reading.
-- **A partial model is marked.** 30 records are known by a model of a smaller or an older form of the rule; their evidence starts with "partial model:". `handback.1`, whose pull form no model ran, is "reasoned".
+- **A partial model is marked.** 26 records are known by a model of a smaller or an older form of the rule; their evidence starts with "partial model:".
 - **23 ids are retired** ([retired.json](retired.json)): five dropped as repeats when the layers were put together, and 18 replaced by `stream-numbers.1` to `.11` (V5-30).
 - **Records that sit in a layer other than their mechanism's:** `srchi-marks.1` is L5, `srchi-marks.15` is L4 and `scan.17` is L4. The layer is a field, not part of the id.
 
@@ -92,7 +92,7 @@ A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as
 
 **Evidence that is owed**
 
-30. The one-commit slot move has no full model yet. `slot-move`'s records and the carry rules are among the 33 partial models: known from a smaller probe or from the three-step move.
+30. The one-commit slot move has its model ([models/slot-move](../models/slot-move/README.md)), but not every part of it reaches the bar. The first two models catch 91 % and 86 % of their planted mistakes; the third, one group with its members, catches 62 %, against a bar of 85 %. A voter added while a member is down did not finish within an hour. The records it asks to change (`slot-move.7`, `.12`, `.13`, `.17`, `.21`, `.22`, `slot-table.4`, `.5`, `.7`) keep their old evidence until the owner decides. `slot-move.2`, `.9`, `.10`, `.16` and `.20` have no caught mistake: the model holds them by its shape, or has no line for them.
 31. The merger's rules (`merger.6` to `merger.11`) were run on the three-step move.
 32. The saga's fences were modelled with locks and sagas in one group.
 33. `ws-listener.1` to `ws-listener.3` are readings; no source words them.
