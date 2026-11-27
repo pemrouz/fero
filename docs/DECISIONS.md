@@ -156,3 +156,22 @@ Decision:
 REJECTED: keeping two commits and looking at the 10 ms bar again.
 
 Consequences: reads from an uncommitted tail are not modelled, so reads keep waiting for commits, and `slot-move.7`'s evidence says partial model. A write behind an uncommitted final copy can be lost with it if the leader changes. Its writer then gets no answer and sends it again, as for any write *(reasoned)*. `slot-move.2`, and the check that the source's own fence has committed before it reopens (m15), hold in every model, but no planted mistake on them is caught. Whether each still counts as a rule is a question for slice 3's review.
+
+## V5-36 — A recovery in a move gets its rules, five more records are added, and slice 3's budget is 58 (2026-11-27; card 0002 questions 5 and 6, asked one at a time)
+
+Context: the ledger had one rule for a recovery that meets a move (`slot-table.7`). The second slot-move model has an unclean recovery with a moving epoch, and it needs nine; with any one taken away a property fails in 2 to 24 steps *(checked)*. Question 6 adds five more records the models need: `move-policy.7`, `slot-move.24` and `subscribe.38` to `.40`. A smaller way, where a slot caught in a move by a recovery waits for the operator, would drop three rules, but it is reasoned only.
+
+Decision:
+1. Four records beside `slot-table.7`:
+   - `slot-table.8`: a move's row holds its target's incarnation, and the target takes the final copy only from a fence that names it in that incarnation.
+   - `slot-table.9`: a recovered group serves a slot it held only once the home log holds a recovery row for it that names the group in its new life, and it reopens in that row's epoch.
+   - `slot-table.10`: the home group writes that row only if the table names the group and, if a move went into it, its copy holds the last final copy.
+   - `slot-table.11`: a give-up in another incarnation is marked lost; the home group writes the row back above every other at a new epoch, and the source reopens only after it.
+2. `slot-move.24`: a group fences a slot only for a move newer than every move its log names, and takes a final copy only for a move newer than every fence, final copy and reopen in its log; a group that holds a slot open takes no final copy for it. `slot-move.8` may fold into it (low 0). The card's shorter words, "older than the newest", let a source fence its newest move twice. Planted that way, `NoBack` fails in 21 steps (mistake d06 of the decided form) *(checked)*. So the record takes the models' words.
+3. `move-policy.7`: the next move of a slot starts only once the last one's final copy has committed or its row was written back.
+4. `subscribe.38` to `.40`: a subscriber takes a picture's part only at or past its cursor; a picture names the slots its group handed off and where; a group asked for a slot it handed off answers END, with code moved, and names where it went.
+5. Slice 3's budget goes from 54 to 58. The whole stays at 826; at 832 records it is inside its 5 % headroom, and so is every layer.
+
+REJECTED: the smaller way for a recovery (reasoned only; a model would come first); leaving the recovery until slice 3 starts; accepting the five records but looking for cuts first; not taking them now.
+
+Consequences: slice 3 holds 57 records, 55 to 79 at low and high, once `growth.5` has moved to slice 2 (V5-33). L1 holds 227 records against a cap of 228 with headroom, so its next record needs a card. `slot-table.8` also holds two lines a second reader found are rules (the slot-move model's extra mistakes f11, f12), which show only with a recovery. A move whose target has had a new life needs no rule of its own "has not ended": `slot-table.11` covers it (u08 not caught). The recovery rules were shaped on data groups only: the home group's own recovery, and a slot that moved on to a third group, are not modelled, and their evidence says partial model. A recovery lands in slice 2 (`recover.3`) but the epoch rules in slice 3; what a slice 2 recovery does to the epoch is on [NOTES](../spec/NOTES.md). [SHAPES](../spec/SHAPES.md) now says the epoch rises at a recovery that may have lost records, not at a move (`slot-sequence.2`), and question 32 asks how a picture lists the slots it handed off.

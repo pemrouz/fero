@@ -77,7 +77,7 @@ Shape state: **draft**. Built in slice 1.
 
 | # | Field | Bytes | Meaning | State |
 |---|---|---|---|---|
-| 1 | epoch | `varint` | The slot's epoch. It rises at a slot move and at a restore. A position from an older epoch never looks newer | S (field), P (encoding) |
+| 1 | epoch | `varint` | The slot's epoch. It rises at an operator recovery that may have lost records (`slot-table.7`, `slot-table.9`, `slot-table.11`) and at a restore; a move carries it (`slot-sequence.2`). A position from an older epoch never looks newer | S (field), P (encoding) |
 | 2 | sequence | `varint` | The slot's own count, stamped by the leader in log-end order. It has gaps where other partitions of the slot wrote | S (one varint, DESIGN-V5 4.3) |
 
 Where a slot must be said (a cursor, a `DELTA`), a `u16` slot goes first.
@@ -735,6 +735,7 @@ Each closes by a model, a probe of slice 0, a timing in slice 1, or an owner's c
 | 29 | The text of an attempt id; a tighter cursor for runs of slots | Session in hex, a dash, the call id; no run packing | Slice 1; the read-cost timing |
 | 30 | Does a mark name its reader as text in every record, or by a number set once? | Text | E-61's three rules in slice 1; the counted pin on bytes per record |
 | 31 | Does a `moved` answer, and an `END` with code `moved`, carry the slot's row and its version, so that a client that keeps only the newest row (`slot-table.6`) takes it? Which version does a target that gave a move up name (`slot-move.23`)? | Not drafted | A model of versioned routes with a give-up, slice 3 |
+| 32 | How does a picture list the slots its group handed off and where each went (`subscribe.39`)? | Not drafted | Slice 3 |
 
 ## 13. What this page did not do
 

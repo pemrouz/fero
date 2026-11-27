@@ -1,6 +1,8 @@
 # Question 2. What the slot-move and founding models found
 
-**Open.** Nine short questions, asked one at a time. Each has a recommendation.
+**Answered 2026-11-27: the recommended option on all nine.** Recorded as V5-33 to V5-39 in [DECISIONS](../../docs/DECISIONS.md). The card below is kept as it was asked, except that the retired record is no longer written as a live id. Its budget line, for slice 3 at 58:
+
+budget 0002: layers L0 86 L1 218 L2 106 L3 146 L4 107 L5 110 D 53 | slices S0 0 S1 257 S2 132 S3 58 S4 145 S5 78 S6 84 S7 22 S8 54 | whole 826 | headroom 5 %
 
 **Blocks:** nothing in slice 0. Questions 1 and 6 change records of slice 1 (`selection.1`, `route-smart.1`). The rest change slices 2 and 3. The ledger is not changed until the answers are in.
 

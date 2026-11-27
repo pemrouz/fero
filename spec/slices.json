@@ -92,9 +92,9 @@
   "name": "slot move",
   "adds": "The slot move in one commit, the slot table in the home log, the carried set, the grow rule by size and load, clients that learn new routes, the fold's rules for a moved slot.",
   "rules": {
-   "records": 48,
-   "low": 47,
-   "high": 60
+   "records": 57,
+   "low": 55,
+   "high": 77
   },
   "models": [
    "the full one-commit move model at 85 % (READY M6): models/slot-move; its first two models pass, its members model is at 62 % and owed",

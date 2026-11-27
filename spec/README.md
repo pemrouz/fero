@@ -5,15 +5,15 @@ Nothing is built yet. These pages are what the build is steered by.
 1. [SYSTEM.md](SYSTEM.md): what fero v5 is, on one screen. [SHAPES.md](SHAPES.md): the shapes in bytes, a draft.
 2. [ledger.json](ledger.json): every first-build rule, one record each, sorted by layer then id. [later.json](later.json): rules kept for after the first build. [retired.json](retired.json): ids that were given up and are never used again.
 3. [slices.json](slices.json): the nine slices, 0 to 8, each with its rule count, its models, its pins and what the owner sees and runs.
-4. [budget.json](budget.json): the most rule records each layer, each slice and the whole may hold. It was set by [cards/0001-budget.md](cards/0001-budget.md), the first question for the owner, and accepted as V5-25. The budget is on the margins only; no cell of the grid has one.
+4. [budget.json](budget.json): the most rule records each layer, each slice and the whole may hold. It was set by [cards/0001-budget.md](cards/0001-budget.md), the first question for the owner, and accepted as V5-25. [cards/0002-models.md](cards/0002-models.md) raised slice 3 to 58 (V5-36). The budget is on the margins only; no cell of the grid has one.
 5. [NOTES.md](NOTES.md): what the ledger leaves out and why, what was settled when it was put together, and every open question.
 
 ## The counts
 
 Counted by the tools from `ledger.json`; the gate fails if these lines drift.
 
-Records by layer: L0 87, L1 221, L2 99, L3 146, L4 107, L5 110, D 53.
-Records by slice: S0 0, S1 256, S2 136, S3 48, S4 145, S5 78, S6 84, S7 22, S8 54.
+Records by layer: L0 87, L1 227, L2 99, L3 149, L4 107, L5 110, D 53.
+Records by slice: S0 0, S1 256, S2 136, S3 57, S4 145, S5 78, S6 84, S7 22, S8 54.
 
 ## The bars
 
