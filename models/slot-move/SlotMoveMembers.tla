@@ -22,7 +22,11 @@
    Raft records; the Raft port has its own proof (probe P1).
 
    Marks:  \* @rule <id>  a move's rule;  \* @keeps <id>  a rule the move
-   leans on;  \* @world  an assumption. *)
+   leans on;  \* @world  an assumption.
+
+   The decided form (the owner's answers to card 0002): the bounds named
+   mem-d-* set OneCommit = TRUE, as in SlotMove.tla.  This model has no
+   slot table, so the switch BackFirst is not here. *)
 EXTENDS Naturals, Sequences, FiniteSets, TLC
 
 CONSTANTS M,          \* the members that may hold a copy of the real group
@@ -33,6 +37,11 @@ CONSTANTS M,          \* the members that may hold a copy of the real group
           MaxFaults,  \* member faults
           MaxCfg,     \* membership changes proposed
           MaxPCrash   \* leader changes in the other group
+
+(* A switch with a default, as in SlotMove.tla.  FALSE: a leader takes a
+   write only for a slot the log it knows committed holds open.  TRUE (the
+   decided form): the guard reads its own log end alone. *)
+OneCommit == FALSE
 
 VARIABLES mlog, term, mci, lead, alive,   \* the real group, by member
           plog, pci,                      \* the other group: one log, one commit index
@@ -169,8 +178,8 @@ PutE(g, a, e) ==
 
 (* ---- the move ---- *)
 Take(g, a, s) ==
-    /\ Mode(g, Com(g, a)) = "open"                              \* @rule slot-table.1
-    /\ Mode(g, End(g, a)) = "open"                              \* @rule slot-move.1
+    /\ Mode(g, Com(g, a)) = "open" \/ OneCommit                 \* @rule two-commit
+    /\ Mode(g, End(g, a)) = "open"                              \* @rule slot-table.1 slot-move.1
     /\ LET T == Tab(End(g, a))
            n == T.hi[s] + 1                                     \* @keeps stream-numbers.4
        IN /\ n <= N
@@ -179,7 +188,7 @@ Take(g, a, s) ==
 Fence(a) ==
     /\ Mode("A", Com("A", a)) = "open"                          \* @rule slot-move.2
     /\ Mode("A", End("A", a)) = "open"                          \* @rule slot-move.1 once
-    /\ ~HasT(End("A", a), "fence")                              \* @rule fence.once
+    /\ ~HasT(End("A", a), "fence")                              \* @rule slot-move.24 fence.once
     /\ PutE("A", a, [t |-> "fence", tm |-> 0])
 
 Final(b) ==

@@ -27,7 +27,15 @@
    membership change, a data group with no majority, routes.  The home log
    is committed rows only here; it may be down.
 
-   Marks as in SlotMove.tla:  \* @rule <id>,  \* @keeps <id>,  \* @world. *)
+   Marks as in SlotMove.tla:  \* @rule <id>,  \* @keeps <id>,  \* @world.
+   A mark with no ledger id names a line the ledger took no record for: the
+   source's incarnation in the row (row.inc write-src, row.inc source) and
+   the early copy's check of the target's incarnation (row.inc copy) are
+   spare beside the rules here, and so is ended.inc.
+
+   The decided form (the owner's answers to card 0002): the bounds named
+   msg-d-* set OneCommit = TRUE and BackFirst = FALSE, as in SlotMove.tla.
+   The give-up marked lost still waits for its row (unf.wait). *)
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS S,          \* the streams
@@ -39,6 +47,11 @@ CONSTANTS S,          \* the streams
           MaxDown,    \* times the home group loses its majority
           NeedReady,  \* must the source wait for a ready report?
           BackFirst   \* must the row be written back before any reopen?
+
+(* A switch with a default, as in SlotMove.tla.  FALSE: a group takes a
+   write only for a slot its committed log holds open.  TRUE (the decided
+   form): the guard reads the log end alone. *)
+OneCommit == FALSE
 
 VARIABLES log,     \* log[g]: the leader's log of data group g, tail included
           ci,      \* ci[g]: how much of log[g] is committed
@@ -71,7 +84,7 @@ ModeBy(g, L, T) ==
     LET k == LastOf(L, T) IN
     IF k = 0 THEN (IF g = "A" THEN "open" ELSE "none")
     ELSE IF L[k].t = "fence" THEN "fenced"                      \* @rule slot-move.3
-    ELSE IF L[k].t = "rec" THEN "shut"                          \* @rule recover.shut
+    ELSE IF L[k].t = "rec" THEN "shut"                          \* @rule slot-table.9 recover.shut
     ELSE "open"
 Mode(g, L) == ModeBy(g, L, Stops)
 \* the group's copy holds the slot's records, whatever a recovery did since
@@ -106,15 +119,15 @@ Vis(L)   == IF BaseIx(L) = 0 THEN OwnWs(L) ELSE L[BaseIx(L)].recs \o OwnWs(L)
 Delta(T0, T1) ==
     [seq  |-> T1.seq,                                           \* @rule slot-sequence.2 seq
      ep   |-> T1.ep,                                            \* @rule slot-sequence.2 epoch
-     hi   |-> [s \in S |-> IF T1.hi[s] # T0.hi[s] THEN T1.hi[s] ELSE 0],   \* @rule delta.marks
-     ans  |-> T1.ans \ T0.ans,                                  \* @rule delta.answers
-     rest |-> T1.rest /\ ~T0.rest]                              \* @rule delta.rest
+     hi   |-> [s \in S |-> IF T1.hi[s] # T0.hi[s] THEN T1.hi[s] ELSE 0],   \* @rule slot-move.13 delta.marks
+     ans  |-> T1.ans \ T0.ans,                                  \* @rule slot-move.13 delta.answers
+     rest |-> T1.rest /\ ~T0.rest]                              \* @rule slot-move.13 delta.rest
 Merge(C, D) ==
-    [seq  |-> D.seq,                                            \* @rule merge.seq
-     ep   |-> D.ep,                                             \* @rule merge.epoch
-     hi   |-> [s \in S |-> Max({C.hi[s], D.hi[s]})],            \* @rule merge.marks
-     ans  |-> C.ans \cup D.ans,                                 \* @rule merge.answers
-     rest |-> C.rest \/ D.rest]                                 \* @rule merge.rest
+    [seq  |-> D.seq,                                            \* @rule slot-move.13 merge.seq
+     ep   |-> D.ep,                                             \* @rule slot-move.13 merge.epoch
+     hi   |-> [s \in S |-> Max({C.hi[s], D.hi[s]})],            \* @rule slot-move.13 merge.marks
+     ans  |-> C.ans \cup D.ans,                                 \* @rule slot-move.13 merge.answers
+     rest |-> C.rest \/ D.rest]                                 \* @rule slot-move.13 merge.rest
 
 \* the newest early copy a log holds for move m
 HeldIx(L, m) == LET C == {i \in DOMAIN L : L[i].t = "copy" /\ L[i].v = m} IN
@@ -137,8 +150,8 @@ Said(k)   == {f \in said : f.k = k}
 (* The last move has ended, as the home group can know it. *)
 Settled ==
     LET T == Table(home) IN
-    \/ ~IsTo(T)                                                 \* @rule ended.back
-    \/ /\ \E f \in Said("final") : f.m = T.m                    \* @rule ended.open
+    \/ ~IsTo(T)                                                 \* @rule move-policy.7 ended.back
+    \/ /\ \E f \in Said("final") : f.m = T.m                    \* @rule move-policy.7 ended.open
        /\ inc[T.own] = T.dinc                                   \* @rule ended.inc
 
 Init == /\ log = [g \in DG |-> <<>>] /\ ci = [g \in DG |-> 0]
@@ -152,8 +165,8 @@ SameH     == UNCHANGED <<log, ci, inc, hup, said, ever, crashes, recs, downs>>
 
 (* ---- a leader takes a write ---- *)
 Take(g, s) ==
-    /\ Mode(g, CL(g)) = "open"                                  \* @rule slot-table.1
-    /\ Mode(g, log[g]) = "open"                                 \* @rule slot-move.1
+    /\ Mode(g, CL(g)) = "open" \/ OneCommit                     \* @rule two-commit
+    /\ Mode(g, log[g]) = "open"                                 \* @rule slot-table.1 slot-move.1
     /\ LET T == Tab(g, log[g])
            n == T.hi[s] + 1                                     \* @keeps stream-numbers.4
        IN /\ n <= N
@@ -174,7 +187,7 @@ StartMove(d) ==
        /\ home' = Append(home, [m |-> TopM(home) + 1, step |-> 0, own |-> d, src |-> T.own,
                                 ep |-> T.ep, for |-> 0,
                                 sinc |-> inc[T.own],            \* @rule row.inc write-src
-                                dinc |-> inc[d]])               \* @rule row.inc write-dst
+                                dinc |-> inc[d]])               \* @rule slot-table.8 row.inc write-dst
     /\ SameH
 
 (* The early copy: the slot's records and its carried set up to some
@@ -215,10 +228,10 @@ Fence(a) ==
          LET T == Table(SubSeq(home, 1, k)) IN
          /\ IsTo(T) /\ T.own = d /\ T.src = a                   \* @rule slot-table.4
          /\ T.sinc = inc[a]                                     \* @rule row.inc source
-         /\ \A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v < T.m   \* @rule fence.newer
-         /\ \E b \in {0} \cup {f.p + 1 : f \in Ready(T.m)} :    \* @rule slot-move.12
-              /\ NeedReady => b > 0                             \* @world slot-move.12 wait
-              /\ Put(a, [t |-> "fence", v |-> T.m, to |-> d, base |-> b, dinc |-> T.dinc])
+         /\ \A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v < T.m   \* @rule slot-move.24 fence.newer
+         /\ \E b \in {0} \cup {f.p + 1 : f \in Ready(T.m)} :    \* @rule slot-move.13 fence.base
+              /\ NeedReady => b > 0                             \* @world ready.wait
+              /\ Put(a, [t |-> "fence", v |-> T.m, to |-> d, base |-> b, dinc |-> T.dinc])   \* @rule slot-table.8 fence.inc
     /\ Same
 
 \* the source's carried set when its view held exactly p records
@@ -231,7 +244,7 @@ FenceFact(a, i) ==
         At == SubSeq(log[a], 1, i - 1)                          \* @rule slot-move.4 at
         R  == Vis(At)
         T1 == Tab(a, At)
-        p  == IF e.base = 0 THEN 0 ELSE e.base - 1              \* @rule delta.base source
+        p  == IF e.base = 0 THEN 0 ELSE e.base - 1              \* @rule slot-move.13 delta.base source
         T0 == IF e.base = 0 THEN NoTab ELSE TabAt(a, At, p)
     IN [k |-> "fence", m |-> e.v, g |-> a, to |-> e.to, dinc |-> e.dinc, base |-> e.base,
         drecs |-> SubSeq(R, p + 1, Len(R)),                     \* @rule slot-move.5
@@ -246,7 +259,7 @@ Snap(a, i, T) ==
      full |-> Tab(a, At), frecs |-> Vis(At), end |-> FALSE]
 Cands(d) ==
     LET T == Table(home) IN
-    {f \in Said("fence") : f.to = d}
+    {f \in Said("fence") : f.to = d}                            \* @rule slot-table.8 fence.to
       \cup (IF IsTo(T) /\ T.own = d THEN {Snap(T.src, i, T) : i \in 0..ci[T.src]} ELSE {})
 
 (* The final copy: one entry at the target; its commit opens the slot. *)
@@ -255,12 +268,12 @@ Final(d) ==
     /\ \E f \in Cands(d) :                                      \* @rule slot-move.4
          LET h == HeldIx(L, f.m) IN
          /\ f.end                                               \* @rule slot-move.14
-         /\ f.dinc = inc[d]                                     \* @rule row.inc target
+         /\ f.dinc = inc[d]                                     \* @rule slot-table.8 row.inc target
          /\ ~Has(L, "abort", f.m)                               \* @rule slot-move.18
          /\ ~Has(L, "final", f.m)                               \* @rule slot-move.8
-         /\ Mode(d, L) # "open"                                 \* @rule final.shut
-         /\ \A i \in DOMAIN L : L[i].t \in {"fence", "unf", "final", "reopen"} => L[i].v < f.m   \* @rule final.newer
-         /\ f.base = 0 \/ (h > 0 /\ L[h].p = f.base - 1)        \* @rule delta.base
+         /\ Mode(d, L) # "open"                                 \* @rule slot-move.24 final.shut
+         /\ \A i \in DOMAIN L : L[i].t \in {"fence", "unf", "final", "reopen"} => L[i].v < f.m   \* @rule slot-move.24 final.newer
+         /\ f.base = 0 \/ (h > 0 /\ L[h].p = f.base - 1)        \* @rule slot-move.13 delta.base
          /\ Put(d, [t |-> "final", v |-> f.m, src |-> f.g, base |-> f.base,
                     ep   |-> f.dtab.ep,
                     recs |-> IF f.base = 0 THEN f.drecs ELSE L[h].recs \o f.drecs,
@@ -277,7 +290,7 @@ Abort(d) ==
          /\ ~Has(log[d], "final", T.m)                          \* @rule slot-move.17
          /\ ~Has(log[d], "abort", T.m)
          /\ Put(d, [t |-> "abort", v |-> T.m, src |-> T.src,
-                    lost |-> T.dinc # inc[d]])                  \* @rule abort.lost
+                    lost |-> T.dinc # inc[d]])                  \* @rule slot-table.11 abort.lost
     /\ Same
 
 (* The home group writes the row back on a target's abort report.  If the
@@ -286,20 +299,20 @@ Abort(d) ==
 LastInto(g) == Max({0} \cup {home[i].m : i \in {j \in DOMAIN home : IsTo(home[j]) /\ home[j].own = g}})
 Back ==
     /\ hup
-    /\ \E f \in Said("abort") :                                 \* @rule back.committed
+    /\ \E f \in Said("abort") :                                 \* @rule slot-table.5 back.committed
          LET T   == Table(home)
-             top == /\ f.lost                                   \* @rule back.lost
-                    /\ LastInto(f.g) = f.m                      \* @rule back.lost last
-                    /\ \/ T.own = f.g /\ (T.step # 2 \/ T.sinc # inc[f.g])   \* @rule back.lost holder
-                       \/ IsTo(T) /\ T.src = f.g               \* @rule back.lost giver
+             top == /\ f.lost                                   \* @rule slot-table.11 back.lost
+                    /\ LastInto(f.g) = f.m                      \* @rule slot-table.11 back.lost last
+                    /\ \/ T.own = f.g /\ (T.step # 2 \/ T.sinc # inc[f.g])   \* @rule slot-table.11 back.lost holder
+                       \/ IsTo(T) /\ T.src = f.g               \* @rule slot-table.11 back.lost giver
          IN
          /\ ~ \E i \in DOMAIN home : home[i].for = f.m /\ home[i].step = 1
          /\ \E j \in DOMAIN home :
               /\ home[j].m = f.m /\ home[j].step = 0
               /\ home' = Append(home,
-                   [m    |-> IF top THEN TopM(home) + 1 ELSE f.m,          \* @rule back.lost top
-                    step |-> 1, own |-> f.src, src |-> f.g, for |-> f.m,
-                    ep   |-> IF top THEN TopEp(home) + 1 ELSE home[j].ep,  \* @rule back.epoch
+                   [m    |-> IF top THEN TopM(home) + 1 ELSE f.m,          \* @rule slot-table.11 back.lost top
+                    step |-> 1, own |-> f.src, src |-> f.g, for |-> f.m,  \* @rule slot-table.5 back.src
+                    ep   |-> IF top THEN TopEp(home) + 1 ELSE home[j].ep,  \* @rule slot-table.11 back.epoch
                     sinc |-> 0, dinc |-> 0])
     /\ SameH
 
@@ -314,9 +327,9 @@ Unfence(a) ==
          LET rows == {i \in DOMAIN home : home[i].for = f.m /\ home[i].step = 1} IN
          /\ f.m = L[k].v /\ f.g = L[k].to                       \* @rule slot-move.19
          /\ BackFirst => rows # {}                              \* @rule slot-table.5
-         /\ f.lost => rows # {}                                 \* @rule unf.wait
+         /\ f.lost => rows # {}                                 \* @rule slot-table.11 unf.wait
          /\ Put(a, [t |-> "unf", v |-> L[k].v,
-                    ep |-> IF f.lost THEN home[CHOOSE i \in rows : TRUE].ep   \* @rule unf.epoch
+                    ep |-> IF f.lost THEN home[CHOOSE i \in rows : TRUE].ep   \* @rule slot-table.11 unf.epoch
                            ELSE EpOf(a, L)])
     /\ Same
 
@@ -366,9 +379,9 @@ RecRow(g) ==
     IN
     /\ hup
     /\ k > 0 /\ L[k].t = "rec"
-    /\ Holds(g, L)                                              \* @rule recover.copy
-    /\ T.own = g                                                \* @rule recover.table
-    /\ LastInto(g) = 0 \/ Has(L, "final", LastInto(g))          \* @rule recover.final
+    /\ Holds(g, L)                                              \* @rule slot-table.10 recover.copy
+    /\ T.own = g                                                \* @rule slot-table.10 recover.table
+    /\ LastInto(g) = 0 \/ Has(L, "final", LastInto(g))          \* @rule slot-table.10 recover.final
     /\ ~ \E i \in DOMAIN home : home[i].step = 2 /\ home[i].own = g /\ home[i].sinc = inc[g]
     /\ home' = Append(home, [m |-> TopM(home) + 1, step |-> 2, own |-> g, src |-> g, for |-> 0,
                              ep |-> TopEp(home) + 1,            \* @rule slot-table.7
@@ -382,9 +395,9 @@ Reopen(g) ==
     IN
     /\ k > 0 /\ L[k].t = "rec"
     /\ \E i \in DOMAIN home :
-         /\ home[i].step = 2 /\ home[i].own = g
-         /\ home[i].sinc = inc[g]                               \* @rule recover.row
-         /\ Put(g, [t |-> "reopen", v |-> home[i].m, ep |-> home[i].ep])   \* @rule recover.epoch
+         /\ home[i].step = 2 /\ home[i].own = g                 \* @rule slot-table.9 own.row
+         /\ home[i].sinc = inc[g]                               \* @rule slot-table.9 recover.row
+         /\ Put(g, [t |-> "reopen", v |-> home[i].m, ep |-> home[i].ep])   \* @rule slot-table.9 recover.epoch
     /\ Same
 
 HDown == /\ hup /\ downs < MaxDown /\ hup' = FALSE /\ downs' = downs + 1

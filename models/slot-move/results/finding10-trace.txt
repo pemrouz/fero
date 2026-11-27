@@ -1,0 +1,33 @@
+Finding 10: slot-move.24 as written ("never fences ... for a move older than the newest row its
+log names") lets a source fence its newest move a second time. Planted mistake d06 is that text,
+with at most two fences of one move; decided form, second model, bound msg-d-rec-twice.
+NoBack fails at the last state: A serves in epoch 1 with no record, where a reader had already
+seen position (2, 1) at A. One line per step (TLC's trace has 21 states).
+
+ 1 the start: A serves the slot, epoch 1
+ 2 the home log takes the row of move 1, A to B
+ 3 A logs the fence of move 1
+ 4 A's fence commits; its report exists
+ 5 B logs the final copy of move 1
+ 6 B's final copy commits: B serves the slot, with no record
+ 7 the home log takes the row of move 2, B to A (move 1 ended by its final copy)
+ 8 B logs the fence of move 2
+ 9 B's fence commits; its report exists: the final copy of move 2, B's state, epoch 1, no record
+10 B is recovered from a copy that is empty: its log is cut to its recovery entry, its life is now 1
+11 B gives move 1 up, on an old read of the table, marked "lost" (its row named life 0)
+12 the abort commits; its report exists
+13 the home log writes the row back to A as a new row, number 3, above every other, at epoch 2
+14 A reopens the slot in epoch 2 (it waited for that row)
+15 A takes write 1 of stream x at position (2, 1)
+16 the reopen commits: A serves in epoch 2
+17 A fences move 1 again, on an old read of the table: the newest move its log names is 1,
+   so the record as written does not bar it (the model's own line does: 1 is not newer than 1)
+18 A logs the final copy of move 2 from B's old report (step 9): A's log end is fenced, so
+   "a group that holds the slot open takes no final copy" no longer stops it, and 2 is newer
+   than every move A's log names
+19 the write commits; a reader sees position (2, 1)
+20 the second fence commits
+21 the final copy commits: A serves in epoch 1 with no record
+
+With the model's line: step 17 cannot happen (a move is fenced only if it is newer than every
+move the log names), A's log end stays open after step 14, and step 18 is barred by R10.

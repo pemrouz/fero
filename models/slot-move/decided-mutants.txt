@@ -1,0 +1,102 @@
+# Planted mistakes in the decided form: the move as the owner decided it on card 0002.
+# decided.py runs each on the decided form's bounds (d-*, msg-d-*, mem-d-*: OneCommit = TRUE,
+# BackFirst = FALSE), not on the bounds the first lists were run on.
+#
+# Two kinds of line:
+#   id ; record
+#       plants the mistake of that id from mutants.txt or extra-mutants.txt, as it stands there;
+#   id ; record ; module ; mark ; old text ; new text ; what the mistake is
+#       a new mistake (ids d), on the line with that mark (the text after "@rule"); a mark "-"
+#       means the line where the old text occurs once in the module.
+# The record is the ledger record the line holds since card 0002; "none" is a line the ledger
+# took no record for.
+#
+# slot-table.8: a move's row holds the target's incarnation; the fence names the target in it;
+# the target takes the final copy only from a fence that names it, in that incarnation.
+u04 ; slot-table.8
+u06 ; slot-table.8
+f11 ; slot-table.8
+f12 ; slot-table.8
+u03 ; none
+u05 ; none
+u07 ; none
+#
+# slot-table.9: a recovered group serves a slot only once the home log holds its recovery row,
+# and reopens in that row's epoch.
+u01 ; slot-table.9
+u22 ; slot-table.9
+u23 ; slot-table.9
+f04 ; slot-table.9
+#
+# slot-table.10: the home group writes that row only if the table names the group and its copy
+# holds the last final copy into it.
+u18 ; slot-table.10
+u19 ; slot-table.10
+u20 ; slot-table.10
+#
+# slot-table.11: a give-up in another incarnation is marked lost; the row goes back above every
+# other at a new epoch; the source reopens only after it, in its epoch.
+u09 ; slot-table.11
+u10 ; slot-table.11
+u11 ; slot-table.11
+u12 ; slot-table.11
+u13 ; slot-table.11
+u14 ; slot-table.11
+u15 ; slot-table.11
+u16 ; slot-table.11
+u17 ; slot-table.11
+#
+# slot-move.24: never fence, and never take a final copy, for a move older than the newest row
+# the log names; a group that holds the slot open takes no final copy.
+m22 ; slot-move.24
+u24 ; slot-move.24
+u25 ; slot-move.24
+u26 ; slot-move.24
+n05 ; slot-move.24
+d05 ; slot-move.24 ; SlotMove ; slot-move.24 fence.once ; ~Has(L, "fence", T.m) ; Cardinality({i \in DOMAIN L : L[i].t = "fence" /\ L[i].v = T.m}) < 2 /\ \A i \in DOMAIN L : L[i].t \in {"fence", "final", "abort", "unf"} => L[i].v <= T.m ; probe: the record as written bars only a move older than the newest its log names, so the source may fence the newest move again (twice at most here)
+d06 ; slot-move.24 ; SlotMoveMsg ; slot-move.24 fence.newer ; \A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v < T.m ; (\A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v <= T.m) /\ Cardinality({i \in DOMAIN L : L[i].t = "fence" /\ L[i].v = T.m}) < 2 ; probe: the record as written, for the fence: the newest move its log names may be fenced again (twice at most here)
+d07 ; slot-move.24 ; SlotMoveMsg ; slot-move.24 final.newer ; => L[i].v < f.m ; => L[i].v <= f.m ; probe: the record as written, for the final copy: a final copy for the newest move its log names is not barred by this line
+d08 ; slot-move.24 ; SlotMove ; slot-move.8 ; ~Has(L, "final", v) ; \A j \in DOMAIN L : L[j].t \in {"fence", "final", "abort", "unf"} => L[j].v <= v ; slot-move.8 replaced by the first half of slot-move.24 alone: the target takes a final copy unless its log names a newer move
+#
+# slot-move.23: a target that gave a move up answers moved, naming the source.
+m21 ; slot-move.23
+#
+# move-policy.7: the next move starts only once the last one's final copy committed or its row
+# was written back.
+t06 ; move-policy.7
+t07 ; move-policy.7
+u53 ; move-policy.7
+d04 ; move-policy.7 ; SlotMoveMsg ; move-policy.7 ended.back ; \/ ~IsTo(T) ; \/ ~IsTo(T) \/ (\E f \in Said("abort") : f.m = T.m) ; a move counts as ended once its abort is reported, row or no row (t06 in the second model)
+u08 ; none
+#
+# slot-table.5, the reopen that does not wait for the row: the row goes back when the home group
+# answers; the source's reopen waits only for the target's committed abort.
+d01 ; slot-table.5 ; SlotMove ; slot-table.5 ; /\ BackFirst => BackDone(L[k].v) ; /\ BackDone(L[k].v) ; the source's reopen waits for the row (slot-table.5 as it was)
+d03 ; slot-table.5 ; SlotMoveMsg ; slot-table.5 ; /\ BackFirst => rows # {} ; /\ rows # {} ; the source's reopen waits for the row (slot-table.5 as it was), second model
+d02 ; slot-table.5 ; SlotMove ; slot-table.5 back.committed ; \E j \in 1..ci[d] : ; \E j \in {} : ; the row is never written back after a give-up
+t05 ; slot-table.5
+e06 ; slot-table.5
+f03 ; slot-table.5
+m16 ; slot-move.19
+m17 ; slot-move.19
+#
+# The write guard at the log end (slot-table.1, slot-move.7, slot-move.1): with one commit in the
+# window it is the only guard, and the target takes writes behind its final copy at once.
+m03 ; slot-table.1
+u45 ; slot-table.1
+n02 ; slot-table.1
+m01 ; slot-move.3
+u44 ; slot-move.3
+n01 ; slot-move.3
+m02 ; slot-move.7
+n14 ; slot-move.7
+m06 ; slot-move.4
+n06 ; slot-move.4
+e01 ; stream-numbers.4
+f02 ; stream-numbers.4
+g01 ; stream-numbers.4
+#
+# slot-move.13: the fence names the base of the delta; the target takes the final copy only if
+# its early copy stands there.
+u28 ; slot-move.13
+u29 ; slot-move.13

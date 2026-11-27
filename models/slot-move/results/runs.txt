@@ -143,3 +143,129 @@ ok msg-x-rec2-down: pass (want pass); 2670562 generated, 904392 distinct; depth 
 ok mem-x-src-add-term: pass (want pass); 43695755 generated, 6712545 distinct; depth 31; 1304 s
 # Not counted: mem-x-src-add-fault, stopped by hand after 23 minutes at 10,853,567 distinct, 5,059,773 on queue, depth 14; no property had failed.
 # The stall check on s-strict with a membership change counted as a calm step: 948 stuck of 6688 (998 as the check stands).
+
+# After card 0002: the decided form (OneCommit = TRUE, BackFirst = FALSE).
+# TLC2 2026.11.19, Java 21, 2 workers, -fp 31, LIMIT 3500 s, checkpoints every 10 minutes; beside another model job the whole time.
+# ./run.sh (2 GB heap), with the switch OneCommit and the new marks in place: the bounds made before.
+# Every safety bound and stall check has the counts and depth above; the reach goals are reached again.
+ok core: pass (want pass); 232 generated, 113 distinct; depth 15; 1 s
+ok crash: pass (want pass); 14450 generated, 4322 distinct; depth 20; 4 s
+ok bulk: pass (want pass); 29032 generated, 10475 distinct; depth 23; 5 s
+ok twice: pass (want pass); 41761 generated, 16092 distinct; depth 29; 6 s
+ok lock: pass (want pass); 5837 generated, 2436 distinct; depth 19; 3 s
+ok ver: pass (want pass); 139457 generated, 46291 distinct; depth 22; 10 s
+ok ver2: pass (want pass); 2125 generated, 987 distinct; depth 19; 3 s
+ok lazy: pass (want pass); 76964 generated, 23780 distinct; depth 29; 5 s
+ok down: pass (want pass); 616188 generated, 176840 distinct; depth 23; 26 s
+ok r-moved: violated (want violated); 547 generated, 252 distinct; depth 12; 1 s
+ok r-back: violated (want violated); 228 generated, 111 distinct; depth 15; 2 s
+ok r-twice: violated (want violated); 1071 generated, 502 distinct; depth 18; 1 s
+ok r-hard: violated (want violated); 4928708 generated, 1233831 distinct; depth 19; 53 s
+ok s-strict: stall (want stall); 152135 generated, 33440 distinct; depth 20; 0 stuck of 13376,0 stuck of 13376,998 stuck of 6688; 11 s
+ok s-lazy: none (want none); 183663 generated, 40000 distinct; depth 20; 0 stuck of 16000,0 stuck of 16000,0 stuck of 8000; 12 s
+ok s-twice: none (want none); 16873 generated, 4200 distinct; depth 26; 0 stuck of 1680,0 stuck of 1680,0 stuck of 840; 4 s
+ok msg-core: pass (want pass); 158 generated, 92 distinct; depth 13; 1 s
+ok msg-early: pass (want pass); 636 generated, 356 distinct; depth 17; 2 s
+ok msg-crash: pass (want pass); 1922 generated, 804 distinct; depth 17; 2 s
+ok msg-rec: pass (want pass); 2429 generated, 1406 distinct; depth 21; 3 s
+ok msg-rec-early: pass (want pass); 14095 generated, 7624 distinct; depth 23; 5 s
+ok msg-rec-crash: pass (want pass); 5945 generated, 2812 distinct; depth 23; 2 s
+ok msg-rec-down: pass (want pass); 9406 generated, 4218 distinct; depth 23; 3 s
+ok msg-rec-twice: pass (want pass); 36174 generated, 18967 distinct; depth 30; 8 s
+ok msg-rec-lazy: pass (want pass); 41707 generated, 21030 distinct; depth 30; 12 s
+ok msg-rec-three: pass (want pass); 176690 generated, 83688 distinct; depth 36; 53 s
+ok msg-rec2: pass (want pass); 311951 generated, 150732 distinct; depth 32; 63 s
+ok msg-r-early: violated (want violated); 711 generated, 380 distinct; depth 17; 2 s
+ok msg-r-lostback: violated (want violated); 1738 generated, 919 distinct; depth 13; 2 s
+ok msg-r-reopen: violated (want violated); 725 generated, 377 distinct; depth 9; 2 s
+ok msg-r-oldreport: violated (want violated); 862 generated, 438 distinct; depth 9; 2 s
+ok msg-r-aftersrc: violated (want violated); 1803 generated, 966 distinct; depth 13; 3 s
+ok msg-r-afterdst: violated (want violated); 1273 generated, 647 distinct; depth 11; 3 s
+ok mem-src-core: pass (want pass); 3710 generated, 948 distinct; depth 17; 2 s
+ok mem-dst-core: pass (want pass); 2579 generated, 678 distinct; depth 15; 3 s
+ok mem-dst-grow: pass (want pass); 26921 generated, 6710 distinct; depth 19; 4 s
+ok mem-dst-shrink: pass (want pass); 26559 generated, 6391 distinct; depth 18; 5 s
+ok mem-src-fault: pass (want pass); 521731 generated, 134665 distinct; depth 22; 22 s
+ok mem-dst-fault: pass (want pass); 289297 generated, 75281 distinct; depth 20; 15 s
+ok mem-src-cfg: pass (want pass); 848721 generated, 153112 distinct; depth 25; 32 s
+ok mem-src-cfg2: pass (want pass); 833570 generated, 189684 distinct; depth 24; 32 s
+ok mem-src-r: violated (want violated); 2155 generated, 631 distinct; depth 9; 3 s
+ok mem-dst-r: violated (want violated); 21241 generated, 5567 distinct; depth 14; 4 s
+ok slot-move
+# ./run.sh decided (2 GB heap):
+ok d-core: pass (want pass); 410 generated, 151 distinct; depth 15; 2 s
+ok d-crash: pass (want pass); 21523 generated, 5742 distinct; depth 21; 4 s
+ok d-bulk: pass (want pass); 44734 generated, 13874 distinct; depth 23; 6 s
+ok d-twice: pass (want pass); 67306 generated, 22644 distinct; depth 29; 9 s
+ok d-lock: pass (want pass); 8437 generated, 3215 distinct; depth 19; 2 s
+ok d-ver: pass (want pass); 217713 generated, 63993 distinct; depth 22; 15 s
+ok d-ver2: pass (want pass); 4349 generated, 1427 distinct; depth 19; 3 s
+ok d-lazy: pass (want pass); 98921 generated, 27180 distinct; depth 29; 7 s
+ok d-down: pass (want pass); 875647 generated, 232025 distinct; depth 23; 35 s
+ok d-r-moved: violated (want violated); 610 generated, 241 distinct; depth 11; 2 s
+ok d-r-back: violated (want violated); 339 generated, 132 distinct; depth 13; 1 s
+ok d-r-twice: violated (want violated); 1618 generated, 620 distinct; depth 18; 2 s
+ok d-r-hard: violated (want violated); 5099837 generated, 1225683 distinct; depth 19; 63 s
+ok d-s-lazy: none (want none); 210099 generated, 44120 distinct; depth 20; 0 stuck of 17648,0 stuck of 17648,0 stuck of 8824; 14 s
+ok d-s-twice: none (want none); 18545 generated, 4460 distinct; depth 26; 0 stuck of 1784,0 stuck of 1784,0 stuck of 892; 4 s
+ok msg-d-core: pass (want pass); 233 generated, 114 distinct; depth 13; 1 s
+ok msg-d-early: pass (want pass); 826 generated, 414 distinct; depth 17; 2 s
+ok msg-d-crash: pass (want pass); 2600 generated, 988 distinct; depth 17; 3 s
+ok msg-d-rec: pass (want pass); 3673 generated, 1752 distinct; depth 21; 4 s
+ok msg-d-rec-early: pass (want pass); 20137 generated, 9382 distinct; depth 23; 8 s
+ok msg-d-rec-crash: pass (want pass); 9002 generated, 3504 distinct; depth 23; 5 s
+ok msg-d-rec-down: pass (want pass); 13510 generated, 5256 distinct; depth 23; 7 s
+ok msg-d-rec-twice: pass (want pass); 52258 generated, 23493 distinct; depth 30; 16 s
+ok msg-d-rec-three: pass (want pass); 226108 generated, 98118 distinct; depth 36; 67 s
+ok msg-d-rec2: pass (want pass); 407534 generated, 176659 distinct; depth 32; 75 s
+ok msg-d-r-early: violated (want violated); 874 generated, 394 distinct; depth 14; 3 s
+ok msg-d-r-lostback: violated (want violated); 2455 generated, 1129 distinct; depth 13; 3 s
+ok msg-d-r-reopen: violated (want violated); 844 generated, 405 distinct; depth 9; 2 s
+ok msg-d-r-oldreport: violated (want violated); 1233 generated, 567 distinct; depth 10; 3 s
+ok msg-d-r-aftersrc: violated (want violated); 2453 generated, 1128 distinct; depth 13; 3 s
+ok msg-d-r-afterdst: violated (want violated); 1371 generated, 620 distinct; depth 10; 3 s
+ok msg-d-r-twice: violated (want violated); 793 generated, 387 distinct; depth 14; 3 s
+ok mem-d-src-core: pass (want pass); 4074 generated, 1020 distinct; depth 16; 3 s
+ok mem-d-dst-core: pass (want pass); 3042 generated, 771 distinct; depth 15; 2 s
+ok mem-d-dst-grow: pass (want pass); 29570 generated, 7106 distinct; depth 19; 6 s
+ok mem-d-dst-shrink: pass (want pass); 31026 generated, 7190 distinct; depth 18; 6 s
+ok mem-d-src-fault: pass (want pass); 580921 generated, 146876 distinct; depth 21; 26 s
+ok mem-d-dst-fault: pass (want pass); 358226 generated, 90838 distinct; depth 21; 19 s
+ok mem-d-src-cfg: pass (want pass); 965936 generated, 173229 distinct; depth 23; 27 s
+ok mem-d-src-r: violated (want violated); 2230 generated, 643 distinct; depth 9; 1 s
+ok mem-d-dst-r: violated (want violated); 16048 generated, 4340 distinct; depth 12; 2 s
+ok mem-d-r-back: violated (want violated); 3293 generated, 877 distinct; depth 12; 2 s
+ok slot-move
+# ./run.sh big <name>, the decided big bounds, two at a time (a 3 GB or a 2 GB heap).
+# msg-d-deep-all passed the limit and was resumed from its checkpoint (./run.sh resume msg-d-deep-all):
+WRONG msg-d-deep-all: error (want pass); ; depth ; 3500 s
+(resumed) ok msg-d-deep-all: pass (want pass); 13829906 generated, 7876110 distinct; depth 38; 2807 s
+ok d-big-ver: pass (want pass); 51728245 generated, 11658335 distinct; depth 37; 3123 s
+ok mem-d-src-two: pass (want pass); 22340622 generated, 5590083 distinct; depth 26; 830 s
+ok d-big-all: pass (want pass); 8520213 generated, 2303315 distinct; depth 33; 590 s
+ok msg-d-big-early: pass (want pass); 3649753 generated, 1324172 distinct; depth 39; 809 s
+ok msg-d-big-rec: pass (want pass); 3662549 generated, 1258098 distinct; depth 40; 763 s
+ok msg-d-x-rec2-early: pass (want pass); 8429533 generated, 3622013 distinct; depth 36; 2390 s
+ok mem-d-x-src-add-term: pass (want pass); 50394875 generated, 7675708 distinct; depth 29; 1569 s
+ok mem-d-x-src-cfg2-fault: pass (want pass); 34899686 generated, 8632530 distinct; depth 28; 1203 s
+ok d-x-lazy-ver: pass (want pass); 5937263 generated, 1612700 distinct; depth 33; 424 s
+ok msg-d-x-rec2-down: pass (want pass); 3422814 generated, 1059954 distinct; depth 36; 537 s
+ok msg-d-x-s2n2: pass (want pass); 1327691 generated, 573870 distinct; depth 31; 331 s
+ok mem-d-x-src-n2: pass (want pass); 2239878 generated, 529117 distinct; depth 23; 111 s
+ok d-x-lock-ver: pass (want pass); 1201065 generated, 373314 distinct; depth 25; 149 s
+ok msg-d-x-lazy-down: pass (want pass); 459546 generated, 140958 distinct; depth 34; 80 s
+ok mem-d-x-dst-grow-fault: pass (want pass); 1677166 generated, 412730 distinct; depth 26; 64 s
+ok mem-d-x-src-pcrash: pass (want pass); 1206579 generated, 293752 distinct; depth 23; 53 s
+ok mem-d-x-dst-pcrash: pass (want pass); 756123 generated, 181676 distinct; depth 23; 32 s
+ok d-x-ver-copy: pass (want pass); 62711 generated, 21534 distinct; depth 29; 11 s
+ok mem-d-dst-two: pass (want pass); 10479072 generated, 2495799 distinct; depth 26; 395 s
+ok mem-d-r-two: violated (want violated); 7866989 generated, 2241381 distinct; depth 15; 148 s
+ok d-big-streams: pass (want pass); 4286476 generated, 1122650 distinct; depth 34; 593 s
+ok d-big-faults: pass (want pass); 4056658 generated, 903585 distinct; depth 25; 200 s
+ok msg-d-big-three: pass (want pass); 704730 generated, 296053 distinct; depth 40; 271 s
+ok d-big-three: pass (want pass); 1797197 generated, 448826 distinct; depth 34; 177 s
+ok d-big-lock: pass (want pass); 1293479 generated, 327645 distinct; depth 32; 65 s
+ok msg-d-big-all: pass (want pass); 413157 generated, 129444 distinct; depth 27; 44 s
+ok d-big-two: pass (want pass); 325026 generated, 91138 distinct; depth 33; 22 s
+# ./run.sh decided-mutants (2 GB heap): 61 planted mistakes, 52 caught; results/decided-mutants.md.
+# Finding 10, d06 on msg-d-rec-twice with 1 worker: NoBack is violated; 29,724 distinct states when it stopped; a trace of 21 states (results/finding10-trace.txt).

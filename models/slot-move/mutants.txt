@@ -1,12 +1,16 @@
 # Planted mistakes, one line each, on the marked lines of SlotMove.tla.
 # id ; rule (the mark on the line) ; old text ; new text ; what the mistake is
+# Since card 0002 the rule column names the ledger id where the line now has one,
+# then the line's old short name. The ids and the results they had stay as they were.
+# k01 and n03 sit on the guard on the committed log, now marked two-commit: it held
+# slot-table.1 as it was; the decided text of slot-table.1 is the guard on the log end.
 # Kinds (the study's DEV-10 d): drop a guard, flip < and <=, drop or weaken
 # an update, read the wrong place.
 #
 # m: the move's own entries and guards.
 m01 ; slot-move.3 ; THEN "fenced" ; THEN "open" ; the fence does not stop the source
 m02 ; slot-move.7 ; ELSE "open" ; ELSE IF L[k].t = "final" THEN "none" ELSE "open" ; the final copy's commit does not open the slot
-m03 ; slot-move.1 ; /\ Mode(g, log[g]) = "open" ; /\ TRUE ; the source takes a write after its fence is in its log
+m03 ; slot-table.1 slot-move.1 ; /\ Mode(g, log[g]) = "open" ; /\ TRUE ; the source takes a write after its fence is in its log
 m04 ; slot-move.2 ; /\ Mode(a, CL(a)) = "open" ; /\ TRUE ; the source fences a slot its committed log does not hold open
 m05 ; slot-move.1 once ; /\ Mode(a, L) = "open" ; /\ TRUE ; the source fences a slot whose fence is already in its log
 m06 ; slot-move.4 ; \E i \in 1..ci[a] ; \E i \in 1..Len(log[a]) ; the final copy is sent from a fence that has not committed
@@ -24,8 +28,8 @@ m17 ; slot-move.19 ; /\ Has(CL(d), "abort", L[k].v) ; /\ TRUE ; the source reope
 m18 ; slot-move.11 ; R == Vis(CL(a)) ; R == Vis(log[a]) ; the early copy takes records that have not committed
 m19 ; stream-numbers.11 ; ELSE L[BaseIx(L)].tab ; ELSE NoTab ; the target opens without the carried table
 m20 ; moved.fence ; THEN L[LastOf(L, Stops)].to ; THEN g ; a fenced source answers retry, not moved
-m21 ; moved.abort ; THEN T.src ; THEN g ; a target that gave up answers retry, not moved
-m22 ; fence.once ; ~Has(L, "fence", T.m) ; Cardinality({i \in DOMAIN L : L[i].t = "fence" /\ L[i].v = T.m}) < 2 ; the source fences one move a second time
+m21 ; slot-move.23 moved.abort ; THEN T.src ; THEN g ; a target that gave up answers retry, not moved
+m22 ; slot-move.24 fence.once ; ~Has(L, "fence", T.m) ; Cardinality({i \in DOMAIN L : L[i].t = "fence" /\ L[i].v = T.m}) < 2 ; the source fences one move a second time
 m23 ; slot-move.17 target ; /\ IsTo(T) /\ T.own = d ; /\ IsTo(T) ; the source, not the target, aborts a move
 #
 # c: the carried set, one part at a time.
@@ -43,13 +47,13 @@ t01 ; slot-table.4 committed ; \E k \in 0..ci["H"] ; \E k \in 0..Len(log["H"]) ;
 t02 ; slot-table.4 ; /\ IsTo(T) /\ T.own = d /\ T.src = a ; /\ T.own = d /\ T.src = a ; the source fences on a row that was written back
 t03 ; slot-table.5 ; /\ BackFirst => BackDone(L[k].v) ; /\ TRUE ; the source reopens before the row is written back
 t04 ; slot-table.6 ; L[CHOOSE i \in R : \A j \in R : RowLeq(L[j], L[i])] ; L[Max(R)] ; the table keeps the last row written, not the highest version
-t05 ; back.committed ; \E j \in 1..ci[d] ; \E j \in 1..Len(log[d]) ; the row is written back on an abort that has not committed
-t06 ; ended.back ; \/ ~IsTo(T) ; \/ ~IsTo(T) \/ Has(CL(T.own), "abort", T.m) ; a move counts as ended once its abort commits, row or no row
-t07 ; ended.open ; \/ Has(CL(T.own), "final", T.m) ; \/ Has(log[T.own], "final", T.m) ; a move counts as ended on a final copy that has not committed
+t05 ; slot-table.5 back.committed ; \E j \in 1..ci[d] ; \E j \in 1..Len(log[d]) ; the row is written back on an abort that has not committed
+t06 ; move-policy.7 ended.back ; \/ ~IsTo(T) ; \/ ~IsTo(T) \/ Has(CL(T.own), "abort", T.m) ; a move counts as ended once its abort commits, row or no row
+t07 ; move-policy.7 ended.open ; \/ Has(CL(T.own), "final", T.m) ; \/ Has(log[T.own], "final", T.m) ; a move counts as ended on a final copy that has not committed
 t08 ; move-policy.4 ; /\ Settled ; /\ TRUE ; the home group starts a second move while one is under way
 #
 # k: rules of other mechanisms that the move leans on.
-k01 ; slot-table.1 ; /\ Mode(g, CL(g)) = "open" ; /\ TRUE ; a leader takes writes for a slot its committed log does not hold open
+k01 ; two-commit ; /\ Mode(g, CL(g)) = "open" ; /\ TRUE ; a leader takes writes for a slot its committed log does not hold open
 k02 ; stream-numbers.4 ; n == T.hi[s] + 1 ; n == 1 ; a write at or below the high mark is taken again
 k03 ; fence-tokens.1 ; /\ Tok(s) = 0 \/ Tok(s) >= T.tok ; /\ TRUE ; a write under an old lock token is taken
 k04 ; slot-sequence.1 ; <<T.ep, T.seq + 1>> ; <<T.ep, T.seq>> ; a record is stamped with the last sequence, not the next
@@ -64,53 +68,53 @@ x03 ; copy.server ; /\ Mode(a, CL(a)) = "open" /\ Mode(d, L) # "open" ; /\ Mode(
 #
 # u: the second model, SlotMoveMsg.tla.
 # the rules a recovery needs
-u01 ; recover.shut ; THEN "shut" ; THEN "open" ; a recovered group goes on serving the slot from its cut log
+u01 ; slot-table.9 recover.shut ; THEN "shut" ; THEN "open" ; a recovered group goes on serving the slot from its cut log
 u02 ; meta-directory.2 ; inc' = [inc EXCEPT ![g] = @ + 1] ; inc' = inc ; a recovery does not raise the group's incarnation
 u03 ; row.inc write-src ; sinc |-> inc[T.own], ; sinc |-> 0, ; a move's row does not hold the source's incarnation
-u04 ; row.inc write-dst ; dinc |-> inc[d]]) ; dinc |-> 0]) ; a move's row does not hold the target's incarnation
+u04 ; slot-table.8 row.inc write-dst ; dinc |-> inc[d]]) ; dinc |-> 0]) ; a move's row does not hold the target's incarnation
 u05 ; row.inc source ; /\ T.sinc = inc[a] ; /\ TRUE ; a recovered source fences a move ordered for its old life
-u06 ; row.inc target ; /\ f.dinc = inc[d] ; /\ TRUE ; a recovered target takes a final copy ordered for its old life
+u06 ; slot-table.8 row.inc target ; /\ f.dinc = inc[d] ; /\ TRUE ; a recovered target takes a final copy ordered for its old life
 u07 ; row.inc copy ; /\ T.dinc = inc[d] ; /\ TRUE ; a recovered target copies early for a move ordered for its old life
 u08 ; ended.inc ; /\ inc[T.own] = T.dinc ; /\ TRUE ; a move counts as ended though its target has had a new life since
-u09 ; abort.lost ; lost |-> T.dinc # inc[d]]) ; lost |-> FALSE]) ; a recovered target does not say its old life's records may be lost
-u10 ; back.lost ; top == /\ f.lost ; top == /\ FALSE ; the row written back after a lost target is an ordinary one
-u11 ; back.lost last ; /\ LastInto(f.g) = f.m ; /\ TRUE ; a lost target's old move overrides a newer move into it
-u12 ; back.lost holder ; /\ (T.step # 2 \/ T.sinc # inc[f.g]) ; /\ TRUE ; a lost target's old move overrides its own recovery row
-u13 ; back.lost giver ; \/ IsTo(T) /\ T.src = f.g ; \/ FALSE ; a move out of the lost target hides that the slot went back
-u14 ; back.lost top ; IF top THEN TopM(home) + 1 ELSE f.m, ; f.m, ; the row written back after a lost target is not above the later rows
-u15 ; back.epoch ; IF top THEN TopEp(home) + 1 ELSE home[j].ep, ; home[j].ep, ; the row written back after a lost target keeps the old epoch
-u16 ; unf.epoch ; IF f.lost THEN home[CHOOSE i \in rows : TRUE].ep ; IF FALSE THEN 0 ; the source reopens in its old epoch after a lost target
-u17 ; unf.wait ; /\ f.lost => rows # {} ; /\ TRUE ; the source reopens after a lost target before the row is written back
-u18 ; recover.copy ; /\ Holds(g, L) ; /\ TRUE ; a recovered group asks for a slot its copy does not hold
-u19 ; recover.table ; /\ T.own = g ; /\ TRUE ; a recovered group gets a row for a slot the table gives to another group
-u20 ; recover.final ; /\ LastInto(g) = 0 \/ Has(L, "final", LastInto(g)) ; /\ TRUE ; a recovered group gets a row though its copy is older than the last move into it
+u09 ; slot-table.11 abort.lost ; lost |-> T.dinc # inc[d]]) ; lost |-> FALSE]) ; a recovered target does not say its old life's records may be lost
+u10 ; slot-table.11 back.lost ; top == /\ f.lost ; top == /\ FALSE ; the row written back after a lost target is an ordinary one
+u11 ; slot-table.11 back.lost last ; /\ LastInto(f.g) = f.m ; /\ TRUE ; a lost target's old move overrides a newer move into it
+u12 ; slot-table.11 back.lost holder ; /\ (T.step # 2 \/ T.sinc # inc[f.g]) ; /\ TRUE ; a lost target's old move overrides its own recovery row
+u13 ; slot-table.11 back.lost giver ; \/ IsTo(T) /\ T.src = f.g ; \/ FALSE ; a move out of the lost target hides that the slot went back
+u14 ; slot-table.11 back.lost top ; IF top THEN TopM(home) + 1 ELSE f.m, ; f.m, ; the row written back after a lost target is not above the later rows
+u15 ; slot-table.11 back.epoch ; IF top THEN TopEp(home) + 1 ELSE home[j].ep, ; home[j].ep, ; the row written back after a lost target keeps the old epoch
+u16 ; slot-table.11 unf.epoch ; IF f.lost THEN home[CHOOSE i \in rows : TRUE].ep ; IF FALSE THEN 0 ; the source reopens in its old epoch after a lost target
+u17 ; slot-table.11 unf.wait ; /\ f.lost => rows # {} ; /\ TRUE ; the source reopens after a lost target before the row is written back
+u18 ; slot-table.10 recover.copy ; /\ Holds(g, L) ; /\ TRUE ; a recovered group asks for a slot its copy does not hold
+u19 ; slot-table.10 recover.table ; /\ T.own = g ; /\ TRUE ; a recovered group gets a row for a slot the table gives to another group
+u20 ; slot-table.10 recover.final ; /\ LastInto(g) = 0 \/ Has(L, "final", LastInto(g)) ; /\ TRUE ; a recovered group gets a row though its copy is older than the last move into it
 u21 ; slot-table.7 ; ep |-> TopEp(home) + 1, ; ep |-> T.ep, ; a recovery writes the slot's row at the old epoch
-u22 ; recover.row ; /\ home[i].sinc = inc[g] ; /\ TRUE ; a group reopens on the recovery row of an older life
-u23 ; recover.epoch ; ep |-> home[i].ep]) ; ep |-> EpOf(g, L)]) ; a recovered group reopens in its old epoch
-u24 ; fence.newer ; \A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v < T.m ; ~Has(L, "fence", T.m) ; the source fences a move older than one it already acted on
-u25 ; final.shut ; /\ Mode(d, L) # "open" ; /\ TRUE ; a group that holds the slot open takes a final copy
-u26 ; final.newer ; => L[i].v < f.m ; => TRUE ; a group takes the final copy of a move older than one it already acted on
+u22 ; slot-table.9 recover.row ; /\ home[i].sinc = inc[g] ; /\ TRUE ; a group reopens on the recovery row of an older life
+u23 ; slot-table.9 recover.epoch ; ep |-> home[i].ep]) ; ep |-> EpOf(g, L)]) ; a recovered group reopens in its old epoch
+u24 ; slot-move.24 fence.newer ; \A i \in DOMAIN L : L[i].t \in MoveEntries => L[i].v < T.m ; ~Has(L, "fence", T.m) ; the source fences a move older than one it already acted on
+u25 ; slot-move.24 final.shut ; /\ Mode(d, L) # "open" ; /\ TRUE ; a group that holds the slot open takes a final copy
+u26 ; slot-move.24 final.newer ; => L[i].v < f.m ; => TRUE ; a group takes the final copy of a move older than one it already acted on
 # the early carried set, the delta and the merge
 u27 ; slot-move.14 ; /\ f.end ; /\ TRUE ; the target takes an early copy for the final copy
-u28 ; delta.base ; (h > 0 /\ L[h].p = f.base - 1) ; h > 0 ; the target merges a delta onto a copy that stands at another place
-u29 ; delta.base source ; ELSE e.base - 1 ; ELSE 0 ; the source cuts the delta at the wrong place
+u28 ; slot-move.13 delta.base ; (h > 0 /\ L[h].p = f.base - 1) ; h > 0 ; the target merges a delta onto a copy that stands at another place
+u29 ; slot-move.13 delta.base source ; ELSE e.base - 1 ; ELSE 0 ; the source cuts the delta at the wrong place
 u30 ; slot-move.5 ; SubSeq(R, p + 1, Len(R)) ; SubSeq(R, p + 2, Len(R)) ; the delta starts one record late
-u31 ; delta.marks ; IF T1.hi[s] # T0.hi[s] THEN T1.hi[s] ELSE 0 ; 0 ; the delta leaves out the high marks that changed
-u32 ; delta.answers ; T1.ans \ T0.ans, ; {}, ; the delta leaves out the new kept answers
-u33 ; delta.rest ; T1.rest /\ ~T0.rest ; FALSE ; a full final copy leaves out the parts that are only bytes here
+u31 ; slot-move.13 delta.marks ; IF T1.hi[s] # T0.hi[s] THEN T1.hi[s] ELSE 0 ; 0 ; the delta leaves out the high marks that changed
+u32 ; slot-move.13 delta.answers ; T1.ans \ T0.ans, ; {}, ; the delta leaves out the new kept answers
+u33 ; slot-move.13 delta.rest ; T1.rest /\ ~T0.rest ; FALSE ; a full final copy leaves out the parts that are only bytes here
 u34 ; slot-sequence.2 seq ; T1.seq, ; T0.seq, ; the delta carries the sequence of the early copy's place
 u35 ; slot-sequence.2 epoch ; T1.ep, ; 0, ; the delta does not carry the epoch
-u36 ; merge.seq ; D.seq, ; C.seq, ; the merge keeps the early copy's sequence
-u37 ; merge.epoch ; D.ep, ; C.ep, ; the merge keeps the early copy's epoch
-u38 ; merge.marks ; Max({C.hi[s], D.hi[s]}) ; D.hi[s] ; the merge drops the early copy's high marks
-u39 ; merge.answers ; C.ans \cup D.ans, ; D.ans, ; the merge drops the early copy's kept answers
-u40 ; merge.rest ; C.rest \/ D.rest ; D.rest ; the merge drops the early copy's byte parts
+u36 ; slot-move.13 merge.seq ; D.seq, ; C.seq, ; the merge keeps the early copy's sequence
+u37 ; slot-move.13 merge.epoch ; D.ep, ; C.ep, ; the merge keeps the early copy's epoch
+u38 ; slot-move.13 merge.marks ; Max({C.hi[s], D.hi[s]}) ; D.hi[s] ; the merge drops the early copy's high marks
+u39 ; slot-move.13 merge.answers ; C.ans \cup D.ans, ; D.ans, ; the merge drops the early copy's kept answers
+u40 ; slot-move.13 merge.rest ; C.rest \/ D.rest ; D.rest ; the merge drops the early copy's byte parts
 u41 ; slot-move.13 early ; tab |-> Tab(a, At)]) ; tab |-> NoTab]) ; the early copy does not hold the carried set
 u42 ; slot-move.12 report ; p |-> e.p] ; p |-> 0] ; the ready report names the wrong place
 u43 ; copy.forward ; ELSE p > L[HeldIx(L, T.m)].p ; ELSE TRUE ; a later early copy may stand before an earlier one
 # the move's own guards, again in this world
 u44 ; slot-move.3 ; THEN "fenced" ; THEN "open" ; the fence does not stop the source
-u45 ; slot-move.1 ; /\ Mode(g, log[g]) = "open" ; /\ TRUE ; the source takes a write after its fence is in its log
+u45 ; slot-table.1 slot-move.1 ; /\ Mode(g, log[g]) = "open" ; /\ TRUE ; the source takes a write after its fence is in its log
 u46 ; slot-move.18 ; /\ ~Has(L, "abort", f.m) ; /\ TRUE ; the target takes a final copy after its abort
 u47 ; slot-move.8 ; /\ ~Has(L, "final", f.m) ; /\ TRUE ; the target takes the final copy twice
 u48 ; slot-move.17 ; /\ ~Has(log[d], "final", T.m) ; /\ TRUE ; the target aborts a move whose final copy is in its log
@@ -118,7 +122,7 @@ u49 ; slot-move.19 ; /\ f.m = L[k].v /\ f.g = L[k].to ; /\ f.g = L[k].to ; the s
 u50 ; slot-table.4 ; /\ IsTo(T) /\ T.own = d /\ T.src = a ; /\ T.own = d /\ T.src = a ; the source fences on a row that was written back
 u51 ; slot-table.6 ; Hm[CHOOSE i \in DOMAIN Hm : \A j \in DOMAIN Hm : RowLeq(Hm[j], Hm[i])] ; Hm[Len(Hm)] ; the table keeps the last row written, not the highest version
 u52 ; move-policy.4 ; /\ Settled ; /\ TRUE ; the home group starts a second move while one is under way
-u53 ; ended.open ; /\ \E f \in Said("final") : f.m = T.m ; /\ TRUE ; a move counts as ended with no final copy
+u53 ; move-policy.7 ended.open ; /\ \E f \in Said("final") : f.m = T.m ; /\ TRUE ; a move counts as ended with no final copy
 u54 ; stream-numbers.11 ; ELSE L[BaseIx(L)].tab ; ELSE NoTab ; the target opens without the carried table
 u55 ; stream-numbers.4 ; n == T.hi[s] + 1 ; n == 1 ; a write at or below the high mark is taken again
 u56 ; slot-sequence.1 ; <<T.ep, T.seq + 1>> ; <<T.ep, T.seq>> ; a record is stamped with the last sequence, not the next
@@ -126,10 +130,10 @@ u56 ; slot-sequence.1 ; <<T.ep, T.seq + 1>> ; <<T.ep, T.seq>> ; a record is stam
 # n: the third model, SlotMoveMembers.tla.
 # the move's guards, as a leader reads them
 n01 ; slot-move.3 ; THEN "fenced" ; THEN "open" ; the fence does not stop the source
-n02 ; slot-move.1 ; /\ Mode(g, End(g, a)) = "open" ; /\ TRUE ; a leader takes a write after the fence is in its own log
-n03 ; slot-table.1 ; /\ Mode(g, Com(g, a)) = "open" ; /\ TRUE ; a leader takes a write for a slot the log it knows committed does not hold open
+n02 ; slot-table.1 slot-move.1 ; /\ Mode(g, End(g, a)) = "open" ; /\ TRUE ; a leader takes a write after the fence is in its own log
+n03 ; two-commit ; /\ Mode(g, Com(g, a)) = "open" ; /\ TRUE ; a leader takes a write for a slot the log it knows committed does not hold open
 n04 ; slot-move.2 ; /\ Mode("A", Com("A", a)) = "open" ; /\ TRUE ; a leader fences a slot the log it knows committed does not hold open
-n05 ; fence.once ; /\ ~HasT(End("A", a), "fence") ; /\ Cardinality(Idx(End("A", a), {"fence"})) < 2 ; a leader fences the move a second time
+n05 ; slot-move.24 fence.once ; /\ ~HasT(End("A", a), "fence") ; /\ Cardinality(Idx(End("A", a), {"fence"})) < 2 ; a leader fences the move a second time
 n06 ; slot-move.4 ; LET C == Com("A", t) IN ; LET C == End("A", t) IN ; the final copy is sent from a fence some member holds but no one knows committed
 n07 ; slot-move.18 ; /\ ~HasT(L, "abort") ; /\ TRUE ; a leader takes a final copy after an abort is in its log
 n08 ; slot-move.8 ; /\ ~HasT(L, "final") ; /\ TRUE ; a leader takes the final copy twice

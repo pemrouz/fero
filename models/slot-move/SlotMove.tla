@@ -41,7 +41,14 @@
    Lines marked  \* @rule <id>   hold a rule of the ledger (or a named line).
    Lines marked  \* @keeps <id>  hold a rule from another mechanism that the
    move leans on.  Lines marked  \* @world <name>  are assumptions of the
-   world.  mutants.txt plants one-line mistakes on them. *)
+   world.  mutants.txt plants one-line mistakes on them.  A mark that names
+   a ledger id and then a short word (slot-move.24 fence.once) is the line
+   of that record that the word names.
+
+   The decided form (the owner's answers to card 0002): the bounds named
+   d-* set OneCommit = TRUE and BackFirst = FALSE.  The window then holds
+   one commit, and the source reopens after a give-up without waiting for
+   the row.  The other bounds keep the form they were made with. *)
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS S,          \* the streams: a subset of {"x", "y"}
@@ -56,6 +63,16 @@ CONSTANTS S,          \* the streams: a subset of {"x", "y"}
           GrowB,      \* does B start one voter short?
           BackFirst,  \* must the row be written back before the source reopens?
           Strict      \* route mode: a writer sends only where its route says
+
+(* A switch with a default.  A .cfg may set it (OneCommit = TRUE); TLC then
+   uses that value in place of this definition.  Bounds that do not set it
+   keep the form they were made with.
+     FALSE: the window holds two commits.  A group takes a write only for a
+            slot its committed log holds open (slot-table.1 as it was).
+     TRUE:  the decided form.  The guard reads the log end alone: the target
+            takes writes behind its final copy at once, and the source
+            behind its reopen (slot-table.1, slot-move.7, slot-move.20). *)
+OneCommit == FALSE
 
 VARIABLES log,     \* log[g]: the leader's log of group g, tail included
           ci,      \* ci[g]: how much of log[g] is committed
@@ -161,8 +178,8 @@ IsTo(r) == r.m > 0 /\ r.step = 0
    know it: the row was written back, or the target's final copy committed. *)
 Settled ==
     LET T == Table(log["H"]) IN
-    \/ ~IsTo(T)                                                 \* @rule ended.back
-    \/ Has(CL(T.own), "final", T.m)                             \* @rule ended.open
+    \/ ~IsTo(T)                                                 \* @rule move-policy.7 ended.back
+    \/ Has(CL(T.own), "final", T.m)                             \* @rule move-policy.7 ended.open
 
 Init == /\ log = [g \in G |-> <<>>] /\ ci = [g \in G |-> 0]
         /\ alt = [g \in G |-> <<>>] /\ up = [g \in G |-> TRUE]
@@ -178,8 +195,8 @@ Rec(o) == log[o[1]][o[2]]
 Take(g, s) ==
     /\ up[g]
     /\ Strict => g = route
-    /\ Mode(g, CL(g)) = "open"                                  \* @rule slot-table.1
-    /\ Mode(g, log[g]) = "open"                                 \* @rule slot-move.1
+    /\ Mode(g, CL(g)) = "open" \/ OneCommit                     \* @rule two-commit
+    /\ Mode(g, log[g]) = "open"                                 \* @rule slot-table.1 slot-move.1
     /\ LET L == log[g]
            T == Tab(g, L)
            n == T.hi[s] + 1                                     \* @keeps stream-numbers.4
@@ -238,7 +255,7 @@ Fence(a) ==
     /\ \E k \in 0..ci["H"] :                                   \* @rule slot-table.4 committed
          LET T == Table(SubSeq(log["H"], 1, k)) IN   \* the table, maybe read stale
          /\ IsTo(T) /\ T.own = d /\ T.src = a                   \* @rule slot-table.4
-         /\ ~Has(L, "fence", T.m)                               \* @rule fence.once
+         /\ ~Has(L, "fence", T.m)                               \* @rule slot-move.24 fence.once
          /\ Put(a, [t |-> "fence", v |-> T.m, to |-> d])
     /\ UNCHANGED <<ci, alt, up, route, crashes, downs>>
 
@@ -278,13 +295,13 @@ Abort(d) ==
 (* After its abort has committed, the target writes the row back. *)
 Back(d) ==
     /\ up["H"] /\ up[d]
-    /\ \E j \in 1..ci[d] :                                      \* @rule back.committed
+    /\ \E j \in 1..ci[d] :                                      \* @rule slot-table.5 back.committed
          /\ log[d][j].t = "abort"
          /\ ~ \E i \in DOMAIN log["H"] :
                 log["H"][i].t = "row" /\ log["H"][i].m = log[d][j].v /\ log["H"][i].step = 1
          /\ Put("H", [t |-> "row", m |-> log[d][j].v,
                       step |-> 1,
-                      own |-> log[d][j].src, src |-> d])
+                      own |-> log[d][j].src, src |-> d])        \* @rule slot-table.5 back.src
     /\ UNCHANGED <<ci, alt, up, route, crashes, downs>>
 
 BackDone(v) == \E i \in 1..ci["H"] :
@@ -357,7 +374,7 @@ Where(g) ==
     IN
     IF Mode(g, L) = "fenced" THEN L[LastOf(L, Stops)].to        \* @rule moved.fence
     ELSE IF T.own # g THEN T.own                                \* @keeps home-records.2
-    ELSE IF IsTo(T) /\ Has(L, "abort", T.m) THEN T.src          \* @rule moved.abort
+    ELSE IF IsTo(T) /\ Has(L, "abort", T.m) THEN T.src          \* @rule slot-move.23 moved.abort
     ELSE g                                       \* the answer is retry: slot-move.9
 
 Ask(g) ==

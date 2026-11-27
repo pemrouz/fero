@@ -20,6 +20,14 @@
 #   ./run.sh resume NAME  go on with a big bound from its last checkpoint
 #   ./run.sh mutants      plant every mistake of mutants.txt
 #   ./run.sh extra        plant every mistake of extra-mutants.txt
+#   ./run.sh decided      the decided form's small bounds, reach and stall checks
+#   ./run.sh decided big  also the decided form's big bounds
+#   ./run.sh decided-mutants  plant every mistake of decided-mutants.txt
+#
+# The decided form is the move as the owner decided it on card 0002: one
+# commit in the window (OneCommit = TRUE) and the source's reopen not waiting
+# for the row (BackFirst = FALSE).  Its bounds are named d-*, msg-d-* and
+# mem-d-*; each is an older bound's world with those two switches set.
 #
 # A safety bound must end "pass".  A reach bound must end "violated": its
 # check says "the goal is never reached", so a failure shows the goal is.
@@ -49,6 +57,9 @@ fi
 if [ "${1:-}" = "extra" ]; then
   shift; exec python3 "$HERE/extra.py" "$@"
 fi
+if [ "${1:-}" = "decided-mutants" ]; then
+  shift; exec python3 "$HERE/decided.py" "$@"
+fi
 
 SMALL="core:pass crash:pass bulk:pass twice:pass lock:pass ver:pass ver2:pass lazy:pass down:pass
 r-moved:violated r-back:violated r-twice:violated r-hard:violated
@@ -69,16 +80,41 @@ MORE="x-ver-copy:pass x-lock-ver:pass x-lazy-ver:pass
 msg-x-lazy-down:pass msg-x-rec2-early:pass msg-x-rec2-down:pass msg-x-s2n2:pass msg-r-twice:violated
 mem-x-src-pcrash:pass mem-x-dst-pcrash:pass mem-x-dst-grow-fault:pass mem-x-src-n2:pass
 mem-x-src-cfg2-fault:pass mem-x-src-add-term:pass mem-r-back:violated"
+# The decided form (card 0002).  The same worlds as the bounds above, with
+# OneCommit = TRUE and BackFirst = FALSE.  Left out because they would repeat
+# a world: big-lazy (it is d-big-all), msg-rec-lazy (msg-d-rec-twice), s-strict
+# (d-s-lazy), mem-src-cfg2 (it has no writes, so the switch changes nothing).
+# The stall checks must find no stall: no slot waits for the home group.
+DSMALL="d-core:pass d-crash:pass d-bulk:pass d-twice:pass d-lock:pass d-ver:pass d-ver2:pass d-lazy:pass d-down:pass
+d-r-moved:violated d-r-back:violated d-r-twice:violated d-r-hard:violated
+d-s-lazy:none d-s-twice:none
+msg-d-core:pass msg-d-early:pass msg-d-crash:pass msg-d-rec:pass msg-d-rec-early:pass msg-d-rec-crash:pass
+msg-d-rec-down:pass msg-d-rec-twice:pass msg-d-rec-three:pass msg-d-rec2:pass
+msg-d-r-early:violated msg-d-r-lostback:violated msg-d-r-reopen:violated msg-d-r-oldreport:violated
+msg-d-r-aftersrc:violated msg-d-r-afterdst:violated msg-d-r-twice:violated
+mem-d-src-core:pass mem-d-dst-core:pass mem-d-dst-grow:pass mem-d-dst-shrink:pass mem-d-src-fault:pass
+mem-d-dst-fault:pass mem-d-src-cfg:pass mem-d-src-r:violated mem-d-dst-r:violated mem-d-r-back:violated"
+DBIG="d-big-all:pass d-big-faults:pass d-big-two:pass d-big-lock:pass d-big-ver:pass d-big-streams:pass
+d-big-three:pass d-x-ver-copy:pass d-x-lock-ver:pass d-x-lazy-ver:pass
+msg-d-big-rec:pass msg-d-big-three:pass msg-d-big-early:pass msg-d-big-all:pass msg-d-deep-all:pass
+msg-d-x-lazy-down:pass msg-d-x-s2n2:pass msg-d-x-rec2-down:pass msg-d-x-rec2-early:pass
+mem-d-src-two:pass mem-d-dst-two:pass mem-d-r-two:violated
+mem-d-x-src-pcrash:pass mem-d-x-dst-pcrash:pass mem-d-x-dst-grow-fault:pass mem-d-x-src-n2:pass
+mem-d-x-src-cfg2-fault:pass mem-d-x-src-add-term:pass"
 # Not run by default: bounds that did not finish in an hour here.  Name one
 # after "big" to try it:  ./run.sh big deep-faults
 DEEP="deep-faults:pass mem-deep-four:pass mem-x-src-add-fault:pass"
 LIST=$SMALL
 RECOVER=""
-if [ "${1:-}" = "big" ]; then LIST="$SMALL $BIG $MORE"; shift; fi
-if [ "${1:-}" = "resume" ]; then LIST="$SMALL $BIG $MORE"; RECOVER=yes; shift; fi
+if [ "${1:-}" = "decided" ]; then
+  LIST=$DSMALL; shift
+  if [ "${1:-}" = "big" ]; then LIST="$DSMALL $DBIG"; shift; fi
+fi
+if [ "${1:-}" = "big" ]; then LIST="$SMALL $BIG $MORE $DSMALL $DBIG"; shift; fi
+if [ "${1:-}" = "resume" ]; then LIST="$SMALL $BIG $MORE $DSMALL $DBIG"; RECOVER=yes; shift; fi
 if [ $# -gt 0 ]; then
   PICK=""
-  for item in $LIST $DEEP; do
+  for item in $SMALL $BIG $MORE $DEEP $DSMALL $DBIG; do
     cfg=${item%%:*}
     for name in "$@"; do [ "$name" = "$cfg" ] && PICK="$PICK $item"; done
   done
@@ -97,7 +133,7 @@ for item in $LIST; do
   dir="$WORK/$cfg"
   t0=$(date +%s)
   case $cfg in
-  s-*)
+  s-*|d-s-*)
     rm -rf "$dir"; mkdir -p "$dir"
     (cd "$HERE" && limited ${HEAVY:-} java -Xmx"$HEAP" -XX:+UseParallelGC \
         -cp "$TLA_JAR" tlc2.TLC -noGenerateSpecTE -workers 1 -metadir "$dir/meta" \
@@ -112,7 +148,7 @@ for item in $LIST; do
     ;;
   *)
     more=""
-    case $cfg in big-*|deep-*|x-*|msg-big-*|msg-deep-*|msg-x-*|mem-*-two|mem-deep-*|mem-x-*) more="-checkpoint $CKPT";; esac
+    case $cfg in big-*|deep-*|x-*|msg-big-*|msg-deep-*|msg-x-*|mem-*-two|mem-deep-*|mem-x-*|d-big-*|d-x-*|msg-d-big-*|msg-d-deep-*|msg-d-x-*|mem-d-x-*) more="-checkpoint $CKPT";; esac
     module=SlotMove
     case $cfg in msg-*) module=SlotMoveMsg;; mem-*) module=SlotMoveMembers;; esac
     ck=""

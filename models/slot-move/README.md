@@ -34,12 +34,14 @@ Three models answer it, each with a part of that world (see "The models"). The d
 - **Finding 4.** The source must never fence the same move twice. The ledger has no such rule. Without it, a late report after the slot has moved there and back fences the slot for good *(checked)*.
 - **Finding 5.** As the rules are written, the window holds two commits, the fence's and the final copy's, where the record's 10 ms bar rests on one. The model shows one way to one commit that keeps every property *(checked)*.
 - **Finding 6.** One rule is not enough for an unclean recovery. The ledger has `slot-table.7` alone. The second model needs nine rules, R1 to R7, R9 and R10 in its section; with any one of them gone a property fails in 2 to 24 steps *(checked)*.
-- **Finding 7.** Finding 4's rule has a strong form and a twin: a group never fences, and never takes a final copy, for a move older than the newest row its log names (R9). That twin also covers `slot-move.8` *(checked)*.
+- **Finding 7.** Finding 4's rule has a strong form and a twin: a group never fences, and never takes a final copy, for a move older than the newest row its log names (R9). That twin also covers `slot-move.8` *(checked)*. Finding 10, in the decided form, shows the fence half must bar the newest move too.
 - **Finding 8.** The carried set sent early needs a base: the fence names the place the delta starts from, and the target opens only if its early copy stands at that place. Without the check a record is applied twice in 12 steps *(checked)*.
 - **Finding 9.** `slot-move.22` must count the voters of the newest configuration in the leader's log, committed or not. Counted in the committed one, a slot opens in a group of two voters in 10 steps *(checked, third model)*.
 - Planted mistakes: 108 of 131 caught (82 %) over the three models, against a bar of 85 %. By model: the first 42 of 46 (91 %), the second 48 of 56 (86 %), the third 18 of 29 (62 %). The first and the second model reach the bar. The third does not, and the three together are just under it. Every mistake that is not caught is explained in "Planted mistakes": most change nothing these worlds can see, and three need a deeper Raft model than the third one's short form.
 
 - **A second reading** ran every counted bound again (the same results and state counts), added 15 bounds that put faults side by side that had not met, all passing, and planted 24 more mistakes on lines the first list does not have, 22 caught. It found no failing property. It found rule lines of the second model that carry no mark, and it narrows three of the claims below. See "A second reading".
+
+- **After card 0002** the owner took the proposals, and the move now runs in the decided form: one commit in the window, and the source's reopen first. All 70 of its bounds end as they should: 53 safety bounds pass, the largest of 11,658,335 states; 15 reach goals are reached; and the 2 stall checks find no stuck state, with the home group down too *(checked)*. Of 53 mistakes planted on the lines of the new and changed records, 49 are caught (92 %) *(measured)*. **Finding 10:** `slot-move.24` as worded bars only a move older than the newest its log names; planted that way, a source fences its newest move again and `NoBack` fails in 21 steps. See "After card 0002: the decided form".
 
 The findings and the changes they ask of the ledger are in "Findings", in the sections of the second and third model, and in "Proposals for the ledger". Nothing in the ledger was changed by this study.
 
@@ -596,7 +598,9 @@ So eight lines of the second model are spare beside the others at these bounds. 
 
 ## Proposals for the ledger
 
-None of these is applied. Each needs the spec's own gate.
+**The owner took every proposal below, in its recommended form (card 0002; decisions V5-33 to V5-39).** See "After card 0002: the decided form".
+
+As first written, none of these was applied: each needed the spec's own gate. The table is kept as it was proposed.
 
 | # | Record | Old text | New text | Why | Evidence |
 |---|---|---|---|---|---|
@@ -699,6 +703,279 @@ Three changes were dropped before they were counted, because they made the state
 - **The reading of `slot-table.4` is the model's choice.** The ledger's words allow the row inside the window, and the record's own answer to the home group going down (a target that never wrote the row gives up alone, `slot-move.21`) belongs to that reading. The models run only the other one, the row before the fence. The reading inside the window is reasoned about in Finding 3 and never run.
 - **Mistakes are hand-listed, on marked lines.** The record's counting rule asks for mistakes made mechanically from the model text. The extra list above is a cross-check from the other side: lines nobody had marked.
 
+## After card 0002: the decided form
+
+The owner answered card 0002 with the recommended option on all nine questions (decisions V5-33 to V5-39). For the move that settles three choices the models had left open, and it makes the rules the second model needed into ledger records. This section runs the move in that form: a switch, new bounds, planted mistakes and marks. At the switch's default every model runs as it did.
+
+### What was decided
+
+- **The row comes before the fence** (`slot-table.4`). The models already do this.
+- **After a give-up the source reopens first** (`slot-table.5`). It waits for the target's committed abort, not for the row; the row goes back when the home group answers. A give-up marked lost is the one exception: then the source waits for its row, which holds the new epoch (`slot-table.11`). This is `BackFirst = FALSE`, the form the earlier bounds called "the reopen does not wait for the row".
+- **One commit in the window** (`slot-table.1`, `slot-move.7`). A group takes a write for a slot its log holds open, committed or not. So the target takes writes behind its final copy at once, and the source behind its reopen. This was planted mistake `k01` in the first model, `f15` in the second and `n03` in the third; it is now `OneCommit = TRUE`.
+- **Every rule the second model holds stays**, and now has a record:
+
+| Rule here | Ledger record |
+|---|---|
+| R1, the target's half (`row.inc`), and the fence that names the target (`f11`, `f12`) | `slot-table.8` |
+| R2, R4 (`recover.shut`, `recover.row`, `recover.epoch`) | `slot-table.9`, beside `slot-table.7` |
+| R3 (`recover.table`, `recover.final`, `recover.copy`) | `slot-table.10` |
+| R5 to R7 (`abort.lost`, `back.lost`, `back.epoch`, `unf.wait`, `unf.epoch`) | `slot-table.11` |
+| R9, R10 and Finding 4 (`fence.newer`, `final.newer`, `final.shut`, `fence.once`) | `slot-move.24` |
+| Finding 1, when a move has ended (`ended.back`, `ended.open`) | `move-policy.7` |
+| what a target that gave up answers (`moved.abort`) | `slot-move.23`, in place of the retired slot-move.21 |
+| Finding 8, the base of the delta (`delta.base`) | `slot-move.13` |
+
+### The switch
+
+`OneCommit` is a definition with a default, `FALSE`, in each of the three models. A `.cfg` may set it (`OneCommit = TRUE`), and TLC then uses that value in place of the definition. So an older `.cfg` runs as it did, and no older `.cfg` was changed. The guard now reads:
+
+```
+    /\ Mode(g, CL(g)) = "open" \/ OneCommit                     \* @rule two-commit
+    /\ Mode(g, log[g]) = "open"                                 \* @rule slot-table.1 slot-move.1
+```
+
+A bound of the decided form sets `OneCommit = TRUE` and `BackFirst = FALSE`; the third model has no slot table, so only the first. Each is an older bound's world with only those two switches changed, and it takes that bound's name after `d-` (first model), `msg-d-` or `mem-d-`. Four older bounds have no twin, because the twin would repeat a world: `big-lazy` (it is `d-big-all`), `msg-rec-lazy` (`msg-d-rec-twice`), `s-strict` (`d-s-lazy`), and `mem-src-cfg2`, which has no writes, so the switch changes nothing in it. The three bounds that did not finish have no twin either.
+
+**The older bounds keep their counts.** After the switch and the new marks went in, `./run.sh` ended `ok slot-move`: all 28 safety bounds and the 3 stall checks have the same distinct states and the same depth as in the tables above, and the 12 reach goals are reached again *(measured)*. So the switch's default and the marks change no state.
+
+**A cross-check.** `d-lazy` has 27,180 distinct states, the count `k01` had on `lazy` in its own run ([results/k01-runs.txt](results/k01-runs.txt)): `lazy` already had `BackFirst = FALSE`, so `d-lazy` is `lazy` with `k01` *(measured)*.
+
+The stall check's answers (`Where`, `Ask`) are as they were: a group answers `moved` while its committed log does not hold the slot open. So in the decided form a group whose log end holds the slot open, not yet committed, may answer `moved` where the real group would take the write. That adds a step and takes none away, and from such a state the real group's own path, take the write and commit, is always there too; so the extra step is never the only way out *(reasoned)*.
+
+### Bounds and results
+
+Same box and tools, with another model job beside these runs the whole time: TLC2 2026.11.19 on Java 21, 2 workers, `-fp 31`, a 2 GB heap for the small bounds and a 2 or 3 GB heap for the big ones. Every run is complete *(checked; states and times measured)*. "The world of" names the older bound whose world it is; its row in the tables above says what that world has. The last column is the older bound's distinct states, where it was counted. Times are wall-clock on a busy box, so read them as rough. A run marked "resumed" passed the hour's limit (3,500 s here), and went on from its last checkpoint; its time is the two parts together.
+
+**The first model, small bounds and reach checks.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `d-core` | `core` | pass | 151 | 15 | 2 s | 113 |
+| `d-crash` | `crash` | pass | 5,742 | 21 | 4 s | 4,322 |
+| `d-bulk` | `bulk` | pass | 13,874 | 23 | 6 s | 10,475 |
+| `d-twice` | `twice` | pass | 22,644 | 29 | 9 s | 16,092 |
+| `d-lock` | `lock` | pass | 3,215 | 19 | 2 s | 2,436 |
+| `d-ver` | `ver` | pass | 63,993 | 22 | 15 s | 46,291 |
+| `d-ver2` | `ver2` | pass | 1,427 | 19 | 3 s | 987 |
+| `d-lazy` | `lazy` | pass | 27,180 | 29 | 7 s | 23,780 |
+| `d-down` | `down` | pass | 232,025 | 23 | 35 s | 176,840 |
+| `d-r-moved` | `r-moved` | goal reached | 241 | 11 | 2 s | reached |
+| `d-r-back` | `r-back` | goal reached | 132 | 13 | 1 s | reached |
+| `d-r-twice` | `r-twice` | goal reached | 620 | 18 | 2 s | reached |
+| `d-r-hard` | `r-hard` | goal reached | 1,225,683 | 19 | 63 s | reached |
+
+**The first model, big bounds.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `d-big-two` | `big-two` | pass | 91,138 | 33 | 22 s | 66,703 |
+| `d-big-lock` | `big-lock` | pass | 327,645 | 32 | 65 s | 233,670 |
+| `d-big-three` | `big-three` | pass | 448,826 | 34 | 177 s | 323,359 |
+| `d-big-faults` | `big-faults` | pass | 903,585 | 25 | 200 s | 710,725 |
+| `d-big-streams` | `big-streams` | pass | 1,122,650 | 34 | 593 s | 758,790 |
+| `d-big-all` | `big-all` | pass | 2,303,315 | 33 | 590 s | 1,658,720 |
+| `d-big-ver` | `big-ver` | pass | 11,658,335 | 37 | 3123 s | 8,001,160 |
+| `d-x-ver-copy` | `x-ver-copy` | pass | 21,534 | 29 | 11 s | 15,332 |
+| `d-x-lock-ver` | `x-lock-ver` | pass | 373,314 | 25 | 149 s | 274,352 |
+| `d-x-lazy-ver` | `x-lazy-ver` | pass | 1,612,700 | 33 | 424 s | 1,498,675 |
+
+**The second model, small bounds and reach checks.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `msg-d-core` | `msg-core` | pass | 114 | 13 | 1 s | 92 |
+| `msg-d-early` | `msg-early` | pass | 414 | 17 | 2 s | 356 |
+| `msg-d-crash` | `msg-crash` | pass | 988 | 17 | 3 s | 804 |
+| `msg-d-rec` | `msg-rec` | pass | 1,752 | 21 | 4 s | 1,406 |
+| `msg-d-rec-early` | `msg-rec-early` | pass | 9,382 | 23 | 8 s | 7,624 |
+| `msg-d-rec-crash` | `msg-rec-crash` | pass | 3,504 | 23 | 5 s | 2,812 |
+| `msg-d-rec-down` | `msg-rec-down` | pass | 5,256 | 23 | 7 s | 4,218 |
+| `msg-d-rec-twice` | `msg-rec-twice` | pass | 23,493 | 30 | 16 s | 18,967 |
+| `msg-d-rec-three` | `msg-rec-three` | pass | 98,118 | 36 | 67 s | 83,688 |
+| `msg-d-rec2` | `msg-rec2` | pass | 176,659 | 32 | 75 s | 150,732 |
+| `msg-d-r-early` | `msg-r-early` | goal reached | 394 | 14 | 3 s | reached |
+| `msg-d-r-lostback` | `msg-r-lostback` | goal reached | 1,129 | 13 | 3 s | reached |
+| `msg-d-r-reopen` | `msg-r-reopen` | goal reached | 405 | 9 | 2 s | reached |
+| `msg-d-r-oldreport` | `msg-r-oldreport` | goal reached | 567 | 10 | 3 s | reached |
+| `msg-d-r-aftersrc` | `msg-r-aftersrc` | goal reached | 1,128 | 13 | 3 s | reached |
+| `msg-d-r-afterdst` | `msg-r-afterdst` | goal reached | 620 | 10 | 3 s | reached |
+| `msg-d-r-twice` | `msg-r-twice` | goal reached | 387 | 14 | 3 s | reached |
+
+**The second model, big bounds.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `msg-d-big-three` | `msg-big-three` | pass | 296,053 | 40 | 271 s | 240,077 |
+| `msg-d-big-all` | `msg-big-all` | pass | 129,444 | 27 | 44 s | 103,602 |
+| `msg-d-big-rec` | `msg-big-rec` | pass | 1,258,098 | 40 | 763 s | 1,018,412 |
+| `msg-d-big-early` | `msg-big-early` | pass | 1,324,172 | 39 | 809 s | 1,162,414 |
+| `msg-d-deep-all` | `msg-deep-all` | pass | 7,876,110 | 38 | 6307 s (resumed) | 6,480,516 |
+| `msg-d-x-lazy-down` | `msg-x-lazy-down` | pass | 140,958 | 34 | 80 s | 126,180 |
+| `msg-d-x-s2n2` | `msg-x-s2n2` | pass | 573,870 | 31 | 331 s | 438,735 |
+| `msg-d-x-rec2-down` | `msg-x-rec2-down` | pass | 1,059,954 | 36 | 537 s | 904,392 |
+| `msg-d-x-rec2-early` | `msg-x-rec2-early` | pass | 3,622,013 | 36 | 2390 s | 3,151,608 |
+
+**The third model, small bounds and reach checks.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `mem-d-src-core` | `mem-src-core` | pass | 1,020 | 16 | 3 s | 948 |
+| `mem-d-dst-core` | `mem-dst-core` | pass | 771 | 15 | 2 s | 678 |
+| `mem-d-dst-grow` | `mem-dst-grow` | pass | 7,106 | 19 | 6 s | 6,710 |
+| `mem-d-dst-shrink` | `mem-dst-shrink` | pass | 7,190 | 18 | 6 s | 6,391 |
+| `mem-d-src-fault` | `mem-src-fault` | pass | 146,876 | 21 | 26 s | 134,665 |
+| `mem-d-dst-fault` | `mem-dst-fault` | pass | 90,838 | 21 | 19 s | 75,281 |
+| `mem-d-src-cfg` | `mem-src-cfg` | pass | 173,229 | 23 | 27 s | 153,112 |
+| `mem-d-src-r` | `mem-src-r` | goal reached | 643 | 9 | 1 s | reached |
+| `mem-d-dst-r` | `mem-dst-r` | goal reached | 4,340 | 12 | 2 s | reached |
+| `mem-d-r-back` | `mem-r-back` | goal reached | 877 | 12 | 2 s | reached |
+
+**The third model, big bounds.**
+
+| Bound | The world of | Result | Distinct states | Depth | Time | The older bound's states |
+|---|---|---|---|---|---|---|
+| `mem-d-dst-two` | `mem-dst-two` | pass | 2,495,799 | 26 | 395 s | 2,133,498 |
+| `mem-d-src-two` | `mem-src-two` | pass | 5,590,083 | 26 | 830 s | 4,969,277 |
+| `mem-d-r-two` | `mem-r-two` | goal reached | 2,241,381 | 15 | 148 s | reached |
+| `mem-d-x-src-pcrash` | `mem-x-src-pcrash` | pass | 293,752 | 23 | 53 s | 269,330 |
+| `mem-d-x-dst-pcrash` | `mem-x-dst-pcrash` | pass | 181,676 | 23 | 32 s | 150,562 |
+| `mem-d-x-dst-grow-fault` | `mem-x-dst-grow-fault` | pass | 412,730 | 26 | 64 s | 380,003 |
+| `mem-d-x-src-n2` | `mem-x-src-n2` | pass | 529,117 | 23 | 111 s | 467,116 |
+| `mem-d-x-src-cfg2-fault` | `mem-x-src-cfg2-fault` | pass | 8,632,530 | 28 | 1203 s | 7,611,724 |
+| `mem-d-x-src-add-term` | `mem-x-src-add-term` | pass | 7,675,708 | 29 | 1569 s | 6,712,545 |
+
+**The stall checks** of the decided form. One stream, and a writer follows its route, as before.
+
+| Bound | The world of | States | Home up: the writes can finish | Home up: and the table names the server | Home down: the writes can finish without it |
+|---|---|---|---|---|---|
+| `d-s-lazy` | `s-lazy` (and `s-strict`) | 44,120 | 0 stuck of 17,648 | 0 stuck of 17,648 | 0 stuck of 8,824 |
+| `d-s-twice` | `s-twice` | 4,460 | 0 stuck of 1,784 | 0 stuck of 1,784 | 0 stuck of 892 |
+
+So in the decided form no state is stuck, with the home group down too *(checked)*. That is the result Finding 2 asked for, now with one commit in the window.
+
+In all 53 safety bounds of the decided form, 62,072,070 distinct states, every property holding on each: by model 19 bounds and 19,233,293 states, 19 and 16,600,352, and 15 and 26,238,425. The largest is `d-big-ver`, 11,658,335 states. The longest run is `msg-d-deep-all`: stopped at the limit after 3,500 s, then 2,807 s more from its checkpoint; every run uses the same fingerprint function, so its count is the whole space's, as the resume test in "How to run it" showed *(measured)*. All 15 reach goals are reached. Every safety bound of the decided form has more states than its older twin, from 6 % (`mem-d-dst-grow`) to 48 % (`d-big-streams`): the target takes writes sooner, and the source reopens sooner *(measured; the reason is reasoned)*.
+
+### Planted mistakes in the decided form
+
+[decided-mutants.txt](decided-mutants.txt) lists 61 one-line mistakes on the lines that hold the new and the changed records. 53 are the mistakes of `mutants.txt` and `extra-mutants.txt` on those lines, planted again as they stand there; 8 are new (ids `d`), for lines that had none or for the record's own words. [decided.py](decided.py) plants each in the decided form and runs it as `mutate.py` does: the small bounds (in the first model first without `Whole`), the reach checks, the stall checks (first model), then the slower bounds, all of them `d-`, `msg-d-` or `mem-d-` bounds. The full table, with runs and times, is [results/decided-mutants.md](results/decided-mutants.md).
+
+| Record | Planted | Caught | Not caught, and why |
+|---|---|---|---|
+| `slot-table.8` | 4 | 4 | |
+| `slot-table.9` | 4 | 4 | |
+| `slot-table.10` | 3 | 2 | `u18`: the other two lines imply it, as before |
+| `slot-table.11` | 9 | 8 | `u12`: R3 makes its case impossible, as before |
+| `slot-move.24` | 5 | 4 | `n05`: a stall only a stall check sees, and the third model has none, as before |
+| `slot-move.23` | 1 | 1 | |
+| `move-policy.7` | 4 | 4 | |
+| `slot-table.5`, the reopen first (and `slot-move.19`'s two guards on it) | 8 | 7 | `d03`: the reopen that waits for the row only makes a slot wait; the second model has no stall check |
+| the write guard at the log end (`slot-table.1`, `slot-move.1`, `.3`, `.4`, `.7`, `stream-numbers.4`) | 13 | 13 | |
+| `slot-move.13`, the base check | 2 | 2 | |
+| **the records' own lines** | **53** | **49 (92 %)** | |
+| probes of the record's words (`slot-move.24`: `d05` to `d08`) | 4 | 2 | `d05`, `d07`: harmless, as expected; `d06` is Finding 10; `d08` leaves out the record's second half (see Finding 10) |
+| lines the ledger took no record for (`u03`, `u05`, `u07`, `u08`) | 4 | 1 | spare, as before; `u03` is caught only because `u05`'s line is there |
+
+All *(measured)*. **Every reused mistake ends as it did on the older bounds**: the same 47 caught and the same 6 not caught. Some are caught sooner or by another property: `m03` by `PosUnique` in 4 steps (was `Views` in 9), `u45` by `NoLoss` in 3 (was 8), `n02` by `Views` in 4 (was 8), `u06` and `f11` by `OneTaker` in 9 (were `TableRight` in 10). `m16` and `m17`, which only the bounds with the reopen first could catch, are now caught on `d-crash` and `d-core`.
+
+| Record | Id | Model | The mistake | Caught by |
+|---|---|---|---|---|
+| `slot-table.8` | u04 | second | a move's row does not hold the target's incarnation | reach goal lost: msg-d-r-afterdst |
+| `slot-table.8` | u06 | second | a recovered target takes a final copy ordered for its old life | OneTaker on msg-d-rec, 9 steps |
+| `slot-table.8` | f11 | second | the fence binds the target's incarnation of now, not the row's | OneTaker on msg-d-rec, 9 steps |
+| `slot-table.8` | f12 | second | the target does not check that the fence names it | OneTaker on msg-d-rec2, 8 steps |
+| (no record) | u03 | second | a move's row does not hold the source's incarnation | reach goal lost: msg-d-r-aftersrc |
+| (no record) | u05 | second | a recovered source fences a move ordered for its old life | **not caught** |
+| (no record) | u07 | second | a recovered target copies early for a move ordered for its old life | **not caught** |
+| `slot-table.9` | u01 | second | a recovered group goes on serving the slot from its cut log | OneServer on msg-d-rec, 2 steps |
+| `slot-table.9` | u22 | second | a group reopens on the recovery row of an older life | NoBack on msg-d-rec2, 10 steps |
+| `slot-table.9` | u23 | second | a recovered group reopens in its old epoch | NoBack on msg-d-rec, 7 steps |
+| `slot-table.9` | f04 | second | a group reopens on another group's recovery row | StateRight on msg-d-rec2, 6 steps |
+| `slot-table.10` | u18 | second | a recovered group asks for a slot its copy does not hold | **not caught** |
+| `slot-table.10` | u19 | second | a recovered group gets a row for a slot the table gives to another group | TableRight on msg-d-rec, 8 steps |
+| `slot-table.10` | u20 | second | a recovered group gets a row though its copy is older than the last move into it | TableRight on msg-d-rec-twice, 9 steps |
+| `slot-table.11` | u09 | second | a recovered target does not say its old life's records may be lost | NoBack on msg-d-rec, 13 steps |
+| `slot-table.11` | u10 | second | the row written back after a lost target is an ordinary one | NoBack on msg-d-rec, 14 steps |
+| `slot-table.11` | u11 | second | a lost target's old move overrides a newer move into it | TableRight on msg-d-rec-three, 20 steps |
+| `slot-table.11` | u12 | second | a lost target's old move overrides its own recovery row | **not caught** |
+| `slot-table.11` | u13 | second | a move out of the lost target hides that the slot went back | NoBack on msg-d-rec-twice, 15 steps |
+| `slot-table.11` | u14 | second | the row written back after a lost target is not above the later rows | TableRight on msg-d-rec-twice, 16 steps |
+| `slot-table.11` | u15 | second | the row written back after a lost target keeps the old epoch | NoBack on msg-d-rec, 14 steps |
+| `slot-table.11` | u16 | second | the source reopens in its old epoch after a lost target | NoBack on msg-d-rec, 14 steps |
+| `slot-table.11` | u17 | second | the source reopens after a lost target before the row is written back | the model stops on msg-d-rec |
+| `slot-move.24` | m22 | first | the source fences one move a second time | stall check, d-s-twice (home up: the writes can finish; home up: and the table names the server; home down: the writes can finish without it) |
+| `slot-move.24` | u24 | second | the source fences a move older than one it already acted on | InOrder on msg-d-rec-twice, 24 steps |
+| `slot-move.24` | u25 | second | a group that holds the slot open takes a final copy | NoBack on msg-d-rec-twice, 19 steps |
+| `slot-move.24` | u26 | second | a group takes the final copy of a move older than one it already acted on | OneTaker on msg-d-rec-three, 20 steps |
+| `slot-move.24` | n05 | third | a leader fences the move a second time | **not caught** |
+| `slot-move.24` | d05 | first | (probe) the record as written bars only a move older than the newest its log names, so the source may fence the newest move again (twice at most here) | **not caught** |
+| `slot-move.24` | d06 | second | (probe) the record as written, for the fence: the newest move its log names may be fenced again (twice at most here) | NoBack on msg-d-rec-twice, 21 steps |
+| `slot-move.24` | d07 | second | (probe) the record as written, for the final copy: a final copy for the newest move its log names is not barred by this line | **not caught** |
+| `slot-move.24` | d08 | first | slot-move.8 replaced by the first half of slot-move.24 alone: the target takes a final copy unless its log names a newer move | Views on d-core, 11 steps |
+| `slot-move.23` | m21 | first | a target that gave up answers retry, not moved | stall check, d-s-lazy (home down: the writes can finish without it) |
+| `move-policy.7` | t06 | first | a move counts as ended once its abort commits, row or no row | TableRight on d-twice, 11 steps |
+| `move-policy.7` | t07 | first | a move counts as ended on a final copy that has not committed | TableRight on d-twice, 17 steps |
+| `move-policy.7` | u53 | second | a move counts as ended with no final copy | TableRight on msg-d-rec-twice, 6 steps |
+| `move-policy.7` | d04 | second | a move counts as ended once its abort is reported, row or no row (t06 in the second model) | TableRight on msg-d-rec-twice, 8 steps |
+| (no record) | u08 | second | a move counts as ended though its target has had a new life since | **not caught** |
+| `slot-table.5` | d01 | first | the source's reopen waits for the row (slot-table.5 as it was) | stall check, d-s-lazy (home down: the writes can finish without it) |
+| `slot-table.5` | d03 | second | the source's reopen waits for the row (slot-table.5 as it was), second model | **not caught** |
+| `slot-table.5` | d02 | first | the row is never written back after a give-up | stall check, d-s-lazy (home up: and the table names the server) |
+| `slot-table.5` | t05 | first | the row is written back on an abort that has not committed | TableRight on d-crash, 11 steps |
+| `slot-table.5` | e06 | first | the row is written back to the target, not the source | TableRight on d-core, 7 steps |
+| `slot-table.5` | f03 | second | the row is written back to the target, not the source | TableRight on msg-d-core, 5 steps |
+| `slot-move.19` | m16 | first | the source reopens on an abort that has not committed | OneTaker on d-crash, 9 steps |
+| `slot-move.19` | m17 | first | the source reopens with no abort | OneTaker on d-core, 7 steps |
+| `slot-table.1` | m03 | first | the source takes a write after its fence is in its log | PosUnique on d-core, 4 steps |
+| `slot-table.1` | u45 | second | the source takes a write after its fence is in its log | NoLoss on msg-d-core, 3 steps |
+| `slot-table.1` | n02 | third | a leader takes a write after the fence is in its own log | Views on mem-d-src-core, 4 steps |
+| `slot-move.3` | m01 | first | the fence does not stop the source | OneTaker on d-core, 6 steps |
+| `slot-move.3` | u44 | second | the fence does not stop the source | OneTaker on msg-d-core, 5 steps |
+| `slot-move.3` | n01 | third | the fence does not stop the source | OneServer on mem-d-src-core, 7 steps |
+| `slot-move.7` | m02 | first | the final copy's commit does not open the slot | reach goal lost: d-r-moved |
+| `slot-move.7` | n14 | third | the final copy's commit does not open the slot | reach goal lost: mem-d-src-r |
+| `slot-move.4` | m06 | first | the final copy is sent from a fence that has not committed | OneServer on d-core, 8 steps |
+| `slot-move.4` | n06 | third | the final copy is sent from a fence some member holds but no one knows committed | OneServer on mem-d-src-core, 5 steps |
+| `stream-numbers.4` | e01 | first | a leader reads the stream table and the sequence from its committed log, not its log end | PosUnique on d-core, 5 steps |
+| `stream-numbers.4` | f02 | second | a leader reads the stream table and the sequence from its committed log | InOrder on msg-d-core, 5 steps |
+| `stream-numbers.4` | g01 | third | a leader reads the stream table and the sequence from the log it knows committed | PosUnique on mem-d-src-core, 6 steps |
+| `slot-move.13` | u28 | second | the target merges a delta onto a copy that stands at another place | InOrder on msg-d-early, 12 steps |
+| `slot-move.13` | u29 | second | the source cuts the delta at the wrong place | InOrder on msg-d-early, 10 steps |
+
+### What it shows
+
+- **The decided form holds.** All 53 safety bounds pass, all 15 reach goals are reached, and both stall checks find no stuck state, with the home group down too *(checked)*. That covers every world the three models had, now with one commit in the window and the reopen first: lock tokens, row versions and stamps, the home group down, a membership change, one recovery and two, the carried set sent early, and two member faults with a second election. No property failed, so there is no failing trace to keep.
+- **Finding 10: `slot-move.24` must bar the newest move too.** The record says a group never fences, and never takes a final copy, "for a move older than the newest row its log names". A move equal to the newest is not older, so these words let a source fence its newest move a second time. The models' lines say more: a group fences, or takes a final copy, only for a move newer than every move its log names (`fence.newer`, `final.newer`; in the first and third model, `fence.once` and `slot-move.8`). Planted mistake `d06` is the record's words on the fence, with at most two fences of one move: `NoBack` fails in 21 steps on `msg-d-rec-twice` *(checked; [results/finding10-trace.txt](results/finding10-trace.txt))*. The way in: the slot moves to B, a move back to A starts, B fences it and is then recovered, and gives the first move up as lost; A reopens in epoch 2 and takes a write. Then A fences the first move again. Its log end is fenced now, so R10 ("a group that holds the slot open takes no final copy") no longer stops it, and it takes the final copy of the move back from B's old report: A serves in epoch 1 a view older than the one it served in epoch 2.
+  - Without a recovery the same words are harmless: `d05`, in the first model, is not caught *(checked)*.
+  - For the final copy the words are enough: `d07` is not caught *(checked)*. `d08` replaces `slot-move.8`'s line with the record's first half alone, and a target takes a move's final copy twice: `Views` fails in 11 steps on `d-core` *(checked)*. With the whole record in its place, the second half included ("a group that holds a slot open takes no final copy"), nothing is caught on the 23 `d-` runs of the first model or the 17 `msg-d-` runs of the second *(checked)*. So `slot-move.8` folds into `slot-move.24`, as V5-36 allows.
+  - So only the fence half needs the models' words. The ledger now says: "A group fences a slot only for a move newer than every move its log names, and takes a final copy only for a move newer than every fence, final copy and reopen in its log; a group that holds a slot open takes no final copy for it." The second model has run exactly these lines on every bound (`fence.newer`, `final.newer`, `final.shut`), and there `slot-move.8` is spare (`u47`, not caught). Another way would close the case too: the reopen after a lost give-up could name the row it reopens by, so that A's log names a move newer than both *(reasoned; not modelled)*.
+- **Without the row written back, only the stall check sees it.** With the reopen first, a row that is never written back breaks no safety property: `d02` passes every small bound and reach check, and only the stall check finds that the table never names the server again (shortest way in: the row commits) *(checked)*. And the old form comes back as a mistake: `d01`, the reopen that waits for the row, is Finding 2 again, a slot that waits for the home group (shortest way in: the row commits, the source fences, the home group goes down) *(checked)*.
+- **What the third model says of one commit.** With members, a leader that takes writes behind a final copy or a reopen that only its own log holds keeps every property, with two member faults, a second election, an old leader that still acts and a membership change (`mem-d-src-two`, `mem-d-dst-two`: 5,590,083 and 2,495,799 states), and K-01's reach goal is reached (`mem-d-r-two`) *(checked)*. A write that an old leader takes behind a final copy that never commits is dropped with it. No property sees that, because a writer's answer waits for its own write's commit (`slot-table.2`; answers are not modelled) *(reasoned)*.
+
+### Marks
+
+Each line that now holds a ledger record carries its id, then the line's old short name, so `mutants.txt` stays readable: `\* @rule slot-move.24 fence.newer`. Comments only: the older bounds keep their counts (above).
+
+| Lines (old short name) | Now marked |
+|---|---|
+| `row.inc write-dst`, `row.inc target` (second model) | `slot-table.8` |
+| the fence's `dinc` and the target's check that the fence names it, unmarked before (`f11`, `f12`) | `slot-table.8 fence.inc`, `slot-table.8 fence.to` |
+| `recover.shut`, `recover.row`, `recover.epoch`; the reopen on the group's own recovery row, unmarked before (`f04`) | `slot-table.9`; `slot-table.9 own.row` |
+| `recover.table`, `recover.final`, `recover.copy` | `slot-table.10` |
+| `abort.lost`, `back.lost` (and its `last`, `holder`, `giver`, `top`), `back.epoch`, `unf.wait`, `unf.epoch` | `slot-table.11` |
+| `fence.newer`, `final.newer`, `final.shut`; `fence.once` (first and third model) | `slot-move.24` |
+| `moved.abort` | `slot-move.23` |
+| `ended.back`, `ended.open` (first and second model) | `move-policy.7` |
+| `back.committed`; the row written back to the source, unmarked before (`e06`, `f03`) | `slot-table.5`; `slot-table.5 back.src` |
+| `delta.base`, `delta.base source`, `delta.*`, `merge.*`; the fence's choice of base, marked `slot-move.12` before | `slot-move.13`; `slot-move.13 fence.base` |
+| the guard on the log end, marked `slot-move.1` before | `slot-table.1 slot-move.1` |
+| the guard on the committed log, marked `slot-table.1` before | `two-commit`: it held `slot-table.1` as it was; `OneCommit` turns it off |
+
+The source's wait for the ready report was marked `@world slot-move.12 wait`; it is now `@world ready.wait`, since `slot-move.12` no longer has that half.
+
+Some lines keep a mark with no ledger id, because the ledger took no record for them: the source's half of R1 (`row.inc write-src`, `row.inc source`) and the early copy's check (`row.inc copy`), which the models show are spare (`u05`, `u07` not caught); `ended.inc` (`u08`, covered by `slot-table.11`); `copy.forward` (`u43`, harmless); `moved.fence` (no record says whom a fenced source names).
+
+In `mutants.txt` the rule column follows the marks: 42 rows changed: 40 now name a ledger id they did not name before, and `k01` and `n03` now name `two-commit`. The ids and the results they had are as they were; `results/mutants.json` keeps the old names it was run with. In `extra-mutants.txt`, the old text of `f15` follows the new guard line; it is the same change.
+
 ## How to run it
 
 ```sh
@@ -710,6 +987,9 @@ export WORK=<scratch dir>               # optional; default ./target/work
 ./run.sh mutants         # every planted mistake; or: ./run.sh mutants m07 c03
 ./run.sh big x-lock-ver  # a bound of the second reading, by name ("big" runs them all)
 ./run.sh extra           # the second reading's planted mistakes; or: ./run.sh extra e02 f12
+./run.sh decided         # the decided form (card 0002): its small bounds, reach checks and stall checks
+./run.sh decided big     # also the decided form's big bounds; one by name: ./run.sh big d-big-ver
+./run.sh decided-mutants # the decided form's planted mistakes; or: ./run.sh decided-mutants d01 u24
 ```
 
 It ends `ok slot-move` or fails. It needs Java 17 or newer and Python 3.
@@ -730,9 +1010,10 @@ The big bounds of the other two models (`msg-big-*`, `mem-*-two`) write checkpoi
 | [SlotMoveMsg.tla](SlotMoveMsg.tla) | the second model: stored reports, the recovery, the early carried set |
 | [SlotMoveMembers.tla](SlotMoveMembers.tla) | the third model: one group with its members |
 | [SlotMoveStall.tla](SlotMoveStall.tla) | the model with one derived variable, for the stall check |
-| `*.cfg` | one file per bound. First model: `core` to `down` (small), `big-*`, `r-*` (reach), `s-*` (stall). Second: `msg-*`. Third: `mem-*`. Two did not finish and are not run by default: `deep-faults`, `mem-deep-four`. The second reading's bounds have an `x` in their names (`x-*`, `msg-x-*`, `mem-x-*`), and two reach bounds, `msg-r-twice` and `mem-r-back` |
+| `*.cfg` | one file per bound. First model: `core` to `down` (small), `big-*`, `r-*` (reach), `s-*` (stall). Second: `msg-*`. Third: `mem-*`. Two did not finish and are not run by default: `deep-faults`, `mem-deep-four`. The second reading's bounds have an `x` in their names (`x-*`, `msg-x-*`, `mem-x-*`), and two reach bounds, `msg-r-twice` and `mem-r-back`. The decided form's bounds are `d-*`, `msg-d-*` and `mem-d-*`: each is the world of the bound with the rest of the name |
 | [run.sh](run.sh) | reruns everything |
 | [stall.py](stall.py) | the stall check, on TLC's printed graph |
 | [mutants.txt](mutants.txt), [mutate.py](mutate.py) | the planted mistakes and their runner |
 | [extra-mutants.txt](extra-mutants.txt), [extra.py](extra.py) | the second reading's planted mistakes and their runner |
-| [results/](results) | `runs.txt` (every bound's result line), `mutants.md` and `mutants.json`, the stall checks' output, and the traces of the findings |
+| [decided-mutants.txt](decided-mutants.txt), [decided.py](decided.py) | the planted mistakes of the decided form and their runner |
+| [results/](results) | `runs.txt` (every bound's result line), `mutants.md` and `mutants.json`, `extra-mutants.*`, `decided-mutants.*`, the stall checks' output, and the traces of the findings |

@@ -37,4 +37,4 @@ g02 ; SlotMoveMembers ; mci'  = [mci EXCEPT ![j] = Max({mci[j], mci[l]})] ; mci'
 g03 ; SlotMoveMembers ; IF j = i THEN TRUE ELSE IF j \in Q THEN FALSE ELSE lead[j]] ; IF j = i THEN TRUE ELSE lead[j]] ; a leader that votes for another goes on leading in the new term
 g04 ; SlotMoveMembers ; 2 * Cardinality(Q \cap V) > Cardinality(V) ; 2 * Cardinality(Q \cap V) >= Cardinality(V) ; half of the voters count as a majority
 g05 ; SlotMoveMembers ; recs |-> Vis(SubSeq(C, 1, i - 1)), ; recs |-> Vis(End("A", t)), ; the final copy takes the records of a member's whole log, not the committed part before the fence
-f15 ; SlotMoveMsg ; /\ Mode(g, CL(g)) = "open"                                  \* @rule slot-table.1 ; /\ TRUE ; probe: a leader takes writes behind an open that has not committed (Finding 5's one-commit window, with a recovery)
+f15 ; SlotMoveMsg ; /\ Mode(g, CL(g)) = "open" \/ OneCommit ; /\ TRUE ; probe: a leader takes writes behind an open that has not committed (Finding 5's one-commit window, with a recovery)
