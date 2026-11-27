@@ -26,6 +26,7 @@ The study's models for E-51, E-52 and E-31 are Python, on the study's own engine
 1. **The four designs hold** at every bound run, once row 4 has the rule of finding 10: 28 complete runs, 20 small and 8 big, and no property fails *(checked)*. All 11 reach goals are reached, and on 5 small bounds, at least one per model, the design can still finish from every judged state *(checked)*. The biggest run is 21,511,833 states in 444 s; the longest is 792 s *(measured)*. Every run is under the hour. The big bounds were run a second time on a busier box: the same state counts, the longest 1,592 s *(measured)*.
 2. **79 of 87 planted mistakes are caught**, 90 % *(checked)*. DEV-03's bar is 85 %. The first 58 were planted when the models were written (56 caught then). The other 29 were planted on a second pass, many on lines that had no mark before.
 3. **The models needed rules the ledger does not hold, and four ledger texts are wrong or loose as they read** (`selection.1`; `genesis-conditional-create.4`; `slot-move.22`; `handback.5` beside `move-policy.6`). Eleven findings are in "What the models found"; findings 10 and 11 came from bounds added on a second pass (a slot that moves back; more groups than copies). The ledger changes they ask for are in "Ledger changes proposed". None is applied here.
+4. **After card 0002** the owner took every recommended option (V5-33 to V5-39). Way B holds with four groups on four machines, `SpreadEven` too, on 6,328,888 states *(checked)*. A switch runs `slot-move.22` as the owner decided it for fewer machines than copies: one and two machines open every slot, a third machine that comes later is taken in, and a group that shrinks does not open early *(checked)*. It needs `growth.1` and `growth.2` to place and grow to every machine when there are fewer than three, and way B's group record no longer waits for three machines. Two costs: in a founding race a slot can open and take writes with one copy before the other machines take up the id, and a group record written before they come names the founder's machine *(checked)*. See "After card 0002", which also gives the text for `slot-move.22`.
 
 ## How a model is checked
 
@@ -36,7 +37,7 @@ Four kinds of check, the same in every model:
 - **No stuck state.** In each model `Calm` is the steps of the design itself: no fault, no operator, no new work. `NoStuck` says: with everything up, a state where no calm step can run is a finished state.
 - **Always can finish.** From every judged state, calm steps alone can reach a goal state. The study calls this AG EF. TLC cannot check it by itself, so `<Model>Live.tla` adds a tag to each state, TLC writes the whole state graph, and [agef.py](agef.py) walks it back from the goals. It runs on one small bound per model, and on two for row 4.
 
-Lines marked `\* @rule <id>` in a model hold the rules. The id is the ledger record the line stands for. An id that starts `new:` is a rule the ledger does not hold yet. A name that starts `line:` marks a line that is part of how a rule is carried out and has no ledger id of its own. `mutants.txt` plants one-line mistakes on these lines.
+Lines marked `\* @rule <id>` in a model hold the rules. The id is the ledger record the line stands for. Until card 0002, an id that started `new:` was a rule the ledger did not hold yet; since the owner's answers every such line names its record, or a `line:` name where the owner dropped the rule (see "After card 0002"). A name that starts `line:` marks a line that is part of how a rule is carried out and has no ledger id of its own. `mutants.txt` plants one-line mistakes on these lines.
 
 ## Row 1: settings per group ([Settings.tla](Settings.tla))
 
@@ -81,7 +82,7 @@ The reach checks ask for the row's own case: the home group was down before the 
 
 **The world.** Three to five machines that go down and come back with their disks. An object store with create-if-absent. Groups are abstract Raft groups: a group works while its leader and a majority of its voters are up. Only committed state is kept.
 
-**The rules.** Founding is the study's four steps (`genesis-conditional-create.1` to `.6`): write a candidate id to disk, ask the store to create it, found only if the stored id is your own, else drop it and adopt. The founder makes the home group with itself as the only voter (`.4`). Its first entry holds the slot table for every group the size hint asks for (`.8`). The home group's leader writes a group record per other group, and the machine the record names makes that group (`growth.5`). Each group writes a placement of `Copies` machines, the quieter ones first (`growth.1`, `healing-self.16`, `healing-self.19`), grows to them (`growth.2`), and only then opens its share of the slots (`slot-move.22`). Leadership goes to the preferred member, only if it is a voter (`handback.1`, `handback.2`).
+**The rules.** Founding is the study's four steps (`genesis-conditional-create.1` to `.6`): write a candidate id to disk, ask the store to create it, found only if the stored id is your own, else drop it and adopt. The founder makes the home group with itself as the only voter (`.4`). Its first entry holds the slot table for every group the size hint asks for (`.8`). The home group's leader writes a group record per other group, and the machine the record names makes that group (`growth.5`). Each group writes a placement of `Copies` machines, the quieter ones first (`growth.1`, `healing-self.16`, `healing-self.19`), grows to them (`growth.2`), and only then opens its share of the slots (`slot-move.22`). Leadership goes to the preferred member, only if it is a voter (`handback.1`, `handback.2`). After card 0002 a switch, `Fewer`, also runs `slot-move.22` as the owner decided it for a resource with fewer machines than `Copies` (V5-39); see "After card 0002".
 
 Two ways to spread the groups are modelled, because the ledger's own rules do not spread them (finding 5):
 
@@ -109,7 +110,7 @@ Two ways to spread the groups are modelled, because the ledger's own rules do no
 
 **The world.** Groups A and B. Slot s1 starts in A, s2 in B. A slot's log is a counter: record n makes the slot's value n, so a record taken twice or skipped shows. A move is a fence at the old group, then an open at the new one. A slot moves once, to the other group; on the `c-back` bounds it may then move back. A group may go down; a link may drop alone. A link carries frames in order.
 
-**The rules.** A selection over the whole resource is one subscription per group (`selection.1`). A group answers with a picture of the slots it holds, each at its own position (`subscribe.1`, `subscribe.3`), then each later committed record (`subscribe.5`, `subscribe.6`). At a move the old group ends the slot with END at the fence and names the new group; the client asks the new group for the slot (`subscribe.29`), and the new group answers only once the slot is open there (`slot-move.9`, which the ledger writes for writes; here it stands for an ask). A group asked for a slot it has handed off answers END and names where the slot went (`new:ask-ended`, finding 10). The client keeps one store with a cursor per slot: a picture sets the rows and the cursor (`subscribe.12`, `subscribe.13`), and a record is taken only if it is the next one, once (`subscribe.14` to `.16`).
+**The rules.** A selection over the whole resource is one subscription per group (`selection.1`). A group answers with a picture of the slots it holds, each at its own position (`subscribe.1`, `subscribe.3`), then each later committed record (`subscribe.5`, `subscribe.6`). At a move the old group ends the slot with END at the fence and names the new group; the client asks the new group for the slot (`subscribe.29`), and the new group answers only once the slot is open there (`slot-move.9`, which the ledger writes for writes; here it stands for an ask). A group asked for a slot it has handed off answers END and names where the slot went (`subscribe.40`, finding 10). The client keeps one store with a cursor per slot: a picture sets the rows and the cursor (`subscribe.12`, `subscribe.13`), and a record is taken only if it is the next one, once (`subscribe.14` to `.16`).
 
 **The properties.**
 
@@ -209,7 +210,7 @@ Each finding names the property that fails. For a probe (a bound that must fail)
 
 **1. A group may take up only what the home log has committed, and the alter may count only a take-up that has committed** (row 1). `meta-catalog.5` says neither. Planted out, a group takes up an alter that a home leader change then drops (`Same` fails), and an alter is answered on a take-up that is then dropped (`InForce` fails) *(checked: mistakes s01, s02)*. That every group is waited for is needed too *(checked: s03, s05)*.
 
-**2. "A write under settings a group has not taken up is refused" has no rule** (row 1). The model adds one, `new:settings-behind`: a write names the settings version its sender holds, and a group that is behind sends it back to be sent again. Without it nothing else holds the property (`AsMade` fails) *(checked: s09)*. It is a new field on a write, so it is the owner's call: take the rule, or drop the property.
+**2. "A write under settings a group has not taken up is refused" has no rule** (row 1). The model adds one, the line `line:settings-behind` (marked `new:settings-behind` until card 0002): a write names the settings version its sender holds, and a group that is behind sends it back to be sent again. Without it nothing else holds the property (`AsMade` fails) *(checked: s09)*. It is a new field on a write, so it is the owner's call: take the rule, or drop the property. The owner dropped the property (V5-37). The line and `AsMade` stay in the model, so its runs and mistakes s09, s10 stay as they were; no ledger record stands behind them.
 
 **3. An early answer can still be followed by a refusal, on one group, with no move** (row 1, the part of O7 this row holds). A write is told `received`, a leader change drops it, the gate goes read-only, the client sends it again, and it is refused (`s-early`: `EarlyKept` fails, a run of 8 states) *(checked)*. The early answer stages are built after the first build and have no ledger record, so this is a note for then: a write that the gate can refuse is a write that can be refused.
 
@@ -225,9 +226,9 @@ Each finding names the property that fails. For a probe (a bound that must fail)
 
 **9. A whole selection needs three client and server rules the ledger does not hold** (row 4). (a) A picture's part for a slot is taken only at or past the client's cursor for that slot. Without it a late picture from the old group takes the slot back in time (`NoBack`) *(checked: c02)*. (b) A group's picture names the slots it handed off and where each went. Without it a client whose pictures both miss a slot (finding 8's run), or that lost the END frame with a dropped link, never learns where the slot went and stays without it for good (`NoStuck`) *(checked: c10)*. (c) The client asks the new group for such a slot unless it already takes the slot from there, also for a slot it never held (`NoStuck`) *(checked: c11)*.
 
-**10. A slot that moves back leaves a whole selection stuck, unless a group answers an ask for a slot it has handed off** (row 4). The first form of this model moved each slot once. With a move back, the client is told s1 went to B and asks B. Before B answers, s1 opens at B and moves on, back to A. The ask now waits at B for a slot B will not hold again, and nothing tells the client (`NoStuck` fails, a run of 12 states) *(checked: c25)*. Two halves of one rule are added, `new:ask-ended`: a group asked for a slot it has handed off answers END at once and names the group the slot went to; and a client that gets END from the group it asked turns to the group named. Without the second half the client cannot always finish *(checked: c26, on `c-back-live`)*. With both, every `c-back` bound holds and the client can always finish *(checked)*. An old END or an old picture can still send the client one trip the wrong way; the next END brings it back, which is why c24 is not caught.
+**10. A slot that moves back leaves a whole selection stuck, unless a group answers an ask for a slot it has handed off** (row 4). The first form of this model moved each slot once. With a move back, the client is told s1 went to B and asks B. Before B answers, s1 opens at B and moves on, back to A. The ask now waits at B for a slot B will not hold again, and nothing tells the client (`NoStuck` fails, a run of 12 states) *(checked: c25)*. Two halves of one rule are added, now `subscribe.40`: a group asked for a slot it has handed off answers END at once and names the group the slot went to; and a client that gets END from the group it asked turns to the group named. Without the second half the client cannot always finish *(checked: c26, on `c-back-live`)*. With both, every `c-back` bound holds and the client can always finish *(checked)*. An old END or an old picture can still send the client one trip the wrong way; the next END brings it back, which is why c24 is not caught.
 
-**11. Way A stops spreading the leaders once a resource has more groups than copies** (row 3). Every other bound has at most 3 groups and 3 copies, so each placement holds a machine that leads nothing yet. With 4 groups on 4 machines, all there from the start, way A can end with the founder's machine as the preferred member of two groups and one machine that leads none (`f-many`: `SpreadEven` fails, a run of 17 states) *(checked)*. The cause: a placement is picked by copies held, with ties broken any way, and the preferred member is picked only inside the placement. The fourth group's placement can leave out the one machine that leads nothing. So finding 5's "both ways hold" is shown only for as many groups as copies. `Spread` itself cannot hold when the groups outnumber the machines that are there; `SpreadEven` is the property for that case. Way B on the same bound did not finish here: the run was stopped by the box for lack of memory at about 2.2 million states, with no failure up to there. It is not counted.
+**11. Way A stops spreading the leaders once a resource has more groups than copies** (row 3). Every other bound has at most 3 groups and 3 copies, so each placement holds a machine that leads nothing yet. With 4 groups on 4 machines, all there from the start, way A can end with the founder's machine as the preferred member of two groups and one machine that leads none (`f-many`: `SpreadEven` fails, a run of 17 states) *(checked)*. The cause: a placement is picked by copies held, with ties broken any way, and the preferred member is picked only inside the placement. The fourth group's placement can leave out the one machine that leads nothing. So finding 5's "both ways hold" is shown only for as many groups as copies. `Spread` itself cannot hold when the groups outnumber the machines that are there; `SpreadEven` is the property for that case. Way B on the same bound did not finish here: the run was stopped by the box for lack of memory at about 2.2 million states, with no failure up to there. It is not counted. After card 0002 it was run again, alone and with more memory, and it holds: `SpreadEven` too, on 6,328,888 states (`f-quiet-many`, see "After card 0002") *(checked)*.
 
 Also seen, smaller:
 
@@ -241,7 +242,7 @@ Also seen, smaller:
 
 ## Planted mistakes
 
-`mutants.txt` holds 87 one-line mistakes on the marked rule lines: a guard dropped, a comparison flipped, an update dropped or weakened, the wrong place read. `mutate.py` plants each in a copy of its model and runs the small bounds, then the reach bounds, then the "always can finish" bound. The table of every one is [results/mutants.md](results/mutants.md).
+`mutants.txt` holds 87 one-line mistakes on the marked rule lines (and ten more, d01 to d10, for the decided form of "After card 0002", counted apart): a guard dropped, a comparison flipped, an update dropped or weakened, the wrong place read. `mutate.py` plants each in a copy of its model and runs the small bounds, then the reach bounds, then the "always can finish" bound. The table of every one is [results/mutants.md](results/mutants.md).
 
 | Model | Mistakes | Caught |
 |---|---|---|
@@ -286,9 +287,163 @@ Three more lines are probes, changes the design says are harmless in these world
 - **Ledger records this stage looked at and did not model again:** `meta-directory.1` to `.7` (the group records written again, incarnations, deletes), `meta-members.1` and `.2` (retiring), `soft-directory.1` to `.7` and `.10` to `.13`, most of `healing-self`, `genesis-conditional-create.7` (one box). E-51 and E-52 hold their models; nothing here changes them, but nothing here checks them with several groups either.
 - **Livelock.** "Always can finish" shows a way to the goal exists from every judged state. It does not show that a client that picks badly for ever gets there.
 
+## After card 0002
+
+The owner took the recommended option on all nine questions of card 0002 (V5-33 to V5-39). Three things in this folder follow from that: a switch in [Found.tla](Found.tla) for question 9 (V5-39), way B with four groups for question 8 (V5-38), and the marks.
+
+### The switch: fewer machines than copies (V5-39)
+
+V5-39: a group opens with fewer voters than the copies setting when the resource has fewer machines than that, and grows as machines come. Found.tla gets a constant `Fewer`:
+
+| `Fewer` | When a group may open its slots | How a group grows | Used by |
+|---|---|---|---|
+| `"no"` | with `Copies` voters (the reading before card 0002) | a placement of `Copies` machines, then from one voter to all of them in one step | every `f-` bound, as before |
+| `"every"` | with `Copies` voters, or with as many as the resource has machines when it has fewer (the decided reading) | a placement names every listed machine while fewer than `Copies` are listed, and is written again, keeping the voters, when more come; the group grows to all its placed machines | the `fd-` bounds: the decided form |
+| `"three"` | as `"every"` | as `"no"`: the growth rules as the ledger writes them | the probe `fd-two-three` |
+
+With `Fewer = "no"` every `f-` bound keeps its state count *(checked: the rerun below)*. `f-onebox` still fails, as the probe of the old reading.
+
+**What "the resource's machines" is.** A leader must be able to count them, and the count must not drop when a placed machine goes down. If it did, a group that lost a voter could open on a resource that has enough machines, the case `slot-move.22` was written for. The model counts the machines in either of two sets that a leader already holds:
+
+- the **listed** machines: up and holding the resource, the ones the leader may place a copy on (`healing-self.16`, `.19`; the soft directory);
+- every machine a **stored placement** names, of any group, up or down. A group's own placement is in its own log. Another group's placed machines are in the home records as that group's members (`home-records.1`), since `growth.1` adds every placed machine as a learner at once *(reasoned: the model reads the placements themselves, so the short time before a placed machine is a learner, and a voter taken out of another group's config, are not modelled)*.
+
+Each set is needed *(checked)*. With the listed machines only (mistake d04), the home group grows to two voters before the third machine comes, its placement is then written again to name all three, the third crashes before it is a voter, and the group opens with two voters (`NoShrinkOpen` on `fd-crash`, 11 steps). With the placed machines only (d05), a group opens with one voter while a second machine is listed and holds no copy yet (`OpenFull` on `fd-twobox`, 6 steps). With the listed machines and only the group's own placement (d10), the founder's machine, placed in the home group, crashes, and the second group places the two machines left, grows to them and opens with two voters (`NoShrinkOpen` on `fd-crash`, 13 steps): the other groups' placements are needed too.
+
+What the count leaves out: a machine that holds the id, is down, and that no placement names yet is not counted. On `fd-crash` a second machine takes up the id and then crashes, and the home group opens with one voter while two machines hold the id (7 states) *(checked by the second reader)*. No property here forbids it.
+
+**Two new world steps**, not rules:
+
+- `Late` names machines that open the resource only once every group has opened its share. They never found it.
+- `MaxShrink` lets a voter that is down, and is not the leader, be taken out of its group's config while the group's placement still names it. That is a group that shrinks below `Copies` on a resource with enough machines. Before this, Found.tla could not express a shrink: groups only grew.
+
+**New properties.** `AllVoters` cannot hold in the decided form, since a group opens with the machines that are there. The `fd-` bounds check these in its place:
+
+| Name | What it says |
+|---|---|
+| `OpenFull` | no group opens with fewer voters than `Copies`, or than the machines that are up and hold the resource when they are fewer |
+| `NoShrinkOpen` | once some stored placement has named `Copies` machines, no group opens with fewer than `Copies` voters, even with a machine down or a group shrunk |
+| `SpreadAll` | `Spread`, judged only when every machine was there at each placement and group record |
+| `NotDoneAll` | a reach goal: founding is done with every machine there, a late one too |
+
+In the decided form `Done` also asks that each group's placement names `Copies` machines, or every machine there when fewer, and that all of them are voters.
+
+**Symmetry.** No rule names a machine, so the decided bounds with four or five machines name them as model values and use TLC's `SYMMETRY`: TLC keeps one state for all the ways of naming the machines. Their counts are not comparable with the `f-` bounds. Without symmetry `fd-four` was stopped at 1,638,945 states at depth 19 after 7 minutes, not counted *(measured)*; with it, it ends at 158,283. The other `fd-` bounds name the machines as strings, as the `f-` bounds do.
+
+### What ran in the decided form
+
+Each `f-` bound but two has a decided form: way B (`FirstVoter = "quiet"`) and `Fewer = "every"`. Each run is a line in [results/runs.txt](results/runs.txt) *(measured: 2 TLC workers on the shared 4-core box, beside another job and beside one other run of this folder)*.
+
+| Bound | Decided form of | The world | Result | States | Depth | Seconds |
+|---|---|---|---|---|---|---|
+| `fd-onebox` | `f-onebox` | 1 machine, 2 groups, 2 slots | holds | 18 | 10 | 1 |
+| `fd-twobox` | | 2 machines, 2 groups, 2 slots, 1 crash | holds | 1,504 | 17 | 3 |
+| `fd-late` | | 3 machines, the third comes once every group has opened; 2 groups, 2 slots | holds | 1,168 | 19 | 4 |
+| `fd-late-crash` | | as `fd-late`, 1 crash | holds | 7,304 | 22 | 6 |
+| `fd-small` | `f-small` | 3 machines, 2 groups, 2 slots, no crash (with `SpreadAll`, `Even`) | holds | 5,984 | 18 | 6 |
+| `fd-crash` | `f-crash`, `f-quiet-crash` | 3 machines, 2 groups, 2 slots, 1 crash | holds | 39,010 | 20 | 9 |
+| `fd-crash2` | `f-crash2` | as `fd-crash`, 2 crashes | holds | 109,230 | 22 | 15 |
+| `fd-homefirst` | `f-homefirst` | as `fd-crash`, the home group opens its share in the first entry | holds | 26,065 | 19 | 10 |
+| `fd-shrink` | | as `fd-crash`, and a voter that is down may be taken out of its group once | holds | 57,154 | 22 | 14 |
+| `fd-four` | `f-four`, `f-quiet` | 4 machines, 3 groups, 3 slots, no crash (with `SpreadAll`); symmetry | holds | 158,283 | 26 | 111 |
+| `fd-reach` | `f-reach` | reach: founding done with every machine there, a crash allowed | goal reached | 27,920 | 16 | 11 |
+| `fd-reach-late` | | reach: founding done after the late machine came | goal reached | 887 | 16 | 3 |
+| `fd-reach-shrink` | | reach: a group shrank below `Copies` before it opened | goal reached | 2,178 | 10 | 3 |
+| `fd-reach-spread` | `f-reach-spread` | reach: 3 machines, 3 groups, done, each led from another machine | goal reached | 177,999 | 22 | 57 |
+| `fd-quiet-load` | `f-quiet-load` | reach: 5 machines, 3 groups, done with no machine in every group; symmetry | goal reached | 90,568 | 20 | 133 |
+| `fd-live` | `f-live` | always can finish: 3 machines, 2 groups, 2 slots, 1 crash | can finish from all 26,441 judged states | 61,985 | 20 | 27 |
+| `fd-late-live` | | always can finish: as `fd-late-crash` | can finish from all 4,849 judged states | 11,358 | 22 | 11 |
+| `fd-two-live` | | always can finish: as `fd-twobox` | can finish from all 1,127 judged states | 2,185 | 17 | 5 |
+| `fd-two-three` | | probe: as `fd-twobox` with no crash, growth as the ledger writes it (`Fewer = "three"`) | `NoStuck` fails, a run of 7 states | 50 | 7 | 2 |
+| `fd-spread` | `f-aswritten`'s property | probe: `Spread` on `fd-small`'s world | `Spread` fails, a run of 10 states | 1,155 | 10 | 4 |
+| **`fd-big`** | `f-big` | 4 machines, 3 groups, 3 slots, 1 crash; symmetry | holds | 1,755,093 | 30 | 962 |
+| **`fd-many`** | `f-many` | 4 machines, 4 groups, 4 slots, no crash (with `SpreadEven`); symmetry | did not finish in the hour; no failure up to there | 5,760,495 when stopped, 1,252,508 on the queue | 24 | 3,600 |
+| **`fd-many1`** | `f-many` | as `fd-many`, with 1 slot | holds | 993,438 | 28 | 732 |
+| **`f-quiet-many`** | `f-many` | way B with the old reading of `slot-move.22`, no symmetry; alone on the box, 3 workers (below) | holds | 6,328,888 | 29 | 2,495 |
+
+`f-aswritten` and `f-load` have no decided form: they are about the ledger before V5-38 and about way A. `f-quiet-crash` is the same world as `fd-crash`.
+
+### What it shows
+
+1. **One machine and two machines now found the resource and open every slot** *(checked: `fd-onebox`, `fd-twobox`; on two machines it can always finish, `fd-two-live`)*.
+2. **A third machine that comes later is taken in.** The groups open with two voters, and when the third machine comes each group writes its placement again and grows to three *(checked: `fd-late`, `fd-late-crash`; the goal is reached, `fd-reach-late`; it can always finish, `fd-late-live`)*.
+3. **A group that shrinks below `Copies` does not open on a resource with enough machines** *(checked: `fd-shrink`, `NoShrinkOpen`)*. The machine taken out is still in the group's placement, so the count stays at three. Read as the listed machines only, the shrunk group opens with two voters *(checked: d04 planted, on `fd-shrink`, with TLC told to go on past the first failure, which is the crash run above; the shortest run through a shrink has 11 states: the home group grows to three voters, one crashes and is taken out of the config, and the group opens with two)*.
+4. **The growth rules must change with it.** With growth as the ledger writes it, a group on two machines keeps one voter: `growth.1` places three machines or none, and `growth.2` never rests a group at two voters. The decided count asks for two, so no slot opens (probe `fd-two-three`: `NoStuck` fails, a run of 7 states) *(checked)*. The model therefore places every listed machine while fewer than `Copies` are listed (d07 shows it is needed) and grows a group again when a machine comes (d08). `growth.3` (a group at two voters with fewer than three live candidates makes one a learner again) would undo the two voters on two machines; it is not modelled *(reasoned)*.
+5. **Way B's group record must not wait for `Copies` machines.** This README said way B's record "waits until copies machines are there". With fewer machines that wait never ends: on one machine no other group is ever made (d06: `NoStuck` on `fd-onebox`). The decided form's record waits until `Copies` machines are listed, or the resource's machines when it has fewer. No property needs that shorter wait: mistake d13, which drops it, is caught on no `fd-` bound *(checked by the second reader)*. So the ledger holds no wait. The cost: if the other machines open the resource a moment after founding, a record may already have named the founder's machine, and it stays the group's preferred member (`handback.5`). On `fd-spread` the founder's machine is the preferred member of both groups (`Spread` fails, a run of 10 states) *(checked)*. That is the outcome of `f-aswritten` that V5-38 was chosen to avoid, in the case where the records are written before the other machines are listed. When every machine is there before the records, the leaders are spread (`SpreadAll` holds on `fd-small` and `fd-four`; `fd-reach-spread` reaches a founding where each group is led from another machine) *(checked)*. Spreading leaders after a late machine comes is left to the move policy, as for copies (see "Also seen, smaller" above).
+6. **In a founding race, a slot opens and takes writes with one copy.** On `fd-small`'s world (3 machines, no crash) the founder opens the home group's share right after founding, before the other two have taken up the id (5 states), and a write then commits with one copy (6 states) *(checked by the second reader)*. No property here forbids it. Under the old reading it could not happen. It follows from counting only the machines a leader can see: at that moment the resource has one machine.
+
+### Way B with four groups (V5-38)
+
+V5-38 owed way B with four groups or more. The bound `f-quiet-many` is `f-many`'s world (4 machines, 4 groups, 4 slots, no crash, every machine there from the start) with way B, read as before card 0002 (`Fewer = "no"`), with every property of `f-many`, `SpreadEven` the one it is for. It ran alone on the box: 3 TLC workers, a 6 GB heap and 2 GB for TLC's fingerprints outside the heap, a checkpoint every 10 minutes, a limit of one hour.
+
+**It finished, and every property holds, `SpreadEven` too: 6,328,888 states, depth 29, 2,495 s** *(checked; measured)*. TLC put the chance that two states shared a fingerprint at about 1 in 200,000 *(measured: 5.3E-6 optimistic, 1.5E-6 from the fingerprints)*. So with more groups than copies, way B spreads the preferred members as evenly as they can be, where way A does not (`f-many`, finding 11). The run on the second pass that ran out of memory had reached 2,195,739 states.
+
+`f-quiet-many` reads `slot-move.22` as before card 0002. That gives the same verdict for `SpreadEven` as the decided reading *(reasoned)*: `SpreadEven` is judged only when every machine was there at each placement and group record, and on such a run every placement names three machines and every record's wait is met under both readings, so the same placements and records can be written. The decided form of the same world, `fd-many` (with symmetry), did not finish within its hour: it was stopped at 5,760,495 states at depth 24, with 1,252,508 still on the queue, and no property had failed *(measured; not counted)*. With one slot in place of four (`fd-many1`), it finishes and every property holds, `SpreadEven` too: 993,438 states with symmetry, depth 28, 732 s *(checked)*. `SpreadEven` does not look at slots, and the slots only add the opens and writes.
+
+### The marks
+
+The `new:` marks now name the records the owner added or changed *(counted)*. In `mutants.txt`, `results/mutants.json` and `results/mutants.md` the 87 mistakes changed in the rule column only; no mistake id and no result changed. The rows d01 to d10 are new (below).
+
+| Was | Now | Lines |
+|---|---|---|
+| `new:ask-ended` | `subscribe.40` | Selection.tla, c25 |
+| `new:picture-names-moved` | `subscribe.39` | Selection.tla, c10 |
+| `new:turn-on-moved` | `subscribe.39` | Selection.tla, c11 |
+| `new:picture-per-slot` | `subscribe.38` | Selection.tla, c02, c20 |
+| `new:ready-per-slot` | `selection.1` | Selection.tla, c12 |
+| `new:first-voter-by-load` | `growth.5` (way B's naming rule) | Found.tla, f20 |
+| `new:settings-behind` | `line:settings-behind` | Settings.tla, s09, s10 |
+
+`AsMade` and the line `line:settings-behind` are the property the owner dropped (V5-37). They stay in Settings.tla so that its runs stay as they were. The mark `growth.5 record` is on way A's line (the first voter is the home group's leader), the reading of `growth.5` before V5-38.
+
+The small bounds were run again after the renames: every bound that holds has the same state count as before *(checked: the 25 small bounds that hold or can always finish have the same generated and distinct counts as on the second pass; see [results/runs.txt](results/runs.txt))*.
+
+### Planted mistakes in the decided form
+
+Ten more mistakes, ids d01 to d10, on the new lines. `mutate.py` runs them on the `fd-` bounds. They are counted apart from the 87 above, whose results stand.
+
+| id | rule | the mistake | caught by |
+|---|---|---|---|
+| d01 | `slot-move.22 fewer` | the machines half dropped: a group needs Copies voters however few machines the resource has | NoStuck on fd-onebox, 6 steps |
+| d02 | `slot-move.22 fewer` | the copies half dropped: a group needs a voter on every machine the resource has | NoStuck on fd-four, 17 steps |
+| d03 | `slot-move.22 fewer` | the guard dropped: a group opens with any number of voters | OpenFull on fd-twobox, 6 steps |
+| d04 | `slot-move.22 machines` | the resource's machines are only the listed ones: a machine that is down is not counted | NoShrinkOpen on fd-crash, 11 steps |
+| d05 | `slot-move.22 machines` | the resource's machines are only the placed ones: a listed machine with no copy yet is not counted | OpenFull on fd-twobox, 6 steps |
+| d06 | `line:record-waits` | way B's group record still waits for Copies machines | NoStuck on fd-onebox, 6 steps |
+| d07 | `growth.1 fewer` | growth as written: a placement names Copies machines, never fewer | NoStuck on fd-twobox, 7 steps |
+| d08 | `growth.2 fewer` | a group grows only from one voter, not again when a machine comes later | NoStuck on fd-small, 14 steps |
+| d09 | `line:place-keeps-voters` | a placement written again may leave a voter out | **not caught** |
+| d10 | `slot-move.22 machines` | the resource's machines are the listed ones and the group's own placement only, not the other groups' | NoShrinkOpen on fd-crash, 13 steps |
+
+**9 of 10 caught** *(checked; [results/mutants.md](results/mutants.md) has the runs)*. d09 is not caught: when a group's placement is written again, no property here looks at a voter left out of it. It is like f28: the line is in the model and no property sees it.
+
+### The ledger text for `slot-move.22`
+
+Proposed, as the decided form runs it:
+
+> No slot opens in a group that has fewer voters than the resource's copies setting, or than the resource's machines when it has fewer; voters are counted in the newest membership in the leader's log, committed or not, and the machines are every machine the leader may place a copy on and every machine that any group's stored placement names, up or down.
+
+Each part is needed *(checked)*:
+
+| Part | Planted out | What fails |
+|---|---|---|
+| "the resource's copies setting" | d02: a voter on every machine | `NoStuck` on `fd-four`: with four machines no group gets four voters |
+| the guard itself | d03: no guard | `OpenFull` on `fd-twobox`: a group opens with one voter while two machines are there |
+| "or than the resource's machines when it has fewer" | d01: `Copies` always | `NoStuck` on `fd-onebox`: one machine never opens a slot (the old text; probe `f-onebox`) |
+| "every machine the leader may place a copy on" | d05: placed machines only | `OpenFull` on `fd-twobox`: a listed machine with no copy yet is not counted |
+| "every machine that any group's stored placement names, up or down" | d04: listed machines only | `NoShrinkOpen` on `fd-crash` (a crash) and on `fd-shrink` (a shrink) |
+| "any group's" | d10: the group's own placement only | `NoShrinkOpen` on `fd-crash`: a machine placed in another group is down |
+| "the newest membership in the leader's log, committed or not" | n09 in the slot-move models | not in this model: a group's config here changes in one step |
+
+The old reading's mistakes f08 and f09 stand for the copies half on a resource with enough machines.
+
+Two other records must say something too, or the decided form is stuck on two machines (finding 4 of this section): `growth.1`, a placement of three machines or of every listed machine when fewer are listed, and written again as machines come; `growth.2` and `growth.3`, a group on fewer than three machines has a voter on each. Way B's record must not wait for `Copies` machines (d06), and no property needs a shorter wait (d13), so no record holds a wait. The ledger takes the text above and the growth changes as V5-39.
+
 ## Ledger changes proposed
 
-None is applied. Each line: the record, the text now, the text proposed, why, the evidence.
+**After card 0002: the owner took every recommended option (V5-33 to V5-39). V5-37 dropped the settings-version property, so `meta-catalog.6` below was not added.** The ledger now holds the other texts. What follows is the proposal as it stood before the answers. The text this folder now proposes for `slot-move.22` (V5-39) is in "After card 0002".
+
+None is applied here. Each line: the record, the text now, the text proposed, why, the evidence.
 
 **Text changes, each needed by a property** *(checked by the mistakes named)*:
 
@@ -315,14 +470,14 @@ None is applied. Each line: the record, the text now, the text proposed, why, th
 | Way | Changes | What it gives |
 |---|---|---|
 | A, an exception | `handback.5`: "... picked again only once it has left the group's stored placement, or when a new group writes its first full placement ...". `move-policy.6`: "A new group's first full placement is picked by load and memory, and names as preferred member the placed machine that should lead the fewest groups." | `growth.5` keeps the creating leader as first voter. That machine holds a copy of every group it makes (`f-load`). |
-| B, name another machine | `growth.5`: "... a group record in the home log that names as first voter the machine named for the fewest groups ...". `move-policy.6`: "A new group's placement is picked by load and memory, and its first voter is not the creating leader's machine when another can be." | `handback.5` and `handback.6` stay as written. No machine has to hold every group (`f-quiet-load`). The record waits until `copies` machines are there. |
+| B, name another machine | `growth.5`: "... a group record in the home log that names as first voter the machine named for the fewest groups ...". `move-policy.6`: "A new group's placement is picked by load and memory, and its first voter is not the creating leader's machine when another can be." | `handback.5` and `handback.6` stay as written. No machine has to hold every group (`f-quiet-load`). The record waits until `copies` machines are there; with fewer machines, until the resource's machines are (see "After card 0002"). |
 
 **Notes on the proposals above, from the second pass:**
 
 - `growth.5`: the proposed text should also say the record is written once and its first voter never changes (f21).
 - `route-smart.1`: "only if newer" holds for every row a client takes, on a new link too (h12, h13). `slot-table.6` may be the better home: "the slot table, every copy and every client keep the highest version of each slot's row".
 - `genesis-conditional-create.4`: "it applies no seed row" is more than the runs show. `f-homefirst` holds with the home group applying the seed rows of its own share in the first entry. What f12 shows is: the first entry applies no seed row of another group's slots.
-- The choice for finding 5: way A as proposed is shown only for as many groups as copies (finding 11). If way A is taken, the placement must also look at who leads what, or the preferred member must be picked before the placement. Way B is not shown either way past 3 groups.
+- The choice for finding 5: way A as proposed is shown only for as many groups as copies (finding 11). If way A is taken, the placement must also look at who leads what, or the preferred member must be picked before the placement. Way B was not shown either way past 3 groups then; after card 0002 it holds with 4 groups on 4 machines (`f-quiet-many`).
 
 **Evidence only** (the text stands): `meta-catalog.4` holds with two groups, beside `writer-judging.1` and `writer-judging.2` (s06, s07, s08, s12); `home-records.1` and `home-records.2` hold and are needed (h06, h07; the model keeps only the slot table's row, so "partial model"); `selection.6` holds for a live selection's ready (c13); `subscribe.29` holds for a whole selection (c07, c08, c09); `slot-table.1` holds in both worlds (h01, f13).
 
@@ -334,14 +489,14 @@ None is applied. Each line: the record, the text now, the text proposed, why, th
 ```sh
 export TLA_JAR=<the tools jar>      # tla2tools.jar
 export WORK=<scratch dir>           # TLC's files go here
-./run.sh                            # the small bounds, the reach checks, the probes: ends "ok founding"
+./run.sh                            # the small bounds, the reach checks, the probes, the fd- bounds: ends "ok founding"
 ./run.sh big                        # also the big bounds, each under one hour
 ./run.sh big s-big                  # one bound by name
 ./run.sh mutants                    # every planted mistake; writes results/mutants.md
 ./run.sh mutants s03 c12            # some of them
 ```
 
-`HEAVY` may name a wrapper command (a CPU lock on a shared box). `WORKERS` is TLC's worker threads (default 2). `LIMIT` is the seconds one run may take (default 3600); when it passes, the run's whole process group is killed and the run is not counted.
+`HEAVY` may name a wrapper command (a CPU lock on a shared box). `WORKERS` is TLC's worker threads (default 2). `JAVA_MEM` is the JVM's memory flags (default `-Xmx4g`) and `FPMEM` TLC's `-fpmem`. TLC keeps its fingerprints outside the heap, by default a quarter of the box's memory, so on a shared box set both: `f-quiet-many` ("After card 0002") ran with `JAVA_MEM="-Xmx6g -XX:MaxDirectMemorySize=2g" FPMEM=0.11`. `LIMIT` is the seconds one run may take (default 3600); when it passes, the run's whole process group is killed and the run is not counted.
 
 **Pause and resume.** A big bound runs with `-checkpoint 10`: TLC saves its state every 10 minutes under `$WORK/<bound>/meta` (`EVERY` sets the minutes). If the run is stopped (the box restarts, the limit passes, Ctrl-C), go on from the last checkpoint with:
 
@@ -351,7 +506,7 @@ export WORK=<scratch dir>           # TLC's files go here
 
 That passes TLC `-recover` with the newest checkpoint folder. Keep `$WORK`: the checkpoint lives there. A resumed run must hash states the same way as the run it goes on from, and TLC picks its hash function at random for each run, so `run.sh` pins it (`-fp 1 -seed 1`) for the big bounds. This was tried *(checked)*: `c-big` was stopped after 79 s and resumed; it ended with the same 4,140,146 states and depth as the run that was never stopped ([results/resume.txt](results/resume.txt)). After a resume TLC's "generated" count starts again from the checkpoint; the distinct states and the result stand. A resumed run's time is the sum of its parts; count it only if the sum is under the hour.
 
-The small bounds each take seconds to two minutes, so they are simply run again. A pass over the planted mistakes is 87 short jobs: `mutate.py` takes ids, so a stopped pass goes on with the ids that are left, and it merges them into `results/mutants.json`.
+The small bounds each take seconds to two minutes, so they are simply run again. A pass over the planted mistakes is 97 short jobs (87, then d01 to d10 on the `fd-` bounds): `mutate.py` takes ids, so a stopped pass goes on with the ids that are left, and it merges them into `results/mutants.json`.
 
 ## Files
 
@@ -361,6 +516,7 @@ The small bounds each take seconds to two minutes, so they are simply run again.
 | `*Live.tla` | each model with the tag for the "always can finish" check |
 | `agef.py` | that check, on the graph TLC writes |
 | `s-*.cfg`, `h-*.cfg`, `f-*.cfg`, `c-*.cfg` | one bound each, for rows 1 to 4 |
+| `fd-*.cfg` | row 3 in the decided form, after card 0002 (way B, `Fewer = "every"`) |
 | `mutants.txt`, `mutate.py` | the planted mistakes and their runner |
 | `run.sh` | reruns everything |
 | `results/runs.txt` | every counted run: bound, result, states, depth, seconds |

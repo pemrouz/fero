@@ -105,3 +105,86 @@ ok Selection c-back-down: pass (want pass); 27621209 generated, 6370476 distinct
 #
 # Not counted: way B of finding 5 on the bound of f-many (FirstVoter = "quiet", 4 machines, 4 groups, SpreadEven).
 # The run was stopped by the box for lack of memory at 2,195,739 distinct states, 650,221 on the queue, no failure up to there.
+#
+# After card 0002 (2026-11-27). Found.tla got the switch Fewer (V5-39), the world steps Late and MaxShrink, and new
+# properties; every old f- bound sets Fewer = "no", Late = {}, MaxShrink = 0. The new: marks were renamed (comments only).
+# The fd- bounds are row 3 in the decided form (way B, Fewer = "every"); fd-four, fd-quiet-load, fd-big and fd-many use
+# TLC's symmetry over the machines, so their counts are not comparable with the f- bounds.
+# 2 TLC workers, beside another job and beside one other run of this folder (fd-big, then fd-many).
+#
+# ./run.sh   (the small bounds, the reach checks, the probes, and the fd- bounds)   2026-11-27
+ok Settings s-small: pass (want pass); 1204 generated, 520 distinct; depth 13; 3 s
+ok Settings s-two: pass (want pass); 868643 generated, 200225 distinct; depth 22; 24 s
+ok Settings s-alter2: pass (want pass); 3305287 generated, 840096 distinct; depth 26; 94 s
+ok Settings s-reach: violated (want violated); 297544 generated, 85089 distinct; depth 15; 11 s; NotDone fails
+ok Settings s-reach-ro: violated (want violated); 318 generated, 175 distinct; depth 9; 2 s; NotRefused fails
+ok Settings s-reach-behind: violated (want violated); 144 generated, 96 distinct; depth 7; 2 s; NotBehind fails
+ok Settings s-live: live (want live); 9363 generated, 3487 distinct; depth 16; 3 s; live: 3487 states, 1647 judged, 324 goals, 0 cannot finish
+ok HomeRecords h-small: pass (want pass); 10047 generated, 4848 distinct; depth 21; 2 s
+ok HomeRecords h-foreign: pass (want pass); 61287 generated, 21053 distinct; depth 23; 4 s
+ok HomeRecords h-pre: pass (want pass); 722698 generated, 216831 distinct; depth 24; 17 s
+ok HomeRecords h-reach: violated (want violated); 1639 generated, 946 distinct; depth 8; 2 s; NotFound fails
+ok HomeRecords h-reach-far: violated (want violated); 999027 generated, 405040 distinct; depth 12; 23 s; NotFoundFar fails
+ok HomeRecords h-reach-other: violated (want violated); 1828 generated, 1064 distinct; depth 6; 2 s; NotFoundOther fails
+ok HomeRecords h-live: live (want live); 171006 generated, 75010 distinct; depth 26; 16 s; live: 75010 states, 74557 judged, 10718 goals, 0 cannot finish
+ok Found f-small: pass (want pass); 820 generated, 362 distinct; depth 17; 2 s
+ok Found f-crash: pass (want pass); 9991 generated, 3412 distinct; depth 21; 5 s
+ok Found f-crash2: pass (want pass); 43816 generated, 12786 distinct; depth 23; 8 s
+ok Found f-homefirst: pass (want pass); 11251 generated, 3637 distinct; depth 20; 5 s
+ok Found f-four: pass (want pass); 428345 generated, 125632 distinct; depth 25; 52 s
+ok Found f-quiet: pass (want pass); 345713 generated, 125704 distinct; depth 23; 56 s
+ok Found f-quiet-crash: pass (want pass); 5503 generated, 2098 distinct; depth 19; 4 s
+ok Found f-quiet-load: violated (want violated); 1129890 generated, 378602 distinct; depth 18; 205 s; NotSpared fails
+ok Found f-reach: violated (want violated); 6134 generated, 2367 distinct; depth 17; 4 s; NotDone fails
+ok Found f-reach-spread: violated (want violated); 9521 generated, 3102 distinct; depth 24; 6 s; NotSpread fails
+ok Found f-live: live (want live); 14377 generated, 5087 distinct; depth 21; 8 s; live: 5087 states, 2567 judged, 66 goals, 0 cannot finish
+ok Selection c-small: pass (want pass); 2695 generated, 1092 distinct; depth 18; 2 s
+ok Selection c-move: pass (want pass); 177278 generated, 50555 distinct; depth 27; 6 s
+ok Selection c-down: pass (want pass); 300047 generated, 94346 distinct; depth 29; 8 s
+ok Selection c-both: pass (want pass); 1137359 generated, 291596 distinct; depth 31; 19 s
+ok Selection c-down2: pass (want pass); 868357 generated, 244907 distinct; depth 31; 16 s
+ok Selection c-back: pass (want pass); 23591 generated, 8110 distinct; depth 32; 3 s
+ok Selection c-back-drop: pass (want pass); 2686245 generated, 626505 distinct; depth 40; 38 s
+ok Selection c-reach: violated (want violated); 110800 generated, 40332 distinct; depth 15; 5 s; NotFinishedDown fails
+ok Selection c-back-reach: violated (want violated); 859686 generated, 297593 distinct; depth 17; 15 s; NotFinishedBack fails
+ok Selection c-live: live (want live); 37632 generated, 12936 distinct; depth 22; 5 s; live: 12936 states, 9075 judged, 248 goals, 0 cannot finish
+ok Selection c-back-live: live (want live); 229967 generated, 70509 distinct; depth 34; 13 s; live: 70509 states, 53504 judged, 4842 goals, 0 cannot finish
+ok Found fd-onebox: pass (want pass); 26 generated, 18 distinct; depth 10; 1 s
+ok Found fd-twobox: pass (want pass); 3555 generated, 1504 distinct; depth 17; 3 s
+ok Found fd-late: pass (want pass); 3453 generated, 1168 distinct; depth 19; 4 s
+ok Found fd-late-crash: pass (want pass); 21991 generated, 7304 distinct; depth 22; 6 s
+ok Found fd-small: pass (want pass); 17947 generated, 5984 distinct; depth 18; 6 s
+ok Found fd-crash: pass (want pass); 118867 generated, 39010 distinct; depth 20; 9 s
+ok Found fd-crash2: pass (want pass); 367999 generated, 109230 distinct; depth 22; 15 s
+ok Found fd-homefirst: pass (want pass); 80755 generated, 26065 distinct; depth 19; 10 s
+ok Found fd-shrink: pass (want pass); 168880 generated, 57154 distinct; depth 22; 14 s
+ok Found fd-four: pass (want pass); 705810 generated, 158283 distinct; depth 26; 111 s
+ok Found fd-reach: violated (want violated); 76925 generated, 27920 distinct; depth 16; 11 s; NotDoneAll fails
+ok Found fd-reach-late: violated (want violated); 2319 generated, 887 distinct; depth 16; 3 s; NotDoneAll fails
+ok Found fd-reach-shrink: violated (want violated); 5241 generated, 2178 distinct; depth 10; 3 s; NotShrunkShut fails
+ok Found fd-reach-spread: violated (want violated); 695314 generated, 177999 distinct; depth 22; 57 s; NotSpread fails
+ok Found fd-quiet-load: violated (want violated); 401912 generated, 90568 distinct; depth 20; 133 s; NotSpared fails
+ok Found fd-live: live (want live); 181066 generated, 61985 distinct; depth 20; 27 s; live: 61985 states, 26441 judged, 387 goals, 0 cannot finish
+ok Found fd-late-live: live (want live); 32872 generated, 11358 distinct; depth 22; 11 s; live: 11358 states, 4849 judged, 150 goals, 0 cannot finish
+ok Found fd-two-live: live (want live); 4957 generated, 2185 distinct; depth 17; 5 s; live: 2185 states, 1127 judged, 40 goals, 0 cannot finish
+ok Settings s-early: violated (want violated); 664 generated, 339 distinct; depth 9; 3 s; EarlyKept fails
+ok Found f-aswritten: violated (want violated); 356 generated, 140 distinct; depth 11; 2 s; Spread fails
+ok Found f-onebox: violated (want violated); 6 generated, 6 distinct; depth 6; 2 s; NoStuck fails
+ok Found f-many: violated (want violated); 351191 generated, 109215 distinct; depth 17; 42 s; SpreadEven fails
+ok Selection c-asread: violated (want violated); 1108 generated, 499 distinct; depth 9; 2 s; Whole fails
+ok Found fd-two-three: violated (want violated); 80 generated, 50 distinct; depth 7; 2 s; NoStuck fails
+ok Found fd-spread: violated (want violated); 2475 generated, 1155 distinct; depth 10; 4 s; Spread fails
+ok founding
+#
+# ./run.sh big f-quiet-many   (V5-38: way B on f-many's world, alone on the box; 3 workers, -Xmx6g, 2 GB of
+# fingerprints off the heap, a checkpoint every 10 minutes; the chance of a fingerprint clash 5.3E-6)
+ok Found f-quiet-many: pass (want pass); 21710045 generated, 6328888 distinct; depth 29; 2495 s
+#
+# ./run.sh big fd-big, then fd-many, then fd-many1   (the decided form, symmetry; 2 workers)
+ok Found fd-big: pass (want pass); 7692748 generated, 1755093 distinct; depth 30; 962 s
+ok Found fd-many1: pass (want pass); 4492230 generated, 993438 distinct; depth 28; 732 s
+#
+# Not counted: fd-many, stopped at its 3600 s limit at 5,760,495 distinct states, depth 24, 1,252,508 on the queue,
+# no failure up to there. fd-four without symmetry, stopped by hand at 1,638,945 distinct states at depth 19.
+# Checked by hand, not a run.sh line: d04 planted on fd-shrink with TLC's -continue; the shortest failing run through
+# a shrink has 11 states (Place, Grow, Crash, Shrink, Open with two voters).

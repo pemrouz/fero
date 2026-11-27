@@ -16,8 +16,8 @@ Made by `mutate.py` from `mutants.txt`. A mistake is caught when a property fail
 | s06 | `meta-catalog.4` | drop the read-only gate | GateGroup on s-small, 6 steps | 1, 2 s |
 | s07 | `meta-catalog.4` | the gate is read from committed entries only, not the log end | GateGroup on s-small, 6 steps | 1, 2 s |
 | s08 | `writer-judging.1` | a write is judged under the committed settings, not the ones at the log end | JudgeOrder on s-small, 6 steps | 1, 2 s |
-| s09 | `new:settings-behind` | drop the refusal of a write made under settings the group has not taken up | AsMade on s-small, 7 steps | 1, 2 s |
-| s10 | `new:settings-behind` | flip > to >=: a write made under the group's own settings is sent back | cannot always finish on s-live: 191 of 1102 judged states | 5, 27 s |
+| s09 | `line:settings-behind` | drop the refusal of a write made under settings the group has not taken up | AsMade on s-small, 7 steps | 1, 2 s |
+| s10 | `line:settings-behind` | flip > to >=: a write made under the group's own settings is sent back | cannot always finish on s-live: 191 of 1102 judged states | 5, 27 s |
 | s11 | `meta-catalog.5 own-entry` | the take-up entry drops the gate | Same on s-small, 5 steps | 1, 1 s |
 | s12 | `writer-judging.2` | the read-only refusal is sent before the gate's entry has committed | RoTrue on s-small, 4 steps | 1, 1 s |
 | s13 | `line:learn-committed` | a copy hands out a settings version its group has not committed | Shape on s-alter2, 5 steps | 3, 34 s |
@@ -69,7 +69,7 @@ Made by `mutate.py` from `mutants.txt`. A mistake is caught when a property fail
 | f17 | `healing-self.16` | a placement names a machine the leader cannot reach | OneId on f-small, 6 steps | 1, 2 s |
 | f18 | `genesis-conditional-create.4` | the founder is not the home group's only voter | VoterHas on f-small, 4 steps | 1, 1 s |
 | f19 | `handback.1` | leadership is never handed to the preferred member | cannot always finish on f-live: 2039 of 2213 judged states | 7, 60 s |
-| f20 | `new:first-voter-by-load` | a group record names any machine, whatever it was named for already | Spread on f-quiet, 10 steps | 4, 11 s |
+| f20 | `growth.5` | a group record names any machine, whatever it was named for already | Spread on f-quiet, 10 steps | 4, 11 s |
 | f21 | `line:record-once` | a group record is written again, by a later leader | OneLog on f-crash, 14 steps | 2, 7 s |
 | f22 | `line:place-leader` | a placement leaves the group's leader out | PrefPlaced on f-small, 7 steps | 1, 2 s |
 | f23 | `line:open-once` | a group opens its share again | SeedOnce on f-small, 10 steps | 1, 2 s |
@@ -85,7 +85,7 @@ Made by `mutate.py` from `mutants.txt`. A mistake is caught when a property fail
 | id | rule | the mistake | caught by | runs |
 |---|---|---|---|---|
 | c01 | `subscribe.14` | the client takes a record that is not the next one | Exact on c-small, 12 steps | 1, 3 s |
-| c02 | `new:picture-per-slot` | the client takes a picture of a slot from before its cursor | NoBack on c-small, 10 steps | 1, 3 s |
+| c02 | `subscribe.38` | the client takes a picture of a slot from before its cursor | NoBack on c-small, 10 steps | 1, 3 s |
 | c03 | `subscribe.13` | a picture does not set the slot's cursor | Exact on c-small, 5 steps | 1, 3 s |
 | c04 | `subscribe.12` | a picture does not put in the slot's rows | Exact on c-small, 5 steps | 1, 2 s |
 | c05 | `subscribe.16` | a record does not move the cursor on | Exact on c-small, 7 steps | 1, 3 s |
@@ -93,9 +93,9 @@ Made by `mutate.py` from `mutants.txt`. A mistake is caught when a property fail
 | c07 | `subscribe.29 end` | END names the old group, not the new one | **not caught** | 7, 102 s |
 | c08 | `subscribe.29 turn` | the client ignores END | NoStuck on c-small, 12 steps | 1, 3 s |
 | c09 | `subscribe.29 again` | the client never asks the new group for the slot | cannot always finish on c-live: 1177 of 7770 judged states | 6, 44 s |
-| c10 | `new:picture-names-moved` | a picture does not name the slots the group handed off | NoStuck on c-small, 9 steps | 1, 3 s |
-| c11 | `new:turn-on-moved` | a slot the client never held is not asked for at the new group | NoStuck on c-small, 9 steps | 1, 3 s |
-| c12 | `new:ready-per-slot` | ready as soon as every group's picture has come | Whole on c-small, 8 steps | 1, 3 s |
+| c10 | `subscribe.39` | a picture does not name the slots the group handed off | NoStuck on c-small, 9 steps | 1, 3 s |
+| c11 | `subscribe.39` | a slot the client never held is not asked for at the new group | NoStuck on c-small, 9 steps | 1, 3 s |
+| c12 | `selection.1` | ready as soon as every group's picture has come | Whole on c-small, 8 steps | 1, 3 s |
 | c13 | `selection.1 ready` | ready once one group's picture has come | Waits on c-down, 7 steps | 3, 15 s |
 | c14 | `subscribe.3` | a picture names the wrong position | NoStuck on c-small, 8 steps | 1, 3 s |
 | c15 | `subscribe.5` | a server sends a record that has not committed | Exact on c-small, 6 steps | 1, 2 s |
@@ -103,13 +103,30 @@ Made by `mutate.py` from `mutants.txt`. A mistake is caught when a property fail
 | c17 | `subscribe.1` | a group streams slots it does not hold | NoStuck on c-small, 11 steps | 1, 2 s |
 | c18 | `subscribe.6` | a record is sent under the next position | NoStuck on c-small, 10 steps | 1, 2 s |
 | c19 | `line:spic-src` | a slot's picture does not set the group the slot is taken from | NoStuck on c-back, 17 steps | 4, 17 s |
-| c20 | `new:picture-per-slot` | a picture that does not cover a slot is taken for it | Exact on c-small, 4 steps | 1, 2 s |
+| c20 | `subscribe.38` | a picture that does not cover a slot is taken for it | Exact on c-small, 4 steps | 1, 2 s |
 | c21 | `line:spic-position` | a slot's picture names position 0 | NoStuck on c-small, 13 steps | 1, 2 s |
 | c22 | `line:spic-sent` | after a slot's picture the group skips a record | NoStuck on c-small, 13 steps | 1, 2 s |
 | c23 | `line:end-src` | an END from a group the slot is not taken from clears where it is taken from | NoStuck on c-back, 16 steps | 4, 19 s |
 | c24 | `subscribe.29 turn` | an END from any group turns the client, an old END too | **not caught** | 7, 55 s |
-| c25 | `new:ask-ended` | an ask for a slot the group handed off waits for ever | NoStuck on c-back, 12 steps | 4, 24 s |
+| c25 | `subscribe.40` | an ask for a slot the group handed off waits for ever | NoStuck on c-back, 12 steps | 4, 24 s |
 | c26 | `subscribe.29 turn` | an END that answers an ask does not turn the client | cannot always finish on c-back-live: 1484 of 37757 judged states | 7, 58 s |
+
+## Found in the decided form, after card 0002: 9 of 10 caught
+
+Way B and the new reading of `slot-move.22` (Fewer = "every"), on the fd- bounds. Counted apart from the total above.
+
+| id | rule | the mistake | caught by | runs |
+|---|---|---|---|---|
+| d01 | `slot-move.22 fewer` | the machines half dropped: a group needs Copies voters however few machines the resource has | NoStuck on fd-onebox, 6 steps | 1, 1 s |
+| d02 | `slot-move.22 fewer` | the copies half dropped: a group needs a voter on every machine the resource has | NoStuck on fd-four, 17 steps | 7, 60 s |
+| d03 | `slot-move.22 fewer` | the guard dropped: a group opens with any number of voters | OpenFull on fd-twobox, 6 steps | 2, 4 s |
+| d04 | `slot-move.22 machines` | the resource's machines are only the listed ones: a machine that is down is not counted | NoShrinkOpen on fd-crash, 11 steps | 4, 16 s |
+| d05 | `slot-move.22 machines` | the resource's machines are only the placed ones: a listed machine with no copy yet is not counted | OpenFull on fd-twobox, 6 steps | 2, 4 s |
+| d06 | `line:record-waits` | way B's group record still waits for Copies machines | NoStuck on fd-onebox, 6 steps | 1, 2 s |
+| d07 | `growth.1 fewer` | growth as written: a placement names Copies machines, never fewer | NoStuck on fd-twobox, 7 steps | 2, 4 s |
+| d08 | `growth.2 fewer` | a group grows only from one voter, not again when a machine comes later | NoStuck on fd-small, 14 steps | 3, 11 s |
+| d09 | `line:place-keeps-voters` | a placement written again may leave a voter out | **not caught** | 11, 257 s |
+| d10 | `slot-move.22 machines` | the resource's machines are the listed ones and the group's own placement only, not the other groups' | NoShrinkOpen on fd-crash, 13 steps | 4, 20 s |
 
 ## Probes: 3 of 3 not caught, as expected
 

@@ -20,7 +20,7 @@
  {
   "id": "c02",
   "model": "Selection",
-  "rule": "new:picture-per-slot",
+  "rule": "subscribe.38",
   "note": "the client takes a picture of a slot from before its cursor",
   "caught": true,
   "by": "NoBack on c-small, 10 steps",
@@ -258,7 +258,7 @@
  {
   "id": "c10",
   "model": "Selection",
-  "rule": "new:picture-names-moved",
+  "rule": "subscribe.39",
   "note": "a picture does not name the slots the group handed off",
   "caught": true,
   "by": "NoStuck on c-small, 9 steps",
@@ -276,7 +276,7 @@
  {
   "id": "c11",
   "model": "Selection",
-  "rule": "new:turn-on-moved",
+  "rule": "subscribe.39",
   "note": "a slot the client never held is not asked for at the new group",
   "caught": true,
   "by": "NoStuck on c-small, 9 steps",
@@ -294,7 +294,7 @@
  {
   "id": "c12",
   "model": "Selection",
-  "rule": "new:ready-per-slot",
+  "rule": "selection.1",
   "note": "ready as soon as every group's picture has come",
   "caught": true,
   "by": "Whole on c-small, 8 steps",
@@ -530,7 +530,7 @@
  {
   "id": "c20",
   "model": "Selection",
-  "rule": "new:picture-per-slot",
+  "rule": "subscribe.38",
   "note": "a picture that does not cover a slot is taken for it",
   "caught": true,
   "by": "Exact on c-small, 4 steps",
@@ -696,7 +696,7 @@
  {
   "id": "c25",
   "model": "Selection",
-  "rule": "new:ask-ended",
+  "rule": "subscribe.40",
   "note": "an ask for a slot the group handed off waits for ever",
   "caught": true,
   "by": "NoStuck on c-back, 12 steps",
@@ -802,6 +802,406 @@
     "secs": 13,
     "judged": 37757,
     "cannot": 1484
+   }
+  ]
+ },
+ {
+  "id": "d01",
+  "model": "Found",
+  "rule": "slot-move.22 fewer",
+  "note": "the machines half dropped: a group needs Copies voters however few machines the resource has",
+  "caught": true,
+  "by": "NoStuck on fd-onebox, 6 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 6,
+    "distinct": 6,
+    "secs": 1
+   }
+  ]
+ },
+ {
+  "id": "d02",
+  "model": "Found",
+  "rule": "slot-move.22 fewer",
+  "note": "the copies half dropped: a group needs a voter on every machine the resource has",
+  "caught": true,
+  "by": "NoStuck on fd-four, 17 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 1
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1504,
+    "secs": 2
+   },
+   {
+    "bound": "fd-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 884,
+    "secs": 4
+   },
+   {
+    "bound": "fd-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 677,
+    "secs": 8
+   },
+   {
+    "bound": "fd-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 985,
+    "secs": 8
+   },
+   {
+    "bound": "fd-late",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1168,
+    "secs": 4
+   },
+   {
+    "bound": "fd-four",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 17,
+    "distinct": 147,
+    "secs": 33
+   }
+  ]
+ },
+ {
+  "id": "d03",
+  "model": "Found",
+  "rule": "slot-move.22 fewer",
+  "note": "the guard dropped: a group opens with any number of voters",
+  "caught": true,
+  "by": "OpenFull on fd-twobox, 6 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 6,
+    "distinct": 87,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "d04",
+  "model": "Found",
+  "rule": "slot-move.22 machines",
+  "note": "the resource's machines are only the listed ones: a machine that is down is not counted",
+  "caught": true,
+  "by": "NoShrinkOpen on fd-crash, 11 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1648,
+    "secs": 3
+   },
+   {
+    "bound": "fd-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 206,
+    "secs": 7
+   },
+   {
+    "bound": "fd-crash",
+    "verdict": "violated",
+    "inv": "NoShrinkOpen",
+    "steps": 11,
+    "distinct": 4082,
+    "secs": 4
+   }
+  ]
+ },
+ {
+  "id": "d05",
+  "model": "Found",
+  "rule": "slot-move.22 machines",
+  "note": "the resource's machines are only the placed ones: a listed machine with no copy yet is not counted",
+  "caught": true,
+  "by": "OpenFull on fd-twobox, 6 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "violated",
+    "inv": "OpenFull",
+    "steps": 6,
+    "distinct": 86,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "d06",
+  "model": "Found",
+  "rule": "line:record-waits",
+  "note": "way B's group record still waits for Copies machines",
+  "caught": true,
+  "by": "NoStuck on fd-onebox, 6 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 6,
+    "distinct": 6,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "d07",
+  "model": "Found",
+  "rule": "growth.1 fewer",
+  "note": "growth as written: a placement names Copies machines, never fewer",
+  "caught": true,
+  "by": "NoStuck on fd-twobox, 7 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 7,
+    "distinct": 119,
+    "secs": 2
+   }
+  ]
+ },
+ {
+  "id": "d08",
+  "model": "Found",
+  "rule": "growth.2 fewer",
+  "note": "a group grows only from one voter, not again when a machine comes later",
+  "caught": true,
+  "by": "NoStuck on fd-small, 14 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1600,
+    "secs": 3
+   },
+   {
+    "bound": "fd-small",
+    "verdict": "violated",
+    "inv": "NoStuck",
+    "steps": 14,
+    "distinct": 190,
+    "secs": 6
+   }
+  ]
+ },
+ {
+  "id": "d09",
+  "model": "Found",
+  "rule": "line:place-keeps-voters",
+  "note": "a placement written again may leave a voter out",
+  "caught": false,
+  "by": null,
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1504,
+    "secs": 3
+   },
+   {
+    "bound": "fd-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 287,
+    "secs": 7
+   },
+   {
+    "bound": "fd-crash",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 795,
+    "secs": 14
+   },
+   {
+    "bound": "fd-shrink",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 628,
+    "secs": 16
+   },
+   {
+    "bound": "fd-late",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 148,
+    "secs": 5
+   },
+   {
+    "bound": "fd-four",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 616,
+    "secs": 159
+   },
+   {
+    "bound": "fd-reach",
+    "verdict": "violated",
+    "inv": "NotDoneAll",
+    "steps": 16,
+    "distinct": 528,
+    "secs": 11
+   },
+   {
+    "bound": "fd-reach-late",
+    "verdict": "violated",
+    "inv": "NotDoneAll",
+    "steps": 16,
+    "distinct": 1084,
+    "secs": 5
+   },
+   {
+    "bound": "fd-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 325,
+    "secs": 24,
+    "judged": 26441,
+    "cannot": 0
+   },
+   {
+    "bound": "fd-late-live",
+    "verdict": "live",
+    "inv": null,
+    "steps": 0,
+    "distinct": 702,
+    "secs": 11,
+    "judged": 4849,
+    "cannot": 0
+   }
+  ]
+ },
+ {
+  "id": "d10",
+  "model": "Found",
+  "rule": "slot-move.22 machines",
+  "note": "the resource's machines are the listed ones and the group's own placement only, not the other groups'",
+  "caught": true,
+  "by": "NoShrinkOpen on fd-crash, 13 steps",
+  "runs": [
+   {
+    "bound": "fd-onebox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 18,
+    "secs": 2
+   },
+   {
+    "bound": "fd-twobox",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 1612,
+    "secs": 4
+   },
+   {
+    "bound": "fd-small",
+    "verdict": "pass",
+    "inv": null,
+    "steps": 0,
+    "distinct": 217,
+    "secs": 7
+   },
+   {
+    "bound": "fd-crash",
+    "verdict": "violated",
+    "inv": "NoShrinkOpen",
+    "steps": 13,
+    "distinct": 50,
+    "secs": 7
    }
   ]
  },
@@ -1282,7 +1682,7 @@
  {
   "id": "f20",
   "model": "Found",
-  "rule": "new:first-voter-by-load",
+  "rule": "growth.5",
   "note": "a group record names any machine, whatever it was named for already",
   "caught": true,
   "by": "Spread on f-quiet, 10 steps",
@@ -2326,7 +2726,7 @@
  {
   "id": "s09",
   "model": "Settings",
-  "rule": "new:settings-behind",
+  "rule": "line:settings-behind",
   "note": "drop the refusal of a write made under settings the group has not taken up",
   "caught": true,
   "by": "AsMade on s-small, 7 steps",
@@ -2344,7 +2744,7 @@
  {
   "id": "s10",
   "model": "Settings",
-  "rule": "new:settings-behind",
+  "rule": "line:settings-behind",
   "note": "flip > to >=: a write made under the group's own settings is sent back",
   "caught": true,
   "by": "cannot always finish on s-live: 191 of 1102 judged states",

@@ -62,7 +62,7 @@ NoGone == [s \in Slots |-> "none"]
 \* fenceAt[g][s] is the position at which g handed slot s off, or NoP while
 \* g has not handed it off or holds it again.
 \* The slots a group handed off, with the group each went to.
-Gone(g) == [s \in Slots |-> IF fenceAt[g][s] # NoP THEN Other(g) ELSE "none"]   \* @rule new:picture-names-moved
+Gone(g) == [s \in Slots |-> IF fenceAt[g][s] # NoP THEN Other(g) ELSE "none"]   \* @rule subscribe.39
 
 Init == /\ up = [g \in Groups |-> TRUE]
         /\ hold = [s \in Slots |-> Start(s)]
@@ -148,7 +148,7 @@ ServeSlot(g, s) ==
 \* answers END and names the group the slot went to.
 ServeGone(g, s) ==
     /\ up[g] /\ sub[g] /\ [t |-> "slot", g |-> g, s |-> s] \in req /\ Room(g)
-    /\ fenceAt[g][s] # NoP                                                             \* @rule new:ask-ended
+    /\ fenceAt[g][s] # NoP                                                             \* @rule subscribe.40
     /\ req' = req \ {[t |-> "slot", g |-> g, s |-> s]}
     /\ q' = [q EXCEPT ![g] = Append(@, Frame("end", s, fenceAt[g][s], Other(g), NoAt, NoGone))]
     /\ UNCHANGED <<up, hold, pos, moved, fenceAt, from, sub, strm, sent, cs, has, cur, view, src, ask, downs, drops, back>>
@@ -188,13 +188,13 @@ AskSlot(s) ==
     /\ UNCHANGED <<up, hold, pos, moved, fenceAt, from, sub, strm, sent, q, cs, has, cur, view, src, ask, downs, drops, back>>
 
 \* A picture of a slot is taken only at or past the client's cursor for it.
-TakesPic(s, n) == n # NoP /\ (~has[s] \/ n >= cur[s])                                  \* @rule new:picture-per-slot
+TakesPic(s, n) == n # NoP /\ (~has[s] \/ n >= cur[s])                                  \* @rule subscribe.38
 \* A record is taken only if it is the next one for its slot.
 TakesRec(s, n) == has[s] /\ n = cur[s] + 1                                             \* @rule subscribe.14
 
 \* A slot the group says it handed off: the client turns to the new group,
 \* unless it already takes the slot from there.
-Turn(g, s, to) == to # "none" /\ src[s] \in {g, "none"}                                \* @rule new:turn-on-moved
+Turn(g, s, to) == to # "none" /\ src[s] \in {g, "none"}                                \* @rule subscribe.39
 
 Recv(g) ==
     /\ q[g] # <<>>
@@ -231,7 +231,7 @@ Recv(g) ==
 \* The selection is ready when every group's picture has come and every
 \* slot is covered.
 Ready == /\ \A g \in Groups : cs[g] = "live"                                           \* @rule selection.1 ready
-         /\ ReadyBySlots => \A s \in Slots : has[s]                                    \* @rule new:ready-per-slot
+         /\ ReadyBySlots => \A s \in Slots : has[s]                                    \* @rule selection.1
 
 --------------------------------------------------------------------------
 (* Faults *)

@@ -16,8 +16,8 @@ s05 ; Settings ; meta-catalog.5 ; \A g \in Groups ; \A g \in {Home} ; the alter 
 s06 ; Settings ; meta-catalog.4 ; IF RoAt(L, n) ; IF FALSE ; drop the read-only gate
 s07 ; Settings ; meta-catalog.4 ; IF RoAt(L, n) ; IF RoAt(L, ci[m.g]) ; the gate is read from committed entries only, not the log end
 s08 ; Settings ; writer-judging.1 ; JudgeAt(g) == Len(log[g]) ; JudgeAt(g) == ci[g] ; a write is judged under the committed settings, not the ones at the log end
-s09 ; Settings ; new:settings-behind ; m.cv > a ; FALSE ; drop the refusal of a write made under settings the group has not taken up
-s10 ; Settings ; new:settings-behind ; m.cv > a ; m.cv >= a ; flip > to >=: a write made under the group's own settings is sent back
+s09 ; Settings ; line:settings-behind ; m.cv > a ; FALSE ; drop the refusal of a write made under settings the group has not taken up
+s10 ; Settings ; line:settings-behind ; m.cv > a ; m.cv >= a ; flip > to >=: a write made under the group's own settings is sent back
 s11 ; Settings ; meta-catalog.5 own-entry ; SetE(v, RoAt(H, Len(H))) ; SetE(v, FALSE) ; the take-up entry drops the gate
 s12 ; Settings ; writer-judging.2 ; LastSet(L, n) <= ci[m.g] ; TRUE ; the read-only refusal is sent before the gate's entry has committed
 s13 ; Settings ; line:learn-committed ; cver' = Taken(g) ; cver' = TakenEnd(g) ; a copy hands out a settings version its group has not committed
@@ -62,7 +62,7 @@ f15 ; Found ; healing-self.19 ; Load(a) <= Load(b) ; TRUE ; a placement ignores 
 f16 ; Found ; move-policy.6 ; PLoad(p, g) <= PLoad(q, g) ; TRUE ; a new group's preferred member ignores load
 f17 ; Found ; healing-self.16 ; S \subseteq Avail \ {lead[g]} ; S \subseteq M \ {lead[g]} ; a placement names a machine the leader cannot reach
 f18 ; Found ; genesis-conditional-create.4 ; voters' = [voters EXCEPT ![0] = {m}] ; voters' = [voters EXCEPT ![0] = M] ; the founder is not the home group's only voter
-f20 ; Found ; new:first-voter-by-load ; RLoad(m) <= RLoad(q) ; TRUE ; a group record names any machine, whatever it was named for already
+f20 ; Found ; growth.5 ; RLoad(m) <= RLoad(q) ; TRUE ; a group record names any machine, whatever it was named for already
 f19 ; Found ; handback.1 ; lead' = [lead EXCEPT ![g] = pref[g]] ; lead' = lead ; leadership is never handed to the preferred member
 f21 ; Found ; line:record-once ; /\ g # 0 /\ rec[g] = "none" ; /\ g # 0 ; a group record is written again, by a later leader
 f22 ; Found ; line:place-leader ; S \cup {lead[g]}] ; S] ; a placement leaves the group's leader out
@@ -76,7 +76,7 @@ f29 ; Found ; line:handback-up ; pref[g] # lead[g] /\ up[pref[g]] ; pref[g] # le
 #
 # c: Selection (row 4).
 c01 ; Selection ; subscribe.14 ; n = cur[s] + 1 ; TRUE ; the client takes a record that is not the next one
-c02 ; Selection ; new:picture-per-slot ; n >= cur[s] ; TRUE ; the client takes a picture of a slot from before its cursor
+c02 ; Selection ; subscribe.38 ; n >= cur[s] ; TRUE ; the client takes a picture of a slot from before its cursor
 c03 ; Selection ; subscribe.13 ; THEN f.at[s] ELSE cur[s]] ; THEN cur[s] ELSE cur[s]] ; a picture does not set the slot's cursor
 c04 ; Selection ; subscribe.12 ; THEN f.at[s] ELSE view[s]] ; THEN view[s] ELSE view[s]] ; a picture does not put in the slot's rows
 c05 ; Selection ; subscribe.16 ; THEN f.n ELSE @] ; THEN @ ELSE @] ; a record does not move the cursor on
@@ -84,9 +84,9 @@ c06 ; Selection ; subscribe.15 ; THEN @ + 1 ELSE @] ; THEN @ ELSE @] ; a record 
 c07 ; Selection ; subscribe.29 end ; Other(g), NoAt, NoGone ; g, NoAt, NoGone ; END names the old group, not the new one
 c08 ; Selection ; subscribe.29 turn ; THEN f.to ELSE @] ; THEN @ ELSE @] ; the client ignores END
 c09 ; Selection ; subscribe.29 again ; req' = req \cup {[t |-> "slot", g |-> ask[s], s |-> s]} ; req' = req ; the client never asks the new group for the slot
-c10 ; Selection ; new:picture-names-moved ; THEN Other(g) ELSE "none"] ; THEN "none" ELSE "none"] ; a picture does not name the slots the group handed off
-c11 ; Selection ; new:turn-on-moved ; src[s] \in {g, "none"} ; src[s] = g ; a slot the client never held is not asked for at the new group
-c12 ; Selection ; new:ready-per-slot ; ReadyBySlots => \A s \in Slots : has[s] ; TRUE ; ready as soon as every group's picture has come
+c10 ; Selection ; subscribe.39 ; THEN Other(g) ELSE "none"] ; THEN "none" ELSE "none"] ; a picture does not name the slots the group handed off
+c11 ; Selection ; subscribe.39 ; src[s] \in {g, "none"} ; src[s] = g ; a slot the client never held is not asked for at the new group
+c12 ; Selection ; selection.1 ; ReadyBySlots => \A s \in Slots : has[s] ; TRUE ; ready as soon as every group's picture has come
 c13 ; Selection ; selection.1 ready ; \A g \in Groups : cs[g] = "live" ; \E g \in Groups : cs[g] = "live" ; ready once one group's picture has come
 c14 ; Selection ; subscribe.3 ; THEN pos[s] ELSE NoP] ; THEN 0 ELSE NoP] ; a picture names the wrong position
 c15 ; Selection ; subscribe.5 ; sent[g][s] < Last(g, s) ; sent[g][s] < MaxRec ; a server sends a record that has not committed
@@ -94,13 +94,27 @@ c16 ; Selection ; slot-move.9 ; hold[s] = g ; hold[s] # "none" ; a group answers
 c17 ; Selection ; subscribe.1 ; {s \in Slots : hold[s] = g}] ; Slots] ; a group streams slots it does not hold
 c18 ; Selection ; subscribe.6 ; sent[g][s] + 1, ; sent[g][s] + 2, ; a record is sent under the next position
 c19 ; Selection ; line:spic-src ; [src EXCEPT ![f.s] = g] ; src ; a slot's picture does not set the group the slot is taken from
-c20 ; Selection ; new:picture-per-slot ; n # NoP /\ ( ; ( ; a picture that does not cover a slot is taken for it
+c20 ; Selection ; subscribe.38 ; n # NoP /\ ( ; ( ; a picture that does not cover a slot is taken for it
 c21 ; Selection ; line:spic-position ; Frame("spic", s, Last(g, s), ; Frame("spic", s, 0, ; a slot's picture names position 0
 c22 ; Selection ; line:spic-sent ; = Last(g, s)] ; = Last(g, s) + 1] ; after a slot's picture the group skips a record
 c23 ; Selection ; line:end-src ; IF @ = g THEN "none" ELSE @] ; "none"] ; an END from a group the slot is not taken from clears where it is taken from
 c24 ; Selection ; subscribe.29 turn ; IF src[f.s] = g \/ @ = g THEN ; IF TRUE THEN ; an END from any group turns the client, an old END too
-c25 ; Selection ; new:ask-ended ; fenceAt[g][s] # NoP ; FALSE ; an ask for a slot the group handed off waits for ever
+c25 ; Selection ; subscribe.40 ; fenceAt[g][s] # NoP ; FALSE ; an ask for a slot the group handed off waits for ever
 c26 ; Selection ; subscribe.29 turn ; src[f.s] = g \/ @ = g ; src[f.s] = g ; an END that answers an ask does not turn the client
 x01 ; Selection ; subscribe.29 at-fence ; sent[g][s] = fenceAt[g][s] ; TRUE ; END goes out before the last records below the fence (a picture replaces them in state mode)
 x02 ; Selection ; subscribe.14 ; n = cur[s] + 1 ; n >= cur[s] + 1 ; the client takes a record past the next one (no stream here has a gap)
 x03 ; HomeRecords ; slot-table.6 ; new.e > old.e ; new.e >= old.e ; flip > to >=: a row of the same epoch is the same row
+#
+# d: Found in the decided form (after card 0002): way B, Fewer = "every".
+# Run on the fd- bounds (mutate.py's plan for ids that start with d); counted
+# apart from the 87 above.
+d01 ; Found ; slot-move.22 fewer ; Min(Copies, Cardinality(Known(g))) ; Copies ; the machines half dropped: a group needs Copies voters however few machines the resource has
+d02 ; Found ; slot-move.22 fewer ; Min(Copies, Cardinality(Known(g))) ; Cardinality(Known(g)) ; the copies half dropped: a group needs a voter on every machine the resource has
+d03 ; Found ; slot-move.22 fewer ; Cardinality(voters[g]) >= Min(Copies, Cardinality(Known(g))) ; TRUE ; the guard dropped: a group opens with any number of voters
+d04 ; Found ; slot-move.22 machines ; Known(g) == Avail \cup UNION {place[h] : h \in Groups} ; Known(g) == Avail ; the resource's machines are only the listed ones: a machine that is down is not counted
+d05 ; Found ; slot-move.22 machines ; Known(g) == Avail \cup UNION {place[h] : h \in Groups} ; Known(g) == UNION {place[h] : h \in Groups} ; the resource's machines are only the placed ones: a listed machine with no copy yet is not counted
+d06 ; Found ; line:record-waits ; THEN Copies ELSE Need(g) ; THEN Copies ELSE Copies ; way B's group record still waits for Copies machines
+d07 ; Found ; growth.1 fewer ; Cardinality(place[g]) < Size /\ Cardinality(S) = Size - 1 ; Cardinality(place[g]) < Copies /\ Cardinality(S) = Copies - 1 ; growth as written: a placement names Copies machines, never fewer
+d08 ; Found ; growth.2 fewer ; voters[g] # place[g] ; Cardinality(voters[g]) = 1 ; a group grows only from one voter, not again when a machine comes later
+d09 ; Found ; line:place-keeps-voters ; voters[g] \subseteq S \cup {lead[g]} ; TRUE ; a placement written again may leave a voter out
+d10 ; Found ; slot-move.22 machines ; Avail \cup UNION {place[h] : h \in Groups} ; Avail \cup place[g] ; the resource's machines are the listed ones and the group's own placement only, not the other groups'

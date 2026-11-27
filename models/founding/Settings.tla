@@ -14,8 +14,10 @@
    sends writes that name that version.
 
    Lines marked  \* @rule <ledger id or name>  hold the rules.  mutants.txt
-   plants one-line mistakes on them.  A name that starts "new:" is a rule
-   the ledger does not hold yet. *)
+   plants one-line mistakes on them.  A name that starts "line:" marks a
+   line that has no ledger id of its own.  The "behind" answer (line
+   settings-behind) holds AsMade, the property the owner dropped (V5-37):
+   the model keeps both so its runs stay as they were. *)
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS Data,      \* the groups beside the home group
@@ -122,7 +124,8 @@ Commit(g) ==
     /\ UNCHANGED <<log, up, answered, cver, wst, wg, msgs, crashes, downs, early>>
 
 \* A leader takes a write, refuses it read-only, or sends it back as
-\* "behind" when the sender holds settings this group has not taken up.
+\* "behind" when the sender holds settings this group has not taken up
+\* (no ledger rule: the owner dropped AsMade, V5-37).
 \* It sends the read-only refusal only once the entry that set the gate has
 \* committed; until then the write waits.
 Take(m) ==
@@ -135,7 +138,7 @@ Take(m) ==
           THEN /\ LastSet(L, n) <= ci[m.g]                    \* @rule writer-judging.2
                /\ wst' = [wst EXCEPT ![m.w] = "ro"]
                /\ UNCHANGED <<log, early>>
-          ELSE IF m.cv > a                                    \* @rule new:settings-behind
+          ELSE IF m.cv > a                                    \* @rule line:settings-behind
           THEN /\ wst' = [wst EXCEPT ![m.w] = "behind"]
                /\ UNCHANGED <<log, early>>
           ELSE /\ log' = [log EXCEPT ![m.g] = Append(@, WrE(m.w, a, m.cv))]
@@ -238,6 +241,7 @@ GateAll == ~late
 InForce == \A v \in answered : \A g \in Groups : Taken(g) >= v
 
 \* No write is judged under settings older than the ones its sender held.
+\* The owner dropped this property (V5-37); it is kept as it was checked.
 AsMade == \A g \in Groups : \A i \in Committed(g) :
             log[g][i].t = "w" => log[g][i].cv <= log[g][i].v
 

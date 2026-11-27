@@ -7,10 +7,16 @@
 #   WORKERS  TLC worker threads                             default 2
 #   LIMIT    seconds one run may take                       default 3600
 #   EVERY    minutes between a big bound's checkpoints      default 10
+#   JAVA_MEM the JVM's memory flags                         default -Xmx4g
+#   FPMEM    TLC's -fpmem (a share of the box's memory)     default TLC's own
 #
-#   ./run.sh              the small bounds, the reach checks, the probes
-#   ./run.sh big          also the big bounds (each under one hour)
+#   ./run.sh              the small bounds, the reach checks, the probes,
+#                         and the same in the decided form (fd-, after card 0002)
+#   ./run.sh big          also the big bounds (each under one hour; f-quiet-many
+#                         needs JAVA_MEM=-Xmx6g, see the README)
 #   ./run.sh big NAME...  only the named bounds, for example: big s-big c-reach
+#                         (fd-many runs only by name: it takes over an hour,
+#                         so give it a larger LIMIT or resume it)
 #   ./run.sh resume NAME  go on with a big bound from its last checkpoint
 #   ./run.sh mutants      plant every mistake of mutants.txt
 #
@@ -45,12 +51,19 @@ Found:f-quiet:pass Found:f-quiet-crash:pass Found:f-quiet-load:violated
 Found:f-reach:violated Found:f-reach-spread:violated Found:f-live:live
 Selection:c-small:pass Selection:c-move:pass Selection:c-down:pass Selection:c-both:pass
 Selection:c-down2:pass Selection:c-back:pass Selection:c-back-drop:pass
-Selection:c-reach:violated Selection:c-back-reach:violated Selection:c-live:live Selection:c-back-live:live"
+Selection:c-reach:violated Selection:c-back-reach:violated Selection:c-live:live Selection:c-back-live:live
+Found:fd-onebox:pass Found:fd-twobox:pass Found:fd-late:pass Found:fd-late-crash:pass
+Found:fd-small:pass Found:fd-crash:pass Found:fd-crash2:pass Found:fd-homefirst:pass Found:fd-shrink:pass
+Found:fd-four:pass Found:fd-reach:violated Found:fd-reach-late:violated Found:fd-reach-shrink:violated
+Found:fd-reach-spread:violated Found:fd-quiet-load:violated Found:fd-live:live Found:fd-late-live:live Found:fd-two-live:live"
 # Probes: each must FAIL, and the README says what the failure shows.
 PROBES="Settings:s-early:violated Found:f-aswritten:violated Found:f-onebox:violated
-Found:f-many:violated Selection:c-asread:violated"
+Found:f-many:violated Selection:c-asread:violated Found:fd-two-three:violated Found:fd-spread:violated"
 BIG="Settings:s-big:pass HomeRecords:h-two:pass HomeRecords:h-big:pass HomeRecords:h-down2:pass
-Found:f-big:pass Found:f-load:pass Selection:c-big:pass Selection:c-back-down:pass"
+Found:f-big:pass Found:f-load:pass Selection:c-big:pass Selection:c-back-down:pass
+Found:fd-big:pass Found:f-quiet-many:pass Found:fd-many1:pass"
+# Past an hour: run only by name.
+LONG="Found:fd-many:pass"
 
 RESUME=""
 LIST="$SMALL $PROBES"
@@ -58,7 +71,7 @@ if [ "${1:-}" = "big" ]; then LIST="$SMALL $PROBES $BIG"; shift; fi
 if [ "${1:-}" = "resume" ]; then RESUME=yes; LIST="$BIG"; shift; fi
 if [ $# -gt 0 ]; then
   PICK=""
-  for item in $LIST; do
+  for item in $LIST $LONG; do
     rest=${item#*:}; cfg=${rest%%:*}
     for name in "$@"; do [ "$name" = "$cfg" ] && PICK="$PICK $item"; done
   done
@@ -84,7 +97,8 @@ for item in $LIST; do
   if [ "$want" = live ]; then tla="${mod}Live.tla"; more="$more -dump dot $dir/graph.dot"; fi
   t0=$(date +%s)
   # timeout kills the whole process group when the limit passes.
-  (cd "$HERE" && timeout -k 10 "$LIMIT" ${HEAVY:-} java -Xmx4g -XX:+UseParallelGC \
+  [ -n "${FPMEM:-}" ] && more="$more -fpmem $FPMEM"
+  (cd "$HERE" && timeout -k 10 "$LIMIT" ${HEAVY:-} java ${JAVA_MEM:--Xmx4g} -XX:+UseParallelGC \
       -cp "$TLA_JAR" tlc2.TLC -noGenerateSpecTE -workers "$WORKERS" -metadir "$dir/meta" $more \
       -config "$cfg.cfg" "$tla") > "$dir/out.txt" 2>&1
   t1=$(date +%s)

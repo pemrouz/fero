@@ -6,7 +6,8 @@ goal can no longer be reached, or when the "always can finish" check fails.
 
 Environment: TLA_JAR (the tla2tools jar), WORK (a scratch folder, default
 ./target/work), HEAVY (an optional wrapper command), LIMIT (seconds a run
-may take, default 3600), WORKERS (default 2).
+may take, default 3600), WORKERS (default 2), JAVA_MEM (the JVM's memory
+flags, default -Xmx3g), FPMEM (TLC's -fpmem, default TLC's own).
 Usage: mutate.py [id ...]   writes results/mutants.json and results/mutants.md
        mutate.py --report   writes mutants.md again from mutants.json
 """
@@ -17,6 +18,8 @@ WORK = os.path.abspath(os.environ.get("WORK", "./target/work"))
 JAR = os.environ.get("TLA_JAR", "tla2tools.jar")
 HEAVY = os.environ.get("HEAVY", "").split()
 LIMIT = int(os.environ.get("LIMIT", "3600"))
+MEM = os.environ.get("JAVA_MEM", "-Xmx3g").split()
+FPMEM = os.environ.get("FPMEM", "")
 sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import agef
@@ -29,6 +32,9 @@ PLAN = {
     "Found": (["f-small", "f-crash", "f-homefirst", "f-quiet", "f-four"], ["f-reach"], ["f-live"]),
     "Selection": (["c-small", "c-move", "c-down", "c-back"], ["c-reach"], ["c-live", "c-back-live"]),
 }
+# The mistakes whose id starts with d: Found in the decided form (after card 0002).
+DPLAN = (["fd-onebox", "fd-twobox", "fd-small", "fd-crash", "fd-shrink", "fd-late", "fd-four"],
+         ["fd-reach", "fd-reach-late"], ["fd-live", "fd-late-live"])
 
 def run(cmd, folder):
     """Run one TLC; on a timeout kill its whole process group."""
@@ -45,8 +51,10 @@ def run(cmd, folder):
 def tlc(folder, module, cfg, dump=None):
     meta = os.path.join(folder, "meta-" + cfg)
     shutil.rmtree(meta, ignore_errors=True)
-    cmd = HEAVY + ["java", "-Xmx3g", "-XX:+UseParallelGC", "-cp", JAR, "tlc2.TLC", "-noGenerateSpecTE",
+    cmd = HEAVY + ["java"] + MEM + ["-XX:+UseParallelGC", "-cp", JAR, "tlc2.TLC", "-noGenerateSpecTE",
                    "-workers", os.environ.get("WORKERS", "2"), "-metadir", meta]
+    if FPMEM:
+        cmd += ["-fpmem", FPMEM]
     if dump:
         cmd += ["-dump", "dot", dump]
     cmd += ["-config", cfg + ".cfg", module + ".tla"]
@@ -114,7 +122,7 @@ def main():
     for mid, module, rule, old, new, note in rows_of(want):
         folder = os.path.join(WORK, "mutants", mid)
         plant(module, rule, old, new, folder)
-        safety, reach, lives = PLAN[module]
+        safety, reach, lives = DPLAN if mid[0] == "d" else PLAN[module]
         row = dict(id=mid, model=module, rule=rule, note=note, caught=False, by=None, runs=[])
         for cfg in safety:
             r = tlc(folder, module, cfg)
@@ -160,7 +168,7 @@ def report(rows, out):
         f.write("# Planted mistakes\n\nMade by `mutate.py` from `mutants.txt`. "
                 "A mistake is caught when a property fails on a bound, when a reach goal "
                 "can no longer be reached, or when the \"always can finish\" check fails.\n")
-        real = [r for r in rows if r["id"][0] != "x"]
+        real = [r for r in rows if r["id"][0] in "shfc"]
         n = sum(r["caught"] for r in real)
         pct = f" ({100 * n // len(real)} %)" if real else ""
         f.write(f"\n**{n} of {len(real)} caught{pct}.**\n")
@@ -176,6 +184,17 @@ def report(rows, out):
                 f.write(f"| {r['id']} | `{r['rule']}` | {r['note']} | "
                         f"{r['by'] or '**not caught**'} | {len(r['runs'])}, {secs} s |\n")
             print(f"{title}: {k} of {len(part)} caught")
+        later = [r for r in rows if r["id"][0] == "d"]
+        if later:
+            k = sum(r["caught"] for r in later)
+            f.write(f"\n## Found in the decided form, after card 0002: {k} of {len(later)} caught\n\n"
+                    "Way B and the new reading of `slot-move.22` (Fewer = \"every\"), on the fd- bounds. "
+                    "Counted apart from the total above.\n\n" + head)
+            for r in later:
+                secs = sum(x["secs"] for x in r["runs"])
+                f.write(f"| {r['id']} | `{r['rule']}` | {r['note']} | "
+                        f"{r['by'] or '**not caught**'} | {len(r['runs'])}, {secs} s |\n")
+            print(f"decided form: {k} of {len(later)} caught")
         probes = [r for r in rows if r["id"][0] == "x"]
         if probes:
             k = sum(not r["caught"] for r in probes)
