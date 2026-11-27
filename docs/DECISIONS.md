@@ -129,3 +129,16 @@ Decision: the texts change as card 0002 lists them.
 REJECTED: going through each fix alone (each is what a model needed, and none changes a count); holding them until slices 2 and 3.
 
 Consequences: the records' evidence names the models. `growth.5` moves from slice 3 to slice 2: founding with several groups in slice 2 makes its groups by these records, and a rule fero adds goes on at first use ([spec/README](../spec/README.md)). Slice 2 then holds 136 records, inside its 5 % headroom of 138.
+
+## V5-34 — The slot table row comes before the fence, and the source reopens first (2026-11-27; card 0002 questions 2 and 3, asked one at a time)
+
+Context: `slot-table.4` said the target writes the slot's row "before it serves the slot", which allows the row before the fence or inside the window. The model ran only "before the fence": the home group writes the move's row when it starts the move, and the fence needs that row committed (`RowFirst` holds on every bound; mistake t01 fails it in 3 steps) *(checked)*. Inside the window, the home group's commit would sit in the window too *(reasoned)*. With the row first, slot-move.21's case, a target that has not written the row, never meets a fence. And `slot-table.5` made the source wait for the home group before it reopens a slot whose move was given up. With the home group down, 998 of 6,688 states are stuck (bound s-strict). With the reopen first, 0 of 8,000 are (s-lazy), and every safety property holds (lazy, big-lazy, msg-rec-lazy) *(checked)*.
+
+Decision:
+1. `slot-table.4`: the source fences a slot only for a move whose row, naming the target, has committed in the home log's slot table.
+2. `slot-table.5`: once the target's abort has committed, the row goes back to the source when the home group answers, and the source's reopen does not wait for it, unless the give-up was marked lost (V5-36).
+3. slot-move.21 is retired. In its place, `slot-move.23`: a target that gave a move up answers writes with moved and names the source, so a writer still finds the slot while the table names that target (mistake m21, caught by the stall check).
+
+REJECTED: keeping `slot-table.4` open (the other reading would need its own model, and it puts the home group in the window); keeping `slot-table.5` as written (the table is exact whenever a slot is served, but a slot can wait for the home group for a whole outage).
+
+Consequences: V5-18 pick 6's give-up without the home group now comes from the reopen going first, not from a target that never wrote the row. For a while the table may name a target that gave up. This decision retires one record and adds one, so the count does not change. Open: under `slot-table.6` a client keeps only the newest row. The moved answer of `slot-move.23` names the source, whose row is older than the one naming the target. So that answer must carry a row the client takes; which version it carries is not decided, and neither model has versioned routes together with a give-up *(reasoned)*. It is on [NOTES](../spec/NOTES.md) and [SHAPES](../spec/SHAPES.md) question 31.

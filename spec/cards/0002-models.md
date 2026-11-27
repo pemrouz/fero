@@ -42,16 +42,16 @@ Each fix below makes a record say what the model needed for a property to hold. 
 
 ## 2. When the target writes the slot table row
 
-`slot-table.4` says the target writes the row "before it serves the slot". That allows the row before the fence, or inside the window. The model ran only "before the fence". Inside the window the home group's commit sits in the window: three commits in place of one, and a home group that goes down blocks the open *(reasoned, not run)*. With the row first, a target "that has not written the row" never meets a fence, so `slot-move.21` never applies.
+`slot-table.4` says the target writes the row "before it serves the slot". That allows the row before the fence, or inside the window. The model ran only "before the fence". Inside the window the home group's commit sits in the window: three commits in place of one, and a home group that goes down blocks the open *(reasoned, not run)*. With the row first, a target "that has not written the row" never meets a fence, so slot-move.21 never applies.
 
-- **A (recommended):** the row is written before the fence. `slot-move.21` is retired or replaced (see question 3).
+- **A (recommended):** the row is written before the fence. slot-move.21 is retired or replaced (see question 3).
 - **B:** keep the wording open. The other reading then needs its own model run.
 
 ## 3. Giving a move up while the home group is down
 
 As written (`slot-table.5`), after a move is given up the row goes back to the source before the source reopens the slot. That needs the home group. With the home group down, 998 of 6,688 states are stuck: the slot takes no writes anywhere until the home group returns.
 
-- **A (recommended): the source reopens first.** The row goes back when the home group answers. No state is stuck (0 of 8,000), and every safety property holds. For a while the table names a target that gave up, so that target answers `moved` and names the source: this sentence replaces `slot-move.21`. One exception stays: after a recovery has lost the target's data, the source waits for the home group, because only the home log can give the new epoch.
+- **A (recommended): the source reopens first.** The row goes back when the home group answers. No state is stuck (0 of 8,000), and every safety property holds. For a while the table names a target that gave up, so that target answers `moved` and names the source: this sentence replaces slot-move.21. One exception stays: after a recovery has lost the target's data, the source waits for the home group, because only the home log can give the new epoch.
 - **B: keep it as written.** The table is exact whenever a slot is served, and a slot can wait for the home group.
 
 ## 4. One commit in the window

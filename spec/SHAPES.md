@@ -734,6 +734,7 @@ Each closes by a model, a probe of slice 0, a timing in slice 1, or an owner's c
 | 28 | The fields of `DOOR` and `DIAG`; how a frame sits in a WebSocket message; what TLS changes in "encode once" | One frame per WebSocket message; the rest not drafted | Slice 1b's TLS timing; slice 7 |
 | 29 | The text of an attempt id; a tighter cursor for runs of slots | Session in hex, a dash, the call id; no run packing | Slice 1; the read-cost timing |
 | 30 | Does a mark name its reader as text in every record, or by a number set once? | Text | E-61's three rules in slice 1; the counted pin on bytes per record |
+| 31 | Does a `moved` answer, and an `END` with code `moved`, carry the slot's row and its version, so that a client that keeps only the newest row (`slot-table.6`) takes it? Which version does a target that gave a move up name (`slot-move.23`)? | Not drafted | A model of versioned routes with a give-up, slice 3 |
 
 ## 13. What this page did not do
 
