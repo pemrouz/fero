@@ -38,3 +38,4 @@ V5-1 to V5-24 are on the `design` branch. Decisions made from here on are append
 - **V5-34** (2026-11-27): card 0002 questions 2 and 3. A move's row commits in the slot table before the source fences; after a give-up the source reopens first, and the row goes back when the home group answers. slot-move.21 is retired for `slot-move.23`.
 - **V5-35** (2026-11-27): card 0002 question 4. The window holds one commit: the target takes writes behind its final copy once the copy is in its log, and reads wait for its commit.
 - **V5-36** (2026-11-27): card 0002 questions 5 and 6. Nine records are added: a recovery in the middle of a move, the next move, older moves and whole selections. Slice 3's budget goes to 58; the ledger is 832 records.
+- **V5-37** (2026-11-27): card 0002 question 7. A write does not name its settings version; the property is dropped. No ledger change.

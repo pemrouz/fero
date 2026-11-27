@@ -175,3 +175,13 @@ Decision:
 REJECTED: the smaller way for a recovery (reasoned only; a model would come first); leaving the recovery until slice 3 starts; accepting the five records but looking for cuts first; not taking them now.
 
 Consequences: slice 3 holds 57 records, 55 to 79 at low and high, once `growth.5` has moved to slice 2 (V5-33). L1 holds 227 records against a cap of 228 with headroom, so its next record needs a card. `slot-table.8` also holds two lines a second reader found are rules (the slot-move model's extra mistakes f11, f12), which show only with a recovery. A move whose target has had a new life needs no rule of its own "has not ended": `slot-table.11` covers it (u08 not caught). The recovery rules were shaped on data groups only: the home group's own recovery, and a slot that moved on to a third group, are not modelled, and their evidence says partial model. A recovery lands in slice 2 (`recover.3`) but the epoch rules in slice 3; what a slice 2 recovery does to the epoch is on [NOTES](../spec/NOTES.md). [SHAPES](../spec/SHAPES.md) now says the epoch rises at a recovery that may have lost records, not at a move (`slot-sequence.2`), and question 32 asks how a picture lists the slots it handed off.
+
+## V5-37 — A write does not name its settings version (2026-11-27; card 0002 question 7, asked one at a time)
+
+Context: the founding brief asked that a write sent under settings a group has not taken up be refused. No ledger rule does that, and the model can hold it only with a new field on every write, the settings version its sender holds (mistake s09) *(checked)*.
+
+Decision: the property is dropped. An alter is answered only once every group has taken it up (`meta-catalog.5`), so a client that waits for the answer never writes ahead of a group.
+
+REJECTED: a new field on every write and a rule to send a write back from a group that is behind (+1 record in slice 2).
+
+Consequences: a client that learns a new settings version some other way, before the alter is answered, may write under it to a group that is behind; that group judges the write under the settings it has *(reasoned)*. No ledger change.
