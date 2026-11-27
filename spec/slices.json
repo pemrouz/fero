@@ -61,9 +61,9 @@
   "name": "groups that heal",
   "adds": "Membership changes, learners, snapshots and leader transfer in use (their Raft rules are on from slice 1, with the port), healing, the hand-back, growth from one voter, a clean stop, the watchdog, the soft directory, founding with a candidate id, local snapshots and log trimming, repair from a peer, the operator's recover command, health in full.",
   "rules": {
-   "records": 135,
-   "low": 133,
-   "high": 175
+   "records": 136,
+   "low": 134,
+   "high": 178
   },
   "models": [
    "E-51",
@@ -92,8 +92,8 @@
   "name": "slot move",
   "adds": "The slot move in one commit, the slot table in the home log, the carried set, the grow rule by size and load, clients that learn new routes, the fold's rules for a moved slot.",
   "rules": {
-   "records": 49,
-   "low": 49,
+   "records": 48,
+   "low": 48,
    "high": 59
   },
   "models": [

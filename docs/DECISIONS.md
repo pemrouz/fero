@@ -109,3 +109,23 @@ Decision:
 REJECTED: short runs judged on one core (46 minutes, over the line); full suites every night (6.5 hours); fields as switches but not the marker's own off branches (78.0 %, a kill); BUILD's list as written (75.6 %, a kill, and the fallback of rule ids typed on tests, which go stale by hand).
 
 Consequences: `proof` in spec/README.md is `switch` by this test. The quiet machine runs the nightly pass on several cores. The projection rests mostly on nine TypeScript rules of a study prototype; one of them nearly loops when it is off and doubles the mean. It is measured again on `server/` once it exists. On that sample the pass proved 5 of 9 TypeScript rules, under T4's gate of 85 % *(measured)*. A kernel crate that uses `rule` needs its "no outside crates" test to allow the workspace's own `rule` crate. P6 also found five Raft records that the port does not hold because they are the host's duty (`raft-readindex.4`, `raft-snapshot.1`, `.4`, `.5`, `.8`); STATUS lists them for slice 1.
+
+## V5-33 — The models' text fixes that add no rule are taken (2026-11-27; card 0002 question 1, asked one at a time)
+
+Context: slice 0 ran two models the design owed: the slot move in one commit ([models/slot-move](../models/slot-move/README.md)) and founding with several groups ([models/founding](../models/founding/README.md)). A second reader checked each. The card's eleven rows change twelve records, so that each says what the models needed for a property to hold. Most fixes have a planted mistake that fails without them *(checked)*. `slot-move.3` names what every bound already used, and `slot-move.12`, `.16` and `.17` drop what no property needs. None adds a record.
+
+Decision: the texts change as card 0002 lists them.
+1. `meta-catalog.5`: a group takes up a settings version only once the home log has committed it, and an alter counts only take-ups that have committed (mistakes s01 to s05).
+2. `slot-table.6`: the table, every copy and every client keep only the newest row of a slot; a row's version is its number in the home log, then its step (u51, h03, h12, h13). `route-smart.1` says the same for a client on `moved`: it takes the new owner only from a newer row (h13).
+3. `genesis-conditional-create.4` and `.8`: the founding entry holds the slot table for every group and applies no seed row of another group's slots; each group opens only its own share and applies its own seed rows (f10 to f12). The home group may apply its own share in the first entry (bound f-homefirst holds).
+4. `growth.5`: the group record is written once, and only the machine it names makes the group (f06, f07, f21). Who it names is V5-38.
+5. `selection.1`: a whole selection is ready only once a picture covers every slot (probe c-asread, c12).
+6. `slot-move.3`: a move is named by the number of its row in the slot table.
+7. `slot-move.12`: the target reports where its copy reached (u42). That the source waits for the report is a speed choice, not a rule: every property holds without it.
+8. `slot-move.13`: the fence names where the delta starts, and the target takes the final copy only if its early copy stands there (u28, u29).
+9. `slot-move.17` and `.16`: only the target gives a move up, and it may do so before the fence too (m23); `.16` keeps only "a target that gave a move up drops its unseen copy".
+10. `slot-move.22`: voters are counted in the newest membership in the leader's log, committed or not (n09). V5-39 adds to it.
+
+REJECTED: going through each fix alone (each is what a model needed, and none changes a count); holding them until slices 2 and 3.
+
+Consequences: the records' evidence names the models. `growth.5` moves from slice 3 to slice 2: founding with several groups in slice 2 makes its groups by these records, and a rule fero adds goes on at first use ([spec/README](../spec/README.md)). Slice 2 then holds 136 records, inside its 5 % headroom of 138.
