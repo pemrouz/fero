@@ -185,3 +185,13 @@ Decision: the property is dropped. An alter is answered only once every group ha
 REJECTED: a new field on every write and a rule to send a write back from a group that is behind (+1 record in slice 2).
 
 Consequences: a client that learns a new settings version some other way, before the alter is answered, may write under it to a group that is behind; that group judges the write under the settings it has *(reasoned)*. No ledger change.
+
+## V5-38 — A new group's first voter is the machine that leads the fewest groups (2026-11-27; card 0002 question 8, asked one at a time)
+
+Context: as written, `growth.5`, `handback.5` and `handback.6` make the founder's machine the preferred member of every group, against `move-policy.6` (probe f-aswritten) *(checked)*. Way A, an exception in `handback.5`, fails with four groups on four machines (probe f-many) *(checked)*. Way B, naming another machine as first voter, held up to three groups *(checked)*; its four-group run had run out of memory on the shared machine. The owner chose way B once it held with four groups. It does: on four machines with four groups every property holds, `SpreadEven` too, on 6,328,888 states (bound f-quiet-many, with more memory) *(checked)*.
+
+Decision: way B. `growth.5`'s record names as first voter the listed machine that is first voter or preferred member of the fewest groups. `handback.5` and `.6` keep their text. `move-policy.6` keeps only "a new group's placement is picked by load and memory": its clause about the busy group's leader's machine would contradict `growth.5` when that machine leads the fewest groups, and way B now picks the first voter.
+
+REJECTED: way A amended so the placement also looks at who leads what (not modelled); deciding after more runs.
+
+Consequences: no record makes the group record wait for machines to come. Waiting for `Copies` machines stalls one machine (V5-39), and no property needs a shorter wait. So if the records are written before the other machines are listed, the usual start, they name the founder's machine, and it stays the preferred member of those groups: the outcome V5-38 was chosen to avoid (probe fd-spread) *(checked)*. When every machine is there first, the leaders are spread *(checked)*. Spreading them after the founding race is left to the move policy, and is on [NOTES](../spec/NOTES.md). With V5-39's count the same world holds with one slot (fd-many1); with four slots the run did not finish in an hour, and no property had failed *(measured)*.
