@@ -195,3 +195,17 @@ Decision: way B. `growth.5`'s record names as first voter the listed machine tha
 REJECTED: way A amended so the placement also looks at who leads what (not modelled); deciding after more runs.
 
 Consequences: no record makes the group record wait for machines to come. Waiting for `Copies` machines stalls one machine (V5-39), and no property needs a shorter wait. So if the records are written before the other machines are listed, the usual start, they name the founder's machine, and it stays the preferred member of those groups: the outcome V5-38 was chosen to avoid (probe fd-spread) *(checked)*. When every machine is there first, the leaders are spread *(checked)*. Spreading them after the founding race is left to the move policy, and is on [NOTES](../spec/NOTES.md). With V5-39's count the same world holds with one slot (fd-many1); with four slots the run did not finish in an hour, and no property had failed *(measured)*.
+
+## V5-39 — With fewer machines than copies, a group opens anyway (2026-11-27; card 0002 question 9, asked one at a time)
+
+Context: `slot-move.22` said no slot opens in a group with fewer voters than the copies setting. On one machine with copies 3 no slot ever opens (probe f-onebox) *(checked)*, against `open.8` (a solo node is the only voter of its groups) and `genesis-conditional-create.7` (a one-box id is a real founding).
+
+Decision:
+1. `slot-move.22` counts voters against the copies setting, or against the resource's machines when it has fewer. The resource's machines are every machine the leader may place a copy on, and every machine that any group's stored placement names, up or down, so a group that loses a voter does not open early. Each part is needed: with it taken out, a property fails in 6 to 17 steps (founding mistakes d01 to d05, d10) *(checked)*.
+2. The growth rules follow, or a group on two machines keeps one voter and never opens (probe fd-two-three) *(checked)*. `growth.1`: a placement names every listed machine while fewer than three are listed, and is written again as machines come (d07). `growth.2`: healing rests a group at two voters while the resource has two machines, and grows it again when a machine comes (d08). `growth.3` keeps two voters on two machines *(reasoned)*.
+
+One, two and three machines, a machine that comes later, and a group that shrinks all hold (bounds fd-onebox, fd-twobox, fd-late, fd-shrink and 9 more) *(checked)*.
+
+REJECTED: limiting the rule to a new group of a growing resource (it would leave a group that shrinks below copies on a big resource unchecked by this rule) *(reasoned)*.
+
+Consequences: a leader counts only the machines it can see. So in a founding race on three machines, the home group can open and take a write with one copy before the other two have taken up the id (founding's second reader, on fd-small's world) *(checked)*. Under the old reading this could not happen. A machine that holds the id and is down, and that no placement names yet, is not counted either. Both are on [NOTES](../spec/NOTES.md) for the owner. A leader knows other groups' placements through the home records' members, which the model reads directly *(reasoned)*.

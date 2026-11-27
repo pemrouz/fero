@@ -40,3 +40,4 @@ V5-1 to V5-24 are on the `design` branch. Decisions made from here on are append
 - **V5-36** (2026-11-27): card 0002 questions 5 and 6. Nine records are added: a recovery in the middle of a move, the next move, older moves and whole selections. Slice 3's budget goes to 58; the ledger is 832 records.
 - **V5-37** (2026-11-27): card 0002 question 7. A write does not name its settings version; the property is dropped. No ledger change.
 - **V5-38** (2026-11-27): card 0002 question 8. Way B: a new group's first voter is the machine that is first voter or preferred member of the fewest groups. It holds with four groups on four machines.
+- **V5-39** (2026-11-27): card 0002 question 9. With fewer machines than copies a group opens with every machine there and grows as more come; the growth rules follow. In a founding race a slot can then take a write with one copy (spec/NOTES B).

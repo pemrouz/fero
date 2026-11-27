@@ -63,7 +63,7 @@
   "rules": {
    "records": 136,
    "low": 134,
-   "high": 180
+   "high": 181
   },
   "models": [
    "E-51",
@@ -94,7 +94,7 @@
   "rules": {
    "records": 57,
    "low": 55,
-   "high": 77
+   "high": 79
   },
   "models": [
    "the full one-commit move model at 85 % (READY M6): models/slot-move; its first two models pass, its members model is at 62 % and owed",
