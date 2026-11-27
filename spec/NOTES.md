@@ -38,10 +38,10 @@ One rule has one home. Where two layers held the same rule, one record stays.
 - **Three rules are the operator's** (`cluster-credentials.10` to `cluster-credentials.12`). No code can carry their id; their `proof` says so.
 - **Four rules had no home and were added:** `access-rules.1`, `stream-rows.2`, `healing-self.20`, `shape-version.1`.
 - **Four more were added from the decisions:** `derive-view.12` and `emit-fold.6` (the bucket limit, V5-20 item 10), `scan.17` (the verb on the surface, V5-20 item 4), `write-surface.15` (no bare mark and no claim for a client of a resource with methods, V5-17 item 13). `derive-view.9` now also holds the bump addressed to a group (GROUPS V6).
-- **Low has one meaning.** Low is 0 only where a named other record may already hold the rule. 9 records are so; 158 others that were at low 0 to match the study pages' ranges went to 1. Which 9 is this page's reading.
+- **Low has one meaning.** Low is 0 only where a named other record may already hold the rule. 9 records were so then, and 11 are now: V5-35 and V5-36 add `slot-move.1` and `slot-move.8`. 158 others that were at low 0 to match the study pages' ranges went to 1. Which 9 is this page's reading.
 - **High is over 1 where one sentence may hide more than one rule.** 34 records that join two rules in one sentence were raised; `methods.10` holds three. The pick of those 34 is a reading.
 - **A partial model is marked.** 26 records are known by a model of a smaller or an older form of the rule; their evidence starts with "partial model:".
-- **23 ids are retired** ([retired.json](retired.json)): five dropped as repeats when the layers were put together, and 18 replaced by `stream-numbers.1` to `.11` (V5-30).
+- **24 ids are retired** ([retired.json](retired.json)): five dropped as repeats when the layers were put together, 18 replaced by `stream-numbers.1` to `.11` (V5-30), and slot-move.21, replaced by `slot-move.23` (V5-34).
 - **Records that sit in a layer other than their mechanism's:** `srchi-marks.1` is L5, `srchi-marks.15` is L4 and `scan.17` is L4. The layer is a field, not part of the id.
 
 ## Open questions
@@ -51,6 +51,10 @@ Each needs a pick before its slice. None blocks the budget card.
 **For the owner** (the budget card was answered as V5-25)
 
 A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as after the first build, each with its reason: P-06's `none` rung and PERF-03; P-18 and TEST-06 (forks); OPS-07 (restore); F-18 (the slow-leader rule; the watchdog of slice 2 covers a stuck main thread only, *reasoned*); OPS-13 (erase, no rule yet). F-12's recover command is built in slice 2: `recover.1` to `recover.3` hold the command, beside `meta-directory.2`, `meta-directory.3`, `meta-directory.7` and `slot-table.7` (slice 3, with slot epochs).
+
+B. **From V5-39.** A leader counts only the machines it can see. So in a founding race on three machines, the home group can open and take a write with one copy before the other two have taken up the id *(checked: founding, on `fd-small`'s world)*. A machine that holds the id and is down, and that no placement names yet, is not counted either. Should a resource founded for several machines wait for them, and how would a leader know?
+
+C. **From V5-38.** A group record written before the other machines are listed names the founder's machine, which stays the preferred member of that group (probe `fd-spread`). Is spreading the leaders after a founding race the move policy's job, and by which rule?
 
 **Slices**
 
@@ -92,7 +96,17 @@ A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as
 
 **Evidence that is owed**
 
-30. The one-commit slot move has its model ([models/slot-move](../models/slot-move/README.md)), but not every part of it reaches the bar. The first two models catch 91 % and 86 % of their planted mistakes; the third, one group with its members, catches 62 %, against a bar of 85 %. A voter added while a member is down did not finish within an hour. The records it asks to change (`slot-move.7`, `.12`, `.13`, `.17`, `.21`, `.22`, `slot-table.4`, `.5`, `.7`) keep their old evidence until the owner decides. `slot-move.2`, `.9`, `.10`, `.16` and `.20` have no caught mistake: the model holds them by its shape, or has no line for them.
+30. The owner decided card 0002 (V5-33 to V5-39), and the records carry the models' evidence. Still owed, or open:
+    - The slot move's third model, one group with its members, catches 62 % of its planted mistakes, against a bar of 85 %; a voter added while a member is down did not finish within an hour. Both need a bigger machine.
+    - `slot-move.2`, and the source's check that its own fence has committed before it reopens (mistake m15), hold in every model, but no planted mistake on them is caught. Do they count as rules? Slice 3's review.
+    - The source's wait for the target's ready report is a speed choice, not a rule (V5-33). It is the knob for SC-08(b)'s 10 ms window.
+    - Which row version a moved answer carries, so that a client that keeps only the newest row (`slot-table.6`) takes it, also from a target that gave a move up (`slot-move.23`, whose answer names an older owner). Neither model has versioned routes together with a give-up. SHAPES question 31.
+    - The recovery rules (`slot-table.8` to `.11`) were run on data groups only: the home group's own recovery, and a slot that moved on to a third group, are not modelled.
+    - A recovery lands in slice 2 (`recover.3`), but `slot-table.7`, `.9` and `.10` apply from slice 3. What a slice 2 recovery does to a slot's epoch is not said.
+    - A move with the home group down, and a move in two steps, in the founding model's row 2.
+    - V5-37's gap: a client that learns a new settings version before the alter is answered may write under it to a group that is behind.
+    - Founding's selection model keeps one store per client, so "no row shown twice" is assumed there, not checked.
+    - `growth.3`'s two-machine case, and how a leader knows other groups' placements (through the home records' members), are reasoned (V5-39).
 31. The merger's rules (`merger.6` to `merger.11`) were run on the three-step move.
 32. The saga's fences were modelled with locks and sagas in one group.
 33. `ws-listener.1` to `ws-listener.3` are readings; no source words them.
@@ -101,8 +115,8 @@ A. **Answered: V5-26.** The MUSTs the first build does not reach are restated as
 **The pages**
 
 35. **Settled by V5-27.** Servers run on Linux from slice 1; macOS and Windows servers come in slice 7.
-36. [SHAPES.md](SHAPES.md) section 12 lists 30 open questions on bytes. It marks `SNAPSHOT` and `TIMEOUT-NOW` as first sent in slice 2, though their Raft rules are on from slice 1 (question 1). Two are conflicts in the record: whether a batch or a record is one Raft entry, and the two meanings of `busy`. Two need a card: the value's encoding, and one shared log against a journal plus segments.
-37. The budget: see [cards/0001-budget.md](cards/0001-budget.md).
+36. [SHAPES.md](SHAPES.md) section 12 lists 32 open questions on bytes. It marks `SNAPSHOT` and `TIMEOUT-NOW` as first sent in slice 2, though their Raft rules are on from slice 1 (question 1). Two are conflicts in the record: whether a batch or a record is one Raft entry, and the two meanings of `busy`. Two need a card: the value's encoding, and one shared log against a journal plus segments.
+37. The budget: see [cards/0001-budget.md](cards/0001-budget.md), and [cards/0002-models.md](cards/0002-models.md) for slice 3 at 58 (V5-36).
 
 **Decision fields**
 
