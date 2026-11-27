@@ -142,3 +142,17 @@ Decision:
 REJECTED: keeping `slot-table.4` open (the other reading would need its own model, and it puts the home group in the window); keeping `slot-table.5` as written (the table is exact whenever a slot is served, but a slot can wait for the home group for a whole outage).
 
 Consequences: V5-18 pick 6's give-up without the home group now comes from the reopen going first, not from a target that never wrote the row. For a while the table may name a target that gave up. This decision retires one record and adds one, so the count does not change. Open: under `slot-table.6` a client keeps only the newest row. The moved answer of `slot-move.23` names the source, whose row is older than the one naming the target. So that answer must carry a row the client takes; which version it carries is not decided, and neither model has versioned routes together with a give-up *(reasoned)*. It is on [NOTES](../spec/NOTES.md) and [SHAPES](../spec/SHAPES.md) question 31.
+
+## V5-35 — The window holds one commit (2026-11-27; card 0002 question 4, asked one at a time)
+
+Context: the move is called one commit, and the 10 ms bar rests on one commit in the window: E-13 timed one commit at 4.56 ms and two at 12.77 ms at p99 *(measured there)*. As written the window held two: the fence commits, then the final copy commits, and only then did the target take a write. The model's mistake k01 moves the write guard from the committed log to the log end. It is caught on no bound: every property holds with it, the reach goals stay reachable and the stall checks find nothing *(checked)*. With a recovery it holds too (extra mistake f15). Once decided, the three models ran the change as a switch, `OneCommit`, on 70 bounds: 53 safety bounds pass, the largest of 11,658,335 states; 15 reach goals are reached; and the 2 stall checks find no stuck state, with the home group down too *(checked)*.
+
+Decision:
+1. `slot-move.7`: the target takes writes to the slot behind its final copy as soon as the copy is in its log; reads of the slot wait for the copy's commit. A writer's answer waits for its own write's commit, as `slot-table.2` says.
+2. `slot-table.1`: a group takes a write only for a slot its log holds open, committed or not. Otherwise it answers retry while it is the target of a move it has not given up, and moved in every other case.
+3. Two records follow from the same guard: `slot-move.9` (a target that has not given the move up answers retry until the final copy is in its log) and `slot-move.20` (the source takes writes again as soon as its reopen is in its log).
+4. `slot-move.1` (the source takes no write once its fence is in its log) is now the same line in the models as `slot-table.1`, so it may fold into it (low 0).
+
+REJECTED: keeping two commits and looking at the 10 ms bar again.
+
+Consequences: reads from an uncommitted tail are not modelled, so reads keep waiting for commits, and `slot-move.7`'s evidence says partial model. A write behind an uncommitted final copy can be lost with it if the leader changes. Its writer then gets no answer and sends it again, as for any write *(reasoned)*. `slot-move.2`, and the check that the source's own fence has committed before it reopens (m15), hold in every model, but no planted mistake on them is caught. Whether each still counts as a rule is a question for slice 3's review.
